@@ -24,7 +24,7 @@ interface Player : PropertiesContainer, Releaseable {
     /**
      * @param data Array to store [channels][points] waveforms of oscilloscope
      * @param points Points per channel
-     * @return Count of actually stored channels
+     * @return Packed layout of stored channels, see [app.zxtune.playback.ScopeLayout]
      */
     fun scope(data: ShortArray, points: Int): Int
 

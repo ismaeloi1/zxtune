@@ -5,6 +5,7 @@ import android.os.IBinder;
 import android.os.RemoteException;
 
 import app.zxtune.Log;
+import app.zxtune.playback.ScopeLayout;
 import app.zxtune.playback.Visualizer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -49,12 +50,13 @@ public final class VisualizerProxy {
         if (scopeBuffer.length != data.length * 2) {
           scopeBuffer = new byte[data.length * 2];
         }
-        final int channels = delegate.getScope(scopeBuffer, points);
+        final int layout = delegate.getScope(scopeBuffer, points);
+        final int channels = ScopeLayout.channelsOf(layout);
         ByteBuffer.wrap(scopeBuffer, 0, channels * points * 2)
             .order(ByteOrder.nativeOrder())
             .asShortBuffer()
             .get(data, 0, channels * points);
-        return channels;
+        return layout;
       } catch (DeadObjectException e) {
         throw new IllegalStateException(e);
       } catch (RemoteException e) {
@@ -90,12 +92,13 @@ public final class VisualizerProxy {
         if (scopeBuffer.length != data.length / 2) {
           scopeBuffer = new short[data.length / 2];
         }
-        final int channels = delegate.getScope(scopeBuffer, points);
+        final int layout = delegate.getScope(scopeBuffer, points);
+        final int channels = ScopeLayout.channelsOf(layout);
         ByteBuffer.wrap(data)
             .order(ByteOrder.nativeOrder())
             .asShortBuffer()
             .put(scopeBuffer, 0, channels * points);
-        return channels;
+        return layout;
       } catch (Exception e) {
         Log.w(TAG, e, "getScope()");
       }

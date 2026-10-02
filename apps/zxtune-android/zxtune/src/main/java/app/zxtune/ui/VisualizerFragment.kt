@@ -1,6 +1,7 @@
 package app.zxtune.ui
 
 import android.content.Context
+import android.graphics.Color
 import android.os.Bundle
 import android.support.v4.media.session.PlaybackStateCompat
 import android.view.LayoutInflater
@@ -59,6 +60,7 @@ class VisualizerFragment : Fragment() {
         MediaModel.of(requireActivity()).run {
             analyzer = view.findViewById(R.id.spectrum)
             oscilloscope = view.findViewById(R.id.oscilloscope)
+            val coverArtView = view.findViewById<ImageView>(R.id.coverart)
             val modeButton = view.findViewById<ImageButton>(R.id.visualizer_mode)
             val fullscreenButton = view.findViewById<ImageButton>(R.id.visualizer_fullscreen)
             fullscreenButton.setOnClickListener {
@@ -132,6 +134,9 @@ class VisualizerFragment : Fragment() {
                         fullscreenButton.isVisible = it == State.OSCILLOSCOPE
                         modeButton.isVisible = it.isVisible
                         val isScope = it == State.OSCILLOSCOPE
+                        // oscilloscope is displayed on black background instead of cover art
+                        coverArtView.isVisible = !isScope
+                        view.setBackgroundColor(if (isScope) Color.BLACK else Color.TRANSPARENT)
                         modeButton.setImageResource(
                             if (isScope) R.drawable.ic_spectrum else R.drawable.ic_oscilloscope
                         )
@@ -141,12 +146,11 @@ class VisualizerFragment : Fragment() {
                     }
                 }
                 launch {
-                    val imageView = view.findViewById<ImageView>(R.id.coverart)
                     coverArt.collectIndexed { idx, src ->
                         if (0 == idx) {
-                            src.applyTo(imageView)
+                            src.applyTo(coverArtView)
                         } else {
-                            imageView.withFadeout {
+                            coverArtView.withFadeout {
                                 src.applyTo(it)
                             }
                         }
