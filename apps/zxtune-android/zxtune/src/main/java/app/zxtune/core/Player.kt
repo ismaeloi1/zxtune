@@ -22,6 +22,13 @@ interface Player : PropertiesContainer, Releaseable {
     fun analyze(levels: ByteArray): Int
 
     /**
+     * @param data Array to store [channels][points] waveforms of oscilloscope
+     * @param points Points per channel
+     * @return Count of actually stored channels
+     */
+    fun scope(data: ShortArray, points: Int): Int
+
+    /**
      * Render next result.length bytes of sound data
      *
      * @param result Buffer to put data

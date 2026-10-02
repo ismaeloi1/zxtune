@@ -5,4 +5,6 @@ import app.zxtune.playback.Visualizer
 
 internal class PlaybackVisualizer(private val player: Player) : Visualizer {
     override fun getSpectrum(levels: ByteArray) = player.analyze(levels)
+
+    override fun getScope(data: ShortArray, points: Int) = player.scope(data, points)
 }

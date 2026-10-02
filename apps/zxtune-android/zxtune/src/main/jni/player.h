@@ -31,6 +31,7 @@ namespace Player
 
     virtual uint_t GetPosition() const = 0;
     virtual uint_t Analyze(uint_t maxEntries, uint8_t* levels) const = 0;
+    virtual uint_t GetScope(uint_t maxChannels, uint_t points, int16_t* data) const = 0;
 
     virtual bool Render(uint_t samples, int16_t* buffer) = 0;
     virtual void Seek(uint_t frame) = 0;

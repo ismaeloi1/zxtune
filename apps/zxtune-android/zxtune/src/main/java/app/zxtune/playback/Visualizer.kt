@@ -16,4 +16,13 @@ interface Visualizer {
      */
     @Throws(Exception::class)
     fun getSpectrum(levels: ByteArray): Int
+
+    /**
+     * Get currently playing waveforms, triggered for stable oscilloscope view
+     * @param data array to store [channels][points] samples
+     * @param points samples per channel
+     * @return count of actually stored channels: separate voices if supported, else single master channel
+     */
+    @Throws(Exception::class)
+    fun getScope(data: ShortArray, points: Int): Int
 }

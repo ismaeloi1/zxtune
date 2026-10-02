@@ -6,13 +6,24 @@
         android:layout_margin="@dimen/spacing_full"
         android:orientation="horizontal">
 
+    <!-- Surfaces are placed on top of window, so leave space for controls -->
     <app.zxtune.ui.views.SpectrumAnalyzerView
             android:id="@+id/spectrum"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:layout_marginTop="@dimen/visualizer_controls_height"
             custom:spectrumBarsColor="?colorControlNormal"
             android:clickable="false"
             android:focusable="false" />
+
+    <app.zxtune.ui.views.OscilloscopeView
+            android:id="@+id/oscilloscope"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_marginTop="@dimen/visualizer_controls_height"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone" />
 
     <ImageView
             android:id="@+id/coverart"
@@ -21,4 +32,32 @@
             android:clickable="false"
             android:focusable="false"
             android:src="@drawable/background_faded" />
+
+    <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/visualizer_controls_height"
+            android:layout_gravity="top|end"
+            android:orientation="horizontal">
+
+        <ImageButton
+                android:id="@+id/visualizer_fullscreen"
+                android:layout_width="@dimen/visualizer_controls_height"
+                android:layout_height="match_parent"
+                android:background="?selectableItemBackgroundBorderless"
+                android:contentDescription="@string/visualizer_fullscreen"
+                android:scaleType="fitCenter"
+                android:padding="@dimen/spacing_half"
+                android:src="@drawable/ic_fullscreen"
+                android:visibility="gone" />
+
+        <ImageButton
+                android:id="@+id/visualizer_mode"
+                android:layout_width="@dimen/visualizer_controls_height"
+                android:layout_height="match_parent"
+                android:background="?selectableItemBackgroundBorderless"
+                android:contentDescription="@string/visualizer_oscilloscope"
+                android:scaleType="fitCenter"
+                android:padding="@dimen/spacing_half"
+                android:src="@drawable/ic_oscilloscope" />
+    </LinearLayout>
 </FrameLayout>

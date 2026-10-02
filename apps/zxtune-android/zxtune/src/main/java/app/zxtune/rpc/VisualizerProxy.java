@@ -6,6 +6,8 @@ import android.os.RemoteException;
 
 import app.zxtune.Log;
 import app.zxtune.playback.Visualizer;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public final class VisualizerProxy {
 
@@ -38,6 +40,28 @@ public final class VisualizerProxy {
         return 0;
       }
     }
+
+    private byte[] scopeBuffer = new byte[0];
+
+    @Override
+    public synchronized int getScope(short[] data, int points) {
+      try {
+        if (scopeBuffer.length != data.length * 2) {
+          scopeBuffer = new byte[data.length * 2];
+        }
+        final int channels = delegate.getScope(scopeBuffer, points);
+        ByteBuffer.wrap(scopeBuffer, 0, channels * points * 2)
+            .order(ByteOrder.nativeOrder())
+            .asShortBuffer()
+            .get(data, 0, channels * points);
+        return channels;
+      } catch (DeadObjectException e) {
+        throw new IllegalStateException(e);
+      } catch (RemoteException e) {
+        Log.w(TAG, e, "getScope()");
+        return 0;
+      }
+    }
   }
 
   private static class ServerStub extends IVisualizer.Stub {
@@ -54,6 +78,26 @@ public final class VisualizerProxy {
         return delegate.getSpectrum(levels);
       } catch (Exception e) {
         Log.w(TAG, e, "getSpectrum()");
+      }
+      return 0;
+    }
+
+    private short[] scopeBuffer = new short[0];
+
+    @Override
+    public synchronized int getScope(byte[] data, int points) {
+      try {
+        if (scopeBuffer.length != data.length / 2) {
+          scopeBuffer = new short[data.length / 2];
+        }
+        final int channels = delegate.getScope(scopeBuffer, points);
+        ByteBuffer.wrap(data)
+            .order(ByteOrder.nativeOrder())
+            .asShortBuffer()
+            .put(scopeBuffer, 0, channels * points);
+        return channels;
+      } catch (Exception e) {
+        Log.w(TAG, e, "getScope()");
       }
       return 0;
     }

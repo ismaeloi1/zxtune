@@ -6,6 +6,11 @@
         <item name="colorAccent">@color/accent</item>
     </style>
 
+    <style name="FullscreenTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
     <style name="ListItem">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">?android:listPreferredItemHeight</item>

@@ -4,6 +4,10 @@
     <string name="prefs">Preferences</string>
     <string name="review">Rate</string>
     <string name="quit">Quit</string>
+    <!-- visualizer -->
+    <string name="visualizer_oscilloscope">Oscilloscope</string>
+    <string name="visualizer_spectrum">Spectrum analyzer</string>
+    <string name="visualizer_fullscreen">Fullscreen</string>
     <!-- action-related -->
     <string name="add">Add</string>
     <string name="delete">Delete</string>

@@ -17,10 +17,12 @@
 #include "apps/zxtune-android/zxtune/src/main/jni/global_options.h"
 #include "apps/zxtune-android/zxtune/src/main/jni/module.h"
 #include "apps/zxtune-android/zxtune/src/main/jni/properties.h"
+#include "apps/zxtune-android/zxtune/src/main/jni/scope.h"
 
 #include "module/players/pipeline.h"
 #include "sound/impl/fft_analyzer.h"
 
+#include "module/voices_scope.h"
 #include "parameters/merged_accessor.h"
 #include "sound/mixer_factory.h"
 #include "time/timer.h"
@@ -236,8 +238,13 @@ namespace
       , LocalParameters(Parameters::Container::Create())
       , Renderer(Module::CreatePipelinedRenderer(
             holder, samplerate, Parameters::CreateMergedAccessor(LocalParameters, std::move(globalParams))))
+      , ScopeData(Player::Scope::Create(samplerate))
     {
       Require(Duration.Get() != 0);
+      if (auto* const voices = dynamic_cast<Module::VoicesScopeSource*>(Renderer.get()))
+      {
+        voices->SetVoicesScope(ScopeData);
+      }
     }
 
     Parameters::Container& GetParameters() const override
@@ -255,9 +262,16 @@ namespace
       return Analyzer.Analyze(maxEntries, levels);
     }
 
+    uint_t GetScope(uint_t maxChannels, uint_t points, int16_t* data) const override
+    {
+      return ScopeData->Get(maxChannels, points, data);
+    }
+
     bool Render(uint_t samples, int16_t* buffer) override
     {
       Analyzer.FrameStarted();
+      ScopeData->Played(PlayedSamples, samples / Sound::Sample::CHANNELS);
+      PlayedSamples += samples / Sound::Sample::CHANNELS;
       auto rest = samples;
       auto* target = buffer;
       for (;;)
@@ -286,6 +300,7 @@ namespace
     void Seek(uint_t pos) override
     {
       Renderer->SetPosition(Time::Instant<Player::TimeBase>(pos));
+      ScopeData->Reset();
     }
 
     uint_t GetPlaybackPerformance() const override
@@ -306,6 +321,7 @@ namespace
       const Time::Timer timer;
       auto chunk = Renderer->Render();
       RenderingPerformance.Accumulate(timer.Elapsed());
+      ScopeData->Commit(chunk);
       return chunk;
     }
 
@@ -317,6 +333,8 @@ namespace
     BufferTarget Buffer;
     RenderingPerformanceAccountant RenderingPerformance;
     AnalyzerControl Analyzer;
+    const Player::Scope::Ptr ScopeData;
+    uint64_t PlayedSamples = 0;
   };
 
   Player::Control::Ptr CreateControl(const Module::Holder& module, uint_t samplerate)
@@ -377,6 +395,25 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_analyze(JNIEnv* env, jo
     if (rawLevels && player)
     {
       return player->Analyze(rawLevels.Size(), rawLevels.Data());
+    }
+    else
+    {
+      return uint_t(0);
+    }
+  });
+}
+
+EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scope(JNIEnv* env, jobject self, jshortArray data, jint points)
+{
+  return Jni::Call(env, [=]() {
+    // Should be before AutoArray calls - else causes 'using JNI after critical get' error
+    const auto playerHandle = NativePlayerJni::GetHandle(env, self);
+    const auto player = Player::Storage::Instance().Find(playerHandle);
+    const Jni::AutoShortArray rawData(env, data);
+    if (rawData && player && points > 0)
+    {
+      const auto maxChannels = rawData.Size() / points;
+      return player->GetScope(maxChannels, points, rawData.Data());
     }
     else
     {

@@ -66,6 +66,12 @@
             </intent-filter>
         </activity>
         <activity
+                android:name=".ui.OscilloscopeActivity"
+                android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
+                android:exported="false"
+                android:screenOrientation="fullUser"
+                android:theme="@style/FullscreenTheme" />
+        <activity
                 android:name=".ResultActivity"
                 android:exported="false" />
         <activity

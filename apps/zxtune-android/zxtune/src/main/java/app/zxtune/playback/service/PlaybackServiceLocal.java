@@ -444,6 +444,11 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
     public int getSpectrum(byte[] levels) throws Exception {
       return holder.get().visualizer.getSpectrum(levels);
     }
+
+    @Override
+    public int getScope(short[] data, int points) throws Exception {
+      return holder.get().visualizer.getScope(data, points);
+    }
   }
 }
 

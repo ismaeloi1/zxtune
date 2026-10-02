@@ -20,6 +20,8 @@ internal class JniPlayer(handleVal: Int) : Player {
 
     external override fun analyze(levels: ByteArray): Int
 
+    external override fun scope(data: ShortArray, points: Int): Int
+
     override var position: TimeStamp
         get() = TimeStamp.fromMilliseconds(positionMs.toLong())
         set(pos) {
