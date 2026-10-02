@@ -180,17 +180,32 @@ public:
 
   // Per-voice output tap, see set_voice_output()
   short* voice_output;
+  // Shadow filters fed by single voice each to get voice output after filtering.
+  // Registers are always updated, clocking is done only while voice output is enabled
+  Filter voice_filter[3];
+  ExternalFilter voice_extfilt[3];
 
-  void write_voice_output(int s)
+  void clock_voice_filters(int v1, int v2, int v3)
   {
-    if (voice_output) {
-      for (int i = 0; i < 3; i++) {
-        // 20 bits signed voice output to 16 bits
-        const int v = voice[i].output() >> 5;
-        voice_output[s*3 + i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
-      }
+    voice_filter[0].clock(v1, 0, 0);
+    voice_filter[1].clock(0, v2, 0);
+    voice_filter[2].clock(0, 0, v3);
+    for (int i = 0; i < 3; i++) {
+      voice_extfilt[i].clock(voice_filter[i].output());
     }
   }
+
+  void clock_voice_filters(cycle_count delta_t, int v1, int v2, int v3)
+  {
+    voice_filter[0].clock(delta_t, v1, 0, 0);
+    voice_filter[1].clock(delta_t, 0, v2, 0);
+    voice_filter[2].clock(delta_t, 0, 0, v3);
+    for (int i = 0; i < 3; i++) {
+      voice_extfilt[i].clock(delta_t, voice_filter[i].output());
+    }
+  }
+
+  void write_voice_output(int s);
 };
 
 
@@ -241,7 +256,13 @@ void SID::clock()
   }
 
   // Clock filter.
-  filter.clock(voice[0].output(), voice[1].output(), voice[2].output());
+  const int v1 = voice[0].output();
+  const int v2 = voice[1].output();
+  const int v3 = voice[2].output();
+  filter.clock(v1, v2, v3);
+  if (unlikely(voice_output != 0)) {
+    clock_voice_filters(v1, v2, v3);
+  }
 
   // Clock external filter.
   extfilt.clock(filter.output());

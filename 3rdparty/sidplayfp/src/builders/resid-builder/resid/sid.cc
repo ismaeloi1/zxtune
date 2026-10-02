@@ -125,6 +125,9 @@ void SID::set_chip_model(chip_model model)
   }
 
   filter.set_chip_model(model);
+  for (int i = 0; i < 3; i++) {
+    voice_filter[i].set_chip_model(model);
+  }
 }
 
 
@@ -138,6 +141,10 @@ void SID::reset()
   }
   filter.reset();
   extfilt.reset();
+  for (int i = 0; i < 3; i++) {
+    voice_filter[i].reset();
+    voice_extfilt[i].reset();
+  }
 
   bus_value = 0;
   bus_value_ttl = 0;
@@ -291,15 +298,27 @@ void SID::write()
     break;
   case 0x15:
     filter.writeFC_LO(bus_value);
+    for (int i = 0; i < 3; i++) {
+      voice_filter[i].writeFC_LO(bus_value);
+    }
     break;
   case 0x16:
     filter.writeFC_HI(bus_value);
+    for (int i = 0; i < 3; i++) {
+      voice_filter[i].writeFC_HI(bus_value);
+    }
     break;
   case 0x17:
     filter.writeRES_FILT(bus_value);
+    for (int i = 0; i < 3; i++) {
+      voice_filter[i].writeRES_FILT(bus_value);
+    }
     break;
   case 0x18:
     filter.writeMODE_VOL(bus_value);
+    for (int i = 0; i < 3; i++) {
+      voice_filter[i].writeMODE_VOL(bus_value);
+    }
     break;
   default:
     break;
@@ -436,7 +455,7 @@ void SID::write_state(const State& state)
   bus_value_ttl = state.bus_value_ttl;
   write_pipeline = state.write_pipeline;
   write_address = state.write_address;
-  filter.set_voice_mask(state.voice_mask);
+  set_voice_mask(state.voice_mask);
 
   for (i = 0; i < 3; i++) {
     voice[i].wave.accumulator = state.accumulator[i];
@@ -466,6 +485,9 @@ void SID::write_state(const State& state)
 void SID::set_voice_mask(reg4 mask)
 {
   filter.set_voice_mask(mask);
+  for (int i = 0; i < 3; i++) {
+    voice_filter[i].set_voice_mask(mask);
+  }
 }
 
 
@@ -475,6 +497,9 @@ void SID::set_voice_mask(reg4 mask)
 void SID::enable_filter(bool enable)
 {
   filter.enable_filter(enable);
+  for (int i = 0; i < 3; i++) {
+    voice_filter[i].enable_filter(enable);
+  }
 }
 
 
@@ -486,6 +511,9 @@ void SID::enable_filter(bool enable)
 // ----------------------------------------------------------------------------
 void SID::adjust_filter_bias(double dac_bias) {
   filter.adjust_filter_bias(dac_bias);
+  for (int i = 0; i < 3; i++) {
+    voice_filter[i].adjust_filter_bias(dac_bias);
+  }
 }
 
 
@@ -495,6 +523,21 @@ void SID::adjust_filter_bias(double dac_bias) {
 void SID::enable_external_filter(bool enable)
 {
   extfilt.enable_filter(enable);
+  for (int i = 0; i < 3; i++) {
+    voice_extfilt[i].enable_filter(enable);
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Store filtered output of each voice for current sample.
+// ----------------------------------------------------------------------------
+void SID::write_voice_output(int s)
+{
+  if (voice_output) {
+    for (int i = 0; i < 3; i++) {
+      voice_output[s*3 + i] = amplify(voice_extfilt[i].output(), scaleFactor);
+    }
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -822,7 +865,13 @@ void SID::clock(cycle_count delta_t)
   }
 
   // Clock filter.
-  filter.clock(delta_t, voice[0].output(), voice[1].output(), voice[2].output());
+  const int v1 = voice[0].output();
+  const int v2 = voice[1].output();
+  const int v3 = voice[2].output();
+  filter.clock(delta_t, v1, v2, v3);
+  if (unlikely(voice_output != 0)) {
+    clock_voice_filters(delta_t, v1, v2, v3);
+  }
 
   // Clock external filter.
   extfilt.clock(delta_t, filter.output());
