@@ -22,6 +22,7 @@
 #include "debug/log.h"
 #include "formats/multitrack/container.h"
 #include "module/attributes.h"
+#include "module/voices_scope.h"
 #include "parameters/tracking_helper.h"
 #include "strings/sanitize.h"
 
@@ -150,6 +151,17 @@ namespace Module::Sid
     const Parameters::Accessor::Ptr Params;
   };
 
+  class VoicesSinkAdapter : public ReSIDBuilder::VoicesSink
+  {
+  public:
+    void voices(unsigned int chip, const short* samples, unsigned int count) override
+    {
+      Scope->Feed(chip * VOICES, VOICES, samples, count);
+    }
+
+    VoicesScope::Ptr Scope;
+  };
+
   class SidEngine
   {
   public:
@@ -226,10 +238,25 @@ namespace Module::Sid
       Player.play(nullptr, samples * Sound::Sample::CHANNELS);
     }
 
+    void SetVoicesScope(VoicesScope::Ptr scope, uint_t chips)
+    {
+      Sink.Scope = std::move(scope);
+      if (Sink.Scope)
+      {
+        Sink.Scope->SetVoicesCount(chips * VOICES);
+        Builder.voicesSink(&Sink);
+      }
+      else
+      {
+        Builder.voicesSink(nullptr);
+      }
+    }
+
   private:
     sidplayfp Player;
     ReSIDBuilder Builder;
     SidConfig Config;
+    VoicesSinkAdapter Sink;
 
     // cache filter flag
     bool UseFilter = false;
@@ -238,7 +265,9 @@ namespace Module::Sid
 
   const auto FRAME_DURATION = Time::Milliseconds(100);
 
-  class Renderer : public Module::Renderer
+  class Renderer
+    : public Module::Renderer
+    , public VoicesScopeSource
   {
   public:
     Renderer(Model::Ptr tune, uint_t samplerate, const Parameters::Accessor::Ptr& params)
@@ -280,6 +309,13 @@ namespace Module::Sid
       {
         Engine->Skip(GetSamples(toSkip));
       }
+    }
+
+    bool SetVoicesScope(VoicesScope::Ptr scope) override
+    {
+      const uint_t chips = std::max<uint_t>(Tune->getInfo()->sidChips(), 1);
+      Engine->SetVoicesScope(std::move(scope), chips);
+      return true;
     }
 
   private:

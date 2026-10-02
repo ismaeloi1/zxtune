@@ -13,6 +13,7 @@
 #include "debug/log.h"
 #include "module/holder.h"
 #include "module/loop.h"
+#include "module/voices_scope.h"
 #include "parameters/merged_accessor.h"
 #include "parameters/tracking_helper.h"
 #include "sound/gainer.h"
@@ -124,7 +125,9 @@ namespace Module
     Sound::Sample LastSample;
   };
 
-  class PipelinedRenderer : public Renderer
+  class PipelinedRenderer
+    : public Renderer
+    , public VoicesScopeSource
   {
   public:
     PipelinedRenderer(const Holder& holder, uint_t samplerate, Parameters::Accessor::Ptr params)
@@ -169,6 +172,12 @@ namespace Module
     {
       Silence.Reset();
       Delegate->SetPosition(position);
+    }
+
+    bool SetVoicesScope(VoicesScope::Ptr scope) override
+    {
+      auto* const source = dynamic_cast<VoicesScopeSource*>(Delegate.get());
+      return source && source->SetVoicesScope(std::move(scope));
     }
 
   private:
