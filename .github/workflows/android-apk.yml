@@ -1,0 +1,65 @@
+name: Android APK
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+    paths-ignore:
+      - 'apps/zxtune-qt/**'
+      - 'apps/zxtune123/**'
+  workflow_dispatch:
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      NDK_VERSION: 23.2.8568313
+      # Native libraries are built only for this ABI to save build time
+      APK_ABIS: arm64-v8a
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Android SDK packages
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --install \
+            "build-tools;36.0.0" "platforms;android-36" "ndk;${NDK_VERSION}" > /dev/null
+
+      - name: Configure build
+        run: |
+          # Shallow clone has no tags for 'git describe', so pass version explicitly
+          REVISION=$(git ls-remote --tags origin 'r*' | grep -o 'refs/tags/r[0-9]*$' | sed 's|refs/tags/r||' | sort -n | tail -1)
+          echo "MAKEFLAGS=root.version=r${REVISION}-scope-${GITHUB_SHA::9} root.version.index=${REVISION}" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/prebuilt"
+          {
+            echo "android.ndk=$ANDROID_HOME/ndk/${NDK_VERSION}"
+            echo "prebuilt.dir=$RUNNER_TEMP/prebuilt"
+            echo "tools.python=python3"
+          } > variables.mak
+          {
+            echo "sdk.dir=$ANDROID_HOME"
+            echo "ndk.version=${NDK_VERSION}"
+            # Backend endpoints are private, online catalogs relying on them won't work without these variables
+            echo "api.root=${{ vars.ZXTUNE_API_ROOT || 'https://invalid.zxtune.ru' }}"
+            echo "cdn.root=${{ vars.ZXTUNE_CDN_ROOT || 'https://invalid.zxtune.ru' }}"
+            echo "proxy.root=${{ vars.ZXTUNE_PROXY_ROOT || 'https://invalid.zxtune.ru' }}"
+            echo "flavors.fat.abifilters=${APK_ABIS}"
+            echo "build.jni.output=error"
+          } > apps/zxtune-android/local.properties
+
+      - name: Build APK
+        working-directory: apps/zxtune-android
+        run: ./gradlew --no-daemon --stacktrace assembleFatMinsdk16Develop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zxtune-oscilloscope-develop-apk
+          path: pkg/zxtune/outputs/apk/**/*.apk
+          if-no-files-found: error
