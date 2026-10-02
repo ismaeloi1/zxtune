@@ -31,6 +31,7 @@ namespace Player
 
     virtual uint_t GetPosition() const = 0;
     virtual uint_t Analyze(uint_t maxEntries, uint8_t* levels) const = 0;
+    //! @return channels count in low 16 bits, channels per chip in high 16 bits (0 for master channel)
     virtual uint_t GetScope(uint_t maxChannels, uint_t points, int16_t* data) const = 0;
 
     virtual bool Render(uint_t samples, int16_t* buffer) = 0;

@@ -36,11 +36,18 @@ namespace Player
     //! @brief Seek happened, reset all the state
     virtual void Reset() = 0;
 
+    struct Layout
+    {
+      //! channels count actually stored
+      uint_t Channels = 0;
+      //! channels count of each chip (0 for single master channel)
+      uint_t PerChip = 0;
+    };
+
     //! @param maxChannels maximum channels count to get
     //! @param points points per channel to get
     //! @param target [channels][points] array of normalized samples
-    //! @return channels count actually stored
-    virtual uint_t Get(uint_t maxChannels, uint_t points, int16_t* target) = 0;
+    virtual Layout Get(uint_t maxChannels, uint_t points, int16_t* target) = 0;
 
     static Ptr Create(uint_t samplerate);
   };

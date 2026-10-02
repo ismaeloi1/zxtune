@@ -15,6 +15,7 @@
 #include "make_ptr.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <mutex>
 #include <vector>
@@ -28,6 +29,8 @@ namespace Player
     const uint_t TRIGGER_MS = 40;
     const uint_t RENDER_MS = 40;
     const uint_t MAX_VOICES = 32;
+    // Keep separate voices rendering while data is requested at least this often
+    const auto ACTIVITY_TIMEOUT = std::chrono::seconds(2);
 
     class Ring
     {
@@ -109,11 +112,19 @@ namespace Player
     {}
 
     // Render thread
-    void SetVoicesCount(uint_t count) override
+    void SetVoicesCount(uint_t count, uint_t perChip) override
     {
       const std::scoped_lock guard(Lock);
       Voices.resize(std::min(count, MAX_VOICES));
+      VoicesPerChip = perChip;
       Triggers.clear();
+    }
+
+    // Render thread
+    bool IsActive() const override
+    {
+      const auto lastRequest = Clock::time_point(Clock::duration(LastRequest.load()));
+      return Clock::now() - lastRequest < ACTIVITY_TIMEOUT;
     }
 
     // Render thread, no locks - collected data is flushed on Commit
@@ -169,12 +180,13 @@ namespace Player
       ResetTriggers();
     }
 
-    uint_t Get(uint_t maxChannels, uint_t points, int16_t* target) override
+    Layout Get(uint_t maxChannels, uint_t points, int16_t* target) override
     {
+      LastRequest = Clock::now().time_since_epoch().count();
       const std::scoped_lock guard(Lock);
       if (!HasPlayed || !points || !maxChannels)
       {
-        return 0;
+        return {};
       }
       const auto pos = GetPlaybackPosition();
       uint_t samplesPerFrame = Samplerate / 60;
@@ -212,7 +224,10 @@ namespace Player
           out[idx] = ring.At(begin + int64_t(idx) * renderSamples / points);
         }
       }
-      return channels;
+      Layout result;
+      result.Channels = channels;
+      result.PerChip = Voices.empty() ? 0 : VoicesPerChip;
+      return result;
     }
 
   private:
@@ -241,6 +256,7 @@ namespace Player
     std::mutex Lock;
     Ring Master;
     std::vector<Voice> Voices;
+    uint_t VoicesPerChip = 0;
     std::vector<std::unique_ptr<Sound::CorrelationTrigger>> Triggers;
     uint64_t PlayedStart = 0;
     uint_t PlayedSize = 0;
@@ -248,6 +264,7 @@ namespace Player
     bool HasPlayed = false;
     int64_t LastPos = 0;
     bool HasLastPos = false;
+    std::atomic<Clock::rep> LastRequest = 0;
   };
 
   Scope::Ptr Scope::Create(uint_t samplerate)

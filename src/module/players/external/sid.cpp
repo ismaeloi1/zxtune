@@ -228,6 +228,8 @@ namespace Module::Sid
     Sound::Chunk Render(uint_t samples)
     {
       static_assert(Sound::Sample::BITS == 16, "Incompatible sound bits count");
+      // separate voices rendering is expensive, so do it only if required
+      Builder.voicesSink(Sink.Scope && Sink.Scope->IsActive() ? &Sink : nullptr);
       Sound::Chunk result(samples);
       Player.play(safe_ptr_cast<short*>(result.data()), samples * Sound::Sample::CHANNELS);
       return result;
@@ -243,13 +245,9 @@ namespace Module::Sid
       Sink.Scope = std::move(scope);
       if (Sink.Scope)
       {
-        Sink.Scope->SetVoicesCount(chips * VOICES);
-        Builder.voicesSink(&Sink);
+        Sink.Scope->SetVoicesCount(chips * VOICES, VOICES);
       }
-      else
-      {
-        Builder.voicesSink(nullptr);
-      }
+      Builder.voicesSink(nullptr);
     }
 
   private:

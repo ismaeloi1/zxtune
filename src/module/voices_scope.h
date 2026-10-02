@@ -24,8 +24,13 @@ namespace Module
     using Ptr = std::shared_ptr<VoicesScope>;
     virtual ~VoicesScope() = default;
 
-    //! @brief Total voices count, called before any Feed call and on its change
-    virtual void SetVoicesCount(uint_t count) = 0;
+    //! @brief Voices layout, called before any Feed call and on its change
+    //! @param count total voices count
+    //! @param perChip voices count of each chip, voices are enumerated chip by chip
+    virtual void SetVoicesCount(uint_t count, uint_t perChip) = 0;
+
+    //! @brief Check if data is consumed now, so separate voices rendering may be skipped to save resources
+    virtual bool IsActive() const = 0;
 
     //! @brief Store part of rendered voices
     //! @param firstVoice index of the first voice in block

@@ -264,7 +264,8 @@ namespace
 
     uint_t GetScope(uint_t maxChannels, uint_t points, int16_t* data) const override
     {
-      return ScopeData->Get(maxChannels, points, data);
+      const auto layout = ScopeData->Get(maxChannels, points, data);
+      return layout.Channels | (layout.PerChip << 16);
     }
 
     bool Render(uint_t samples, int16_t* buffer) override
