@@ -21,6 +21,7 @@
  */
 
 #include "resid-emu.h"
+#include "resid.h"
 
 #include <cstdio>
 #include <cstring>
@@ -54,7 +55,10 @@ const char* ReSID::getCredits()
 ReSID::ReSID(sidbuilder *builder) :
     sidemu(builder),
     m_sid(*(new reSID::SID)),
-    m_voiceMask(0x07)
+    m_voiceMask(0x07),
+    m_residBuilder(static_cast<ReSIDBuilder*>(builder)),
+    m_voicesBuffer(nullptr),
+    m_chipIndex(0)
 {
     m_buffer = new short[OUTPUTBUFFERSIZE];
     reset(0);
@@ -64,6 +68,22 @@ ReSID::~ReSID()
 {
     delete &m_sid;
     delete[] m_buffer;
+    delete[] m_voicesBuffer;
+}
+
+bool ReSID::lock(EventScheduler *scheduler)
+{
+    if (!sidemu::lock(scheduler))
+        return false;
+    m_chipIndex = m_residBuilder->chipLocked();
+    return true;
+}
+
+void ReSID::unlock()
+{
+    if (isLocked)
+        m_residBuilder->chipUnlocked();
+    sidemu::unlock();
 }
 
 void ReSID::bias(double dac_bias)
@@ -95,7 +115,14 @@ void ReSID::clock()
 {
     reSID::cycle_count cycles = eventScheduler->getTime(EVENT_CLOCK_PHI1) - m_accessClk;
     m_accessClk += cycles;
-    m_bufferpos += m_sid.clock(cycles, m_muted ? nullptr : (short *) m_buffer + m_bufferpos, OUTPUTBUFFERSIZE - m_bufferpos, 1);
+    ReSIDBuilder::VoicesSink* const sink = m_muted ? nullptr : m_residBuilder->getVoicesSink();
+    if (sink && !m_voicesBuffer)
+        m_voicesBuffer = new short[OUTPUTBUFFERSIZE * 3];
+    m_sid.set_voice_output(sink ? m_voicesBuffer : nullptr);
+    const int samples = m_sid.clock(cycles, m_muted ? nullptr : (short *) m_buffer + m_bufferpos, OUTPUTBUFFERSIZE - m_bufferpos, 1);
+    m_bufferpos += samples;
+    if (sink && samples > 0)
+        sink->voices(m_chipIndex, m_voicesBuffer, samples);
 }
 
 void ReSID::filter(bool enable)

@@ -32,6 +32,23 @@
 class SID_EXTERN ReSIDBuilder : public sidbuilder
 {
 public:
+    /**
+     * Receiver of separate voices output (zxtune oscilloscope).
+     */
+    class VoicesSink
+    {
+    public:
+        virtual ~VoicesSink() = default;
+
+        /**
+         * @param chip index of chip in order of locking (0 is the main one)
+         * @param samples interleaved samples of 3 voices
+         * @param count samples count per voice
+         */
+        virtual void voices(unsigned int chip, const short* samples, unsigned int count) = 0;
+    };
+
+
     ReSIDBuilder(const char * const name) :
         sidbuilder(name) {}
     ~ReSIDBuilder();
@@ -60,7 +77,23 @@ public:
      * control range is approximately -500 to 500.
      */
     void bias(double dac_bias);
+
+    /**
+     * Set receiver for separate voices output, nullptr to disable.
+     */
+    void voicesSink(VoicesSink* sink) { m_voicesSink = sink; }
     //@}
+
+    /// @name internal state for emulations
+    //@{
+    VoicesSink* getVoicesSink() const { return m_voicesSink; }
+    unsigned int chipLocked() { return m_lockedChips++; }
+    void chipUnlocked() { if (m_lockedChips) --m_lockedChips; }
+    //@}
+
+private:
+    VoicesSink* m_voicesSink = nullptr;
+    unsigned int m_lockedChips = 0;
 };
 
 #endif // RESID_H

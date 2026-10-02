@@ -32,6 +32,8 @@
 
 #include "sidcxx11.h"
 
+class ReSIDBuilder;
+
 #ifdef HAVE_CONFIG_H
 #  include "config.h"
 #endif
@@ -45,6 +47,10 @@ class ReSID final : public sidemu
 private:
     reSID::SID   &m_sid;
     uint8_t       m_voiceMask;
+
+    ReSIDBuilder* const m_residBuilder;
+    short        *m_voicesBuffer;
+    unsigned int  m_chipIndex;
 
 public:
     static const char* getCredits();
@@ -60,6 +66,9 @@ public:
 
     // c64sid functions
     void reset(uint8_t volume) override;
+
+    bool lock(EventScheduler *scheduler) override;
+    void unlock() override;
 
     // Standard SID emu functions
     void clock() override;

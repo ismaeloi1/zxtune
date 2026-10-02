@@ -52,6 +52,10 @@ public:
   void adjust_sampling_frequency(double sample_freq);
   void enable_raw_debug_output(bool enable);
 
+  // Optional per-voice output tap (zxtune oscilloscope).
+  // When set, clock() also stores 3 interleaved voice samples per output sample.
+  void set_voice_output(short* buf) { voice_output = buf; }
+
   void clock();
   void clock(cycle_count delta_t);
   int clock(cycle_count& delta_t, short* buf, int n, int interleave = 1);
@@ -173,6 +177,20 @@ public:
   short* fir;
 
   bool raw_debug_output; // FIXME: should be private?
+
+  // Per-voice output tap, see set_voice_output()
+  short* voice_output;
+
+  void write_voice_output(int s)
+  {
+    if (voice_output) {
+      for (int i = 0; i < 3; i++) {
+        // 20 bits signed voice output to 16 bits
+        const int v = voice[i].output() >> 5;
+        voice_output[s*3 + i] = v > 32767 ? 32767 : v < -32768 ? -32768 : v;
+      }
+    }
+  }
 };
 
 

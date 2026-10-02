@@ -62,6 +62,7 @@ SID::SID()
 {
   // Initialize pointers.
   sample = 0;
+  voice_output = 0;
   fir = 0;
   fir_N = 0;
   fir_RES = 0;
@@ -891,6 +892,7 @@ int SID::clock_fast(cycle_count& delta_t, short* buf, int n, int interleave)
     }
 
     sample_offset = (next_sample_offset & FIXP_MASK) - (1 << (FIXP_SHIFT - 1));
+    write_voice_output(s);
     buf[s*interleave] = amplify(output(), scaleFactor);
   }
 
@@ -934,6 +936,7 @@ int SID::clock_interpolate(cycle_count& delta_t, short* buf, int n, int interlea
 
     sample_offset = next_sample_offset & FIXP_MASK;
 
+    write_voice_output(s);
     buf[s*interleave] = amplify(
       sample_prev + (sample_offset*(sample_now - sample_prev) >> FIXP_SHIFT),
       scaleFactor
@@ -1037,6 +1040,7 @@ int SID::clock_resample(cycle_count& delta_t, short* buf, int n, int interleave)
 
     v >>= FIR_SHIFT;
 
+    write_voice_output(s);
     buf[s*interleave] = amplify(v, scaleFactor);
   }
 
@@ -1084,6 +1088,7 @@ int SID::clock_resample_fastmem(cycle_count& delta_t, short* buf, int n, int int
 
     v >>= FIR_SHIFT;
 
+    write_voice_output(s);
     buf[s*interleave] = amplify(v, scaleFactor);
   }
 
