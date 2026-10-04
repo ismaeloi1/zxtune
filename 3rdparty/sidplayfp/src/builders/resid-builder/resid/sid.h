@@ -53,7 +53,7 @@ public:
   void enable_raw_debug_output(bool enable);
 
   // Optional per-voice output tap (zxtune oscilloscope).
-  // When set, clock() also stores 3 interleaved voice samples per output sample.
+  // When set, clock() also stores 7 values per output sample: 3 filtered voices, 3 oscillators, volume.
   void set_voice_output(short* buf) { voice_output = buf; }
 
   // Oscillator and envelope outputs of any voice, as OSC3/ENV3 registers

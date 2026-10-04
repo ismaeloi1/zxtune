@@ -150,6 +150,7 @@ SID::SID() :
     muted[0] = muted[1] = muted[2] = false;
 
     voiceOutput = nullptr;
+    lastModeVol = 0;
     for (int i = 0; i < 3; i++)
     {
         voiceFilter6581[i] = new Filter6581();
@@ -545,6 +546,7 @@ void SID::write(int offset, unsigned char value)
         break;
 
     case 0x18: // Volume and filter modes
+        lastModeVol = value;
         filter6581->writeMODE_VOL(value);
         filter8580->writeMODE_VOL(value);
         for (int i = 0; i < 3; i++)

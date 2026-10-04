@@ -111,8 +111,9 @@ private:
     /// Flags for muted channels
     bool muted[3];
 
-    /// zxtune: optional per-voice output tap, 3 interleaved samples per output sample
+    /// zxtune: optional per-voice output tap, 7 values per output sample: 3 filtered voices, 3 oscillators, volume
     short* voiceOutput;
+    unsigned char lastModeVol;
 
     /// zxtune: shadow filters fed by single voice each to get voice output after filtering
     Filter6581* voiceFilter6581[3];
@@ -237,7 +238,7 @@ public:
     void mute(int channel, bool enable) { muted[channel] = enable; }
 
     /**
-     * zxtune: set buffer to store filtered output of each voice (3 interleaved samples per output sample).
+     * zxtune: set buffer to store filtered output of each voice, oscillators and volume (7 values per output sample).
      * Should be big enough to store the same samples count as main output. nullptr to disable.
      */
     void setVoiceOutput(short* buf) { voiceOutput = buf; }
@@ -390,11 +391,14 @@ int SID::outputWithVoices()
 RESID_INLINE
 void SID::writeVoices(int s)
 {
+    short* const dst = voiceOutput + s * 7;
     for (int i = 0; i < 3; i++)
     {
         const int out = (scaleFactor * voiceValue[i]) / 2;
-        voiceOutput[s * 3 + i] = static_cast<short>(out > 32767 ? 32767 : out < -32768 ? -32768 : out);
+        dst[i] = static_cast<short>(out > 32767 ? 32767 : out < -32768 ? -32768 : out);
+        dst[3 + i] = voice[i]->wave()->readOSC();
     }
+    dst[6] = lastModeVol & 0x0f;
 }
 
 RESID_INLINE

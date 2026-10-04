@@ -130,7 +130,7 @@ void ReSIDfp::clock()
     m_accessClk += cycles;
     SidVoicesSink* const sink = m_muted ? nullptr : m_residBuilder->getVoicesSink();
     if (sink && !m_voicesBuffer)
-        m_voicesBuffer = new short[OUTPUTBUFFERSIZE * 3];
+        m_voicesBuffer = new short[OUTPUTBUFFERSIZE * SidVoicesSink::STRIDE];
     m_sid.setVoiceOutput(sink ? m_voicesBuffer : nullptr);
     const int samples = m_sid.clock(cycles, m_buffer+m_bufferpos);
     m_bufferpos += samples;

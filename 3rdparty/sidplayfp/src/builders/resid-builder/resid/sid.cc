@@ -534,9 +534,12 @@ void SID::enable_external_filter(bool enable)
 void SID::write_voice_output(int s)
 {
   if (voice_output) {
+    short* const out = voice_output + s*7;
     for (int i = 0; i < 3; i++) {
-      voice_output[s*3 + i] = amplify(voice_extfilt[i].output(), scaleFactor);
+      out[i] = amplify(voice_extfilt[i].output(), scaleFactor);
+      out[3 + i] = voice[i].wave.readOSC();
     }
+    out[6] = filter.vol;
   }
 }
 

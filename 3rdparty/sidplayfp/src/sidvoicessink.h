@@ -14,10 +14,17 @@ class SidVoicesSink
 public:
     virtual ~SidVoicesSink() = default;
 
+    /// Values per output sample in voices() data
+    enum
+    {
+        STRIDE = 7
+    };
+
     /**
      * @param chip index of chip in order of locking (0 is the main one)
-     * @param samples interleaved samples of 3 voices after filters
-     * @param count samples count per voice
+     * @param samples interleaved data, STRIDE values per output sample:
+     *        3 voices outputs after filters, 3 oscillator outputs (as OSC3), master volume (0..15)
+     * @param count output samples count
      */
     virtual void voices(unsigned int chip, const short* samples, unsigned int count) = 0;
 
