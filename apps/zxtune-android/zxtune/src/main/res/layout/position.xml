@@ -17,7 +17,9 @@
             android:paddingHorizontal="0dp"
             android:paddingVertical="@dimen/spacing_full"
             android:progressDrawable="@drawable/playback_position"
-            android:thumb="@null"
+            android:splitTrack="false"
+            android:thumb="@drawable/playback_position_thumb"
+            android:thumbOffset="0dp"
             tools:progress="33" />
 
     <TextView
