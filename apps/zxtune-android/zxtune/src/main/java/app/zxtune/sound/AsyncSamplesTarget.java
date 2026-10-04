@@ -39,6 +39,14 @@ class AsyncSamplesTarget {
     return target.getSampleRate();
   }
 
+  final long getPlayedFrames() {
+    return target.getPlayedFrames();
+  }
+
+  final String getStatistics() {
+    return target.getStatistics();
+  }
+
   final void release() {
     while (true) {
       thread.interrupt();

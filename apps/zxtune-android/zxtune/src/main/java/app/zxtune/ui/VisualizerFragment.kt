@@ -20,8 +20,11 @@ import app.zxtune.playback.stubs.VisualizerStub
 import app.zxtune.preferences.Preferences
 import app.zxtune.ui.utils.whenLifecycleStarted
 import app.zxtune.ui.views.OscilloscopeView
+import app.zxtune.ui.views.SidDashboardView
 import app.zxtune.ui.views.SpectrumAnalyzerView
 import app.zxtune.utils.ifNotNulls
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.awaitClose
@@ -37,13 +40,12 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.concurrent.atomics.AtomicReference
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 
 @OptIn(ExperimentalAtomicApi::class)
 class VisualizerFragment : Fragment() {
     private lateinit var analyzer: SpectrumAnalyzerView
     private lateinit var oscilloscope: OscilloscopeView
+    private lateinit var dashboard: SidDashboardView
     private val setVisibilityJob = AtomicReference<Job?>(null)
     private val isTabVisible = MutableStateFlow(true)
 
@@ -51,113 +53,117 @@ class VisualizerFragment : Fragment() {
         get() = viewLifecycleOwner.lifecycleScope
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
     ) = container?.let {
         inflater.inflate(R.layout.visualizer, it, false)
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) =
-        MediaModel.of(requireActivity()).run {
-            analyzer = view.findViewById(R.id.spectrum)
-            oscilloscope = view.findViewById(R.id.oscilloscope)
-            val coverArtView = view.findViewById<ImageView>(R.id.coverart)
-            val modeButton = view.findViewById<ImageButton>(R.id.visualizer_mode)
-            val fullscreenButton = view.findViewById<ImageButton>(R.id.visualizer_fullscreen)
-            fullscreenButton.setOnClickListener {
-                OscilloscopeActivity.start(requireContext())
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) = MediaModel.of(requireActivity()).run {
+        analyzer = view.findViewById(R.id.spectrum)
+        oscilloscope = view.findViewById(R.id.oscilloscope)
+        dashboard = view.findViewById(R.id.dashboard)
+        val oscilloscopePanel = view.findViewById<View>(R.id.oscilloscope_panel)
+        val coverArtView = view.findViewById<ImageView>(R.id.coverart)
+        val modeButton = view.findViewById<ImageButton>(R.id.visualizer_mode)
+        val fullscreenButton = view.findViewById<ImageButton>(R.id.visualizer_fullscreen)
+        fullscreenButton.setOnClickListener {
+            OscilloscopeActivity.start(requireContext())
+        }
+        // TODO: use clicks stream, state may switch different modes
+        val state = callbackFlow {
+            val storage = StateStorage(requireContext())
+            var state = storage.load()
+            var lastMode = state.takeIf { it.isVisible } ?: State.SPECTRUM
+            send(state)
+            fun switchTo(next: State) {
+                // failed on busy, avoid hanged clicks
+                trySend(next).onSuccess {
+                    state = next
+                    if (next.isVisible) {
+                        lastMode = next
+                    }
+                    launch {
+                        storage.save(next)
+                    }
+                }
             }
-            // TODO: use clicks stream, state may switch different modes
-            val state = callbackFlow {
-                val storage = StateStorage(requireContext())
-                var state = storage.load()
-                var lastMode = state.takeIf { it.isVisible } ?: State.SPECTRUM
-                send(state)
-                fun switchTo(next: State) {
-                    // failed on busy, avoid hanged clicks
-                    trySend(next).onSuccess {
-                        state = next
-                        if (next.isVisible) {
-                            lastMode = next
-                        }
-                        launch {
-                            storage.save(next)
-                        }
+            view.setOnClickListener {
+                switchTo(if (state.isVisible) State.OFF else lastMode)
+            }
+            modeButton.setOnClickListener {
+                switchTo(state.nextModeOf())
+            }
+            awaitClose {
+                view.setOnClickListener(null)
+                modeButton.setOnClickListener(null)
+            }
+        }.stateIn(scope, SharingStarted.WhileSubscribed(1000), DEFAULT_STATE)
+        val playingSource: Flow<Visualizer?> =
+            visualizer.combine(playbackState) { visualizer, playbackState ->
+                ifNotNulls(visualizer, playbackState?.state) { src, state ->
+                    if (PlaybackStateCompat.STATE_PLAYING == state) {
+                        src
+                    } else {
+                        VisualizerStub
                     }
                 }
-                view.setOnClickListener {
-                    switchTo(if (state.isVisible) State.OFF else lastMode)
-                }
-                modeButton.setOnClickListener {
-                    switchTo(state.nextModeOf())
-                }
-                awaitClose {
-                    view.setOnClickListener(null)
-                    modeButton.setOnClickListener(null)
-                }
-            }.stateIn(scope, SharingStarted.WhileSubscribed(1000), DEFAULT_STATE)
-            val playingSource: Flow<Visualizer?> =
-                visualizer.combine(playbackState) { visualizer, playbackState ->
-                    ifNotNulls(visualizer, playbackState?.state) { src, state ->
-                        if (PlaybackStateCompat.STATE_PLAYING == state) {
-                            src
-                        } else {
-                            VisualizerStub
-                        }
-                    }
-                }.distinctUntilChanged { old, new -> old === new }
-            viewLifecycleOwner.whenLifecycleStarted {
-                launch {
-                    playingSource.collectLatest { src ->
-                        src?.let {
-                            analyzer.drawFrom(it)
-                        }
+            }.distinctUntilChanged { old, new -> old === new }
+        viewLifecycleOwner.whenLifecycleStarted {
+            launch {
+                playingSource.collectLatest { src ->
+                    src?.let {
+                        analyzer.drawFrom(it)
                     }
                 }
-                launch {
-                    combine(playingSource, state, isTabVisible) { src, state, isTabVisible ->
-                        src.takeIf { state == State.OSCILLOSCOPE && isTabVisible && it !== VisualizerStub }
-                    }.distinctUntilChanged { old, new -> old === new }.collect {
-                        oscilloscope.setSource(it)
-                    }
+            }
+            launch {
+                combine(playingSource, state, isTabVisible) { src, state, isTabVisible ->
+                    src.takeIf { state == State.OSCILLOSCOPE && isTabVisible && it !== VisualizerStub }
+                }.distinctUntilChanged { old, new -> old === new }.collect {
+                    oscilloscope.setSource(it)
+                    dashboard.setSource(it, oscilloscope::getStatistics)
                 }
-                launch {
-                    combine(state, isTabVisible) { state, isTabVisible ->
-                        state == State.SPECTRUM && isTabVisible
-                    }.distinctUntilChanged().collect {
-                        setAnalyzerUpdating(it)
-                    }
+            }
+            launch {
+                combine(state, isTabVisible) { state, isTabVisible ->
+                    state == State.SPECTRUM && isTabVisible
+                }.distinctUntilChanged().collect {
+                    setAnalyzerUpdating(it)
                 }
-                launch {
-                    state.collect {
-                        analyzer.isVisible = it == State.SPECTRUM
-                        oscilloscope.isVisible = it == State.OSCILLOSCOPE
-                        fullscreenButton.isVisible = it == State.OSCILLOSCOPE
-                        modeButton.isVisible = it.isVisible
-                        val isScope = it == State.OSCILLOSCOPE
-                        // oscilloscope is displayed on black background instead of cover art
-                        coverArtView.isVisible = !isScope
-                        view.setBackgroundColor(if (isScope) Color.BLACK else Color.TRANSPARENT)
-                        modeButton.setImageResource(
-                            if (isScope) R.drawable.ic_spectrum else R.drawable.ic_oscilloscope
-                        )
-                        modeButton.contentDescription = getString(
-                            if (isScope) R.string.visualizer_spectrum else R.string.visualizer_oscilloscope
-                        )
-                    }
+            }
+            launch {
+                state.collect {
+                    analyzer.isVisible = it == State.SPECTRUM
+                    oscilloscopePanel.isVisible = it == State.OSCILLOSCOPE
+                    fullscreenButton.isVisible = it == State.OSCILLOSCOPE
+                    modeButton.isVisible = it.isVisible
+                    val isScope = it == State.OSCILLOSCOPE
+                    // oscilloscope is displayed on black background instead of cover art
+                    coverArtView.isVisible = !isScope
+                    view.setBackgroundColor(if (isScope) Color.BLACK else Color.TRANSPARENT)
+                    modeButton.setImageResource(
+                        if (isScope) R.drawable.ic_spectrum else R.drawable.ic_oscilloscope
+                    )
+                    modeButton.contentDescription = getString(
+                        if (isScope) R.string.visualizer_spectrum else R.string.visualizer_oscilloscope
+                    )
                 }
-                launch {
-                    coverArt.collectIndexed { idx, src ->
-                        if (0 == idx) {
-                            src.applyTo(coverArtView)
-                        } else {
-                            coverArtView.withFadeout {
-                                src.applyTo(it)
-                            }
+            }
+            launch {
+                coverArt.collectIndexed { idx, src ->
+                    if (0 == idx) {
+                        src.applyTo(coverArtView)
+                    } else {
+                        coverArtView.withFadeout {
+                            src.applyTo(it)
                         }
                     }
                 }
             }
         }
+    }
 
     // Show/hide tab
     fun setIsVisible(isVisible: Boolean) {
@@ -201,7 +207,9 @@ class VisualizerFragment : Fragment() {
     }
 
     enum class State {
-        OFF, SPECTRUM, OSCILLOSCOPE;
+        OFF,
+        SPECTRUM,
+        OSCILLOSCOPE;
 
         val isVisible
             get() = this != OFF

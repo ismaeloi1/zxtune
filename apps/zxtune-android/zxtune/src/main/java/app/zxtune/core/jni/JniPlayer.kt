@@ -20,7 +20,14 @@ internal class JniPlayer(handleVal: Int) : Player {
 
     external override fun analyze(levels: ByteArray): Int
 
-    external override fun scope(data: ShortArray, points: Int): Int
+    external override fun scope(data: ShortArray, points: Int, playing: Long): Int
+
+    external override fun scopeStates(data: ByteArray, records: Int, playing: Long): Int
+
+    override val scopeStatus: String
+        get() = scopeStatus()
+
+    private external fun scopeStatus(): String
 
     override var position: TimeStamp
         get() = TimeStamp.fromMilliseconds(positionMs.toLong())

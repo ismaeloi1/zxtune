@@ -31,6 +31,7 @@ public final class AsyncPlayer implements Player {
   private final AtomicReference<SamplesSource> source;
   private final AtomicReference<TimeStamp> seekRequest;
   private final AsyncSamplesTarget target;
+  private final PlaybackTimeline timeline = new PlaybackTimeline();
   @Nullable
   private Thread thread;
 
@@ -48,6 +49,18 @@ public final class AsyncPlayer implements Player {
 
   public int getSampleRate() {
     return target.getSampleRate();
+  }
+
+  /**
+   * @return index of currently heard frame among rendered by src, negative if unknown
+   */
+  public long getPlaybackFrame(SamplesSource src) {
+    final long played = target.getPlayedFrames();
+    return played >= 0 ? timeline.positionOf(src, played) : -1;
+  }
+
+  public String getStatistics() {
+    return target.getStatistics();
   }
 
   @Override
@@ -81,6 +94,7 @@ public final class AsyncPlayer implements Player {
   private void syncPlay() {
     try {
       target.start();
+      timeline.reset();
       try {
         Log.d(TAG, "Start transfer cycle");
         transferCycle();
@@ -156,7 +170,9 @@ public final class AsyncPlayer implements Player {
         maybeSeek(src);
         final short[] buf = target.getBuffer();
         final TimeStamp pos = src.getPosition();
-        if (src.getSamples(buf)) {
+        final boolean hasSamples = src.getSamples(buf);
+        timeline.onRendered(src, buf.length / SamplesSource.Channels.COUNT, hasSamples);
+        if (hasSamples) {
           if (!commitSamples()) {
             break;
           } else if (pos.compareTo(src.getPosition()) > 0) {

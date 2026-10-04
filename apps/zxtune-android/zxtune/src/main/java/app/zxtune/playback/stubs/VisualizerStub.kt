@@ -15,7 +15,11 @@ object VisualizerStub : Visualizer {
 
     override fun getScope(data: ShortArray, points: Int) = 0
 
-    //TODO: remove
+    override fun getChipStates(data: ByteArray, records: Int) = 0
+
+    override fun getStatus() = ""
+
+    // TODO: remove
     @JvmStatic
     fun instance() = VisualizerStub
 }

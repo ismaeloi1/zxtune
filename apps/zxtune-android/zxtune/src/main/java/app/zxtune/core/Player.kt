@@ -6,7 +6,9 @@ import app.zxtune.TimeStamp
 /**
  * Player interface
  */
-interface Player : PropertiesContainer, Releaseable {
+interface Player :
+    PropertiesContainer,
+    Releaseable {
     /**
      * @return Position
      */
@@ -24,9 +26,23 @@ interface Player : PropertiesContainer, Releaseable {
     /**
      * @param data Array to store [channels][points] waveforms of oscilloscope
      * @param points Points per channel
+     * @param playing Index of currently heard frame among rendered by this player, negative if unknown
      * @return Packed layout of stored channels, see [app.zxtune.playback.ScopeLayout]
      */
-    fun scope(data: ShortArray, points: Int): Int
+    fun scope(data: ShortArray, points: Int, playing: Long): Int
+
+    /**
+     * @param data Array to store [chips][records][CHIP_STATE_SIZE] chip state snapshots
+     * @param records Records count per chip, last one is for currently heard frame
+     * @param playing see [scope]
+     * @return Count of stored chips
+     */
+    fun scopeStates(data: ByteArray, records: Int, playing: Long): Int
+
+    /**
+     * Emulation description and visualization statistics
+     */
+    val scopeStatus: String
 
     /**
      * Render next result.length bytes of sound data

@@ -15,8 +15,11 @@
 #include "make_ptr.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
+#include <cstring>
+#include <deque>
 #include <mutex>
 #include <vector>
 
@@ -98,6 +101,21 @@ namespace Player
       int64_t Offset = 0;
     };
 
+    // ~4s of 4ms snapshots
+    const std::size_t MAX_STATES = 1024;
+
+    struct StateRecord
+    {
+      int64_t Index = 0;
+      std::array<uint8_t, Scope::STATE_RECORD_SIZE> Data = {};
+    };
+
+    struct ChipStates
+    {
+      std::deque<StateRecord> Records;
+      std::vector<StateRecord> Staging;
+    };
+
     using Clock = std::chrono::steady_clock;
   }  // namespace ScopeDetails
 
@@ -117,7 +135,35 @@ namespace Player
       const std::scoped_lock guard(Lock);
       Voices.resize(std::min(count, MAX_VOICES));
       VoicesPerChip = perChip;
+      Chips.resize(perChip ? Voices.size() / perChip : 0);
       Triggers.clear();
+    }
+
+    uint_t GetStatePeriod() const override
+    {
+      return std::max<uint_t>(Samplerate / 250, 1);
+    }
+
+    // Render thread, no locks - collected data is flushed on Commit
+    void FeedState(uint_t chip, const uint8_t* registers, const uint8_t* osc, const uint8_t* env) override
+    {
+      if (chip >= Chips.size() || Chips[chip].Staging.size() >= MAX_STATES)
+      {
+        return;
+      }
+      const auto& voice = Voices[chip * VoicesPerChip];
+      StateRecord rec;
+      rec.Index = int64_t(voice.Samples.Size() + voice.Staging.size());
+      std::memcpy(rec.Data.data(), registers, 0x19);
+      std::memcpy(rec.Data.data() + 0x19, osc, 3);
+      std::memcpy(rec.Data.data() + 0x1c, env, 3);
+      Chips[chip].Staging.push_back(rec);
+    }
+
+    void SetDescription(const String& description) override
+    {
+      const std::scoped_lock guard(Lock);
+      Description = description;
     }
 
     // Render thread
@@ -163,6 +209,15 @@ namespace Player
         voice.Staging.clear();
         voice.Offset = int64_t(voice.Samples.Size()) - int64_t(Master.Size());
       }
+      for (auto& chip : Chips)
+      {
+        chip.Records.insert(chip.Records.end(), chip.Staging.begin(), chip.Staging.end());
+        chip.Staging.clear();
+        while (chip.Records.size() > MAX_STATES)
+        {
+          chip.Records.pop_front();
+        }
+      }
     }
 
     void Played(uint64_t start, uint_t samples) override
@@ -180,15 +235,18 @@ namespace Player
       ResetTriggers();
     }
 
-    Layout Get(uint_t maxChannels, uint_t points, int16_t* target) override
+    Layout Get(uint_t maxChannels, uint_t points, int64_t playing, int16_t* target) override
     {
-      LastRequest = Clock::now().time_since_epoch().count();
+      const auto start = Clock::now();
+      LastRequest = start.time_since_epoch().count();
       const std::scoped_lock guard(Lock);
       if (!HasPlayed || !points || !maxChannels)
       {
         return {};
       }
-      const auto pos = GetPlaybackPosition();
+      LastPlayingHint = playing;
+      // precise position from output device is preferred
+      const auto pos = playing >= 0 ? playing : GetPlaybackPosition();
       uint_t samplesPerFrame = Samplerate / 60;
       if (HasLastPos)
       {
@@ -224,9 +282,48 @@ namespace Player
           out[idx] = ring.At(begin + int64_t(idx) * renderSamples / points);
         }
       }
+      LastComputeUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
+      LastChannels = channels;
       Layout result;
       result.Channels = channels;
       result.PerChip = Voices.empty() ? 0 : VoicesPerChip;
+      return result;
+    }
+
+    uint_t GetStates(uint_t maxChips, uint_t records, int64_t playing, uint8_t* target) override
+    {
+      const std::scoped_lock guard(Lock);
+      if (!HasPlayed || !records || Chips.empty() || VoicesPerChip == 0)
+      {
+        return 0;
+      }
+      const auto pos = playing >= 0 ? playing : GetPlaybackPosition();
+      const auto chips = std::min<uint_t>(static_cast<uint_t>(Chips.size()), maxChips);
+      std::memset(target, 0, std::size_t(chips) * records * STATE_RECORD_SIZE);
+      for (uint_t chip = 0; chip < chips; ++chip)
+      {
+        const auto& recs = Chips[chip].Records;
+        const auto voicePos = pos + Voices[chip * VoicesPerChip].Offset;
+        // last record not newer than currently heard sample
+        auto end = std::upper_bound(recs.begin(), recs.end(), voicePos,
+                                    [](int64_t p, const StateRecord& rec) { return p < rec.Index; });
+        const auto avail = static_cast<uint_t>(std::min<std::ptrdiff_t>(end - recs.begin(), records));
+        auto* out = target + (std::size_t(chip) * records + (records - avail)) * STATE_RECORD_SIZE;
+        for (auto it = end - avail; it != end; ++it, out += STATE_RECORD_SIZE)
+        {
+          std::memcpy(out, it->Data.data(), STATE_RECORD_SIZE);
+        }
+      }
+      return chips;
+    }
+
+    String GetStatus() const override
+    {
+      const std::scoped_lock guard(Lock);
+      String result = Description;
+      result += result.empty() ? "" : "\n";
+      result += "scope: " + std::to_string(LastChannels) + " ch, trigger " + std::to_string(LastComputeUs) + "us, sync "
+                + (LastPlayingHint >= 0 ? "device" : "estimated");
       return result;
     }
 
@@ -253,7 +350,7 @@ namespace Player
   private:
     const uint_t Samplerate;
     const uint_t Stride;
-    std::mutex Lock;
+    mutable std::mutex Lock;
     Ring Master;
     std::vector<Voice> Voices;
     uint_t VoicesPerChip = 0;
@@ -265,6 +362,11 @@ namespace Player
     int64_t LastPos = 0;
     bool HasLastPos = false;
     std::atomic<Clock::rep> LastRequest = 0;
+    std::vector<ChipStates> Chips;
+    String Description;
+    int64_t LastComputeUs = 0;
+    uint_t LastChannels = 0;
+    int64_t LastPlayingHint = -1;
   };
 
   Scope::Ptr Scope::Create(uint_t samplerate)

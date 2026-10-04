@@ -19,6 +19,18 @@ interface SamplesTarget : Releaseable {
     val preferableBufferSize: Int
 
     /**
+     * @return frames actually presented to user since last start, negative if unknown
+     */
+    val playedFrames: Long
+        get() = -1
+
+    /**
+     * @return additional diagnostic information
+     */
+    val statistics: String
+        get() = ""
+
+    /**
      * Initialize target
      */
     @Throws(Exception::class)

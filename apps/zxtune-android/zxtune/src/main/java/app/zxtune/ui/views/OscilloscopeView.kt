@@ -36,13 +36,16 @@ private val LOG = Logger("Oscilloscope")
  * Separate voices are placed by column per chip, voice per row.
  */
 class OscilloscopeView @JvmOverloads constructor(
-    context: Context, attrs: AttributeSet? = null
+    context: Context,
+    attrs: AttributeSet? = null
 ) : GLSurfaceView(context, attrs) {
 
     @Volatile
     private var source: Visualizer? = null
     private val labelTextSize = TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_SP, LABEL_TEXT_SIZE_SP, resources.displayMetrics
+        TypedValue.COMPLEX_UNIT_SP,
+        LABEL_TEXT_SIZE_SP,
+        resources.displayMetrics
     )
     private val labelPadding = labelTextSize / 2
 
@@ -54,6 +57,14 @@ class OscilloscopeView @JvmOverloads constructor(
         setRenderer(ScopeRenderer())
         renderMode = RENDERMODE_WHEN_DIRTY
     }
+
+    @Volatile
+    private var statistics = ""
+
+    /**
+     * @return rendering statistics: real fps, frame interval, drawing time (including data request)
+     */
+    fun getStatistics() = statistics
 
     /**
      * @param src source of data or null to stop updating
@@ -130,8 +141,12 @@ class OscilloscopeView @JvmOverloads constructor(
         private var labelsLayout: ScopeLayout? = null
         private var width = 1
         private var height = 1
-        private var frames = 0L
+        private var frames = 0
         private var framesStart = 0L
+        private var drawNanos = 0L
+        private var maxDrawNanos = 0L
+        private var maxIntervalNanos = 0L
+        private var lastFrameStart = 0L
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             lineProgram = createProgram(LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER)
@@ -155,6 +170,12 @@ class OscilloscopeView @JvmOverloads constructor(
         }
 
         override fun onDrawFrame(gl: GL10?) {
+            val start = System.nanoTime()
+            drawFrame()
+            countFrame(start, System.nanoTime())
+        }
+
+        private fun drawFrame() {
             GLES20.glClearColor(0f, 0f, 0f, 1f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val src = source ?: return
@@ -178,7 +199,6 @@ class OscilloscopeView @JvmOverloads constructor(
             }
             GLES20.glDisableVertexAttribArray(linePosAttr)
             drawLabels(layout, grid)
-            countFrame()
         }
 
         // Center line of each cell
@@ -275,15 +295,33 @@ class OscilloscopeView @JvmOverloads constructor(
             bitmap.recycle()
         }
 
-        private fun countFrame() {
-            val now = System.nanoTime()
-            if (frames == 0L) {
-                framesStart = now
+        private fun countFrame(start: Long, end: Long) {
+            if (lastFrameStart != 0L) {
+                maxIntervalNanos = maxOf(maxIntervalNanos, start - lastFrameStart)
             }
-            if (++frames == 600L) {
-                val fps = frames * 1_000_000_000L / (now - framesStart).coerceAtLeast(1)
-                LOG.d { "$fps fps" }
+            lastFrameStart = start
+            if (frames == 0) {
+                framesStart = start
+            }
+            ++frames
+            drawNanos += end - start
+            maxDrawNanos = maxOf(maxDrawNanos, end - start)
+            val period = end - framesStart
+            if (period >= STATS_PERIOD_NS) {
+                val fps = frames * 1e9 / period
+                statistics = String.format(
+                    java.util.Locale.US,
+                    "gpu: %.1f fps, frame %.2f ms (max %.1f), draw %.2f ms (max %.1f)",
+                    fps,
+                    1000 / fps,
+                    maxIntervalNanos / 1e6,
+                    drawNanos / 1e6 / frames,
+                    maxDrawNanos / 1e6
+                )
                 frames = 0
+                drawNanos = 0
+                maxDrawNanos = 0
+                maxIntervalNanos = 0
             }
         }
     }
@@ -296,6 +334,7 @@ class OscilloscopeView @JvmOverloads constructor(
         private const val CELL_MARGIN = 0.01f
         private const val LABEL_TEXT_SIZE_SP = 12f
         private const val LABEL_ALPHA = 200
+        private const val STATS_PERIOD_NS = 1_000_000_000L
 
         private const val LINE_VERTEX_SHADER = """
             attribute vec2 aPos;

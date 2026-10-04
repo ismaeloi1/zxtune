@@ -3,8 +3,24 @@ package app.zxtune.playback.service
 import app.zxtune.core.Player
 import app.zxtune.playback.Visualizer
 
-internal class PlaybackVisualizer(private val player: Player) : Visualizer {
+/**
+ * @param playingFrame provides index of currently heard frame among rendered by player, negative if unknown
+ * @param outputStatus provides sound output diagnostics
+ */
+internal class PlaybackVisualizer(
+    private val player: Player,
+    private val playingFrame: () -> Long,
+    private val outputStatus: () -> String,
+) : Visualizer {
     override fun getSpectrum(levels: ByteArray) = player.analyze(levels)
 
-    override fun getScope(data: ShortArray, points: Int) = player.scope(data, points)
+    override fun getScope(data: ShortArray, points: Int) = player.scope(data, points, playingFrame())
+
+    override fun getChipStates(data: ByteArray, records: Int) = player.scopeStates(data, records, playingFrame())
+
+    override fun getStatus() = buildString {
+        appendLine(player.scopeStatus)
+        appendLine("output: ${outputStatus()}")
+        append("render: ${player.performance}% realtime")
+    }
 }

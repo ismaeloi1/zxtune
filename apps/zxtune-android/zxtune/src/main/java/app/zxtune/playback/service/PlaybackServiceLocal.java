@@ -136,7 +136,7 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
   private void restoreSession(Uri uri, TimeStamp position) throws Exception {
     final Iterator iter = IteratorFactory.createIterator(context, uri, playback.navigation);
     final PlayableItem newItem = iter.getItem();
-    final Holder newHolder = new Holder(newItem, player.getSampleRate());
+    final Holder newHolder = new Holder(newItem, player);
     newHolder.source.setPosition(position);
     if (iterator.compareAndSet(IteratorStub.instance(), iter)) {
       setNewHolder(newHolder);
@@ -182,7 +182,7 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
   }
 
   private void setNewItem(PlayableItem newItem) {
-    final Holder newHolder = new Holder(newItem, player.getSampleRate());
+    final Holder newHolder = new Holder(newItem, player);
     setNewHolder(newHolder);
   }
 
@@ -285,11 +285,14 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
       this.visualizer = VisualizerStub.instance();
     }
 
-    Holder(PlayableItem item, int samplerate) {
+    Holder(PlayableItem item, AsyncPlayer output) {
       this.item = item;
-      this.player = item.getModule().createPlayer(samplerate);
-      this.source = new SeekableSamplesSource(player);
-      this.visualizer = new PlaybackVisualizer(player);
+      this.player = item.getModule().createPlayer(output.getSampleRate());
+      final SamplesSource src = new SeekableSamplesSource(player);
+      this.source = src;
+      this.visualizer =
+          new PlaybackVisualizer(
+              player, () -> output.getPlaybackFrame(src), output::getStatistics);
     }
 
     final void release() {
@@ -448,6 +451,16 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
     @Override
     public int getScope(short[] data, int points) throws Exception {
       return holder.get().visualizer.getScope(data, points);
+    }
+
+    @Override
+    public int getChipStates(byte[] data, int records) throws Exception {
+      return holder.get().visualizer.getChipStates(data, records);
+    }
+
+    @Override
+    public String getStatus() throws Exception {
+      return holder.get().visualizer.getStatus();
     }
   }
 }

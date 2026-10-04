@@ -28,13 +28,35 @@ class SoundOutputSamplesTarget private constructor(
     private val effectControl: AudioEffectControl,
 ) : SamplesTarget {
 
+    private val positionTracker = AudioTrackPositionTracker(
+        target,
+        target.sampleRate,
+        bufferSize / (SamplesSource.Channels.COUNT * Sample.BYTES)
+    )
+
+    @Volatile
+    private var framesWritten = 0L
+
     override val sampleRate: Int
         get() = target.sampleRate
     override val preferableBufferSize: Int
         get() = bufferSize / Sample.BYTES
 
     @Synchronized
-    override fun start() = target.play()
+    override fun start() {
+        target.play()
+        framesWritten = 0
+        positionTracker.reset()
+    }
+
+    override val playedFrames
+        get() = positionTracker.playedFrames(framesWritten)
+
+    override val statistics
+        get() = buildString {
+            append("${target.sampleRate}Hz buffer=${bufferSize / (SamplesSource.Channels.COUNT * Sample.BYTES) * 1000 / target.sampleRate}ms")
+            append(if (positionTracker.isTimestampUsed) " sync=timestamp" else " sync=head latency=${positionTracker.lastLatencyMs}ms")
+        }
 
     @Synchronized
     override fun writeSamples(buffer: ShortArray) {
@@ -45,6 +67,7 @@ class SoundOutputSamplesTarget private constructor(
             if (written > 0) {
                 pos += written
                 toWrite -= written
+                framesWritten += written / SamplesSource.Channels.COUNT
             } else {
                 when {
                     target.playState == AudioTrack.PLAYSTATE_STOPPED -> break

@@ -64,6 +64,30 @@ public final class VisualizerProxy {
         return 0;
       }
     }
+
+    @Override
+    public int getChipStates(byte[] data, int records) {
+      try {
+        return delegate.getChipStates(data, records);
+      } catch (DeadObjectException e) {
+        throw new IllegalStateException(e);
+      } catch (RemoteException e) {
+        Log.w(TAG, e, "getChipStates()");
+        return 0;
+      }
+    }
+
+    @Override
+    public String getStatus() {
+      try {
+        return delegate.getStatus();
+      } catch (DeadObjectException e) {
+        throw new IllegalStateException(e);
+      } catch (RemoteException e) {
+        Log.w(TAG, e, "getStatus()");
+        return "";
+      }
+    }
   }
 
   private static class ServerStub extends IVisualizer.Stub {
@@ -103,6 +127,26 @@ public final class VisualizerProxy {
         Log.w(TAG, e, "getScope()");
       }
       return 0;
+    }
+
+    @Override
+    public int getChipStates(byte[] data, int records) {
+      try {
+        return delegate.getChipStates(data, records);
+      } catch (Exception e) {
+        Log.w(TAG, e, "getChipStates()");
+      }
+      return 0;
+    }
+
+    @Override
+    public String getStatus() {
+      try {
+        return delegate.getStatus();
+      } catch (Exception e) {
+        Log.w(TAG, e, "getStatus()");
+      }
+      return "";
     }
 
   }
