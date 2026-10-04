@@ -22,7 +22,7 @@ internal class JniPlayer(handleVal: Int) : Player {
 
     external override fun scope(data: ShortArray, points: Int, playing: Long): Int
 
-    external override fun scopeStates(data: ByteArray, records: Int, playing: Long): Int
+    external override fun scopeGauges(data: ByteArray, playing: Long): Int
 
     override val scopeStatus: String
         get() = scopeStatus()

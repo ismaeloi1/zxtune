@@ -66,13 +66,13 @@ public final class VisualizerProxy {
     }
 
     @Override
-    public int getChipStates(byte[] data, int records) {
+    public int getGauges(byte[] data) {
       try {
-        return delegate.getChipStates(data, records);
+        return delegate.getGauges(data);
       } catch (DeadObjectException e) {
         throw new IllegalStateException(e);
       } catch (RemoteException e) {
-        Log.w(TAG, e, "getChipStates()");
+        Log.w(TAG, e, "getGauges()");
         return 0;
       }
     }
@@ -130,11 +130,11 @@ public final class VisualizerProxy {
     }
 
     @Override
-    public int getChipStates(byte[] data, int records) {
+    public int getGauges(byte[] data) {
       try {
-        return delegate.getChipStates(data, records);
+        return delegate.getGauges(data);
       } catch (Exception e) {
-        Log.w(TAG, e, "getChipStates()");
+        Log.w(TAG, e, "getGauges()");
       }
       return 0;
     }

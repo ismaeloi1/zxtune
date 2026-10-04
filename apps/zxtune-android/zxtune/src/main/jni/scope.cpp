@@ -18,6 +18,7 @@
 #include <array>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <cstring>
 #include <deque>
 #include <mutex>
@@ -102,7 +103,12 @@ namespace Player
     };
 
     // ~4s of 4ms snapshots
-    const std::size_t MAX_STATES = 1024;
+    // ~8s of 1ms snapshots
+    const std::size_t MAX_STATES = 8192;
+    // gauges scale is in CPU cycles, PAL clock is precise enough for visualization
+    const uint_t CPU_CLOCK = 985248;
+    const uint_t FAST_COLUMN_CYCLES = 128;
+    const uint_t SLOW_COLUMN_CYCLES = 128 * 128;
 
     struct StateRecord
     {
@@ -114,6 +120,35 @@ namespace Player
     {
       std::deque<StateRecord> Records;
       std::vector<StateRecord> Staging;
+      // osc1..3, volume for each sample
+      std::array<Ring, 4> Fast;
+      std::array<std::vector<int16_t>, 4> FastStaging;
+    };
+
+    uint8_t EnvelopeLevel(uint_t env)
+    {
+      // dB scale down to -48dB
+      const float level = env ? 1.0f + 20.0f * std::log10(env / 255.0f) / 48.0f : 0.0f;
+      return static_cast<uint8_t>(std::clamp(level, 0.0f, 1.0f) * 255);
+    }
+
+    uint8_t FrequencyLevel(uint_t freq)
+    {
+      // logarithmic scale of 7 octaves
+      const float level = freq ? 1.0f + std::log2(freq / 65535.0f) / 7 : 0.0f;
+      return static_cast<uint8_t>(std::clamp(level, 0.0f, 1.0f) * 255);
+    }
+
+    struct Column
+    {
+      uint8_t Min = 255;
+      uint8_t Max = 0;
+
+      void Add(uint8_t val)
+      {
+        Min = std::min(Min, val);
+        Max = std::max(Max, val);
+      }
     };
 
     using Clock = std::chrono::steady_clock;
@@ -141,7 +176,28 @@ namespace Player
 
     uint_t GetStatePeriod() const override
     {
-      return std::max<uint_t>(Samplerate / 250, 1);
+      return std::max<uint_t>(Samplerate / 1000, 1);
+    }
+
+    // Render thread, no locks - collected data is flushed on Commit
+    void FeedChip(uint_t chip, const uint8_t* data, uint_t count) override
+    {
+      if (chip >= Chips.size())
+      {
+        return;
+      }
+      auto& staging = Chips[chip].FastStaging;
+      if (staging[0].size() >= RING_SIZE)
+      {
+        return;
+      }
+      for (uint_t idx = 0; idx < count; ++idx, data += 4)
+      {
+        for (uint_t val = 0; val < 4; ++val)
+        {
+          staging[val].push_back(data[val]);
+        }
+      }
     }
 
     // Render thread, no locks - collected data is flushed on Commit
@@ -213,6 +269,12 @@ namespace Player
       {
         chip.Records.insert(chip.Records.end(), chip.Staging.begin(), chip.Staging.end());
         chip.Staging.clear();
+        for (uint_t val = 0; val < 4; ++val)
+        {
+          auto& staging = chip.FastStaging[val];
+          chip.Fast[val].Push(staging.data(), static_cast<uint_t>(staging.size()), 1);
+          staging.clear();
+        }
         while (chip.Records.size() > MAX_STATES)
         {
           chip.Records.pop_front();
@@ -290,29 +352,18 @@ namespace Player
       return result;
     }
 
-    uint_t GetStates(uint_t maxChips, uint_t records, int64_t playing, uint8_t* target) override
+    uint_t GetGauges(uint_t maxChips, int64_t playing, uint8_t* target) override
     {
       const std::scoped_lock guard(Lock);
-      if (!HasPlayed || !records || Chips.empty() || VoicesPerChip == 0)
+      if (!HasPlayed || Chips.empty() || VoicesPerChip == 0)
       {
         return 0;
       }
       const auto pos = playing >= 0 ? playing : GetPlaybackPosition();
       const auto chips = std::min<uint_t>(static_cast<uint_t>(Chips.size()), maxChips);
-      std::memset(target, 0, std::size_t(chips) * records * STATE_RECORD_SIZE);
       for (uint_t chip = 0; chip < chips; ++chip)
       {
-        const auto& recs = Chips[chip].Records;
-        const auto voicePos = pos + Voices[chip * VoicesPerChip].Offset;
-        // last record not newer than currently heard sample
-        auto end = std::upper_bound(recs.begin(), recs.end(), voicePos,
-                                    [](int64_t p, const StateRecord& rec) { return p < rec.Index; });
-        const auto avail = static_cast<uint_t>(std::min<std::ptrdiff_t>(end - recs.begin(), records));
-        auto* out = target + (std::size_t(chip) * records + (records - avail)) * STATE_RECORD_SIZE;
-        for (auto it = end - avail; it != end; ++it, out += STATE_RECORD_SIZE)
-        {
-          std::memcpy(out, it->Data.data(), STATE_RECORD_SIZE);
-        }
+        FillGauges(Chips[chip], pos + Voices[chip * VoicesPerChip].Offset, target + std::size_t(chip) * GAUGES_SIZE);
       }
       return chips;
     }
@@ -328,6 +379,84 @@ namespace Player
     }
 
   private:
+    // end is index of currently heard sample in chip's samples
+    void FillGauges(const ChipStates& chip, int64_t end, uint8_t* target) const
+    {
+      auto store = [target](uint_t gauge, uint_t col, const Column& c) {
+        auto* out = target + (gauge * GAUGE_COLUMNS + col) * 2;
+        out[0] = c.Min > c.Max ? c.Max : c.Min;
+        out[1] = c.Max;
+      };
+      // fast gauges: wave1..3 (0..2) and volume (9)
+      const double fastSamples = double(FAST_COLUMN_CYCLES) * Samplerate / CPU_CLOCK;
+      uint8_t prev[4] = {};
+      for (uint_t col = 0; col < GAUGE_COLUMNS; ++col)
+      {
+        const auto from = end - int64_t((GAUGE_COLUMNS - col) * fastSamples);
+        const auto to = std::max(from + 1, end - int64_t((GAUGE_COLUMNS - col - 1) * fastSamples));
+        for (uint_t val = 0; val < 4; ++val)
+        {
+          Column c;
+          // connect with previous column for continuous line
+          if (col)
+          {
+            c.Add(prev[val]);
+          }
+          for (auto idx = from; idx < to; ++idx)
+          {
+            const auto raw = static_cast<uint8_t>(chip.Fast[val].At(idx));
+            prev[val] = val == 3 ? static_cast<uint8_t>(raw * 17) : raw;
+            c.Add(prev[val]);
+          }
+          store(val == 3 ? 9 : val, col, c);
+        }
+      }
+      // slow gauges from state snapshots
+      const auto& recs = chip.Records;
+      const double slowSamples = double(SLOW_COLUMN_CYCLES) * Samplerate / CPU_CLOCK;
+      const auto windowStart = end - int64_t(GAUGE_COLUMNS * slowSamples);
+      auto it = std::lower_bound(recs.begin(), recs.end(), windowStart,
+                                 [](const StateRecord& rec, int64_t p) { return rec.Index < p; });
+      const StateRecord* last = it != recs.begin() ? &*(it - 1) : nullptr;
+      for (uint_t col = 0; col < GAUGE_COLUMNS; ++col)
+      {
+        const auto to = end - int64_t((GAUGE_COLUMNS - col - 1) * slowSamples);
+        Column cols[8];
+        auto addRecord = [&cols](const StateRecord& rec) {
+          const auto& d = rec.Data;
+          for (uint_t voice = 0; voice < 3; ++voice)
+          {
+            cols[voice].Add(EnvelopeLevel(d[0x1c + voice]));
+            cols[3 + voice].Add(FrequencyLevel(d[voice * 7] | (d[voice * 7 + 1] << 8)));
+          }
+          cols[6].Add(static_cast<uint8_t>((d[0x17] >> 4) * 17));
+          cols[7].Add(static_cast<uint8_t>(((d[0x15] & 7) | (d[0x16] << 3)) >> 3));
+        };
+        if (last)
+        {
+          addRecord(*last);
+        }
+        for (; it != recs.end() && it->Index < to; ++it)
+        {
+          addRecord(*it);
+          last = &*it;
+        }
+        for (uint_t idx = 0; idx < 3; ++idx)
+        {
+          store(3 + idx, col, cols[idx]);
+          store(6 + idx, col, cols[3 + idx]);
+        }
+        store(10, col, cols[6]);
+        store(11, col, cols[7]);
+      }
+      auto* regs = target + GAUGES_COUNT * GAUGE_COLUMNS * 2;
+      std::memset(regs, 0, STATE_RECORD_SIZE);
+      if (last)
+      {
+        std::memcpy(regs, last->Data.data(), STATE_RECORD_SIZE);
+      }
+    }
+
     // Estimated currently playing sample in master samples index
     int64_t GetPlaybackPosition() const
     {

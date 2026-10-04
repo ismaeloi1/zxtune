@@ -16,7 +16,7 @@ internal class PlaybackVisualizer(
 
     override fun getScope(data: ShortArray, points: Int) = player.scope(data, points, playingFrame())
 
-    override fun getChipStates(data: ByteArray, records: Int) = player.scopeStates(data, records, playingFrame())
+    override fun getGauges(data: ByteArray) = player.scopeGauges(data, playingFrame())
 
     override fun getStatus() = buildString {
         appendLine(player.scopeStatus)

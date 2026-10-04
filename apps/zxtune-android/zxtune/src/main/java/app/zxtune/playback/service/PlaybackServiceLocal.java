@@ -454,8 +454,8 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
     }
 
     @Override
-    public int getChipStates(byte[] data, int records) throws Exception {
-      return holder.get().visualizer.getChipStates(data, records);
+    public int getGauges(byte[] data) throws Exception {
+      return holder.get().visualizer.getGauges(data);
     }
 
     @Override

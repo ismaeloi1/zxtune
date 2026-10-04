@@ -32,12 +32,11 @@ interface Player :
     fun scope(data: ShortArray, points: Int, playing: Long): Int
 
     /**
-     * @param data Array to store [chips][records][CHIP_STATE_SIZE] chip state snapshots
-     * @param records Records count per chip, last one is for currently heard frame
+     * @param data Array to store [chips][app.zxtune.playback.ChipGauges.SIZE] gauges data
      * @param playing see [scope]
      * @return Count of stored chips
      */
-    fun scopeStates(data: ByteArray, records: Int, playing: Long): Int
+    fun scopeGauges(data: ByteArray, playing: Long): Int
 
     /**
      * Emulation description and visualization statistics

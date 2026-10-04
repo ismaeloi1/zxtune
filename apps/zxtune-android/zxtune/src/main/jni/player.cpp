@@ -268,9 +268,9 @@ namespace
       return layout.Channels | (layout.PerChip << 16);
     }
 
-    uint_t GetScopeStates(uint_t maxChips, uint_t records, int64_t playing, uint8_t* data) const override
+    uint_t GetScopeGauges(uint_t maxChips, int64_t playing, uint8_t* data) const override
     {
-      return ScopeData->GetStates(maxChips, records, playing, data);
+      return ScopeData->GetGauges(maxChips, playing, data);
     }
 
     String GetScopeStatus() const override
@@ -434,18 +434,18 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scope(JNIEnv* env, jobj
   });
 }
 
-EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeStates(JNIEnv* env, jobject self, jbyteArray data,
-                                                                     jint records, jlong playing)
+EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeGauges(JNIEnv* env, jobject self, jbyteArray data,
+                                                                     jlong playing)
 {
   return Jni::Call(env, [=]() {
     // Should be before AutoArray calls - else causes 'using JNI after critical get' error
     const auto playerHandle = NativePlayerJni::GetHandle(env, self);
     const auto player = Player::Storage::Instance().Find(playerHandle);
     const Jni::AutoByteArray rawData(env, data);
-    if (rawData && player && records > 0)
+    if (rawData && player)
     {
-      const auto maxChips = rawData.Size() / (records * Player::Scope::STATE_RECORD_SIZE);
-      return player->GetScopeStates(maxChips, records, playing, rawData.Data());
+      const auto maxChips = rawData.Size() / Player::Scope::GAUGES_SIZE;
+      return player->GetScopeGauges(maxChips, playing, rawData.Data());
     }
     else
     {

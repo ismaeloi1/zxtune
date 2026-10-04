@@ -15,7 +15,7 @@ object VisualizerStub : Visualizer {
 
     override fun getScope(data: ShortArray, points: Int) = 0
 
-    override fun getChipStates(data: ByteArray, records: Int) = 0
+    override fun getGauges(data: ByteArray) = 0
 
     override fun getStatus() = ""
 

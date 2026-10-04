@@ -27,13 +27,12 @@ interface Visualizer {
     fun getScope(data: ShortArray, points: Int): Int
 
     /**
-     * Get chip state snapshots for currently playing moment (SID registers, see [ChipState])
-     * @param data array to store [chips][records][ChipState.SIZE] bytes
-     * @param records records per chip, last one is for currently heard moment, period is [ChipState.PERIOD_MS]
+     * Get JSIDPlay2-like gauges of chips state history ending at currently heard moment
+     * @param data array to store [chips][ChipGauges.SIZE] bytes
      * @return count of stored chips
      */
     @Throws(Exception::class)
-    fun getChipStates(data: ByteArray, records: Int): Int
+    fun getGauges(data: ByteArray): Int
 
     /**
      * @return Multiline human readable emulation and performance information
@@ -62,7 +61,39 @@ value class ScopeLayout(private val packed: Int) {
 }
 
 /**
- * Accessor to single record of [Visualizer.getChipStates] (SID registers snapshot)
+ * Accessor to single chip data of [Visualizer.getGauges]
+ */
+class ChipGauges(private val data: ByteArray, private val offset: Int) {
+    /**
+     * @return min/max level (0..255) of gauge column
+     */
+    fun min(gauge: Int, column: Int) = data[offset + (gauge * COLUMNS + column) * 2].toInt() and 0xff
+    fun max(gauge: Int, column: Int) = data[offset + (gauge * COLUMNS + column) * 2 + 1].toInt() and 0xff
+
+    /**
+     * Last registers snapshot
+     */
+    val state
+        get() = ChipState(data, offset + GAUGES * COLUMNS * 2)
+
+    companion object {
+        // see Player::Scope::GAUGES_SIZE
+        const val GAUGES = 12
+        const val COLUMNS = 256
+        const val SIZE = GAUGES * COLUMNS * 2 + ChipState.SIZE
+
+        // wave and volume columns are 128 CPU cycles, others are 16384 cycles
+        fun wave(voice: Int) = voice
+        fun envelope(voice: Int) = 3 + voice
+        fun frequency(voice: Int) = 6 + voice
+        const val VOLUME = 9
+        const val RESONANCE = 10
+        const val CUTOFF = 11
+    }
+}
+
+/**
+ * Accessor to SID registers snapshot
  */
 class ChipState(private val data: ByteArray, private val offset: Int) {
     private fun reg(idx: Int) = data[offset + idx].toInt() and 0xff
@@ -85,7 +116,6 @@ class ChipState(private val data: ByteArray, private val offset: Int) {
 
     companion object {
         const val SIZE = 32
-        const val PERIOD_MS = 4
         private const val OSC_OFFSET = 0x19
         private const val ENV_OFFSET = 0x1c
     }

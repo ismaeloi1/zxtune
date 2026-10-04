@@ -51,15 +51,21 @@ namespace Player
     //! @param target [channels][points] array of normalized samples
     virtual Layout Get(uint_t maxChannels, uint_t points, int64_t playing, int16_t* target) = 0;
 
-    //! Size of chip state record: registers 0x00..0x18, osc[3], env[3], padding
+    //! Gauges layout per chip (JSIDPlay2-like):
+    //! - GAUGES_COUNT gauges by GAUGE_COLUMNS columns of (min, max) bytes, normalized to 0..255
+    //!   order: wave1..3, envelope1..3, frequency1..3, volume, resonance, cutoff
+    //!   wave and volume columns are 128 cycles each, others are 16384 cycles each
+    //! - last chip registers 0x00..0x18 snapshot padded to STATE_RECORD_SIZE
+    static const uint_t GAUGES_COUNT = 12;
+    static const uint_t GAUGE_COLUMNS = 256;
     static const uint_t STATE_RECORD_SIZE = 32;
+    static const uint_t GAUGES_SIZE = GAUGES_COUNT * GAUGE_COLUMNS * 2 + STATE_RECORD_SIZE;
 
     //! @param maxChips maximum chips count to get
-    //! @param records records per chip to get, last one is for currently heard sample
     //! @param playing see Get
-    //! @param target [chips][records][STATE_RECORD_SIZE] array, missing records are zeroed
+    //! @param target [chips][GAUGES_SIZE]
     //! @return chips count actually stored
-    virtual uint_t GetStates(uint_t maxChips, uint_t records, int64_t playing, uint8_t* target) = 0;
+    virtual uint_t GetGauges(uint_t maxChips, int64_t playing, uint8_t* target) = 0;
 
     //! @return emulation description and scope statistics
     virtual String GetStatus() const = 0;

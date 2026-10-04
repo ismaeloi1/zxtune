@@ -11,6 +11,6 @@ interface IVisualizer {
   int getSpectrum(out byte[] levels);
   // data contains 16-bit native endian samples
   int getScope(out byte[] data, int points);
-  int getChipStates(out byte[] data, int records);
+  int getGauges(out byte[] data);
   String getStatus();
 }
