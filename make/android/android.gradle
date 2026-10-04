@@ -88,14 +88,8 @@ android {
         develop {
             minifyEnabled true
             debuggable true
-            // Allow developer builds without access to release keys (e.g. CI),
-            // installable side by side with the official build
-            if (localProperties.getProperty('key.store.password') != null) {
-                signingConfig = signingConfigs.release
-            } else {
-                signingConfig = signingConfigs.debug
-                applicationIdSuffix '.dev'
-            }
+            // Allow developer builds without access to release keys (e.g. CI)
+            signingConfig = localProperties.getProperty('key.store.password') != null ? signingConfigs.release : signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
                     file("${treeRoot}/make/android/proguard-rules-develop.pro")
         }
