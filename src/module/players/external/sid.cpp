@@ -30,12 +30,16 @@
 #include "make_ptr.h"
 
 #include "3rdparty/sidplayfp/src/builders/resid-builder/resid.h"
+#include "3rdparty/sidplayfp/src/builders/residfp-builder/residfp.h"
 #include "3rdparty/sidplayfp/src/config.h"
 #include "3rdparty/sidplayfp/src/sidmd5.h"
 #include "3rdparty/sidplayfp/src/sidplayfp/SidInfo.h"
 #include "3rdparty/sidplayfp/src/sidplayfp/SidTune.h"
 #include "3rdparty/sidplayfp/src/sidplayfp/SidTuneInfo.h"
 #include "3rdparty/sidplayfp/src/sidplayfp/sidplayfp.h"
+
+#include <algorithm>
+#include <memory>
 
 namespace Module::Sid
 {
@@ -131,7 +135,7 @@ namespace Module::Sid
     bool GetUseFilter() const
     {
       using namespace Parameters::ZXTune::Core::SID;
-      return 0 != Parameters::GetInteger(*Params, FILTER, FILTER_DEFAULT);
+      return 0 != Get(FILTER, FILTER_DEFAULT);
     }
 
     uint_t GetMuteMask() const
@@ -140,18 +144,117 @@ namespace Module::Sid
       return Parameters::GetInteger<uint_t>(*Params, CHANNELS_MASK, CHANNELS_MASK_DEFAULT);
     }
 
+    bool GetUseResidFp() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return ENGINE_RESIDFP == Get(ENGINE, ENGINE_DEFAULT);
+    }
+
+    SidConfig::sid_model_t GetModel() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return MODEL_8580 == Get(MODEL, MODEL_DEFAULT) ? SidConfig::MOS8580 : SidConfig::MOS6581;
+    }
+
+    bool GetForceModel() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return 0 != Get(MODEL_FORCE, MODEL_FORCE_DEFAULT);
+    }
+
+    SidConfig::c64_model_t GetClock() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      switch (Get(CLOCK, CLOCK_DEFAULT))
+      {
+      case CLOCK_NTSC:
+        return SidConfig::NTSC;
+      case CLOCK_OLD_NTSC:
+        return SidConfig::OLD_NTSC;
+      case CLOCK_DREAN:
+        return SidConfig::DREAN;
+      case CLOCK_PAL_M:
+        return SidConfig::PAL_M;
+      default:
+        return SidConfig::PAL;
+      }
+    }
+
+    bool GetForceClock() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return 0 != Get(CLOCK_FORCE, CLOCK_FORCE_DEFAULT);
+    }
+
+    bool GetDigiBoost() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return 0 != Get(DIGIBOOST, DIGIBOOST_DEFAULT);
+    }
+
+    double GetFilterBias() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return std::clamp(Get(FILTER_BIAS, FILTER_BIAS_DEFAULT), FILTER_BIAS_MIN, FILTER_BIAS_MAX);
+    }
+
+    double GetFilter6581Curve() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return GetPercent(FILTER_6581_CURVE, FILTER_6581_CURVE_DEFAULT);
+    }
+
+    double GetFilter6581Range() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return GetPercent(FILTER_6581_RANGE, FILTER_6581_RANGE_DEFAULT);
+    }
+
+    double GetFilter8580Curve() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return GetPercent(FILTER_8580_CURVE, FILTER_8580_CURVE_DEFAULT);
+    }
+
+    SidConfig::sid_cw_t GetCombinedWaveforms() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      switch (Get(COMBINED_WAVEFORMS, COMBINED_WAVEFORMS_DEFAULT))
+      {
+      case COMBINED_WAVEFORMS_WEAK:
+        return SidConfig::WEAK;
+      case COMBINED_WAVEFORMS_STRONG:
+        return SidConfig::STRONG;
+      default:
+        return SidConfig::AVERAGE;
+      }
+    }
+
   private:
     Parameters::IntType GetInterpolation() const
     {
       using namespace Parameters::ZXTune::Core::SID;
-      return Parameters::GetInteger(*Params, INTERPOLATION, INTERPOLATION_DEFAULT);
+      return Get(INTERPOLATION, INTERPOLATION_DEFAULT);
+    }
+
+    Parameters::IntType Get(Parameters::Identifier name, Parameters::IntType def) const
+    {
+      return Parameters::GetInteger(*Params, name, def);
+    }
+
+    double GetPercent(Parameters::Identifier name, Parameters::IntType def) const
+    {
+      return std::clamp<Parameters::IntType>(Get(name, def), 0, 100) / 100.0;
     }
 
   private:
     const Parameters::Accessor::Ptr Params;
   };
 
-  class VoicesSinkAdapter : public ReSIDBuilder::VoicesSink
+  // Snapshots of chip state are taken with ~4ms period
+  const uint_t STATE_RATE = 250;
+
+  class VoicesSinkAdapter : public SidVoicesSink
   {
   public:
     void voices(unsigned int chip, const short* samples, unsigned int count) override
@@ -159,7 +262,19 @@ namespace Module::Sid
       Scope->Feed(chip * VOICES, VOICES, samples, count);
     }
 
+    void state(unsigned int chip, const unsigned char* regs, const unsigned char* osc,
+               const unsigned char* env) override
+    {
+      Scope->FeedState(chip, regs, osc, env);
+    }
+
+    unsigned int statePeriod() const override
+    {
+      return StatePeriod;
+    }
+
     VoicesScope::Ptr Scope;
+    uint_t StatePeriod = 1;
   };
 
   class SidEngine
@@ -168,8 +283,7 @@ namespace Module::Sid
     using Ptr = std::unique_ptr<SidEngine>;
 
     SidEngine()
-      : Builder("resid")
-      , Config(Player.config())
+      : Config(Player.config())
     {}
 
     void Init(uint_t samplerate, const Parameters::Accessor& params)
@@ -178,36 +292,63 @@ namespace Module::Sid
       const auto basic = params.FindData(Parameters::ZXTune::Core::Plugins::SID::BASIC);
       const auto chargen = params.FindData(Parameters::ZXTune::Core::Plugins::SID::CHARGEN);
       Player.setRoms(GetData(kernal, GetKernalROM()), GetData(basic, GetBasicROM()), GetData(chargen, GetChargenROM()));
-      const uint_t chipsCount = Player.info().maxsids();
-      Builder.create(chipsCount);
+      ChipsCount = Player.info().maxsids();
       Config.frequency = samplerate;
       Config.powerOnDelay = SidConfig::MAX_POWER_ON_DELAY - 1;
+      Config.playback = Sound::Sample::CHANNELS == 1 ? SidConfig::MONO : SidConfig::STEREO;
+      Sink.StatePeriod = std::max<uint_t>(samplerate / STATE_RATE, 1);
     }
 
     void Load(SidTune& tune)
     {
       CheckSidplayError(Player.load(&tune));
+      Tune = &tune;
+      UpdateDescription();
     }
 
     void ApplyParameters(const SidParameters& sidParams)
     {
-      const auto newFastSampling = sidParams.GetFastSampling();
-      const auto newSamplingMethod = sidParams.GetSamplingMethod();
-      const auto newFilter = sidParams.GetUseFilter();
-      const auto newMuteMask = sidParams.GetMuteMask();
-      if (Config.fastSampling != newFastSampling || Config.samplingMethod != newSamplingMethod
-          || UseFilter != newFilter)
+      const bool useResidFp = sidParams.GetUseResidFp();
+      sidbuilder* const builder = useResidFp ? static_cast<sidbuilder*>(&GetResidFp()) : &GetResid();
+      const bool useFilter = sidParams.GetUseFilter();
+      if (useResidFp)
       {
-        Config.playback = Sound::Sample::CHANNELS == 1 ? SidConfig::MONO : SidConfig::STEREO;
-
-        Config.fastSampling = newFastSampling;
-        Config.samplingMethod = newSamplingMethod;
-        Builder.filter(UseFilter = newFilter);
-        Builder.bias(0.);
-
-        Config.sidEmulation = &Builder;
-        CheckSidplayError(Player.config(Config));
+        auto& fp = GetResidFp();
+        fp.filter(useFilter);
+        fp.filter6581Curve(sidParams.GetFilter6581Curve());
+        fp.filter6581Range(sidParams.GetFilter6581Range());
+        fp.filter8580Curve(sidParams.GetFilter8580Curve());
+        fp.combinedWaveformsStrength(sidParams.GetCombinedWaveforms());
       }
+      else
+      {
+        auto& resid = GetResid();
+        resid.filter(useFilter);
+        resid.bias(sidParams.GetFilterBias());
+      }
+
+      auto newConfig = Config;
+      newConfig.sidEmulation = builder;
+      newConfig.fastSampling = sidParams.GetFastSampling();
+      newConfig.samplingMethod = sidParams.GetSamplingMethod();
+      newConfig.defaultSidModel = sidParams.GetModel();
+      newConfig.forceSidModel = sidParams.GetForceModel();
+      newConfig.defaultC64Model = sidParams.GetClock();
+      newConfig.forceC64Model = sidParams.GetForceClock();
+      newConfig.digiBoost = sidParams.GetDigiBoost();
+      if (!IsConfigured || IsChanged(newConfig))
+      {
+        if (Config.sidEmulation && Config.sidEmulation != builder)
+        {
+          SetSink(Config.sidEmulation, nullptr);
+        }
+        Config = newConfig;
+        CheckSidplayError(Player.config(Config));
+        IsConfigured = true;
+        // voices of new chips are not muted
+        MuteMask = 0;
+      }
+      const auto newMuteMask = sidParams.GetMuteMask();
       for (uint_t chan = 0, diff = MuteMask ^ newMuteMask; diff != 0; ++chan, diff >>= 1)
       {
         if (diff & 1)
@@ -218,6 +359,8 @@ namespace Module::Sid
         }
       }
       MuteMask = newMuteMask;
+      UseFilter = useFilter;
+      UpdateDescription();
     }
 
     uint_t GetSoundFreq() const
@@ -229,7 +372,7 @@ namespace Module::Sid
     {
       static_assert(Sound::Sample::BITS == 16, "Incompatible sound bits count");
       // separate voices rendering is expensive, so do it only if required
-      Builder.voicesSink(Sink.Scope && Sink.Scope->IsActive() ? &Sink : nullptr);
+      SetSink(Config.sidEmulation, Sink.Scope && Sink.Scope->IsActive() ? &Sink : nullptr);
       Sound::Chunk result(samples);
       Player.play(safe_ptr_cast<short*>(result.data()), samples * Sound::Sample::CHANNELS);
       return result;
@@ -246,15 +389,118 @@ namespace Module::Sid
       if (Sink.Scope)
       {
         Sink.Scope->SetVoicesCount(chips * VOICES, VOICES);
+        UpdateDescription();
       }
-      Builder.voicesSink(nullptr);
+      SetSink(Config.sidEmulation, nullptr);
+    }
+
+  private:
+    ReSIDBuilder& GetResid()
+    {
+      if (!Resid)
+      {
+        Resid = std::make_unique<ReSIDBuilder>("reSID");
+        Resid->create(ChipsCount);
+      }
+      return *Resid;
+    }
+
+    ReSIDfpBuilder& GetResidFp()
+    {
+      if (!ResidFp)
+      {
+        ResidFp = std::make_unique<ReSIDfpBuilder>("reSIDfp");
+        ResidFp->create(ChipsCount);
+      }
+      return *ResidFp;
+    }
+
+    void SetSink(sidbuilder* builder, SidVoicesSink* sink)
+    {
+      if (builder && builder == Resid.get())
+      {
+        Resid->voicesSink(sink);
+      }
+      else if (builder && builder == ResidFp.get())
+      {
+        ResidFp->voicesSink(sink);
+      }
+    }
+
+    bool IsChanged(const SidConfig& cfg) const
+    {
+      return cfg.sidEmulation != Config.sidEmulation || cfg.fastSampling != Config.fastSampling
+             || cfg.samplingMethod != Config.samplingMethod || cfg.defaultSidModel != Config.defaultSidModel
+             || cfg.forceSidModel != Config.forceSidModel || cfg.defaultC64Model != Config.defaultC64Model
+             || cfg.forceC64Model != Config.forceC64Model || cfg.digiBoost != Config.digiBoost;
+    }
+
+    static const char* GetClockName(SidConfig::c64_model_t model)
+    {
+      switch (model)
+      {
+      case SidConfig::NTSC:
+        return "NTSC";
+      case SidConfig::OLD_NTSC:
+        return "NTSC (old)";
+      case SidConfig::DREAN:
+        return "Drean";
+      case SidConfig::PAL_M:
+        return "PAL-M";
+      default:
+        return "PAL";
+      }
+    }
+
+    void UpdateDescription()
+    {
+      if (!Sink.Scope || !Tune)
+      {
+        return;
+      }
+      const auto& info = *Tune->getInfo();
+      String clock;
+      if (Config.forceC64Model || info.clockSpeed() == SidTuneInfo::CLOCK_UNKNOWN
+          || info.clockSpeed() == SidTuneInfo::CLOCK_ANY)
+      {
+        clock = GetClockName(Config.defaultC64Model);
+      }
+      else
+      {
+        clock = info.clockSpeed() == SidTuneInfo::CLOCK_NTSC ? "NTSC" : "PAL";
+      }
+      const auto chips = std::max(info.sidChips(), 1);
+      String models;
+      for (int chip = 0; chip < chips; ++chip)
+      {
+        const auto tuneModel = info.sidModel(chip);
+        const bool is8580 = Config.forceSidModel || tuneModel == SidTuneInfo::SIDMODEL_UNKNOWN
+                                    || tuneModel == SidTuneInfo::SIDMODEL_ANY
+                                ? Config.defaultSidModel == SidConfig::MOS8580
+                                : tuneModel == SidTuneInfo::SIDMODEL_8580;
+        models += (chip ? "+" : "");
+        models += is8580 ? "MOS8580" : "MOS6581";
+      }
+      const auto* engine = Config.sidEmulation == ResidFp.get() ? "reSIDfp" : "reSID";
+      const auto* sampling = Config.samplingMethod == SidConfig::RESAMPLE_INTERPOLATE
+                                 ? "resample"
+                                 : (Config.fastSampling ? "fast" : "interpolate");
+      String speed = Player.info().speedString() ? Player.info().speedString() : "";
+      Sink.Scope->SetDescription(clock + ", " + models + ", " + engine + ", " + sampling
+                                 + (UseFilter ? "" : ", no filter") + "\n" + info.formatString() + ", " + speed + ", "
+                                 + std::to_string(info.sidChips()) + " SID, song " + std::to_string(info.currentSong())
+                                 + "/" + std::to_string(info.songs()));
     }
 
   private:
     sidplayfp Player;
-    ReSIDBuilder Builder;
+    std::unique_ptr<ReSIDBuilder> Resid;
+    std::unique_ptr<ReSIDfpBuilder> ResidFp;
     SidConfig Config;
     VoicesSinkAdapter Sink;
+    uint_t ChipsCount = 1;
+    bool IsConfigured = false;
+    const SidTune* Tune = nullptr;
 
     // cache filter flag
     bool UseFilter = false;

@@ -10,6 +10,7 @@
 
 #pragma once
 
+#include "string_type.h"
 #include "types.h"
 
 #include <memory>
@@ -31,6 +32,18 @@ namespace Module
 
     //! @brief Check if data is consumed now, so separate voices rendering may be skipped to save resources
     virtual bool IsActive() const = 0;
+
+    //! @brief Chip state snapshots period in samples
+    virtual uint_t GetStatePeriod() const = 0;
+
+    //! @brief Store chip state snapshot, taken each GetStatePeriod() samples of chip's voices
+    //! @param registers last values written to registers of SID-like chip (0x00..0x18)
+    //! @param osc oscillator outputs of each voice (as OSC3)
+    //! @param env envelope outputs of each voice (as ENV3)
+    virtual void FeedState(uint_t chip, const uint8_t* registers, const uint8_t* osc, const uint8_t* env) = 0;
+
+    //! @brief Human readable description of emulation parameters, e.g. "PAL, MOS8580, reSIDfp"
+    virtual void SetDescription(const String& description) = 0;
 
     //! @brief Store part of rendered voices
     //! @param firstVoice index of the first voice in block

@@ -222,5 +222,80 @@ namespace Parameters::ZXTune::Core
     //! Parameter name
     const auto INTERPOLATION = PREFIX + "interpolation"_id;
     //@}
+
+    //@{
+    //! @name Emulation engine
+    const IntType ENGINE_RESID = 0;
+    const IntType ENGINE_RESIDFP = 1;
+    //! Default is reSIDfp
+    const IntType ENGINE_DEFAULT = ENGINE_RESIDFP;
+    //! Parameter name
+    const auto ENGINE = PREFIX + "engine"_id;
+    //@}
+
+    //@{
+    //! @name Chip model. Used for tunes with unknown model, for all tunes if forced
+    const IntType MODEL_6581 = 0;
+    const IntType MODEL_8580 = 1;
+    //! Default is 6581
+    const IntType MODEL_DEFAULT = MODEL_6581;
+    //! Parameter name
+    const auto MODEL = PREFIX + "model"_id;
+    //! Force model (0/1), default is not
+    const IntType MODEL_FORCE_DEFAULT = 0;
+    const auto MODEL_FORCE = PREFIX + "model_force"_id;
+    //@}
+
+    //@{
+    //! @name C64 clock model. Used for tunes with unknown clock, for all tunes if forced
+    const IntType CLOCK_PAL = 0;
+    const IntType CLOCK_NTSC = 1;
+    const IntType CLOCK_OLD_NTSC = 2;
+    const IntType CLOCK_DREAN = 3;
+    const IntType CLOCK_PAL_M = 4;
+    //! Default is PAL
+    const IntType CLOCK_DEFAULT = CLOCK_PAL;
+    //! Parameter name
+    const auto CLOCK = PREFIX + "clock"_id;
+    //! Force clock (0/1), default is not
+    const IntType CLOCK_FORCE_DEFAULT = 0;
+    const auto CLOCK_FORCE = PREFIX + "clock_force"_id;
+    //@}
+
+    //@{
+    //! @name 8580 digi boost (0/1)
+    const IntType DIGIBOOST_DEFAULT = 0;
+    const auto DIGIBOOST = PREFIX + "digiboost"_id;
+    //@}
+
+    //@{
+    //! @name reSID 6581 filter DAC bias in millivolts, -500..500
+    const IntType FILTER_BIAS_MIN = -500;
+    const IntType FILTER_BIAS_MAX = 500;
+    const IntType FILTER_BIAS_DEFAULT = 0;
+    const auto FILTER_BIAS = PREFIX + "filter_bias"_id;
+    //@}
+
+    //@{
+    //! @name reSIDfp filters tuning in percents, 0..100
+    //! 6581 filter curve: 0 - light, 100 - dark
+    const IntType FILTER_6581_CURVE_DEFAULT = 50;
+    const auto FILTER_6581_CURVE = PREFIX + "filter_6581_curve"_id;
+    //! 6581 filter range: 0 - dark, 100 - light
+    const IntType FILTER_6581_RANGE_DEFAULT = 50;
+    const auto FILTER_6581_RANGE = PREFIX + "filter_6581_range"_id;
+    //! 8580 filter curve: 0 - light, 100 - dark
+    const IntType FILTER_8580_CURVE_DEFAULT = 50;
+    const auto FILTER_8580_CURVE = PREFIX + "filter_8580_curve"_id;
+    //@}
+
+    //@{
+    //! @name reSIDfp combined waveforms strength
+    const IntType COMBINED_WAVEFORMS_AVERAGE = 0;
+    const IntType COMBINED_WAVEFORMS_WEAK = 1;
+    const IntType COMBINED_WAVEFORMS_STRONG = 2;
+    const IntType COMBINED_WAVEFORMS_DEFAULT = COMBINED_WAVEFORMS_AVERAGE;
+    const auto COMBINED_WAVEFORMS = PREFIX + "combined_waveforms"_id;
+    //@}
   }  // namespace SID
 }  // namespace Parameters::ZXTune::Core
