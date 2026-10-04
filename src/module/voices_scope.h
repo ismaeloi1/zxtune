@@ -42,6 +42,10 @@ namespace Module
     //! @param env envelope outputs of each voice (as ENV3)
     virtual void FeedState(uint_t chip, const uint8_t* registers, const uint8_t* osc, const uint8_t* env) = 0;
 
+    //! @brief Store high resolution chip data aligned with voices samples
+    //! @param data interleaved [count][4]: oscillator outputs of 3 voices (as OSC3), master volume (0..15)
+    virtual void FeedChip(uint_t chip, const uint8_t* data, uint_t count) = 0;
+
     //! @brief Human readable description of emulation parameters, e.g. "PAL, MOS8580, reSIDfp"
     virtual void SetDescription(const String& description) = 0;
 

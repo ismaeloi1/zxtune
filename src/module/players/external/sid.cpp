@@ -40,6 +40,8 @@
 
 #include <algorithm>
 #include <memory>
+#include <thread>
+#include <vector>
 
 namespace Module::Sid
 {
@@ -251,15 +253,27 @@ namespace Module::Sid
     const Parameters::Accessor::Ptr Params;
   };
 
-  // Snapshots of chip state are taken with ~4ms period
-  const uint_t STATE_RATE = 250;
+  // Snapshots of chip state are taken with ~1ms period
+  const uint_t STATE_RATE = 1000;
 
   class VoicesSinkAdapter : public SidVoicesSink
   {
   public:
     void voices(unsigned int chip, const short* samples, unsigned int count) override
     {
-      Scope->Feed(chip * VOICES, VOICES, samples, count);
+      // split voices outputs and chip data
+      VoicesData.resize(count * VOICES);
+      ChipData.resize(count * 4);
+      for (unsigned int idx = 0; idx < count; ++idx, samples += SidVoicesSink::STRIDE)
+      {
+        std::copy_n(samples, VOICES, VoicesData.data() + idx * VOICES);
+        for (unsigned int val = 0; val < 4; ++val)
+        {
+          ChipData[idx * 4 + val] = static_cast<uint8_t>(samples[VOICES + val]);
+        }
+      }
+      Scope->Feed(chip * VOICES, VOICES, VoicesData.data(), count);
+      Scope->FeedChip(chip, ChipData.data(), count);
     }
 
     void state(unsigned int chip, const unsigned char* regs, const unsigned char* osc,
@@ -275,6 +289,10 @@ namespace Module::Sid
 
     VoicesScope::Ptr Scope;
     uint_t StatePeriod = 1;
+
+  private:
+    std::vector<int16_t> VoicesData;
+    std::vector<uint8_t> ChipData;
   };
 
   class SidEngine
@@ -303,11 +321,15 @@ namespace Module::Sid
     {
       CheckSidplayError(Player.load(&tune));
       Tune = &tune;
+      // new chips are created, so voices are not muted
+      MuteMask = 0;
       UpdateDescription();
     }
 
-    void ApplyParameters(const SidParameters& sidParams)
+    //! @return true if tune should be reloaded to apply new configuration
+    bool ApplyParameters(const SidParameters& sidParams)
     {
+      bool reloadRequired = false;
       const bool useResidFp = sidParams.GetUseResidFp();
       sidbuilder* const builder = useResidFp ? static_cast<sidbuilder*>(&GetResidFp()) : &GetResid();
       const bool useFilter = sidParams.GetUseFilter();
@@ -343,10 +365,10 @@ namespace Module::Sid
           SetSink(Config.sidEmulation, nullptr);
         }
         Config = newConfig;
+        // models and engine are applied by sidplayfp only on tune loading
+        reloadRequired = IsConfigured && Tune != nullptr;
         CheckSidplayError(Player.config(Config));
         IsConfigured = true;
-        // voices of new chips are not muted
-        MuteMask = 0;
       }
       const auto newMuteMask = sidParams.GetMuteMask();
       for (uint_t chan = 0, diff = MuteMask ^ newMuteMask; diff != 0; ++chan, diff >>= 1)
@@ -361,6 +383,7 @@ namespace Module::Sid
       MuteMask = newMuteMask;
       UseFilter = useFilter;
       UpdateDescription();
+      return reloadRequired;
     }
 
     uint_t GetSoundFreq() const
@@ -576,9 +599,23 @@ namespace Module::Sid
 
     void ApplyParameters()
     {
-      if (SidParams.IsChanged())
+      if (SidParams.IsChanged() && Engine->ApplyParameters(*SidParams))
       {
-        Engine->ApplyParameters(*SidParams);
+        Reload();
+      }
+    }
+
+    // Apply new emulation configuration keeping current position
+    void Reload()
+    {
+      const auto pos = State.At();
+      State.Reset();
+      Engine->Load(*Tune);
+      // restore muted voices
+      Engine->ApplyParameters(*SidParams);
+      if (const auto toSkip = State.Seek(pos))
+      {
+        Engine->Skip(GetSamples(toSkip));
       }
     }
 
@@ -662,8 +699,19 @@ namespace Module::Sid
     }
   };
 
+  // reSIDfp filter models tables are built on first use (thread-safe) and take noticeable time,
+  // so prepare them in background to make the first tune start faster
+  void WarmUpEngines()
+  {
+    std::thread([]() {
+      ReSIDfpBuilder builder("warmup");
+      builder.create(1);
+    }).detach();
+  }
+
   MultitrackFactory::Ptr CreateFactory()
   {
+    WarmUpEngines();
     return MakePtr<Factory>();
   }
 }  // namespace Module::Sid
