@@ -21,6 +21,7 @@
  */
 
 #include "residfp-emu.h"
+#include "residfp.h"
 
 #include <sstream>
 #include <string>
@@ -51,7 +52,12 @@ const char* ReSIDfp::getCredits()
 
 ReSIDfp::ReSIDfp(sidbuilder *builder) :
     sidemu(builder),
-    m_sid(*(new reSIDfp::SID))
+    m_sid(*(new reSIDfp::SID)),
+    m_residBuilder(static_cast<ReSIDfpBuilder*>(builder)),
+    m_voicesBuffer(nullptr),
+    m_chipIndex(0),
+    m_regs(),
+    m_stateSamples(0)
 {
     m_buffer = new short[OUTPUTBUFFERSIZE];
     reset(0);
@@ -61,6 +67,22 @@ ReSIDfp::~ReSIDfp()
 {
     delete &m_sid;
     delete[] m_buffer;
+    delete[] m_voicesBuffer;
+}
+
+bool ReSIDfp::lock(EventScheduler *scheduler)
+{
+    if (!sidemu::lock(scheduler))
+        return false;
+    m_chipIndex = m_residBuilder->chipLocked();
+    return true;
+}
+
+void ReSIDfp::unlock()
+{
+    if (isLocked)
+        m_residBuilder->chipUnlocked();
+    sidemu::unlock();
 }
 
 void ReSIDfp::filter6581Curve(double filterCurve)
@@ -84,6 +106,8 @@ void ReSIDfp::reset(uint8_t volume)
     m_accessClk = 0;
     m_sid.reset();
     m_sid.write(0x18, volume);
+    std::fill(m_regs, m_regs + sizeof(m_regs), 0);
+    m_regs[0x18] = volume;
 }
 
 uint8_t ReSIDfp::read(uint_least8_t addr)
@@ -96,13 +120,31 @@ void ReSIDfp::write(uint_least8_t addr, uint8_t data)
 {
     clock();
     m_sid.write(addr, data);
+    if (addr < sizeof(m_regs))
+        m_regs[addr] = data;
 }
 
 void ReSIDfp::clock()
 {
     const event_clock_t cycles = eventScheduler->getTime(EVENT_CLOCK_PHI1) - m_accessClk;
     m_accessClk += cycles;
-    m_bufferpos += m_sid.clock(cycles, m_buffer+m_bufferpos);
+    SidVoicesSink* const sink = m_muted ? nullptr : m_residBuilder->getVoicesSink();
+    if (sink && !m_voicesBuffer)
+        m_voicesBuffer = new short[OUTPUTBUFFERSIZE * 3];
+    m_sid.setVoiceOutput(sink ? m_voicesBuffer : nullptr);
+    const int samples = m_sid.clock(cycles, m_buffer+m_bufferpos);
+    m_bufferpos += samples;
+    if (sink && samples > 0)
+    {
+        sink->voices(m_chipIndex, m_voicesBuffer, samples);
+        const unsigned int period = sink->statePeriod();
+        for (m_stateSamples += samples; m_stateSamples >= period; m_stateSamples -= period)
+        {
+            const uint8_t osc[3] = {m_sid.readOSC(0), m_sid.readOSC(1), m_sid.readOSC(2)};
+            const uint8_t env[3] = {m_sid.readENV(0), m_sid.readENV(1), m_sid.readENV(2)};
+            sink->state(m_chipIndex, m_regs, osc, env);
+        }
+    }
 }
 
 void ReSIDfp::filter(bool enable)

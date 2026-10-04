@@ -25,6 +25,7 @@
 
 #include "sidplayfp/sidbuilder.h"
 #include "sidplayfp/siddefs.h"
+#include "sidvoicessink.h"
 
 /**
  * ReSID Builder Class
@@ -35,18 +36,7 @@ public:
     /**
      * Receiver of separate voices output (zxtune oscilloscope).
      */
-    class VoicesSink
-    {
-    public:
-        virtual ~VoicesSink() = default;
-
-        /**
-         * @param chip index of chip in order of locking (0 is the main one)
-         * @param samples interleaved samples of 3 voices
-         * @param count samples count per voice
-         */
-        virtual void voices(unsigned int chip, const short* samples, unsigned int count) = 0;
-    };
+    using VoicesSink = SidVoicesSink;
 
 
     ReSIDBuilder(const char * const name) :

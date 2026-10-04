@@ -16,6 +16,10 @@ source_files += src/utils/md5Factory.cpp
 
 source_dirs += src/builders/resid-builder
 
+# reSIDfp engine
+source_dirs += src/builders/residfp-builder src/builders/residfp-builder/residfp
+source_files += src/builders/residfp-builder/residfp/resample/SincResampler.cpp
+
 source_files += $(foreach src,dac envelope extfilt filter pot sid version voice wave,src/builders/resid-builder/resid/$(src).cc)
 
 includes.files += defines.h

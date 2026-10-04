@@ -51,6 +51,8 @@ private:
     ReSIDBuilder* const m_residBuilder;
     short        *m_voicesBuffer;
     unsigned int  m_chipIndex;
+    uint8_t       m_regs[0x19];
+    unsigned int  m_stateSamples;
 
 public:
     static const char* getCredits();

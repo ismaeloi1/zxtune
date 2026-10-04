@@ -149,6 +149,15 @@ SID::SID() :
 
     muted[0] = muted[1] = muted[2] = false;
 
+    voiceOutput = nullptr;
+    for (int i = 0; i < 3; i++)
+    {
+        voiceFilter6581[i] = new Filter6581();
+        voiceFilter8580[i] = new Filter8580();
+        voiceExternalFilter[i] = new ExternalFilter();
+        voiceValue[i] = 0;
+    }
+
     setChipModel(MOS8580);
     reset();
 }
@@ -158,29 +167,62 @@ SID::~SID()
     delete filter6581;
     delete filter8580;
     delete externalFilter;
+    for (int i = 0; i < 3; i++)
+    {
+        delete voiceFilter6581[i];
+        delete voiceFilter8580[i];
+        delete voiceExternalFilter[i];
+    }
     delete potX;
     delete potY;
+}
+
+unsigned char SID::readOSC(int i) const
+{
+    return voice[i]->wave()->readOSC();
+}
+
+unsigned char SID::readENV(int i) const
+{
+    return voice[i]->envelope()->readENV();
 }
 
 void SID::setFilter6581Curve(double filterCurve)
 {
     filter6581->setFilterCurve(filterCurve);
+    for (int i = 0; i < 3; i++)
+    {
+        voiceFilter6581[i]->setFilterCurve(filterCurve);
+    }
 }
 
 void SID::setFilter6581Range(double adjustment)
 {
     filter6581->setFilterRange(adjustment);
+    for (int i = 0; i < 3; i++)
+    {
+        voiceFilter6581[i]->setFilterRange(adjustment);
+    }
 }
 
 void SID::setFilter8580Curve(double filterCurve)
 {
     filter8580->setFilterCurve(filterCurve);
+    for (int i = 0; i < 3; i++)
+    {
+        voiceFilter8580[i]->setFilterCurve(filterCurve);
+    }
 }
 
 void SID::enableFilter(bool enable)
 {
     filter6581->enable(enable);
     filter8580->enable(enable);
+    for (int i = 0; i < 3; i++)
+    {
+        voiceFilter6581[i]->enable(enable);
+        voiceFilter8580[i]->enable(enable);
+    }
 }
 
 void SID::voiceSync(bool sync)
@@ -223,12 +265,20 @@ void SID::setChipModel(ChipModel model)
     {
     case MOS6581:
         filter = filter6581;
+        for (int i = 0; i < 3; i++)
+        {
+            voiceFilter[i] = voiceFilter6581[i];
+        }
         scaleFactor = 3;
         modelTTL = BUS_TTL_6581;
         break;
 
     case MOS8580:
         filter = filter8580;
+        for (int i = 0; i < 3; i++)
+        {
+            voiceFilter[i] = voiceFilter8580[i];
+        }
         scaleFactor = 5;
         modelTTL = BUS_TTL_8580;
         break;
@@ -315,6 +365,12 @@ void SID::reset()
     filter6581->reset();
     filter8580->reset();
     externalFilter->reset();
+    for (int i = 0; i < 3; i++)
+    {
+        voiceFilter6581[i]->reset();
+        voiceFilter8580[i]->reset();
+        voiceExternalFilter[i]->reset();
+    }
 
     if (resampler.get())
     {
@@ -461,21 +517,41 @@ void SID::write(int offset, unsigned char value)
     case 0x15: // Filter cut off frequency (bits #0-#2)
         filter6581->writeFC_LO(value);
         filter8580->writeFC_LO(value);
+        for (int i = 0; i < 3; i++)
+        {
+            voiceFilter6581[i]->writeFC_LO(value);
+            voiceFilter8580[i]->writeFC_LO(value);
+        }
         break;
 
     case 0x16: // Filter cut off frequency (bits #3-#10)
         filter6581->writeFC_HI(value);
         filter8580->writeFC_HI(value);
+        for (int i = 0; i < 3; i++)
+        {
+            voiceFilter6581[i]->writeFC_HI(value);
+            voiceFilter8580[i]->writeFC_HI(value);
+        }
         break;
 
     case 0x17: // Filter control
         filter6581->writeRES_FILT(value);
         filter8580->writeRES_FILT(value);
+        for (int i = 0; i < 3; i++)
+        {
+            voiceFilter6581[i]->writeRES_FILT(value);
+            voiceFilter8580[i]->writeRES_FILT(value);
+        }
         break;
 
     case 0x18: // Volume and filter modes
         filter6581->writeMODE_VOL(value);
         filter8580->writeMODE_VOL(value);
+        for (int i = 0; i < 3; i++)
+        {
+            voiceFilter6581[i]->writeMODE_VOL(value);
+            voiceFilter8580[i]->writeMODE_VOL(value);
+        }
         break;
 
     default:
@@ -489,6 +565,10 @@ void SID::write(int offset, unsigned char value)
 void SID::setSamplingParameters(double clockFrequency, SamplingMethod method, double samplingFrequency, double highestAccurateFrequency)
 {
     externalFilter->setClockFrequency(clockFrequency);
+    for (int i = 0; i < 3; i++)
+    {
+        voiceExternalFilter[i]->setClockFrequency(clockFrequency);
+    }
 
     switch (method)
     {

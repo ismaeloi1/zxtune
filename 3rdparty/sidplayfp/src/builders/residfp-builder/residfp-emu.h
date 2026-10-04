@@ -34,6 +34,7 @@
 
 
 class sidbuilder;
+class ReSIDfpBuilder;
 
 namespace libsidplayfp
 {
@@ -42,6 +43,12 @@ class ReSIDfp final : public sidemu
 {
 private:
     reSIDfp::SID &m_sid;
+
+    ReSIDfpBuilder* const m_residBuilder;
+    short        *m_voicesBuffer;
+    unsigned int  m_chipIndex;
+    uint8_t       m_regs[0x19];
+    unsigned int  m_stateSamples;
 
 public:
     static const char* getCredits();
@@ -57,6 +64,9 @@ public:
 
     // c64sid functions
     void reset(uint8_t volume) override;
+
+    bool lock(EventScheduler *scheduler) override;
+    void unlock() override;
 
     // Standard SID emu functions
     void clock() override;

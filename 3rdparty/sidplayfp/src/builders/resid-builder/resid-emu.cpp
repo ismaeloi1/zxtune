@@ -24,6 +24,7 @@
 #include "resid.h"
 
 #include <cstdio>
+#include <algorithm>
 #include <cstring>
 #include <sstream>
 #include <string>
@@ -58,7 +59,9 @@ ReSID::ReSID(sidbuilder *builder) :
     m_voiceMask(0x07),
     m_residBuilder(static_cast<ReSIDBuilder*>(builder)),
     m_voicesBuffer(nullptr),
-    m_chipIndex(0)
+    m_chipIndex(0),
+    m_regs(),
+    m_stateSamples(0)
 {
     m_buffer = new short[OUTPUTBUFFERSIZE];
     reset(0);
@@ -97,6 +100,8 @@ void ReSID::reset(uint8_t volume)
     m_accessClk = 0;
     m_sid.reset();
     m_sid.write(0x18, volume);
+    std::fill(m_regs, m_regs + sizeof(m_regs), 0);
+    m_regs[0x18] = volume;
 }
 
 uint8_t ReSID::read(uint_least8_t addr)
@@ -109,6 +114,8 @@ void ReSID::write(uint_least8_t addr, uint8_t data)
 {
     clock();
     m_sid.write(addr, data);
+    if (addr < sizeof(m_regs))
+        m_regs[addr] = data;
 }
 
 void ReSID::clock()
@@ -122,7 +129,18 @@ void ReSID::clock()
     const int samples = m_sid.clock(cycles, m_muted ? nullptr : (short *) m_buffer + m_bufferpos, OUTPUTBUFFERSIZE - m_bufferpos, 1);
     m_bufferpos += samples;
     if (sink && samples > 0)
+    {
         sink->voices(m_chipIndex, m_voicesBuffer, samples);
+        const unsigned int period = sink->statePeriod();
+        for (m_stateSamples += samples; m_stateSamples >= period; m_stateSamples -= period)
+        {
+            const uint8_t osc[3] = {static_cast<uint8_t>(m_sid.read_osc(0)), static_cast<uint8_t>(m_sid.read_osc(1)),
+                                    static_cast<uint8_t>(m_sid.read_osc(2))};
+            const uint8_t env[3] = {static_cast<uint8_t>(m_sid.read_env(0)), static_cast<uint8_t>(m_sid.read_env(1)),
+                                    static_cast<uint8_t>(m_sid.read_env(2))};
+            sink->state(m_chipIndex, m_regs, osc, env);
+        }
+    }
 }
 
 void ReSID::filter(bool enable)

@@ -111,6 +111,16 @@ private:
     /// Flags for muted channels
     bool muted[3];
 
+    /// zxtune: optional per-voice output tap, 3 interleaved samples per output sample
+    short* voiceOutput;
+
+    /// zxtune: shadow filters fed by single voice each to get voice output after filtering
+    Filter6581* voiceFilter6581[3];
+    Filter8580* voiceFilter8580[3];
+    Filter* voiceFilter[3];
+    ExternalFilter* voiceExternalFilter[3];
+    int voiceValue[3];
+
     /**
      * Emulated nonlinearity of the envelope DAC.
      *
@@ -225,6 +235,24 @@ public:
      * @param enable is muted?
      */
     void mute(int channel, bool enable) { muted[channel] = enable; }
+
+    /**
+     * zxtune: set buffer to store filtered output of each voice (3 interleaved samples per output sample).
+     * Should be big enough to store the same samples count as main output. nullptr to disable.
+     */
+    void setVoiceOutput(short* buf) { voiceOutput = buf; }
+
+    /**
+     * zxtune: oscillator and envelope outputs of any voice, as OSC3/ENV3 registers
+     */
+    unsigned char readOSC(int i) const;
+    unsigned char readENV(int i) const;
+
+private:
+    int outputWithVoices();
+    void writeVoices(int s);
+
+public:
 
     /**
      * Setting of SID sampling parameters.
@@ -345,6 +373,31 @@ int SID::output() const
 
 
 RESID_INLINE
+int SID::outputWithVoices()
+{
+    const float v1 = voice[0]->output(voice[2]->wave());
+    const float v2 = voice[1]->output(voice[0]->wave());
+    const float v3 = voice[2]->output(voice[1]->wave());
+
+    voiceValue[0] = voiceExternalFilter[0]->clock(static_cast<int>(voiceFilter[0]->clock(v1, 0.f, 0.f)));
+    voiceValue[1] = voiceExternalFilter[1]->clock(static_cast<int>(voiceFilter[1]->clock(0.f, v2, 0.f)));
+    voiceValue[2] = voiceExternalFilter[2]->clock(static_cast<int>(voiceFilter[2]->clock(0.f, 0.f, v3)));
+
+    const int input = static_cast<int>(filter->clock(v1, v2, v3));
+    return externalFilter->clock(input);
+}
+
+RESID_INLINE
+void SID::writeVoices(int s)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        const int out = (scaleFactor * voiceValue[i]) / 2;
+        voiceOutput[s * 3 + i] = static_cast<short>(out > 32767 ? 32767 : out < -32768 ? -32768 : out);
+    }
+}
+
+RESID_INLINE
 int SID::clock(unsigned int cycles, short* buf)
 {
     ageBusValue(cycles);
@@ -368,7 +421,15 @@ int SID::clock(unsigned int cycles, short* buf)
                 voice[1]->envelope()->clock();
                 voice[2]->envelope()->clock();
 
-                if (unlikely(resampler->input(output())))
+                if (unlikely(voiceOutput != nullptr))
+                {
+                    if (unlikely(resampler->input(outputWithVoices())))
+                    {
+                        writeVoices(s);
+                        buf[s++] = resampler->getOutput(scaleFactor);
+                    }
+                }
+                else if (unlikely(resampler->input(output())))
                 {
                     buf[s++] = resampler->getOutput(scaleFactor);
                 }

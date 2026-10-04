@@ -25,6 +25,7 @@
 
 #include "sidplayfp/sidbuilder.h"
 #include "sidplayfp/siddefs.h"
+#include "sidvoicessink.h"
 
 /**
  * ReSIDfp Builder Class
@@ -88,7 +89,22 @@ public:
      */
     void combinedWaveformsStrength(SidConfig::sid_cw_t cws);
 
+    /**
+     * zxtune: set receiver for separate voices output, nullptr to disable.
+     */
+    void voicesSink(SidVoicesSink* sink) { m_voicesSink = sink; }
     //@}
+
+    /// @name internal state for emulations
+    //@{
+    SidVoicesSink* getVoicesSink() const { return m_voicesSink; }
+    unsigned int chipLocked() { return m_lockedChips++; }
+    void chipUnlocked() { if (m_lockedChips) --m_lockedChips; }
+    //@}
+
+private:
+    SidVoicesSink* m_voicesSink = nullptr;
+    unsigned int m_lockedChips = 0;
 };
 
 #endif // RESIDFP_H

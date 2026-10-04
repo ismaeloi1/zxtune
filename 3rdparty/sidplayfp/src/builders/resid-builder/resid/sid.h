@@ -56,6 +56,10 @@ public:
   // When set, clock() also stores 3 interleaved voice samples per output sample.
   void set_voice_output(short* buf) { voice_output = buf; }
 
+  // Oscillator and envelope outputs of any voice, as OSC3/ENV3 registers
+  reg8 read_osc(int i) { return voice[i].wave.readOSC(); }
+  reg8 read_env(int i) { return voice[i].envelope.readENV(); }
+
   void clock();
   void clock(cycle_count delta_t);
   int clock(cycle_count& delta_t, short* buf, int n, int interleave = 1);
