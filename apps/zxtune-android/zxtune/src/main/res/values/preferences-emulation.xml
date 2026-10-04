@@ -93,6 +93,82 @@
     <!-- zxtune.core.sid.filter -->
     <string name="pref_zxtune_sid_filter_title">Filter emulation</string>
     <integer name="pref_zxtune_sid_filter_default">1</integer>
+    <!-- zxtune.core.sid.engine -->
+    <string name="pref_zxtune_sid_engine_title">Emulation engine</string>
+    <string-array name="pref_zxtune_sid_engine_entries" translatable="false">
+        <item>reSID</item>
+        <item>reSIDfp</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_engine_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+    <string name="pref_zxtune_sid_engine_default" translatable="false">1</string>
+    <!-- zxtune.core.sid.model -->
+    <string name="pref_zxtune_sid_model_title">Default chip model</string>
+    <string-array name="pref_zxtune_sid_model_entries" translatable="false">
+        <item>MOS6581</item>
+        <item>MOS8580</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_model_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+    <string name="pref_zxtune_sid_model_default" translatable="false">0</string>
+    <!-- zxtune.core.sid.model_force -->
+    <string name="pref_zxtune_sid_model_force_title">Force chip model</string>
+    <integer name="pref_zxtune_sid_model_force_default">0</integer>
+    <string name="pref_zxtune_sid_force_summary">Ignore value specified in tune</string>
+    <!-- zxtune.core.sid.clock -->
+    <string name="pref_zxtune_sid_clock_title">Default C64 model</string>
+    <string-array name="pref_zxtune_sid_clock_entries" translatable="false">
+        <item>PAL</item>
+        <item>NTSC</item>
+        <item>NTSC (old)</item>
+        <item>Drean (PAL-N)</item>
+        <item>PAL-M</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_clock_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+    </string-array>
+    <string name="pref_zxtune_sid_clock_default" translatable="false">0</string>
+    <!-- zxtune.core.sid.clock_force -->
+    <string name="pref_zxtune_sid_clock_force_title">Force C64 model</string>
+    <integer name="pref_zxtune_sid_clock_force_default">0</integer>
+    <!-- zxtune.core.sid.digiboost -->
+    <string name="pref_zxtune_sid_digiboost_title">MOS8580 digi boost</string>
+    <string name="pref_zxtune_sid_digiboost_summary">Make samples played via volume register audible on MOS8580</string>
+    <integer name="pref_zxtune_sid_digiboost_default">0</integer>
+    <!-- zxtune.core.sid.filter_bias -->
+    <string name="pref_zxtune_sid_filter_bias_title">reSID: MOS6581 filter bias, mV</string>
+    <string name="pref_zxtune_sid_filter_bias_summary">Shifts filter cutoff frequency mapping</string>
+    <integer name="pref_zxtune_sid_filter_bias_default">0</integer>
+    <!-- zxtune.core.sid.filter_*_curve/range -->
+    <string name="pref_zxtune_sid_filter_6581_curve_title">reSIDfp: MOS6581 filter curve</string>
+    <integer name="pref_zxtune_sid_filter_6581_curve_default">50</integer>
+    <string name="pref_zxtune_sid_filter_6581_range_title">reSIDfp: MOS6581 filter range</string>
+    <integer name="pref_zxtune_sid_filter_6581_range_default">50</integer>
+    <string name="pref_zxtune_sid_filter_8580_curve_title">reSIDfp: MOS8580 filter curve</string>
+    <integer name="pref_zxtune_sid_filter_8580_curve_default">50</integer>
+    <string name="pref_zxtune_sid_filter_curve_summary">0 - light, 100 - dark</string>
+    <string name="pref_zxtune_sid_filter_range_summary">0 - dark, 100 - light</string>
+    <!-- zxtune.core.sid.combined_waveforms -->
+    <string name="pref_zxtune_sid_combined_waveforms_title">reSIDfp: combined waveforms</string>
+    <string-array name="pref_zxtune_sid_combined_waveforms_entries">
+        <item>Average</item>
+        <item>Weak</item>
+        <item>Strong</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_combined_waveforms_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string name="pref_zxtune_sid_combined_waveforms_default" translatable="false">0</string>
 
     <!-- other -->
     <string name="pref_zxtune_other_title">Other</string>

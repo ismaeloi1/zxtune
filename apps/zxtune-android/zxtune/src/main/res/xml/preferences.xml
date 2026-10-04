@@ -113,6 +113,37 @@
     <!-- sid -->
     <PreferenceCategory android:title="@string/pref_zxtune_sid_title">
         <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_sid_engine_default"
+                android:entries="@array/pref_zxtune_sid_engine_entries"
+                android:entryValues="@array/pref_zxtune_sid_engine_values"
+                android:key="zxtune.core.sid.engine"
+                android:title="@string/pref_zxtune_sid_engine_title"
+                app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_sid_model_default"
+                android:entries="@array/pref_zxtune_sid_model_entries"
+                android:entryValues="@array/pref_zxtune_sid_model_values"
+                android:key="zxtune.core.sid.model"
+                android:title="@string/pref_zxtune_sid_model_title"
+                app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+                android:defaultValue="@integer/pref_zxtune_sid_model_force_default"
+                android:key="zxtune.core.sid.model_force"
+                android:summary="@string/pref_zxtune_sid_force_summary"
+                android:title="@string/pref_zxtune_sid_model_force_title" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_sid_clock_default"
+                android:entries="@array/pref_zxtune_sid_clock_entries"
+                android:entryValues="@array/pref_zxtune_sid_clock_values"
+                android:key="zxtune.core.sid.clock"
+                android:title="@string/pref_zxtune_sid_clock_title"
+                app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat
+                android:defaultValue="@integer/pref_zxtune_sid_clock_force_default"
+                android:key="zxtune.core.sid.clock_force"
+                android:summary="@string/pref_zxtune_sid_force_summary"
+                android:title="@string/pref_zxtune_sid_clock_force_title" />
+        <DropDownPreference
                 android:defaultValue="@integer/pref_zxtune_sid_interpolation_default"
                 android:entries="@array/pref_interpolation_entries"
                 android:entryValues="@array/pref_interpolation_values"
@@ -123,5 +154,50 @@
                 android:defaultValue="@integer/pref_zxtune_sid_filter_default"
                 android:key="zxtune.core.sid.filter"
                 app:title="@string/pref_zxtune_sid_filter_title" />
+        <SwitchPreferenceCompat
+                android:defaultValue="@integer/pref_zxtune_sid_digiboost_default"
+                android:key="zxtune.core.sid.digiboost"
+                android:summary="@string/pref_zxtune_sid_digiboost_summary"
+                android:title="@string/pref_zxtune_sid_digiboost_title" />
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_zxtune_sid_filter_bias_default"
+                android:key="zxtune.core.sid.filter_bias"
+                android:max="500"
+                android:summary="@string/pref_zxtune_sid_filter_bias_summary"
+                android:title="@string/pref_zxtune_sid_filter_bias_title"
+                app:min="-500"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_zxtune_sid_filter_6581_curve_default"
+                android:key="zxtune.core.sid.filter_6581_curve"
+                android:max="100"
+                android:summary="@string/pref_zxtune_sid_filter_curve_summary"
+                android:title="@string/pref_zxtune_sid_filter_6581_curve_title"
+                app:min="0"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_zxtune_sid_filter_6581_range_default"
+                android:key="zxtune.core.sid.filter_6581_range"
+                android:max="100"
+                android:summary="@string/pref_zxtune_sid_filter_range_summary"
+                android:title="@string/pref_zxtune_sid_filter_6581_range_title"
+                app:min="0"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_zxtune_sid_filter_8580_curve_default"
+                android:key="zxtune.core.sid.filter_8580_curve"
+                android:max="100"
+                android:summary="@string/pref_zxtune_sid_filter_curve_summary"
+                android:title="@string/pref_zxtune_sid_filter_8580_curve_title"
+                app:min="0"
+                app:showSeekBarValue="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_sid_combined_waveforms_default"
+                android:entries="@array/pref_zxtune_sid_combined_waveforms_entries"
+                android:entryValues="@array/pref_zxtune_sid_combined_waveforms_values"
+                android:key="zxtune.core.sid.combined_waveforms"
+                android:title="@string/pref_zxtune_sid_combined_waveforms_title"
+                app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 </PreferenceScreen>
