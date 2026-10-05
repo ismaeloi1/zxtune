@@ -262,15 +262,15 @@ namespace
       return Analyzer.Analyze(maxEntries, levels);
     }
 
-    uint_t GetScope(uint_t maxChannels, uint_t points, int64_t playing, int16_t* data) const override
+    uint_t GetScope(uint_t maxChannels, uint_t points, int64_t playing, uint_t windowMs, int16_t* data) const override
     {
-      const auto layout = ScopeData->Get(maxChannels, points, playing, data);
+      const auto layout = ScopeData->Get(maxChannels, points, playing, windowMs, data);
       return layout.Channels | (layout.PerChip << 16);
     }
 
-    uint_t GetScopeGauges(uint_t maxChips, int64_t playing, uint8_t* data) const override
+    uint_t GetScopeGauges(uint_t maxChips, int64_t playing, uint_t waveWindowMs, uint8_t* data) const override
     {
-      return ScopeData->GetGauges(maxChips, playing, data);
+      return ScopeData->GetGauges(maxChips, playing, waveWindowMs, data);
     }
 
     String GetScopeStatus() const override
@@ -415,7 +415,7 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_analyze(JNIEnv* env, jo
 }
 
 EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scope(JNIEnv* env, jobject self, jshortArray data, jint points,
-                                                               jlong playing)
+                                                               jlong playing, jint windowMs)
 {
   return Jni::Call(env, [=]() {
     // Should be before AutoArray calls - else causes 'using JNI after critical get' error
@@ -425,7 +425,7 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scope(JNIEnv* env, jobj
     if (rawData && player && points > 0)
     {
       const auto maxChannels = rawData.Size() / points;
-      return player->GetScope(maxChannels, points, playing, rawData.Data());
+      return player->GetScope(maxChannels, points, playing, windowMs, rawData.Data());
     }
     else
     {
@@ -435,7 +435,7 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scope(JNIEnv* env, jobj
 }
 
 EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeGauges(JNIEnv* env, jobject self, jbyteArray data,
-                                                                     jlong playing)
+                                                                     jlong playing, jint waveWindowMs)
 {
   return Jni::Call(env, [=]() {
     // Should be before AutoArray calls - else causes 'using JNI after critical get' error
@@ -445,7 +445,7 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeGauges(JNIEnv* env
     if (rawData && player)
     {
       const auto maxChips = rawData.Size() / Player::Scope::GAUGES_SIZE;
-      return player->GetScopeGauges(maxChips, playing, rawData.Data());
+      return player->GetScopeGauges(maxChips, playing, waveWindowMs, rawData.Data());
     }
     else
     {

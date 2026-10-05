@@ -449,13 +449,13 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
     }
 
     @Override
-    public int getScope(short[] data, int points) throws Exception {
-      return holder.get().visualizer.getScope(data, points);
+    public int getScope(short[] data, int points, int windowMs) throws Exception {
+      return holder.get().visualizer.getScope(data, points, windowMs);
     }
 
     @Override
-    public int getGauges(byte[] data) throws Exception {
-      return holder.get().visualizer.getGauges(data);
+    public int getGauges(byte[] data, int waveWindowMs) throws Exception {
+      return holder.get().visualizer.getGauges(data, waveWindowMs);
     }
 
     @Override

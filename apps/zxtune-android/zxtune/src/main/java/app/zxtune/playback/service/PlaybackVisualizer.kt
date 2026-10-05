@@ -14,9 +14,9 @@ internal class PlaybackVisualizer(
 ) : Visualizer {
     override fun getSpectrum(levels: ByteArray) = player.analyze(levels)
 
-    override fun getScope(data: ShortArray, points: Int) = player.scope(data, points, playingFrame())
+    override fun getScope(data: ShortArray, points: Int, windowMs: Int) = player.scope(data, points, playingFrame(), windowMs)
 
-    override fun getGauges(data: ByteArray) = player.scopeGauges(data, playingFrame())
+    override fun getGauges(data: ByteArray, waveWindowMs: Int) = player.scopeGauges(data, playingFrame(), waveWindowMs)
 
     override fun getStatus() = buildString {
         appendLine(player.scopeStatus)

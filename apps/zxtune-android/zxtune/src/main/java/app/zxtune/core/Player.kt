@@ -29,14 +29,14 @@ interface Player :
      * @param playing Index of currently heard frame among rendered by this player, negative if unknown
      * @return Packed layout of stored channels, see [app.zxtune.playback.ScopeLayout]
      */
-    fun scope(data: ShortArray, points: Int, playing: Long): Int
+    fun scope(data: ShortArray, points: Int, playing: Long, windowMs: Int): Int
 
     /**
      * @param data Array to store [chips][app.zxtune.playback.ChipGauges.SIZE] gauges data
      * @param playing see [scope]
      * @return Count of stored chips
      */
-    fun scopeGauges(data: ByteArray, playing: Long): Int
+    fun scopeGauges(data: ByteArray, playing: Long, waveWindowMs: Int): Int
 
     /**
      * Emulation description and visualization statistics

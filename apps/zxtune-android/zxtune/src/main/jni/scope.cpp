@@ -31,7 +31,8 @@ namespace Player
     // ~2.7s at 48kHz, enough to cover output buffers latency
     const uint_t RING_SIZE = 1 << 17;
     const uint_t TRIGGER_MS = 40;
-    const uint_t RENDER_MS = 40;
+    const uint_t MIN_WINDOW_MS = 1;
+    const uint_t MAX_WINDOW_MS = 200;
     const uint_t MAX_VOICES = 32;
     // Keep separate voices rendering while data is requested at least this often
     const auto ACTIVITY_TIMEOUT = std::chrono::seconds(2);
@@ -107,7 +108,6 @@ namespace Player
     const std::size_t MAX_STATES = 8192;
     // gauges scale is in CPU cycles, PAL clock is precise enough for visualization
     const uint_t CPU_CLOCK = 985248;
-    const uint_t FAST_COLUMN_CYCLES = 128;
     const uint_t SLOW_COLUMN_CYCLES = 128 * 128;
 
     struct StateRecord
@@ -297,7 +297,7 @@ namespace Player
       ResetTriggers();
     }
 
-    Layout Get(uint_t maxChannels, uint_t points, int64_t playing, int16_t* target) override
+    Layout Get(uint_t maxChannels, uint_t points, int64_t playing, uint_t windowMs, int16_t* target) override
     {
       const auto start = Clock::now();
       LastRequest = start.time_since_epoch().count();
@@ -330,7 +330,7 @@ namespace Player
         const auto kernelSize = Samplerate * TRIGGER_MS / 1000 / Stride;
         Triggers.emplace_back(new Sound::CorrelationTrigger(kernelSize, Stride, Samplerate));
       }
-      const int64_t renderSamples = Samplerate * RENDER_MS / 1000;
+      const int64_t renderSamples = Samplerate * std::clamp(windowMs, MIN_WINDOW_MS, MAX_WINDOW_MS) / 1000;
       for (uint_t chan = 0; chan < channels; ++chan)
       {
         const auto& ring = Voices.empty() ? Master : Voices[chan].Samples;
@@ -352,7 +352,7 @@ namespace Player
       return result;
     }
 
-    uint_t GetGauges(uint_t maxChips, int64_t playing, uint8_t* target) override
+    uint_t GetGauges(uint_t maxChips, int64_t playing, uint_t waveWindowMs, uint8_t* target) override
     {
       const std::scoped_lock guard(Lock);
       if (!HasPlayed || Chips.empty() || VoicesPerChip == 0)
@@ -363,7 +363,8 @@ namespace Player
       const auto chips = std::min<uint_t>(static_cast<uint_t>(Chips.size()), maxChips);
       for (uint_t chip = 0; chip < chips; ++chip)
       {
-        FillGauges(Chips[chip], pos + Voices[chip * VoicesPerChip].Offset, target + std::size_t(chip) * GAUGES_SIZE);
+        FillGauges(Chips[chip], pos + Voices[chip * VoicesPerChip].Offset,
+                   std::clamp(waveWindowMs, MIN_WINDOW_MS, MAX_WINDOW_MS), target + std::size_t(chip) * GAUGES_SIZE);
       }
       return chips;
     }
@@ -380,7 +381,7 @@ namespace Player
 
   private:
     // end is index of currently heard sample in chip's samples
-    void FillGauges(const ChipStates& chip, int64_t end, uint8_t* target) const
+    void FillGauges(const ChipStates& chip, int64_t end, uint_t waveWindowMs, uint8_t* target) const
     {
       auto store = [target](uint_t gauge, uint_t col, const Column& c) {
         auto* out = target + (gauge * GAUGE_COLUMNS + col) * 2;
@@ -388,10 +389,11 @@ namespace Player
         out[1] = c.Max;
       };
       // fast gauges: wave1..3 (0..2) and volume (9)
-      const double fastSamples = double(FAST_COLUMN_CYCLES) * Samplerate / CPU_CLOCK;
+      const double fastSamples = double(Samplerate) * waveWindowMs / 1000 / GAUGE_COLUMNS;
       uint8_t prev[4] = {};
       for (uint_t col = 0; col < GAUGE_COLUMNS; ++col)
       {
+        // each column contains at least one sample
         const auto from = end - int64_t((GAUGE_COLUMNS - col) * fastSamples);
         const auto to = std::max(from + 1, end - int64_t((GAUGE_COLUMNS - col - 1) * fastSamples));
         for (uint_t val = 0; val < 4; ++val)

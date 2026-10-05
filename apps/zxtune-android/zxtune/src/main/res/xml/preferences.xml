@@ -1,16 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto">
-    <!-- ui -->
-    <PreferenceCategory android:title="@string/pref_zxtune_ui_title">
-        <DropDownPreference
-                android:defaultValue="@string/pref_ui_theme_default"
-                android:entries="@array/pref_ui_theme_entries"
-                android:entryValues="@array/pref_ui_theme_values"
-                android:key="@string/pref_ui_theme_key"
-                android:title="@string/pref_ui_theme_title"
-                app:useSimpleSummaryProvider="true" />
-    </PreferenceCategory>
+    <!-- ui: theme selection is removed, AMOLED black theme is the only one -->
     <!-- other -->
     <PreferenceCategory android:title="@string/pref_zxtune_other_title">
         <DropDownPreference
@@ -110,6 +101,25 @@
                 android:title="@string/pref_interpolation"
                 app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
+    <!-- oscilloscope -->
+    <PreferenceCategory android:title="@string/pref_oscilloscope_title">
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_oscilloscope_window_default"
+                android:key="ui.oscilloscope.window_ms"
+                android:max="100"
+                android:summary="@string/pref_oscilloscope_window_summary"
+                android:title="@string/pref_oscilloscope_window_title"
+                app:min="5"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_oscilloscope_gauge_window_default"
+                android:key="ui.oscilloscope.gauge_window_ms"
+                android:max="40"
+                android:summary="@string/pref_oscilloscope_gauge_window_summary"
+                android:title="@string/pref_oscilloscope_gauge_window_title"
+                app:min="2"
+                app:showSeekBarValue="true" />
+    </PreferenceCategory>
     <!-- sid -->
     <PreferenceCategory android:title="@string/pref_zxtune_sid_title">
         <DropDownPreference
@@ -125,7 +135,7 @@
                 android:entryValues="@array/pref_zxtune_sid_model_values"
                 android:key="zxtune.core.sid.model"
                 android:title="@string/pref_zxtune_sid_model_title"
-                app:useSimpleSummaryProvider="true" />
+                android:summary="@string/pref_zxtune_sid_default_summary" />
         <SwitchPreferenceCompat
                 android:defaultValue="@integer/pref_zxtune_sid_model_force_default"
                 android:key="zxtune.core.sid.model_force"
@@ -137,7 +147,7 @@
                 android:entryValues="@array/pref_zxtune_sid_clock_values"
                 android:key="zxtune.core.sid.clock"
                 android:title="@string/pref_zxtune_sid_clock_title"
-                app:useSimpleSummaryProvider="true" />
+                android:summary="@string/pref_zxtune_sid_default_summary" />
         <SwitchPreferenceCompat
                 android:defaultValue="@integer/pref_zxtune_sid_clock_force_default"
                 android:key="zxtune.core.sid.clock_force"

@@ -41,7 +41,8 @@ class OscilloscopeView @JvmOverloads constructor(
 ) : GLSurfaceView(context, attrs) {
 
     @Volatile
-    private var source: Visualizer? = null
+    var source: Visualizer? = null
+        private set
     private val labelTextSize = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_SP,
         LABEL_TEXT_SIZE_SP,
@@ -60,6 +61,12 @@ class OscilloscopeView @JvmOverloads constructor(
 
     @Volatile
     private var statistics = ""
+
+    /**
+     * Displayed duration of waveforms, as corrscope's render_ms
+     */
+    @Volatile
+    var windowMs = DEFAULT_WINDOW_MS
 
     /**
      * @return rendering statistics: real fps, frame interval, drawing time (including data request)
@@ -180,7 +187,7 @@ class OscilloscopeView @JvmOverloads constructor(
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val src = source ?: return
             val layout = runCatching {
-                ScopeLayout(src.getScope(samples, POINTS))
+                ScopeLayout(src.getScope(samples, POINTS, windowMs))
             }.getOrElse {
                 LOG.w(it) { "Failed to get scope data" }
                 return
@@ -328,6 +335,7 @@ class OscilloscopeView @JvmOverloads constructor(
 
     companion object {
         const val POINTS = 512
+        const val DEFAULT_WINDOW_MS = 40
         const val MAX_CHANNELS = 32
         private const val AMPLIFICATION = 0.95f
         private const val LINE_WIDTH_PX = 3f

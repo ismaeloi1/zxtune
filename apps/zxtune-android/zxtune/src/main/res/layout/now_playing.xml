@@ -6,12 +6,15 @@
         android:layout_height="match_parent"
         tools:ignore="RtlHardcoded">
 
+    <!-- compact to give more space to visualizer -->
     <androidx.appcompat.widget.Toolbar
             android:id="@+id/main_top_panel"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="@dimen/now_playing_toolbar_height"
             android:layout_alignParentTop="true"
+            android:minHeight="@dimen/now_playing_toolbar_height"
             app:title="@string/app_name"
+            app:titleTextAppearance="@style/TextAppearance.AppCompat.Medium"
             tools:menu="@menu/main" />
 
     <androidx.fragment.app.FragmentContainerView

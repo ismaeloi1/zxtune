@@ -37,6 +37,12 @@ class SidDashboardView @JvmOverloads constructor(
 
     @Volatile
     private var source: Visualizer? = null
+
+    /**
+     * Displayed duration of oscillators and volume gauges
+     */
+    @Volatile
+    var waveWindowMs = DEFAULT_WAVE_WINDOW_MS
     private var statsProvider: (() -> String)? = null
 
     // Data is requested on background thread to keep UI responsive, binder calls may take time
@@ -55,12 +61,14 @@ class SidDashboardView @JvmOverloads constructor(
 
     private val density = resources.displayMetrics.density
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(200, 255, 255, 255)
-        textSize = sp(10f)
+        color = Color.argb(230, 255, 255, 255)
+        textSize = sp(TITLE_SIZE_SP)
+        // keeps titles readable over traces
+        setShadowLayer(density * 2, 0f, 0f, Color.BLACK)
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.argb(220, 255, 255, 255)
-        textSize = sp(10f)
+        color = Color.argb(230, 255, 255, 255)
+        textSize = sp(TEXT_SIZE_SP)
         typeface = Typeface.MONOSPACE
     }
     private val framePaint = Paint().apply {
@@ -130,7 +138,7 @@ class SidDashboardView @JvmOverloads constructor(
         executor.execute {
             try {
                 val target = 1 - readyBuffer
-                val chips = runCatching { src.getGauges(buffers[target]) }.getOrDefault(0)
+                val chips = runCatching { src.getGauges(buffers[target], waveWindowMs) }.getOrDefault(0)
                 readyBuffer = target
                 readyChips = chips
                 if (needStatus) {
@@ -172,14 +180,14 @@ class SidDashboardView @JvmOverloads constructor(
         val cellH = areaHeight / 4
         for (voice in 0 until 3) {
             val top = cellH * voice
-            val voicePrefix = if (chips > 1) "SID ${chip + 1} V${voice + 1}" else "V${voice + 1}"
+            val voicePrefix = if (chips > 1) "S${chip + 1}V${voice + 1}" else "V${voice + 1}"
             drawGauge(canvas, gauges, ChipGauges.wave(voice), 0f, top, cellW, cellH, "$voicePrefix ${waveTitle(last, voice)}")
-            drawGauge(canvas, gauges, ChipGauges.envelope(voice), cellW, top, cellW, cellH, "Envelope")
-            drawGauge(canvas, gauges, ChipGauges.frequency(voice), cellW * 2, top, cellW, cellH, "Frequency")
+            drawGauge(canvas, gauges, ChipGauges.envelope(voice), cellW, top, cellW, cellH, "Env ${last.envelopeRegs(voice)}")
+            drawGauge(canvas, gauges, ChipGauges.frequency(voice), cellW * 2, top, cellW, cellH, "Freq ${hex4(last.frequency(voice))}")
         }
         val top = cellH * 3
-        drawGauge(canvas, gauges, ChipGauges.VOLUME, 0f, top, cellW, cellH, "Master volume ${last.volume}")
-        drawGauge(canvas, gauges, ChipGauges.RESONANCE, cellW, top, cellW, cellH, "Resonance ${last.resonance}")
+        drawGauge(canvas, gauges, ChipGauges.VOLUME, 0f, top, cellW, cellH, "Volume ${last.volume}")
+        drawGauge(canvas, gauges, ChipGauges.RESONANCE, cellW, top, cellW, cellH, "Res ${last.resonance}")
         drawGauge(canvas, gauges, ChipGauges.CUTOFF, cellW * 2, top, cellW, cellH, filterTitle(last))
     }
 
@@ -194,12 +202,12 @@ class SidDashboardView @JvmOverloads constructor(
         h: Float,
         title: String
     ) {
-        val pad = density * 2
+        val pad = density
         rect.set(left + pad, top + pad, left + w - pad, top + h - pad)
         canvas.drawRect(rect, framePaint)
-        canvas.drawText(title, rect.left + pad * 2, rect.top + pad - titlePaint.ascent(), titlePaint)
-        val plotTop = rect.top + titlePaint.fontSpacing + pad
-        val plotHeight = rect.bottom - pad - plotTop
+        // title is drawn over the plot to give more space to traces
+        val plotTop = rect.top + pad * 2
+        val plotHeight = rect.bottom - pad * 2 - plotTop
         if (plotHeight <= 0) {
             return
         }
@@ -222,6 +230,7 @@ class SidDashboardView @JvmOverloads constructor(
         tracePaint.strokeWidth = maxOf(columnWidth, density)
         canvas.drawLines(lines, tracePaint)
         tracePaint.strokeWidth = TRACE_WIDTH * density
+        canvas.drawText(title, rect.left + pad * 3, rect.top + pad - titlePaint.ascent(), titlePaint)
     }
 
     private fun padding() = density * 4
@@ -230,6 +239,11 @@ class SidDashboardView @JvmOverloads constructor(
 
     companion object {
         private const val TRACE_WIDTH = 1f
+        private const val TITLE_SIZE_SP = 13f
+        private const val TEXT_SIZE_SP = 12f
+        const val DEFAULT_WAVE_WINDOW_MS = 10
+
+        private fun hex4(value: Int) = String.format(java.util.Locale.US, "%04X", value)
         private const val MAX_CHIPS = 3
         private const val STATUS_PERIOD_NS = 500_000_000L
 
@@ -252,6 +266,8 @@ class SidDashboardView @JvmOverloads constructor(
             if (mode and 1 != 0) append('L')
             if (mode and 2 != 0) append('B')
             if (mode and 4 != 0) append('H')
+            append(' ')
+            append(state.cutoff)
         }
     }
 }

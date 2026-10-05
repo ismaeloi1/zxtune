@@ -21,18 +21,20 @@ interface Visualizer {
      * Get currently playing waveforms, triggered for stable oscilloscope view
      * @param data array to store [channels][points] samples
      * @param points samples per channel
+     * @param windowMs displayed duration of waveforms (corrscope's render_ms)
      * @return layout of stored data, see [ScopeLayout]: separate voices if supported, else single master channel
      */
     @Throws(Exception::class)
-    fun getScope(data: ShortArray, points: Int): Int
+    fun getScope(data: ShortArray, points: Int, windowMs: Int): Int
 
     /**
      * Get JSIDPlay2-like gauges of chips state history ending at currently heard moment
      * @param data array to store [chips][ChipGauges.SIZE] bytes
+     * @param waveWindowMs displayed duration of oscillators and volume gauges
      * @return count of stored chips
      */
     @Throws(Exception::class)
-    fun getGauges(data: ByteArray): Int
+    fun getGauges(data: ByteArray, waveWindowMs: Int): Int
 
     /**
      * @return Multiline human readable emulation and performance information
@@ -101,6 +103,16 @@ class ChipState(private val data: ByteArray, private val offset: Int) {
     fun frequency(voice: Int) = reg(voice * 7) or (reg(voice * 7 + 1) shl 8)
     fun pulseWidth(voice: Int) = reg(voice * 7 + 2) or ((reg(voice * 7 + 3) and 0x0f) shl 8)
     fun control(voice: Int) = reg(voice * 7 + 4)
+
+    /**
+     * Attack/Decay and Sustain/Release registers as ADSR hex digits
+     */
+    fun envelopeRegs(voice: Int) = String.format(
+        java.util.Locale.US,
+        "%02X%02X",
+        reg(voice * 7 + 5),
+        reg(voice * 7 + 6)
+    )
     fun oscillator(voice: Int) = reg(OSC_OFFSET + voice)
     fun envelope(voice: Int) = reg(ENV_OFFSET + voice)
     val cutoff

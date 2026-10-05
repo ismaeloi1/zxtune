@@ -112,6 +112,10 @@ class VisualizerFragment : Fragment() {
             }.distinctUntilChanged { old, new -> old === new }
         viewLifecycleOwner.whenLifecycleStarted {
             launch {
+                // may be changed in preferences
+                OscilloscopeSettings.apply(requireContext(), oscilloscope, dashboard)
+            }
+            launch {
                 playingSource.collectLatest { src ->
                     src?.let {
                         analyzer.drawFrom(it)

@@ -86,6 +86,15 @@
     <!-- zxtune.core.saa.interpolation -->
     <integer name="pref_zxtune_saa_interpolation_default">1</integer>
 
+    <!-- oscilloscope -->
+    <string name="pref_oscilloscope_title">Oscilloscope</string>
+    <string name="pref_oscilloscope_window_title">Waveforms window, ms</string>
+    <string name="pref_oscilloscope_window_summary">Displayed duration of each voice waveform</string>
+    <integer name="pref_oscilloscope_window_default">40</integer>
+    <string name="pref_oscilloscope_gauge_window_title">SID gauges window, ms</string>
+    <string name="pref_oscilloscope_gauge_window_summary">Displayed duration of oscillators and master volume gauges</string>
+    <integer name="pref_oscilloscope_gauge_window_default">10</integer>
+
     <!-- sid -->
     <string name="pref_zxtune_sid_title" translatable="false">MOS6581/SID</string>
     <!-- zxtune.core.sid.interpolation -->
@@ -119,6 +128,7 @@
     <string name="pref_zxtune_sid_model_force_title">Force chip model</string>
     <integer name="pref_zxtune_sid_model_force_default">0</integer>
     <string name="pref_zxtune_sid_force_summary">Ignore value specified in tune</string>
+    <string name="pref_zxtune_sid_default_summary">%s (used if tune does not specify it)</string>
     <!-- zxtune.core.sid.clock -->
     <string name="pref_zxtune_sid_clock_title">Default C64 model</string>
     <string-array name="pref_zxtune_sid_clock_entries" translatable="false">
@@ -141,11 +151,11 @@
     <integer name="pref_zxtune_sid_clock_force_default">0</integer>
     <!-- zxtune.core.sid.digiboost -->
     <string name="pref_zxtune_sid_digiboost_title">MOS8580 digi boost</string>
-    <string name="pref_zxtune_sid_digiboost_summary">Make samples played via volume register audible on MOS8580</string>
+    <string name="pref_zxtune_sid_digiboost_summary">MOS8580 only: make samples played via volume register audible</string>
     <integer name="pref_zxtune_sid_digiboost_default">0</integer>
     <!-- zxtune.core.sid.filter_bias -->
     <string name="pref_zxtune_sid_filter_bias_title">reSID: MOS6581 filter bias, mV</string>
-    <string name="pref_zxtune_sid_filter_bias_summary">Shifts filter cutoff frequency mapping</string>
+    <string name="pref_zxtune_sid_filter_bias_summary">reSID engine, MOS6581 only: shifts filter cutoff frequency mapping</string>
     <integer name="pref_zxtune_sid_filter_bias_default">0</integer>
     <!-- zxtune.core.sid.filter_*_curve/range -->
     <string name="pref_zxtune_sid_filter_6581_curve_title">reSIDfp: MOS6581 filter curve</string>
@@ -154,8 +164,8 @@
     <integer name="pref_zxtune_sid_filter_6581_range_default">50</integer>
     <string name="pref_zxtune_sid_filter_8580_curve_title">reSIDfp: MOS8580 filter curve</string>
     <integer name="pref_zxtune_sid_filter_8580_curve_default">50</integer>
-    <string name="pref_zxtune_sid_filter_curve_summary">0 - light, 100 - dark</string>
-    <string name="pref_zxtune_sid_filter_range_summary">0 - dark, 100 - light</string>
+    <string name="pref_zxtune_sid_filter_curve_summary">reSIDfp engine only: 0 - light, 100 - dark</string>
+    <string name="pref_zxtune_sid_filter_range_summary">reSIDfp engine only: 0 - dark, 100 - light</string>
     <!-- zxtune.core.sid.combined_waveforms -->
     <string name="pref_zxtune_sid_combined_waveforms_title">reSIDfp: combined waveforms</string>
     <string-array name="pref_zxtune_sid_combined_waveforms_entries">

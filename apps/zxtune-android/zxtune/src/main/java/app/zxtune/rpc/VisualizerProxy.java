@@ -45,12 +45,12 @@ public final class VisualizerProxy {
     private byte[] scopeBuffer = new byte[0];
 
     @Override
-    public synchronized int getScope(short[] data, int points) {
+    public synchronized int getScope(short[] data, int points, int windowMs) {
       try {
         if (scopeBuffer.length != data.length * 2) {
           scopeBuffer = new byte[data.length * 2];
         }
-        final int layout = delegate.getScope(scopeBuffer, points);
+        final int layout = delegate.getScope(scopeBuffer, points, windowMs);
         final int channels = ScopeLayout.channelsOf(layout);
         ByteBuffer.wrap(scopeBuffer, 0, channels * points * 2)
             .order(ByteOrder.nativeOrder())
@@ -66,9 +66,9 @@ public final class VisualizerProxy {
     }
 
     @Override
-    public int getGauges(byte[] data) {
+    public int getGauges(byte[] data, int waveWindowMs) {
       try {
-        return delegate.getGauges(data);
+        return delegate.getGauges(data, waveWindowMs);
       } catch (DeadObjectException e) {
         throw new IllegalStateException(e);
       } catch (RemoteException e) {
@@ -111,12 +111,12 @@ public final class VisualizerProxy {
     private short[] scopeBuffer = new short[0];
 
     @Override
-    public synchronized int getScope(byte[] data, int points) {
+    public synchronized int getScope(byte[] data, int points, int windowMs) {
       try {
         if (scopeBuffer.length != data.length / 2) {
           scopeBuffer = new short[data.length / 2];
         }
-        final int layout = delegate.getScope(scopeBuffer, points);
+        final int layout = delegate.getScope(scopeBuffer, points, windowMs);
         final int channels = ScopeLayout.channelsOf(layout);
         ByteBuffer.wrap(data)
             .order(ByteOrder.nativeOrder())
@@ -130,9 +130,9 @@ public final class VisualizerProxy {
     }
 
     @Override
-    public int getGauges(byte[] data) {
+    public int getGauges(byte[] data, int waveWindowMs) {
       try {
-        return delegate.getGauges(data);
+        return delegate.getGauges(data, waveWindowMs);
       } catch (Exception e) {
         Log.w(TAG, e, "getGauges()");
       }
