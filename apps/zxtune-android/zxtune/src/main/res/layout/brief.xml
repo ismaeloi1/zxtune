@@ -18,7 +18,7 @@
     <RelativeLayout
             android:id="@+id/brief_main"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/item_height"
+            android:layout_height="@dimen/controls_height"
             android:gravity="center_vertical"
             android:orientation="vertical"
             android:paddingHorizontal="@dimen/spacing_full">
@@ -55,7 +55,7 @@
 
         <ImageButton
                 android:id="@+id/brief_details_toggle"
-                style="@style/Button.Toggled"
+                style="@style/Button.Toggled.Compact"
                 android:layout_alignParentTop="true"
                 android:layout_alignParentRight="true"
                 android:layout_alignParentBottom="true"

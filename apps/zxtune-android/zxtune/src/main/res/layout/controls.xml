@@ -2,38 +2,39 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="@dimen/controls_height"
         android:orientation="horizontal"
         tools:ignore="RtlHardcoded">
 
     <ImageButton
             android:id="@+id/controls_sequence_mode"
-            style="@style/Button.Toggled"
-            android:layout_margin="@dimen/spacing_full"
+            style="@style/Button.Toggled.Compact"
+            android:layout_marginHorizontal="@dimen/spacing_full"
+            android:layout_marginVertical="@dimen/spacing_half"
             android:layout_weight="0"
             android:src="@drawable/ic_sequence_shuffle" />
 
     <ImageView
             android:id="@+id/controls_prev"
-            style="@style/Button"
+            style="@style/Button.Compact"
             android:layout_weight="1"
             android:src="@drawable/ic_prev" />
 
     <ImageView
             android:id="@+id/controls_play_pause"
-            style="@style/Button"
+            style="@style/Button.Compact"
             android:layout_weight="1"
             android:src="@drawable/ic_play" />
 
     <ImageView
             android:id="@+id/controls_next"
-            style="@style/Button"
+            style="@style/Button.Compact"
             android:layout_weight="1"
             android:src="@drawable/ic_next" />
 
     <ImageView
             android:id="@+id/controls_track_menu"
-            style="@style/Button"
+            style="@style/Button.Compact"
             android:layout_gravity="center_vertical"
             android:layout_weight="0"
             android:src="@drawable/ic_track_menu" />

@@ -44,7 +44,8 @@
 
     <ImageButton
             android:id="@+id/controls_track_mode"
-            style="@style/Button.Toggled"
+            style="@style/Button.Toggled.Compact"
+            android:layout_height="@dimen/controls_height"
             android:layout_alignParentRight="true"
             android:layout_centerVertical="true"
             android:layout_marginLeft="@dimen/spacing_full"
