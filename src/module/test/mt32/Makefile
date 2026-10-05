@@ -1,4 +1,4 @@
-binary_name := module_test_vgm_voices
+binary_name := module_test_mt32
 dirs.root := ../../../..
 source_dirs := .
 

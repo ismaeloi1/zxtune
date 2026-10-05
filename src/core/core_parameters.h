@@ -298,4 +298,33 @@ namespace Parameters::ZXTune::Core
     const auto COMBINED_WAVEFORMS = PREFIX + "combined_waveforms"_id;
     //@}
   }  // namespace SID
+
+  //! @brief MT-32 (Munt) related parameters namespace
+  namespace MT32
+  {
+    //! @brief Parameters#ZXTune#Core#MT32 namespace prefix
+    const auto PREFIX = Core::PREFIX + "mt32"_id;
+
+    //@{
+    //! @name Directory with control and PCM ROM images (full or partial dumps, detected by contents)
+    const auto ROMS_PATH = PREFIX + "roms_path"_id;
+    //@}
+
+    //@{
+    //! @name Preferred model if several ROM sets are available
+    const IntType MODEL_AUTO = 0;
+    const IntType MODEL_MT32 = 1;
+    const IntType MODEL_CM32L = 2;
+    const IntType MODEL_DEFAULT = MODEL_AUTO;
+    const auto MODEL = PREFIX + "model"_id;
+    //@}
+
+    //@{
+    //! @name Separate voices visualization: 9 parts or 32 partials of LA synthesis
+    const IntType VOICES_PARTS = 0;
+    const IntType VOICES_PARTIALS = 1;
+    const IntType VOICES_DEFAULT = VOICES_PARTS;
+    const auto VOICES = PREFIX + "voices"_id;
+    //@}
+  }  // namespace MT32
 }  // namespace Parameters::ZXTune::Core

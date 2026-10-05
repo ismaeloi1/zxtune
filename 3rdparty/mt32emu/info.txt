@@ -1,0 +1,5 @@
+libmt32emu 2.8.3 from https://github.com/munt/munt (commit 6e7c01fba7e1d50c8fa705834889fd0eac136075)
+Changes for zxtune:
+- config.h generated for static C++ API build
+- SampleRateConverter and VersionTagging are not used
+- partials output tap for separate voices visualization (see Synth::setPartialsListener)

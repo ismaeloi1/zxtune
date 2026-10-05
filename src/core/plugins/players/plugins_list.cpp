@@ -30,6 +30,7 @@ namespace ZXTune
   void RegisterVGMPlugins(PlayerPluginsRegistrator& players);
   void RegisterMPTPlugins(PlayerPluginsRegistrator& players);
   void RegisterVGMStreamPlugins(PlayerPluginsRegistrator& players, ArchivePluginsRegistrator& archives);
+  void RegisterMIDIPlugin(PlayerPluginsRegistrator& players);
 
   void RegisterPlayerPlugins(PlayerPluginsRegistrator& players, ArchivePluginsRegistrator& archives)
   {
@@ -46,6 +47,7 @@ namespace ZXTune
     RegisterFLACPlugin(players);
     RegisterVGMPlugins(players);
     RegisterMPTPlugins(players);
+    RegisterMIDIPlugin(players);
     RegisterSIDPlugins(players, archives);
     RegisterGMEPlugins(players, archives);
     RegisterASAPPlugins(players, archives);

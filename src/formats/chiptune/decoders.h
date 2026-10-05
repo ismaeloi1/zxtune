@@ -69,5 +69,6 @@ namespace Formats::Chiptune
   Decoder::Ptr CreateWAVDecoder();
   Decoder::Ptr CreateFLACDecoder();
   Decoder::Ptr CreateV2MDecoder();
+  Decoder::Ptr CreateMIDIDecoder();
   Decoder::Ptr CreateSound98Decoder();
 }  // namespace Formats::Chiptune
