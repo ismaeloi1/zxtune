@@ -459,6 +459,16 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
     }
 
     @Override
+    public int getVoiceGauges(byte[] data, int waveWindowMs) throws Exception {
+      return holder.get().visualizer.getVoiceGauges(data, waveWindowMs);
+    }
+
+    @Override
+    public String getLayout() throws Exception {
+      return holder.get().visualizer.getLayout();
+    }
+
+    @Override
     public String getStatus() throws Exception {
       return holder.get().visualizer.getStatus();
     }

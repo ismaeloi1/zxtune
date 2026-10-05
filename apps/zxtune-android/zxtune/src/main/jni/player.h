@@ -36,6 +36,8 @@ namespace Player
                             int16_t* data) const = 0;
     virtual uint_t GetScopeGauges(uint_t maxChips, int64_t playing, uint_t waveWindowMs, uint8_t* data) const = 0;
     virtual String GetScopeStatus() const = 0;
+    virtual String GetScopeLayout() const = 0;
+    virtual uint_t GetScopeVoiceGauges(uint_t maxVoices, int64_t playing, uint_t waveWindowMs, uint8_t* data) const = 0;
 
     virtual bool Render(uint_t samples, int16_t* buffer) = 0;
     virtual void Seek(uint_t frame) = 0;

@@ -18,6 +18,10 @@ internal class PlaybackVisualizer(
 
     override fun getGauges(data: ByteArray, waveWindowMs: Int) = player.scopeGauges(data, playingFrame(), waveWindowMs)
 
+    override fun getVoiceGauges(data: ByteArray, waveWindowMs: Int) = player.scopeVoiceGauges(data, playingFrame(), waveWindowMs)
+
+    override fun getLayout() = player.scopeLayout
+
     override fun getStatus() = buildString {
         appendLine(player.scopeStatus)
         appendLine("output: ${outputStatus()}")

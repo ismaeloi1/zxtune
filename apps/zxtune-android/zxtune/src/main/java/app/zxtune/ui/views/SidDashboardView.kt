@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief SID chip state gauges and diagnostics (inspired by JSIDPlay2's oscilloscope view)
+ * @brief Chips state gauges and diagnostics (inspired by JSIDPlay2's oscilloscope view)
  * @author vitamin.caig@gmail.com
  */
 package app.zxtune.ui.views
@@ -18,9 +18,14 @@ import android.view.View
 import app.zxtune.Logger
 import app.zxtune.playback.ChipGauges
 import app.zxtune.playback.ChipState
+import app.zxtune.playback.GaugesData
 import app.zxtune.playback.Visualizer
+import app.zxtune.playback.VoiceGauges
+import app.zxtune.playback.VoicesLayout
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.log2
+import kotlin.math.roundToInt
 
 private val LOG = Logger("SidDashboard")
 
@@ -28,7 +33,8 @@ private val LOG = Logger("SidDashboard")
  * Displays history of SID state for single chip:
  * - per voice: oscillator output, envelope (dB), frequency (log scale)
  * - global: master volume, resonance, filter cutoff
- * And multiline status text below. Multi-SID tunes chips are displayed side by side.
+ * Other chips (e.g. YM2612, SN76489, OPL) are displayed per voice: output, level (dB), frequency (log scale).
+ * And multiline status text below. Chips are displayed side by side.
  */
 class SidDashboardView @JvmOverloads constructor(
     context: Context,
@@ -49,10 +55,17 @@ class SidDashboardView @JvmOverloads constructor(
     private val executor = Executors.newSingleThreadExecutor()
     private val requestPending = AtomicBoolean(false)
     private val buffers = Array(2) { ByteArray(MAX_CHIPS * ChipGauges.SIZE) }
+    private var voiceBuffers = Array(2) { ByteArray(0) }
     private var readyBuffer = 0
 
     @Volatile
     private var readyChips = 0
+
+    @Volatile
+    private var readyVoices = 0
+
+    @Volatile
+    private var layout = VoicesLayout.MASTER
 
     @Volatile
     private var status = ""
@@ -118,6 +131,8 @@ class SidDashboardView @JvmOverloads constructor(
         } else if (src == null) {
             Choreographer.getInstance().removeFrameCallback(frameCallback)
             readyChips = 0
+            readyVoices = 0
+            layout = VoicesLayout.MASTER
             invalidate()
         }
     }
@@ -138,10 +153,31 @@ class SidDashboardView @JvmOverloads constructor(
         }
         executor.execute {
             try {
+                if (needStatus) {
+                    // cheap enough to not track layout changes precisely
+                    layout = runCatching { VoicesLayout.parse(src.getLayout()) }.getOrDefault(VoicesLayout.MASTER)
+                }
                 val target = 1 - readyBuffer
-                val chips = runCatching { src.getGauges(buffers[target], waveWindowMs) }.getOrDefault(0)
-                readyBuffer = target
-                readyChips = chips
+                val current = layout
+                if (current.hasRegisters) {
+                    val chips = runCatching { src.getGauges(buffers[target], waveWindowMs) }.getOrDefault(0)
+                    readyBuffer = target
+                    readyVoices = 0
+                    readyChips = chips
+                } else if (current.voicesCount != 0) {
+                    // binder transfers whole array, so keep it as small as possible
+                    val size = current.voicesCount * VoiceGauges.SIZE
+                    if (voiceBuffers[target].size != size) {
+                        voiceBuffers[target] = ByteArray(size)
+                    }
+                    val voices = runCatching { src.getVoiceGauges(voiceBuffers[target], waveWindowMs) }.getOrDefault(0)
+                    readyBuffer = target
+                    readyChips = 0
+                    readyVoices = voices
+                } else {
+                    readyChips = 0
+                    readyVoices = 0
+                }
                 if (needStatus) {
                     status = runCatching { src.getStatus() }.getOrElse {
                         LOG.w(it) { "Failed to get status" }
@@ -161,7 +197,11 @@ class SidDashboardView @JvmOverloads constructor(
         }
         val lineHeight = textPaint.fontSpacing
         val textHeight = lineHeight * lines.size + padding()
-        drawGauges(canvas, height - textHeight)
+        if (readyVoices != 0) {
+            drawVoices(canvas, height - textHeight)
+        } else {
+            drawGauges(canvas, height - textHeight)
+        }
         var y = height - textHeight + padding() / 2 - textPaint.ascent()
         for (line in lines) {
             canvas.drawText(line, padding(), y, textPaint)
@@ -226,10 +266,56 @@ class SidDashboardView @JvmOverloads constructor(
         }
     }
 
+    // Chips are placed side by side as in oscilloscope above (long chips are split to several columns),
+    // 3 gauges per voice
+    private fun drawVoices(canvas: Canvas, areaHeight: Float) {
+        val voices = readyVoices
+        val current = layout
+        if (voices == 0 || areaHeight < density * 40) {
+            return
+        }
+        val data = voiceBuffers[readyBuffer]
+        if (data.size < voices * VoiceGauges.SIZE) {
+            return
+        }
+        var totalCols = 0
+        var maxRows = 1
+        for (group in current.groups) {
+            val cols = columnsOf(group.voices.size)
+            totalCols += cols
+            maxRows = maxOf(maxRows, rowsOf(group.voices.size))
+        }
+        val groupColW = width.toFloat() / maxOf(totalCols, 1)
+        val cellW = groupColW / 3
+        val cellH = areaHeight / maxRows
+        var voice = 0
+        var col = 0
+        for (group in current.groups) {
+            val rows = rowsOf(group.voices.size)
+            if (col != 0) {
+                canvas.drawLine(groupColW * col, 0f, groupColW * col, areaHeight, separatorPaint)
+            }
+            group.voices.forEachIndexed { idx, name ->
+                if (voice >= voices) {
+                    return
+                }
+                val gauges = VoiceGauges(data, voice * VoiceGauges.SIZE)
+                val left = groupColW * (col + idx / rows)
+                val top = cellH * (idx % rows)
+                val wave = "${group.name} $name${if (gauges.isKeyOn) " \u25CF" else ""}"
+                drawGauge(canvas, gauges, VoiceGauges.WAVE, left, top, cellW, cellH, wave)
+                drawGauge(canvas, gauges, VoiceGauges.LEVEL, left + cellW, top, cellW, cellH, levelTitle(gauges))
+                drawGauge(canvas, gauges, VoiceGauges.FREQUENCY, left + cellW * 2, top, cellW, cellH, frequencyTitle(gauges))
+                ++voice
+            }
+            col += columnsOf(group.voices.size)
+        }
+    }
+
     // Each column is vertical line between min and max values, as in JSIDPlay2
     private fun drawGauge(
         canvas: Canvas,
-        gauges: ChipGauges,
+        gauges: GaugesData,
         gauge: Int,
         left: Float,
         top: Float,
@@ -287,6 +373,32 @@ class SidDashboardView @JvmOverloads constructor(
 
         private fun hex4(value: Int) = String.format(java.util.Locale.US, "%04X", value)
         private const val MAX_CHIPS = 3
+
+        // same as in OscilloscopeView
+        private const val MAX_ROWS = 8
+        private fun columnsOf(voices: Int) = (voices + MAX_ROWS - 1) / MAX_ROWS
+        private fun rowsOf(voices: Int) = (voices + columnsOf(voices) - 1) / maxOf(columnsOf(voices), 1)
+
+        private val NOTES = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+
+        internal fun noteName(hz: Float): String {
+            val note = (12 * log2(hz / 440f) + 57).roundToInt()
+            return if (note in 0..131) "${NOTES[note % 12]}${note / 12}" else ""
+        }
+
+        // Estimated from audio if not provided by emulation core
+        internal fun levelTitle(gauges: VoiceGauges) = if (gauges.hasLevel) {
+            if (gauges.level > -96f) "Lvl ${gauges.level.roundToInt()}dB" else "Lvl off"
+        } else {
+            "Lvl ~"
+        }
+
+        internal fun frequencyTitle(gauges: VoiceGauges) = when {
+            !gauges.hasFrequency -> "Freq ~"
+            gauges.isNoise -> "Noise ${gauges.frequency.roundToInt()}Hz"
+            gauges.frequency <= 0f -> "Freq -"
+            else -> "${gauges.frequency.roundToInt()}Hz ${noteName(gauges.frequency)}"
+        }
         private const val STATUS_PERIOD_NS = 500_000_000L
 
         // Waveform bits and flags: Sync, Ring modulation, Test, Filtered

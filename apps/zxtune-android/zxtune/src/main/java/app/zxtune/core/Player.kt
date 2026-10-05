@@ -39,6 +39,18 @@ interface Player :
     fun scopeGauges(data: ByteArray, playing: Long, waveWindowMs: Int): Int
 
     /**
+     * @param data Array to store [voices][app.zxtune.playback.VoiceGauges.SIZE] gauges data
+     * @param playing see [scope]
+     * @return Count of stored voices
+     */
+    fun scopeVoiceGauges(data: ByteArray, playing: Long, waveWindowMs: Int): Int
+
+    /**
+     * Voices layout, see [app.zxtune.playback.VoicesLayout]
+     */
+    val scopeLayout: String
+
+    /**
      * Emulation description and visualization statistics
      */
     val scopeStatus: String

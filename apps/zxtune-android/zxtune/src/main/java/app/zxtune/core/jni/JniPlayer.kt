@@ -24,6 +24,13 @@ internal class JniPlayer(handleVal: Int) : Player {
 
     external override fun scopeGauges(data: ByteArray, playing: Long, waveWindowMs: Int): Int
 
+    external override fun scopeVoiceGauges(data: ByteArray, playing: Long, waveWindowMs: Int): Int
+
+    override val scopeLayout: String
+        get() = scopeLayout()
+
+    private external fun scopeLayout(): String
+
     override val scopeStatus: String
         get() = scopeStatus()
 

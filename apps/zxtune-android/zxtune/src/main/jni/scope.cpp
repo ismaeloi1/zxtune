@@ -34,6 +34,12 @@ namespace Player
     const uint_t MIN_WINDOW_MS = 1;
     const uint_t MAX_WINDOW_MS = 200;
     const uint_t MAX_VOICES = 32;
+    const uint_t MAX_FULL_RATE_TRIGGERS = 8;
+    // ~-66dB
+    const int SILENCE_LEVEL = 16;
+    // pitch estimation window for voices without frequency state
+    const uint_t ESTIMATOR_MS = 40;
+    const uint_t MAX_ESTIMATIONS_PER_CALL = 24;
     // Keep separate voices rendering while data is requested at least this often
     const auto ACTIVITY_TIMEOUT = std::chrono::seconds(2);
 
@@ -95,12 +101,29 @@ namespace Player
       const int64_t Offset;
     };
 
+    struct VoiceRecord
+    {
+      int64_t Index = 0;
+      Module::VoiceState State;
+    };
+
     struct Voice
     {
       Ring Samples;
       std::vector<int16_t> Staging;
       // Samples.Size() - master samples count at last commit
       int64_t Offset = 0;
+      // state snapshots for chips without registers
+      std::deque<VoiceRecord> Records;
+      std::vector<VoiceRecord> RecordsStaging;
+      // computed from audio slow gauges columns (level, frequency) by column index
+      struct CachedColumn
+      {
+        int64_t Index = -1;
+        uint8_t Level = 0;
+        uint8_t Frequency = 0;
+      };
+      std::array<CachedColumn, 512> AudioColumns;
     };
 
     // ~4s of 4ms snapshots
@@ -130,6 +153,20 @@ namespace Player
       // dB scale down to -48dB
       const float level = env ? 1.0f + 20.0f * std::log10(env / 255.0f) / 48.0f : 0.0f;
       return static_cast<uint8_t>(std::clamp(level, 0.0f, 1.0f) * 255);
+    }
+
+    uint8_t LevelOfDb(float db)
+    {
+      // dB scale down to -48dB
+      return static_cast<uint8_t>(std::clamp(1.0f + db / 48.0f, 0.0f, 1.0f) * 255);
+    }
+
+    // logarithmic scale of 7 octaves starting from A0
+    const float MIN_FREQUENCY = 27.5f;
+
+    uint8_t LevelOfFrequency(float hz)
+    {
+      return hz > 0 ? static_cast<uint8_t>(std::clamp(std::log2(hz / MIN_FREQUENCY) / 7, 0.0f, 1.0f) * 255) : 0;
     }
 
     uint8_t FrequencyLevel(uint_t freq)
@@ -165,13 +202,53 @@ namespace Player
     {}
 
     // Render thread
-    void SetVoicesCount(uint_t count, uint_t perChip) override
+    void SetVoicesGroups(const std::vector<Module::VoicesGroup>& groups, bool hasRegisters) override
     {
       const std::scoped_lock guard(Lock);
-      Voices.resize(std::min(count, MAX_VOICES));
-      VoicesPerChip = perChip;
-      Chips.resize(perChip ? Voices.size() / perChip : 0);
+      uint_t total = 0;
+      LayoutDescription = groups.empty() ? "" : (hasRegisters ? "registers" : "audio");
+      for (const auto& group : groups)
+      {
+        const auto voices = std::min<uint_t>(static_cast<uint_t>(group.Voices.size()), MAX_VOICES - total);
+        if (!voices)
+        {
+          break;
+        }
+        LayoutDescription += '\n';
+        LayoutDescription += group.Name;
+        for (uint_t idx = 0; idx < voices; ++idx)
+        {
+          LayoutDescription += '\t';
+          LayoutDescription += group.Voices[idx];
+        }
+        total += voices;
+      }
+      Voices.clear();
+      Voices.resize(total);
+      VoicesPerChip = hasRegisters && !groups.empty() ? static_cast<uint_t>(groups.front().Voices.size()) : 0;
+      Chips.clear();
+      Chips.resize(VoicesPerChip ? total / VoicesPerChip : 0);
       Triggers.clear();
+      // unique among all the scope instances to detect changes on track switching
+      static std::atomic<uint_t> LastLayoutId;
+      LayoutId = ++LastLayoutId & 0x7fff;
+    }
+
+    // Render thread, no locks - collected data is flushed on Commit
+    void FeedVoices(uint_t firstVoice, const Module::VoiceState* states, uint_t count) override
+    {
+      for (uint_t idx = 0; idx < count; ++idx)
+      {
+        const auto voice = firstVoice + idx;
+        if (voice < Voices.size())
+        {
+          auto& target = Voices[voice];
+          if (target.RecordsStaging.size() < MAX_STATES)
+          {
+            target.RecordsStaging.push_back({int64_t(target.Samples.Size() + target.Staging.size()), states[idx]});
+          }
+        }
+      }
     }
 
     uint_t GetStatePeriod() const override
@@ -264,6 +341,12 @@ namespace Player
         voice.Samples.Push(voice.Staging.data(), static_cast<uint_t>(voice.Staging.size()), 1);
         voice.Staging.clear();
         voice.Offset = int64_t(voice.Samples.Size()) - int64_t(Master.Size());
+        voice.Records.insert(voice.Records.end(), voice.RecordsStaging.begin(), voice.RecordsStaging.end());
+        voice.RecordsStaging.clear();
+        while (voice.Records.size() > MAX_STATES)
+        {
+          voice.Records.pop_front();
+        }
       }
       for (auto& chip : Chips)
       {
@@ -325,18 +408,31 @@ namespace Player
       HasLastPos = true;
 
       const uint_t channels = std::min<uint_t>(Voices.empty() ? 1 : static_cast<uint_t>(Voices.size()), maxChannels);
+      // many voices (e.g. OPL3) require cheaper triggering to fit into high refresh rate frames
+      const auto stride = channels > MAX_FULL_RATE_TRIGGERS ? Stride * 2 : Stride;
+      if (stride != TriggersStride)
+      {
+        Triggers.clear();
+        TriggersStride = stride;
+      }
       while (Triggers.size() < channels)
       {
-        const auto kernelSize = Samplerate * TRIGGER_MS / 1000 / Stride;
-        Triggers.emplace_back(new Sound::CorrelationTrigger(kernelSize, Stride, Samplerate));
+        const auto kernelSize = Samplerate * TRIGGER_MS / 1000 / stride;
+        Triggers.emplace_back(new Sound::CorrelationTrigger(kernelSize, stride, Samplerate));
       }
       const int64_t renderSamples = Samplerate * std::clamp(windowMs, MIN_WINDOW_MS, MAX_WINDOW_MS) / 1000;
+      const int64_t triggerSamples = Samplerate * TRIGGER_MS / 1000;
+      uint_t triggered = 0;
       for (uint_t chan = 0; chan < channels; ++chan)
       {
         const auto& ring = Voices.empty() ? Master : Voices[chan].Samples;
         const auto offset = Voices.empty() ? 0 : Voices[chan].Offset;
         const RingWave wave(ring, offset);
-        const auto trigger = Triggers[chan]->GetTrigger(wave, pos, samplesPerFrame);
+        // silent voices (e.g. unused chip channels) are not triggered, stable flat line is displayed
+        const auto range = std::max(renderSamples, triggerSamples);
+        const auto silent = IsSilent(ring, pos + offset - range, pos + offset + range);
+        const auto trigger = silent ? pos : Triggers[chan]->GetTrigger(wave, pos, samplesPerFrame);
+        triggered += !silent;
         const auto begin = trigger - renderSamples / 2 + offset;
         auto* out = target + chan * points;
         for (uint_t idx = 0; idx < points; ++idx)
@@ -346,9 +442,10 @@ namespace Player
       }
       LastComputeUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
       LastChannels = channels;
+      LastTriggered = triggered;
       Layout result;
       result.Channels = channels;
-      result.PerChip = Voices.empty() ? 0 : VoicesPerChip;
+      result.Id = LayoutId;
       return result;
     }
 
@@ -369,13 +466,44 @@ namespace Player
       return chips;
     }
 
+    String GetLayout() const override
+    {
+      const std::scoped_lock guard(Lock);
+      return LayoutDescription;
+    }
+
+    uint_t GetVoiceGauges(uint_t maxVoices, int64_t playing, uint_t waveWindowMs, uint8_t* target) override
+    {
+      const std::scoped_lock guard(Lock);
+      if (!HasPlayed || Voices.empty() || VoicesPerChip != 0)
+      {
+        return 0;
+      }
+      const auto start = Clock::now();
+      const auto pos = playing >= 0 ? playing : GetPlaybackPosition();
+      const auto voices = std::min<uint_t>(static_cast<uint_t>(Voices.size()), maxVoices);
+      EstimatorBudget = MAX_ESTIMATIONS_PER_CALL;
+      for (uint_t idx = 0; idx < voices; ++idx)
+      {
+        auto& voice = Voices[idx];
+        FillVoiceGauges(voice, pos + voice.Offset, std::clamp(waveWindowMs, MIN_WINDOW_MS, MAX_WINDOW_MS),
+                        target + std::size_t(idx) * VOICE_GAUGES_SIZE);
+      }
+      LastGaugesUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
+      return voices;
+    }
+
     String GetStatus() const override
     {
       const std::scoped_lock guard(Lock);
       String result = Description;
       result += result.empty() ? "" : "\n";
-      result += "scope: " + std::to_string(LastChannels) + " ch, trigger " + std::to_string(LastComputeUs) + "us, sync "
-                + (LastPlayingHint >= 0 ? "device" : "estimated");
+      result += "scope: " + std::to_string(LastTriggered) + "/" + std::to_string(LastChannels) + " ch, trigger "
+                + std::to_string(LastComputeUs) + "us, sync " + (LastPlayingHint >= 0 ? "device" : "estimated");
+      if (LastGaugesUs)
+      {
+        result += ", gauges " + std::to_string(LastGaugesUs) + "us";
+      }
       return result;
     }
 
@@ -459,6 +587,167 @@ namespace Player
       }
     }
 
+    static bool IsSilent(const Ring& ring, int64_t from, int64_t to)
+    {
+      for (auto idx = from; idx < to; ++idx)
+      {
+        if (std::abs(int(ring.At(idx))) > SILENCE_LEVEL)
+        {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    // end is index of currently heard sample in voice's samples
+    void FillVoiceGauges(Voice& voice, int64_t end, uint_t waveWindowMs, uint8_t* target)
+    {
+      auto store = [target](uint_t gauge, uint_t col, const Column& c) {
+        auto* out = target + (gauge * GAUGE_COLUMNS + col) * 2;
+        out[0] = c.Min > c.Max ? c.Max : c.Min;
+        out[1] = c.Max;
+      };
+      auto toByte = [](int16_t smp) { return static_cast<uint8_t>((int(smp) + 32768) >> 8); };
+      // fast wave gauge
+      {
+        const double fastSamples = double(Samplerate) * waveWindowMs / 1000 / GAUGE_COLUMNS;
+        uint8_t prev = 128;
+        for (uint_t col = 0; col < GAUGE_COLUMNS; ++col)
+        {
+          const auto from = end - int64_t((GAUGE_COLUMNS - col) * fastSamples);
+          const auto to = std::max(from + 1, end - int64_t((GAUGE_COLUMNS - col - 1) * fastSamples));
+          Column c;
+          if (col)
+          {
+            c.Add(prev);
+          }
+          for (auto idx = from; idx < to; ++idx)
+          {
+            prev = toByte(voice.Samples.At(idx));
+            c.Add(prev);
+          }
+          store(0, col, c);
+        }
+      }
+      // slow gauges, columns are aligned to absolute position to allow caching of audio analysis
+      const auto colSamples = std::max<int64_t>(int64_t(SLOW_COLUMN_CYCLES) * Samplerate / CPU_CLOCK, 1);
+      // only complete columns are displayed
+      const auto lastCol = end / colSamples - 1;
+      const auto& recs = voice.Records;
+      auto it = std::lower_bound(recs.begin(), recs.end(), (lastCol - GAUGE_COLUMNS + 1) * colSamples,
+                                 [](const VoiceRecord& rec, int64_t p) { return rec.Index < p; });
+      const VoiceRecord* last = it != recs.begin() ? &*(it - 1) : nullptr;
+      for (uint_t col = 0; col < GAUGE_COLUMNS; ++col)
+      {
+        const auto colIdx = lastCol - GAUGE_COLUMNS + 1 + col;
+        const auto to = (colIdx + 1) * colSamples;
+        Column level;
+        Column freq;
+        bool levelFromState = false;
+        bool freqFromState = false;
+        auto addRecord = [&](const VoiceRecord& rec) {
+          const auto& st = rec.State;
+          if (st.Flags & Module::VoiceState::HAS_LEVEL)
+          {
+            levelFromState = true;
+            level.Add(LevelOfDb(st.Level));
+          }
+          if (st.Flags & Module::VoiceState::HAS_FREQUENCY)
+          {
+            freqFromState = true;
+            // inaudible voice has no visible pitch
+            const bool audible = !(st.Flags & Module::VoiceState::HAS_LEVEL) || st.Level > -48.0f;
+            freq.Add(audible ? LevelOfFrequency(st.Frequency) : 0);
+          }
+        };
+        if (last)
+        {
+          addRecord(*last);
+        }
+        for (; it != recs.end() && it->Index < to; ++it)
+        {
+          addRecord(*it);
+          last = &*it;
+        }
+        if (!levelFromState || !freqFromState)
+        {
+          const auto& cached = AnalyzeColumn(voice, colIdx, colSamples);
+          if (!levelFromState)
+          {
+            level.Add(cached.Level);
+          }
+          if (!freqFromState)
+          {
+            freq.Add(cached.Frequency);
+          }
+        }
+        store(1, col, level);
+        store(2, col, freq);
+      }
+      auto* state = target + VOICE_GAUGES_COUNT * GAUGE_COLUMNS * 2;
+      std::memset(state, 0, VOICE_STATE_SIZE);
+      if (last)
+      {
+        std::memcpy(state, &last->State.Frequency, sizeof(float));
+        std::memcpy(state + 4, &last->State.Level, sizeof(float));
+        state[8] = last->State.Flags;
+      }
+    }
+
+    // level and pitch of voice audio in column, for voices without state
+    const Voice::CachedColumn& AnalyzeColumn(Voice& voice, int64_t colIdx, int64_t colSamples)
+    {
+      auto& cached = voice.AudioColumns[colIdx & (voice.AudioColumns.size() - 1)];
+      if (cached.Index == colIdx)
+      {
+        return cached;
+      }
+      const auto from = colIdx * colSamples;
+      const auto to = from + colSamples;
+      int peak = 0;
+      for (auto idx = from; idx < to; ++idx)
+      {
+        peak = std::max(peak, std::abs(int(voice.Samples.At(idx))));
+      }
+      bool complete = true;
+      cached.Level = peak ? LevelOfDb(20 * std::log10(peak / 32768.0f)) : 0;
+      cached.Frequency = 0;
+      if (peak && EstimatorBudget == 0)
+      {
+        // will be done on next calls
+        complete = false;
+      }
+      else if (peak)
+      {
+        --EstimatorBudget;
+        if (!Estimator)
+        {
+          Estimator = std::make_unique<Sound::CorrelationTrigger>(Samplerate * ESTIMATOR_MS / 1000 / Stride, Stride,
+                                                                  Samplerate);
+        }
+        // analyze window ending at column end, without DC
+        const auto size = Samplerate * ESTIMATOR_MS / 1000 / Stride;
+        EstimatorData.resize(size);
+        float mean = 0;
+        for (uint_t idx = 0; idx < size; ++idx)
+        {
+          EstimatorData[idx] = voice.Samples.At(to - int64_t(size - idx) * Stride) * (1.0f / 32768);
+          mean += EstimatorData[idx];
+        }
+        mean /= size;
+        for (auto& val : EstimatorData)
+        {
+          val -= mean;
+        }
+        if (const auto period = Estimator->EstimatePeriod(EstimatorData.data(), size))
+        {
+          cached.Frequency = LevelOfFrequency(float(Samplerate) / Stride / period);
+        }
+      }
+      cached.Index = complete ? colIdx : -1;
+      return cached;
+    }
+
     // Estimated currently playing sample in master samples index
     int64_t GetPlaybackPosition() const
     {
@@ -497,7 +786,15 @@ namespace Player
     String Description;
     int64_t LastComputeUs = 0;
     uint_t LastChannels = 0;
+    uint_t LastTriggered = 0;
+    uint_t TriggersStride = 0;
     int64_t LastPlayingHint = -1;
+    String LayoutDescription;
+    uint_t LayoutId = 0;
+    std::unique_ptr<Sound::CorrelationTrigger> Estimator;
+    std::vector<float> EstimatorData;
+    int64_t LastGaugesUs = 0;
+    uint_t EstimatorBudget = 0;
   };
 
   Scope::Ptr Scope::Create(uint_t samplerate)

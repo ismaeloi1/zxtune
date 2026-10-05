@@ -17,6 +17,10 @@ object VisualizerStub : Visualizer {
 
     override fun getGauges(data: ByteArray, waveWindowMs: Int) = 0
 
+    override fun getVoiceGauges(data: ByteArray, waveWindowMs: Int) = 0
+
+    override fun getLayout() = ""
+
     override fun getStatus() = ""
 
     // TODO: remove

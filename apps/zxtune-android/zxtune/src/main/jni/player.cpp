@@ -265,7 +265,7 @@ namespace
     uint_t GetScope(uint_t maxChannels, uint_t points, int64_t playing, uint_t windowMs, int16_t* data) const override
     {
       const auto layout = ScopeData->Get(maxChannels, points, playing, windowMs, data);
-      return layout.Channels | (layout.PerChip << 16);
+      return layout.Channels | ((layout.Id & 0x7fff) << 16);
     }
 
     uint_t GetScopeGauges(uint_t maxChips, int64_t playing, uint_t waveWindowMs, uint8_t* data) const override
@@ -276,6 +276,16 @@ namespace
     String GetScopeStatus() const override
     {
       return ScopeData->GetStatus();
+    }
+
+    String GetScopeLayout() const override
+    {
+      return ScopeData->GetLayout();
+    }
+
+    uint_t GetScopeVoiceGauges(uint_t maxVoices, int64_t playing, uint_t waveWindowMs, uint8_t* data) const override
+    {
+      return ScopeData->GetVoiceGauges(maxVoices, playing, waveWindowMs, data);
     }
 
     bool Render(uint_t samples, int16_t* buffer) override
@@ -451,6 +461,35 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeGauges(JNIEnv* env
     {
       return uint_t(0);
     }
+  });
+}
+
+EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeVoiceGauges(JNIEnv* env, jobject self, jbyteArray data,
+                                                                          jlong playing, jint waveWindowMs)
+{
+  return Jni::Call(env, [=]() {
+    // Should be before AutoArray calls - else causes 'using JNI after critical get' error
+    const auto playerHandle = NativePlayerJni::GetHandle(env, self);
+    const auto player = Player::Storage::Instance().Find(playerHandle);
+    const Jni::AutoByteArray rawData(env, data);
+    if (rawData && player)
+    {
+      const auto maxVoices = rawData.Size() / Player::Scope::VOICE_GAUGES_SIZE;
+      return player->GetScopeVoiceGauges(maxVoices, playing, waveWindowMs, rawData.Data());
+    }
+    else
+    {
+      return uint_t(0);
+    }
+  });
+}
+
+EXPORTED jstring JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeLayout(JNIEnv* env, jobject self)
+{
+  return Jni::Call(env, [=]() {
+    const auto playerHandle = NativePlayerJni::GetHandle(env, self);
+    const auto player = Player::Storage::Instance().Find(playerHandle);
+    return Jni::MakeJstring(env, player ? player->GetScopeLayout() : String());
   });
 }
 

@@ -37,6 +37,21 @@ interface Visualizer {
     fun getGauges(data: ByteArray, waveWindowMs: Int): Int
 
     /**
+     * Get gauges of voices state history ending at currently heard moment, for chips without SID-like registers
+     * @param data array to store [voices][VoiceGauges.SIZE] bytes
+     * @param waveWindowMs displayed duration of wave gauge
+     * @return count of stored voices
+     */
+    @Throws(Exception::class)
+    fun getVoiceGauges(data: ByteArray, waveWindowMs: Int): Int
+
+    /**
+     * @return voices layout description, see [VoicesLayout]. Changes are signalled via [ScopeLayout.id]
+     */
+    @Throws(Exception::class)
+    fun getLayout(): String
+
+    /**
      * @return Multiline human readable emulation and performance information
      */
     @Throws(Exception::class)
@@ -52,8 +67,8 @@ value class ScopeLayout(private val packed: Int) {
     val channels
         get() = packed and 0xffff
 
-    /** Channels count of each chip (voices are enumerated chip by chip), 0 for single master channel */
-    val channelsPerChip
+    /** Voices layout version, see [Visualizer.getLayout] */
+    val id
         get() = packed ushr 16
 
     companion object {
@@ -63,14 +78,100 @@ value class ScopeLayout(private val packed: Int) {
 }
 
 /**
- * Accessor to single chip data of [Visualizer.getGauges]
+ * Decoded result of [Visualizer.getLayout]
  */
-class ChipGauges(private val data: ByteArray, private val offset: Int) {
+class VoicesLayout private constructor(
+    /** SID-like chips with registers state, see [Visualizer.getGauges], else [Visualizer.getVoiceGauges] */
+    val hasRegisters: Boolean,
+    val groups: List<Group>,
+) {
+    class Group(val name: String, val voices: List<String>)
+
+    val voicesCount
+        get() = groups.sumOf { it.voices.size }
+
+    companion object {
+        /** Single master channel */
+        val MASTER = VoicesLayout(false, emptyList())
+
+        fun parse(description: String): VoicesLayout {
+            val lines = description.lines().filter { it.isNotEmpty() }
+            if (lines.size < 2) {
+                return MASTER
+            }
+            val groups = lines.drop(1).map { line ->
+                val fields = line.split('\t')
+                Group(fields.first(), fields.drop(1))
+            }
+            return VoicesLayout(lines.first() == "registers", groups)
+        }
+    }
+}
+
+/**
+ * History of values by columns
+ */
+interface GaugesData {
     /**
      * @return min/max level (0..255) of gauge column
      */
-    fun min(gauge: Int, column: Int) = data[offset + (gauge * COLUMNS + column) * 2].toInt() and 0xff
-    fun max(gauge: Int, column: Int) = data[offset + (gauge * COLUMNS + column) * 2 + 1].toInt() and 0xff
+    fun min(gauge: Int, column: Int): Int
+    fun max(gauge: Int, column: Int): Int
+}
+
+/**
+ * Accessor to single voice data of [Visualizer.getVoiceGauges]
+ */
+class VoiceGauges(private val data: ByteArray, private val offset: Int) : GaugesData {
+    override fun min(gauge: Int, column: Int) = data[offset + (gauge * COLUMNS + column) * 2].toInt() and 0xff
+    override fun max(gauge: Int, column: Int) = data[offset + (gauge * COLUMNS + column) * 2 + 1].toInt() and 0xff
+
+    private fun float(at: Int) = Float.fromBits(
+        (data[at].toInt() and 0xff) or ((data[at + 1].toInt() and 0xff) shl 8) or
+            ((data[at + 2].toInt() and 0xff) shl 16) or ((data[at + 3].toInt() and 0xff) shl 24)
+    )
+
+    private val stateOffset
+        get() = offset + GAUGES * COLUMNS * 2
+
+    /** Hz, valid if [hasFrequency] */
+    val frequency
+        get() = float(stateOffset)
+
+    /** dB, 0 or negative, valid if [hasLevel] */
+    val level
+        get() = float(stateOffset + 4)
+
+    private val flags
+        get() = data[stateOffset + 8].toInt()
+
+    val isKeyOn
+        get() = 0 != (flags and 1)
+    val hasFrequency
+        get() = 0 != (flags and 2)
+    val hasLevel
+        get() = 0 != (flags and 4)
+    val isNoise
+        get() = 0 != (flags and 8)
+
+    companion object {
+        // see Player::Scope::VOICE_GAUGES_SIZE
+        const val GAUGES = 3
+        const val COLUMNS = 256
+        const val SIZE = GAUGES * COLUMNS * 2 + 16
+
+        const val WAVE = 0
+        const val LEVEL = 1
+        const val FREQUENCY = 2
+    }
+}
+
+/**
+ * Accessor to single chip data of [Visualizer.getGauges]
+ */
+class ChipGauges(private val data: ByteArray, private val offset: Int) : GaugesData {
+    override fun min(gauge: Int, column: Int) = data[offset + (gauge * COLUMNS + column) * 2].toInt() and 0xff
+    override fun max(gauge: Int, column: Int) = data[offset + (gauge * COLUMNS + column) * 2 + 1].toInt() and 0xff
 
     /**
      * Last registers snapshot

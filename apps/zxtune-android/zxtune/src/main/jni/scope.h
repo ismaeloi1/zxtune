@@ -41,8 +41,8 @@ namespace Player
     {
       //! channels count actually stored
       uint_t Channels = 0;
-      //! channels count of each chip (0 for single master channel)
-      uint_t PerChip = 0;
+      //! voices layout version, changed on each SetVoicesGroups, see GetLayout
+      uint_t Id = 0;
     };
 
     //! @param maxChannels maximum channels count to get
@@ -68,6 +68,28 @@ namespace Player
     //! @param target [chips][GAUGES_SIZE]
     //! @return chips count actually stored
     virtual uint_t GetGauges(uint_t maxChips, int64_t playing, uint_t waveWindowMs, uint8_t* target) = 0;
+
+    //! @return voices layout description, empty for single master channel:
+    //! - first line: "registers" (SID-like chips, see GetGauges) or "audio" (see GetVoiceGauges)
+    //! - next lines: group (chip) name and its voices names separated by tabs
+    virtual String GetLayout() const = 0;
+
+    //! Gauges layout per voice of chips without registers:
+    //! - VOICE_GAUGES_COUNT gauges by GAUGE_COLUMNS columns of (min, max) bytes, normalized to 0..255
+    //!   order: wave (covers requested window), level (dB down to -48dB), frequency (log scale, 7 octaves from A0)
+    //!   level and frequency are 16384 C64 cycles per column, as for SID gauges
+    //! - last voice state: frequency (float Hz), level (float dB), flags (see Module::VoiceState) padded to
+    //!   VOICE_STATE_SIZE, little endian
+    static const uint_t VOICE_GAUGES_COUNT = 3;
+    static const uint_t VOICE_STATE_SIZE = 16;
+    static const uint_t VOICE_GAUGES_SIZE = VOICE_GAUGES_COUNT * GAUGE_COLUMNS * 2 + VOICE_STATE_SIZE;
+
+    //! @param maxVoices maximum voices count to get
+    //! @param playing see Get
+    //! @param waveWindowMs duration of wave gauge
+    //! @param target [voices][VOICE_GAUGES_SIZE]
+    //! @return voices count actually stored
+    virtual uint_t GetVoiceGauges(uint_t maxVoices, int64_t playing, uint_t waveWindowMs, uint8_t* target) = 0;
 
     //! @return emulation description and scope statistics
     virtual String GetStatus() const = 0;

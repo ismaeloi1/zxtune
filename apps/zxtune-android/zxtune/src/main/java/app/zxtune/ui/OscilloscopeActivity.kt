@@ -3,12 +3,14 @@ package app.zxtune.ui
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.support.v4.media.session.PlaybackStateCompat
 import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -28,6 +30,7 @@ import kotlinx.coroutines.launch
  * Fullscreen oscilloscope, follows device orientation:
  * - portrait: oscilloscope with SID state dashboard below, as in now playing view
  * - landscape: oscilloscope only
+ * Black background covers the whole screen, while content avoids display cutouts (camera holes, notches).
  */
 class OscilloscopeActivity : AppCompatActivity() {
     private lateinit var oscilloscope: OscilloscopeView
@@ -46,6 +49,12 @@ class OscilloscopeActivity : AppCompatActivity() {
             )
             addView(oscilloscope)
             addView(dashboard)
+            setBackgroundColor(Color.BLACK)
+        }
+        ViewCompat.setOnApplyWindowInsetsListener(panel) { view, insets ->
+            val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            view.setPadding(cutout.left, cutout.top, cutout.right, cutout.bottom)
+            insets
         }
         setContentView(panel)
         updateLayout(resources.configuration)
@@ -107,6 +116,16 @@ class OscilloscopeActivity : AppCompatActivity() {
     }
 
     private fun setupImmersiveMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            // draw black background under cutout area in both orientations, see insets listener
+            window.attributes = window.attributes.apply {
+                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                } else {
+                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                }
+            }
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).run {
             hide(WindowInsetsCompat.Type.systemBars())

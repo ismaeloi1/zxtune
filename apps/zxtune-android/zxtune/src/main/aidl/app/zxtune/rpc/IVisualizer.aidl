@@ -12,5 +12,7 @@ interface IVisualizer {
   // data contains 16-bit native endian samples
   int getScope(out byte[] data, int points, int windowMs);
   int getGauges(out byte[] data, int waveWindowMs);
+  int getVoiceGauges(out byte[] data, int waveWindowMs);
+  String getLayout();
   String getStatus();
 }

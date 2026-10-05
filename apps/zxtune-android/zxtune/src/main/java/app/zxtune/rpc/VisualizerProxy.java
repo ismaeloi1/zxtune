@@ -78,6 +78,30 @@ public final class VisualizerProxy {
     }
 
     @Override
+    public int getVoiceGauges(byte[] data, int waveWindowMs) {
+      try {
+        return delegate.getVoiceGauges(data, waveWindowMs);
+      } catch (DeadObjectException e) {
+        throw new IllegalStateException(e);
+      } catch (RemoteException e) {
+        Log.w(TAG, e, "getVoiceGauges()");
+        return 0;
+      }
+    }
+
+    @Override
+    public String getLayout() {
+      try {
+        return delegate.getLayout();
+      } catch (DeadObjectException e) {
+        throw new IllegalStateException(e);
+      } catch (RemoteException e) {
+        Log.w(TAG, e, "getLayout()");
+        return "";
+      }
+    }
+
+    @Override
     public String getStatus() {
       try {
         return delegate.getStatus();
@@ -137,6 +161,26 @@ public final class VisualizerProxy {
         Log.w(TAG, e, "getGauges()");
       }
       return 0;
+    }
+
+    @Override
+    public int getVoiceGauges(byte[] data, int waveWindowMs) {
+      try {
+        return delegate.getVoiceGauges(data, waveWindowMs);
+      } catch (Exception e) {
+        Log.w(TAG, e, "getVoiceGauges()");
+      }
+      return 0;
+    }
+
+    @Override
+    public String getLayout() {
+      try {
+        return delegate.getLayout();
+      } catch (Exception e) {
+        Log.w(TAG, e, "getLayout()");
+      }
+      return "";
     }
 
     @Override

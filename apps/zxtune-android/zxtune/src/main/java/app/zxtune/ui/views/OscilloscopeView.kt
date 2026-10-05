@@ -19,9 +19,9 @@ import android.util.TypedValue
 import android.view.Surface
 import android.view.SurfaceHolder
 import app.zxtune.Logger
-import app.zxtune.R
 import app.zxtune.playback.ScopeLayout
 import app.zxtune.playback.Visualizer
+import app.zxtune.playback.VoicesLayout
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -34,7 +34,7 @@ private val LOG = Logger("Oscilloscope")
 
 /**
  * Renders waveforms provided by [Visualizer.getScope] at display refresh rate (vsync driven).
- * Separate voices are placed by column per chip, voice per row.
+ * Separate voices are placed by column per chip (long chips are split to several columns), voice per row.
  */
 class OscilloscopeView @JvmOverloads constructor(
     context: Context,
@@ -108,25 +108,52 @@ class OscilloscopeView @JvmOverloads constructor(
     }
 
     // Grid of cells: column per chip, row per voice
-    private data class Grid(val channels: Int, val cols: Int, val rows: Int) {
-        fun column(chan: Int) = chan / rows
-        fun row(chan: Int) = chan % rows
+    private class Grid(
+        val cols: Int,
+        val rows: Int,
+        private val cellColumns: IntArray,
+        private val cellRows: IntArray,
+        val labels: List<String>,
+    ) {
+        val channels
+            get() = cellColumns.size
+
+        fun column(chan: Int) = cellColumns[chan]
+        fun row(chan: Int) = cellRows[chan]
 
         companion object {
-            fun of(layout: ScopeLayout): Grid {
-                val channels = layout.channels
-                val perChip = layout.channelsPerChip
-                return if (perChip in 1..channels) {
-                    Grid(channels, (channels + perChip - 1) / perChip, perChip)
-                } else {
-                    Grid(channels, 1, channels)
+            fun of(layout: VoicesLayout, channels: Int): Grid {
+                if (layout.groups.isEmpty()) {
+                    return Grid(1, channels, IntArray(channels), IntArray(channels) { it }, emptyList())
                 }
+                val columns = ArrayList<Int>()
+                val rows = ArrayList<Int>()
+                val labels = ArrayList<String>()
+                var cols = 0
+                var maxRows = 1
+                for (group in layout.groups) {
+                    val voices = group.voices.size
+                    // split long chips (e.g. OPL3 with 23 voices) to equal columns
+                    val groupCols = (voices + MAX_ROWS - 1) / MAX_ROWS
+                    val groupRows = (voices + groupCols - 1) / groupCols
+                    group.voices.forEachIndexed { idx, voice ->
+                        columns.add(cols + idx / groupRows)
+                        rows.add(idx % groupRows)
+                        labels.add("${group.name} - $voice")
+                    }
+                    cols += groupCols
+                    maxRows = maxOf(maxRows, groupRows)
+                }
+                val count = minOf(channels, columns.size)
+                return Grid(
+                    cols,
+                    maxRows,
+                    columns.take(count).toIntArray(),
+                    rows.take(count).toIntArray(),
+                    labels.take(count)
+                )
             }
         }
-    }
-
-    private fun getLabel(layout: ScopeLayout, chan: Int) = layout.channelsPerChip.takeIf { it > 0 }?.let {
-        resources.getString(R.string.visualizer_oscilloscope_voice, chan / it + 1, chan % it + 1)
     }
 
     private inner class ScopeRenderer : Renderer {
@@ -154,7 +181,11 @@ class OscilloscopeView @JvmOverloads constructor(
         private var texturePosAttr = 0
         private var textureUvAttr = 0
         private var labelsTexture = 0
-        private var labelsLayout: ScopeLayout? = null
+        private var labelsGrid: Grid? = null
+        private var layoutSource: Visualizer? = null
+        private var layoutId = -1
+        private var voicesLayout = VoicesLayout.MASTER
+        private var grid: Grid? = null
         private var width = 1
         private var height = 1
         private var frames = 0
@@ -172,7 +203,7 @@ class OscilloscopeView @JvmOverloads constructor(
             texturePosAttr = GLES20.glGetAttribLocation(textureProgram, "aPos")
             textureUvAttr = GLES20.glGetAttribLocation(textureProgram, "aUv")
             labelsTexture = IntArray(1).also { GLES20.glGenTextures(1, it, 0) }[0]
-            labelsLayout = null
+            labelsGrid = null
             GLES20.glEnable(GLES20.GL_BLEND)
             GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
@@ -181,7 +212,7 @@ class OscilloscopeView @JvmOverloads constructor(
             width = maxOf(w, 1)
             height = maxOf(h, 1)
             GLES20.glViewport(0, 0, width, height)
-            labelsLayout = null
+            labelsGrid = null
             LOG.d { "Surface ${width}x$height" }
         }
 
@@ -205,7 +236,7 @@ class OscilloscopeView @JvmOverloads constructor(
             if (channels == 0) {
                 return
             }
-            val grid = Grid.of(layout)
+            val grid = getGrid(src, layout, channels) ?: return
             GLES20.glUseProgram(lineProgram)
             GLES20.glEnableVertexAttribArray(linePosAttr)
             drawGrid(grid)
@@ -214,7 +245,25 @@ class OscilloscopeView @JvmOverloads constructor(
                 drawChannel(grid, chan)
             }
             GLES20.glDisableVertexAttribArray(linePosAttr)
-            drawLabels(layout, grid)
+            drawLabels(grid)
+        }
+
+        // Layout description is requested only on change
+        private fun getGrid(src: Visualizer, layout: ScopeLayout, channels: Int): Grid? {
+            if (src !== layoutSource || layout.id != layoutId) {
+                voicesLayout = runCatching {
+                    VoicesLayout.parse(src.getLayout())
+                }.getOrElse {
+                    LOG.w(it) { "Failed to get voices layout" }
+                    return null
+                }
+                layoutSource = src
+                layoutId = layout.id
+                grid = null
+            }
+            return grid?.takeIf { it.channels == channels } ?: Grid.of(voicesLayout, channels).also {
+                grid = it
+            }
         }
 
         // Center line of each cell
@@ -287,13 +336,13 @@ class OscilloscopeView @JvmOverloads constructor(
             return (AUTO_GAIN_TARGET / maxOf(smoothed, AUTO_GAIN_TARGET / AUTO_GAIN_MAX)).coerceAtLeast(1f)
         }
 
-        private fun drawLabels(layout: ScopeLayout, grid: Grid) {
-            if (layout.channelsPerChip == 0) {
+        private fun drawLabels(grid: Grid) {
+            if (grid.labels.isEmpty()) {
                 return
             }
-            if (labelsLayout != layout) {
-                updateLabels(layout, grid)
-                labelsLayout = layout
+            if (labelsGrid !== grid) {
+                updateLabels(grid)
+                labelsGrid = grid
             }
             GLES20.glUseProgram(textureProgram)
             GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
@@ -310,7 +359,7 @@ class OscilloscopeView @JvmOverloads constructor(
         }
 
         // Labels are rendered once per layout change into screen-sized texture
-        private fun updateLabels(layout: ScopeLayout, grid: Grid) {
+        private fun updateLabels(grid: Grid) {
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -320,7 +369,7 @@ class OscilloscopeView @JvmOverloads constructor(
             val cellW = width.toFloat() / grid.cols
             val cellH = height.toFloat() / grid.rows
             for (chan in 0 until grid.channels) {
-                val label = getLabel(layout, chan) ?: continue
+                val label = grid.labels[chan]
                 val x = cellW * grid.column(chan) + labelPadding
                 val y = cellH * grid.row(chan) + labelPadding - paint.ascent()
                 canvas.drawText(label, x, y, paint)
@@ -375,6 +424,7 @@ class OscilloscopeView @JvmOverloads constructor(
         // per frame, ~0.5s to rise at 120Hz
         private const val AUTO_GAIN_RELEASE = 0.04f
         const val MAX_CHANNELS = 32
+        private const val MAX_ROWS = 8
         private const val AMPLIFICATION = 0.95f
         private const val LINE_WIDTH_PX = 3f
         private const val CELL_MARGIN = 0.01f
