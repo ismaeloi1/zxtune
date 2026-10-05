@@ -39,7 +39,8 @@ namespace Player
     const int SILENCE_LEVEL = 16;
     // pitch estimation window for voices without frequency state
     const uint_t ESTIMATOR_MS = 40;
-    const uint_t MAX_ESTIMATIONS_PER_CALL = 24;
+    // keeps scope lock short while history is filled
+    const uint_t MAX_ESTIMATIONS_PER_CALL = 8;
     // Keep separate voices rendering while data is requested at least this often
     const auto ACTIVITY_TIMEOUT = std::chrono::seconds(2);
 

@@ -229,6 +229,7 @@ void SPC_DSP::run( int clock_count )
 		int main_out_r = 0;
 		int echo_out_l = 0;
 		int echo_out_r = 0;
+		int voices_out [voice_count] = { 0 };
 		voice_t* v = m.voices;
 		uint8_t* v_regs = m.regs;
 		int vbit = 1;
@@ -316,6 +317,8 @@ void SPC_DSP::run( int clock_count )
 					
 					main_out_l += l;
 					main_out_r += r;
+					// same scale as main output with full master volume
+					voices_out [v - m.voices] = ((l < 0 ? -l : l) >= (r < 0 ? -r : r) ? l : r) >> 7;
 					
 					if ( REG(eon) & vbit )
 					{
@@ -605,6 +608,9 @@ skip_brr:
 			SET_LE16A( echo_ptr + 2, r );
 		}
 		
+		if ( m.voices_func )
+			m.voices_func( m.voices_data, voices_out );
+		
 		// Sound out
 		int l = (main_out_l * mvoll + echo_in_l * (int8_t) REG(evoll)) >> 14;
 		int r = (main_out_r * mvolr + echo_in_r * (int8_t) REG(evolr)) >> 14;
@@ -628,6 +634,26 @@ skip_brr:
 
 //// Setup
 
+void SPC_DSP::set_voices_func( voices_func_t func, void* data )
+{
+	m.voices_func = func;
+	m.voices_data = data;
+}
+
+void SPC_DSP::get_voice_state( int voice, voice_state_t* out ) const
+{
+	voice_t const& v = m.voices [voice];
+	uint8_t const* v_regs = &m.regs [voice * 0x10];
+	out->env = v.env;
+	out->released = v.env_mode == env_release;
+	out->pitch = (v_regs [v_pitchl] | (v_regs [v_pitchh] << 8)) & 0x3FFF;
+	out->vol_l = v.volume [0];
+	out->vol_r = v.volume [1];
+	out->srcn = v_regs [v_srcn];
+	out->noise = (m.regs [r_non] >> voice) & 1;
+	out->noise_rate = m.regs [r_flg] & 0x1F;
+}
+
 void SPC_DSP::mute_voices( int mask )
 {
 	m.mute_mask = mask;
@@ -641,6 +667,7 @@ void SPC_DSP::mute_voices( int mask )
 void SPC_DSP::init( void* ram_64k )
 {
 	m.ram = (uint8_t*) ram_64k;
+	set_voices_func( 0, 0 );
 	mute_voices( 0 );
 	disable_surround( false );
 	set_output( 0, 0 );

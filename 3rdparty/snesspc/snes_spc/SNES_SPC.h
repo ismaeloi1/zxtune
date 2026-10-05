@@ -58,6 +58,9 @@ public:
 	// Reduces emulation accuracy.
 	enum { voice_count = 8 };
 	void mute_voices( int mask );
+
+	// zxtune extension: access to DSP for separate voices output
+	SPC_DSP& get_dsp();
 	
 	// If true, prevents channels and global volumes from being phase-negated.
 	// Only supported by fast DSP.
@@ -269,6 +272,8 @@ inline void SNES_SPC::write_port( time_t t, int port, int data )
 }
 
 inline void SNES_SPC::mute_voices( int mask ) { dsp.mute_voices( mask ); }
+
+inline SPC_DSP& SNES_SPC::get_dsp() { return dsp; }
 	
 inline void SNES_SPC::disable_surround( bool disable ) { dsp.disable_surround( disable ); }
 

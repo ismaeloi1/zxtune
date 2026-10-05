@@ -52,6 +52,25 @@ public:
 	// If true, prevents channels and global volumes from being phase-negated
 	void disable_surround( bool disable = true );
 
+// Separate voices output (zxtune extension)
+
+	// Called once per sample pair with voice_count outputs of voices (after envelope and volume,
+	// louder side of stereo pair, 16-bit range for single voice at full volume)
+	typedef void (*voices_func_t)( void* data, int const* voices );
+	void set_voices_func( voices_func_t func, void* data );
+
+	struct voice_state_t
+	{
+		int env;      // 0..0x7FF
+		int released; // envelope is in release mode
+		int pitch;    // 0x1000 is 32kHz sample rate
+		int vol_l, vol_r;
+		int srcn;
+		int noise;    // voice outputs noise
+		int noise_rate; // noise generator rate index 0..0x1F
+	};
+	void get_voice_state( int voice, voice_state_t* out ) const;
+
 // State
 	
 	// Resets DSP and uses supplied values to initialize registers
@@ -136,6 +155,9 @@ private:
 		
 		// non-emulation state
 		uint8_t* ram; // 64K shared RAM between DSP and SMP
+		// after ram to be kept by load()
+		voices_func_t voices_func;
+		void* voices_data;
 		int mute_mask;
 		int surround_threshold;
 		sample_t* out;
