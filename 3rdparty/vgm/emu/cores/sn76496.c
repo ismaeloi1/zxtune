@@ -159,6 +159,8 @@ static void sn76496_shutdown(void *chip);
 static void sn76496_reset(void *chip);
 static void sn76496_freq_limiter(void* chip, UINT32 sample_rate);
 static void sn76496_set_mute_mask(void *chip, UINT32 MuteMask);
+static void sn76496_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+static UINT32 sn76496_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 static void sn76496_set_log_cb(void *info, DEVCB_LOG func, void* param);
 
 static UINT8 device_start_sn76496_mame(const SN76496_CFG* cfg, DEV_INFO* retDevInf);
@@ -169,6 +171,8 @@ static DEVDEF_RWFUNC devFunc[] =
 {
 	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, sn76496_w_mame},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, sn76496_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, sn76496_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, sn76496_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 DEV_DEF devDef_SN76496_MAME =
@@ -229,6 +233,9 @@ struct _sn76496_state
 	UINT32 MuteMsk[4];
 	UINT8 NgpFlags;         // bit 7 - NGP Mode on/off, bit 0 - is 2nd NGP chip
 	sn76496_state* NgpChip2;    // pointer to other chip instance of T6W28
+
+	DEVCB_VOICES voicesCb;
+	void* voicesParam;
 };
 
 
@@ -345,6 +352,7 @@ static void sn76496_update(void* param, UINT32 samples, DEV_SMPL** outputs)
 	DEV_SMPL out2 = 0;
 	INT32 vol[4];
 	INT32 ggst[2];
+	INT32 voices[4];
 
 	R2 = R->NgpFlags ? R->NgpChip2 : NULL;
 	if (R->NgpFlags)
@@ -470,14 +478,24 @@ static void sn76496_update(void* param, UINT32 samples, DEV_SMPL** outputs)
 				{
 					out += vol[i] * R->volume[i] * ggst[0];
 					out2 += vol[i] * R->volume[i] * ggst[1];
+					voices[i] = vol[i] * R->volume[i];
 				}
 				else if (R->MuteMsk[i])
 				{
 					// Make Bipolar Output with PCM possible
 					out += R->volume[i] * ggst[0];
 					out2 += R->volume[i] * ggst[1];
+					voices[i] = R->volume[i];
 				}
+				else
+				{
+					voices[i] = 0;
+				}
+				// single channel maximum is MAX_OUTPUT / 4
+				voices[i] *= 4;
 			}
+			if (R->voicesCb)
+				R->voicesCb(R->voicesParam, 4, voices);
 		}
 		else
 		{
@@ -612,6 +630,61 @@ static void sn76496_freq_limiter(void* chip, UINT32 sample_rate)
 	R->FNumLimit = (R->clock / (2 * R->clock_divider)) / sample_rate;
 	
 	return;
+}
+
+static void sn76496_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	sn76496_state *R = (sn76496_state*)chip;
+	R->voicesCb = cb;
+	R->voicesParam = param;
+}
+
+static UINT32 sn76496_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	sn76496_state *R = (sn76496_state*)chip;
+	// native sample rate, each channel counter is decremented once per sample
+	const double rate = (double)R->clock / 2 / R->clock_divider;
+	UINT32 i;
+
+	for (i = 0; i < 4 && i < count; i ++)
+	{
+		DEV_VOICE_STATE* state = &states[i];
+		const UINT8 att = R->Register[i * 2 + 1] & 0x0f;
+		const INT32 period = R->period[i];
+		// 2dB per step, 15 - off
+		state->level = att == 15 ? -96.0f : -2.0f * att;
+		state->flags = DEVVOICE_LEVEL | (att != 15 ? DEVVOICE_KEYON : 0);
+		state->freq = 0.0f;
+		if (i != 3)
+		{
+			// square wave with half-period of 'period' samples, 0/1 - constant output (PCM)
+			if (period > 1)
+			{
+				state->freq = (float)(rate / (2.0 * period));
+				state->flags |= DEVVOICE_FREQ;
+			}
+		}
+		else if (period > 0)
+		{
+			// LFSR is shifted every 'period' samples
+			const double shiftRate = rate / period;
+			if (in_noise_mode(R))
+			{
+				state->freq = (float)shiftRate;
+				state->flags |= DEVVOICE_FREQ | DEVVOICE_NOISE;
+			}
+			else
+			{
+				// periodic noise: single bit circulates over the whole LFSR
+				UINT32 bits = 1;
+				while ((R->feedback_mask >> bits) != 0)
+					++bits;
+				state->freq = (float)(shiftRate / bits);
+				state->flags |= DEVVOICE_FREQ;
+			}
+		}
+	}
+	return 4;
 }
 
 static void sn76496_set_mute_mask(void *chip, UINT32 MuteMask)

@@ -62,6 +62,8 @@ static DEVDEF_RWFUNC devFunc262_Emu[] =
 	{RWF_VOLUME | RWF_WRITE, DEVRW_VALUE, 0, adlib_OPL3_set_volume},
 	{RWF_VOLUME_LR | RWF_WRITE, DEVRW_VALUE, 0, adlib_OPL3_set_volume_lr},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, adlib_OPL3_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, adlib_OPL3_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, adlib_OPL3_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef262_AdLibEmu =

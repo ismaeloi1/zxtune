@@ -193,6 +193,13 @@ typedef struct opl_chip
 	
 	Bit32s master_vol_l;	// .12 fixed point
 	Bit32s master_vol_r;
+
+	Bit32u noise_lfsr;
+
+	DEVCB_VOICES voicesCb;
+	void* voicesParam;
+	// per-channel outputs of current block, rhythm channels follow melodic ones
+	Bit32s voicebuf[NUM_CHANNELS + 5][BLOCKBUF_SIZE];
 } OPL_DATA;
 
 

@@ -121,6 +121,8 @@ public:
 	virtual const char* const* GetTags(void) = 0;
 	virtual UINT8 GetSongInfo(PLR_SONG_INFO& songInf) = 0;
 	virtual UINT8 GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const = 0;
+	// zxtune extension: running device by PLR_DEV_INFO::id, NULL if not available
+	virtual const struct _vgm_base_device* GetDeviceBase(UINT32 id) const { return NULL; }
 	static UINT8 InitDeviceOptions(PLR_DEV_OPTS& devOpts);
 	virtual UINT8 SetDeviceOptions(UINT32 id, const PLR_DEV_OPTS& devOpts) = 0;
 	virtual UINT8 GetDeviceOptions(UINT32 id, PLR_DEV_OPTS& devOpts) const = 0;

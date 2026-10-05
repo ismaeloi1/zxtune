@@ -203,6 +203,8 @@ UINT8 ym2612_read(void *chip, UINT8 a);
 UINT8 ym2612_timer_over(void *chip, UINT8 c );
 
 void ym2612_set_mute_mask(void *chip, UINT32 MuteMask);
+void ym2612_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+UINT32 ym2612_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 void ym2612_set_options(void *chip, UINT32 Flags);
 void ym2612_set_log_cb(void* chip, DEVCB_LOG func, void* param);
 #endif /* (BUILD_YM2612||BUILD_YM3438) */

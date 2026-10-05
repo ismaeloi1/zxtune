@@ -302,6 +302,13 @@ namespace Sound
     return trigger;
   }
 
+  uint_t CorrelationTrigger::EstimatePeriod(const float* data, uint_t size)
+  {
+    const auto limit = std::min<uint_t>(size, PeriodFFT->GetSize() / 2);
+    PeriodData.assign(data + (size - limit), data + size);
+    return GetPeriod(PeriodData);
+  }
+
   // Tweaked autocorrelation to estimate the period (pitch) of a signal, 0 if unknown
   uint_t CorrelationTrigger::GetPeriod(const Buffer& data)
   {

@@ -411,7 +411,16 @@ namespace Module::Sid
       Sink.Scope = std::move(scope);
       if (Sink.Scope)
       {
-        Sink.Scope->SetVoicesCount(chips * VOICES, VOICES);
+        std::vector<VoicesGroup> groups(chips);
+        for (uint_t chip = 0; chip < chips; ++chip)
+        {
+          groups[chip].Name = "SID " + std::to_string(chip + 1);
+          for (uint_t voice = 0; voice < VOICES; ++voice)
+          {
+            groups[chip].Voices.emplace_back("Voice " + std::to_string(voice + 1));
+          }
+        }
+        Sink.Scope->SetVoicesGroups(groups, true);
         UpdateDescription();
       }
       SetSink(Config.sidEmulation, nullptr);

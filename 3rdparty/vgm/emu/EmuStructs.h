@@ -71,6 +71,8 @@ typedef void (*DEVFUNC_WRITE_VOL_LR)(void* info, INT32 volL, INT32 volR);
 #define RWF_VOLUME_LR	0x86	// volume (left/right separately)
 #define RWF_CHN_MUTE	0x90	// set channel muting (DEVRW_VALUE = single channel, DEVRW_ALL = mask)
 #define RWF_CHN_PAN		0x92	// set channel panning (DEVRW_VALUE = single channel, DEVRW_ALL = array)
+#define RWF_VOICES		0xA0	// per-channel output tap (zxtune extension)
+							//  RWF_WRITE: DEVFUNC_SET_VOICES_CB, RWF_READ: DEVFUNC_GET_VOICES_STATE
 
 // register/memory DEVRW constants
 #define DEVRW_A8D8		0x11	//  8-bit address,  8-bit data
@@ -89,6 +91,26 @@ typedef void (*DEVFUNC_WRITE_VOL_LR)(void* info, INT32 volL, INT32 volR);
 #define DEVLOG_INFO		0x03
 #define DEVLOG_DEBUG	0x04
 #define DEVLOG_TRACE	0x05
+
+// Per-channel output tap (zxtune extension).
+// Called once per emulated (native rate) sample with output value of each channel, before panning.
+// Values are scaled so that single channel at full volume is roughly in 16-bit range.
+typedef void (*DEVCB_VOICES)(void* param, UINT32 count, const INT32* values);
+typedef void (*DEVFUNC_SET_VOICES_CB)(void* info, DEVCB_VOICES cb, void* param);
+
+#define DEVVOICE_KEYON		0x01	// key is pressed/channel is enabled
+#define DEVVOICE_FREQ		0x02	// freq field is valid
+#define DEVVOICE_LEVEL		0x04	// level field is valid
+#define DEVVOICE_NOISE		0x08	// channel produces noise, freq is noise generator rate
+
+typedef struct _device_voice_state
+{
+	float freq;		// Hz
+	float level;	// dB relative to maximal channel volume (0 or negative)
+	UINT8 flags;	// see DEVVOICE_ constants
+} DEV_VOICE_STATE;
+// fill state of up to count channels, returns channels count
+typedef UINT32 (*DEVFUNC_GET_VOICES_STATE)(void* info, UINT32 count, DEV_VOICE_STATE* states);
 
 typedef struct _devdef_readwrite_function
 {

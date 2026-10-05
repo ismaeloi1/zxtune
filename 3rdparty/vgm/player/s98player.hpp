@@ -80,6 +80,7 @@ public:
 	const char* const* GetTags(void);
 	UINT8 GetSongInfo(PLR_SONG_INFO& songInf);
 	UINT8 GetSongDeviceInfo(std::vector<PLR_DEV_INFO>& devInfList) const;
+	const VGM_BASEDEV* GetDeviceBase(UINT32 id) const { return id < _devices.size() ? &_devices[id].base : NULL; }
 	UINT8 SetDeviceOptions(UINT32 id, const PLR_DEV_OPTS& devOpts);
 	UINT8 GetDeviceOptions(UINT32 id, PLR_DEV_OPTS& devOpts) const;
 	UINT8 SetDeviceMuting(UINT32 id, const PLR_MUTE_OPTS& muteOpts);

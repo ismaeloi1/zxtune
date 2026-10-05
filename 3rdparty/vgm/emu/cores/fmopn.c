@@ -4358,6 +4358,9 @@ typedef struct
 	UINT8       WaveOutMode;
 	INT32       WaveL;
 	INT32       WaveR;
+
+	DEVCB_VOICES voicesCb;
+	void*       voicesParam;
 } YM2612;
 
 /* Generate samples for one of the YM2612s */
@@ -4519,6 +4522,20 @@ void ym2612_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 		}
 		lt += ((out_fm[5]>>0) & OPN->pan[10]);
 		rt += ((out_fm[5]>>0) & OPN->pan[11]);
+
+		if (F2612->voicesCb)
+		{
+			/* 14-bit channels outputs, DAC replaces channel 6 output */
+			INT32 voices[7];
+			voices[0] = out_fm[0] << 2;
+			voices[1] = out_fm[1] << 2;
+			voices[2] = out_fm[2] << 2;
+			voices[3] = out_fm[3] << 2;
+			voices[4] = out_fm[4] << 2;
+			voices[5] = F2612->dacen ? 0 : (out_fm[5] << 2);
+			voices[6] = F2612->dacen ? (out_fm[5] << 2) : 0;
+			F2612->voicesCb(F2612->voicesParam, 7, voices);
+		}
 
 		/* buffering */
 		if (F2612->WaveOutMode)
@@ -4779,6 +4796,73 @@ UINT8 ym2612_timer_over(void *chip,UINT8 c)
 	return F2612->OPN.ST.irq;
 }
 
+
+void ym2612_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	YM2612* F2612 = (YM2612 *)chip;
+	F2612->voicesCb = cb;
+	F2612->voicesParam = param;
+}
+
+/* attenuation of loudest carrier in dB, 0 if no carriers are sounding */
+static float fm_carriers_level(const FM_CH* CH, UINT8* keyOn)
+{
+	/* carriers mask per algorithm in SLOT1..SLOT4 order */
+	static const UINT8 CARRIERS[8] = {0x08, 0x08, 0x08, 0x08, 0x0a, 0x0e, 0x0e, 0x0f};
+	static const UINT8 SLOTS[4] = {SLOT1, SLOT2, SLOT3, SLOT4};
+	UINT32 minAtt = MAX_ATT_INDEX;
+	UINT8 op;
+
+	*keyOn = 0;
+	for (op = 0; op < 4; op ++)
+	{
+		const FM_SLOT* slot = &CH->SLOT[SLOTS[op]];
+		UINT32 att;
+		if (! (CARRIERS[CH->ALGO & 7] & (1 << op)))
+			continue;
+		if (slot->key)
+			*keyOn = 1;
+		att = slot->vol_out;
+		if (att < minAtt)
+			minAtt = att;
+	}
+	/* 10-bit attenuation, 0.09375dB per step (6dB per 64 steps, see tl_tab) */
+	return -(float)(minAtt * (96.0 / ENV_LEN));
+}
+
+UINT32 ym2612_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	YM2612* F2612 = (YM2612 *)chip;
+	const double clock = F2612->OPN.ST.clock;
+	UINT32 ch;
+
+	for (ch = 0; ch < 6 && ch < count; ch ++)
+	{
+		const FM_CH* CH = &F2612->CH[ch];
+		const UINT32 fnum = CH->block_fnum & 0x7ff;
+		const UINT32 block = (CH->block_fnum >> 11) & 7;
+		DEV_VOICE_STATE* state = &states[ch];
+		UINT8 keyOn;
+
+		state->level = fm_carriers_level(CH, &keyOn);
+		/* fnote = fnum * clock * 2^(block-1) / (144 * 2^20) */
+		state->freq = (float)(fnum * clock * (1 << block) / (144.0 * (1 << 21)));
+		state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
+		if (ch == 5 && F2612->dacen)
+		{
+			state->flags = 0;
+			state->level = -96.0f;
+		}
+	}
+	if (count > 6)
+	{
+		/* DAC: audio only */
+		states[6].freq = 0.0f;
+		states[6].level = 0.0f;
+		states[6].flags = F2612->dacen ? DEVVOICE_KEYON : 0;
+	}
+	return 7;
+}
 
 void ym2612_set_mute_mask(void *chip, UINT32 MuteMask)
 {

@@ -37,6 +37,7 @@
 
 #include "../../stdtype.h"
 #include "../snddef.h"
+#include "../EmuStructs.h"
 #include "adlibemu_opl_inc.h"
 
 
@@ -171,7 +172,9 @@ INLINE void operator_advance_drums(OPL_DATA* chip, op_type* op_pt1, Bit32s vib1,
 	Bit32u c3 = op_pt3->tcount/FIXEDPT;
 	Bit32u phasebit = (((c1 & 0x88) ^ ((c1<<5) & 0x80)) | ((c3 ^ (c3<<2)) & 0x20)) ? 0x02 : 0x00;
 
-	Bit32u noisebit = rand()&1;
+	// 23-bit LFSR as in real chip instead of rand() for deterministic output
+	Bit32u noisebit = chip->noise_lfsr & 1;
+	chip->noise_lfsr = (chip->noise_lfsr >> 1) | ((((chip->noise_lfsr >> 0) ^ (chip->noise_lfsr >> 14) ^ (chip->noise_lfsr >> 15) ^ (chip->noise_lfsr >> 22)) & 1) << 22);
 
 	Bit32u snare_phase_bit = (((Bitu)((op_pt1->tcount/FIXEDPT) / 0x100))&1);
 
@@ -695,6 +698,7 @@ void* ADLIBEMU(init)(UINT32 clock, UINT32 samplerate)
 	ADLIBEMU(set_update_handler)(OPL, adlibemu_update_req, OPL);
 	//ADLIBEMU(reset)(OPL);
 
+	OPL->noise_lfsr = 1;
 	ADLIBEMU(set_volume)(OPL, 0x10000);
 	ADLIBEMU(set_mute_mask)(OPL, 0x000000);
 
@@ -715,6 +719,7 @@ void ADLIBEMU(reset)(void *chip)
 	op_type* op;
 	
 	memset(OPL->adlibreg, 0x00, sizeof(OPL->adlibreg));
+	OPL->noise_lfsr = 1;
 	memset(OPL->op, 0x00, sizeof(op_type) * MAXOPERATORS);
 	memset(OPL->wave_sel, 0x00, sizeof(OPL->wave_sel));
 	
@@ -1169,6 +1174,8 @@ UINT8 ADLIBEMU(reg_read)(void *chip, UINT8 port)
 #undef CHANVAL_OUT
 #if defined(OPLTYPE_IS_OPL3)
 #define CHANVAL_OUT(chn)								\
+	if (OPL->voicesCb)									\
+		OPL->voicebuf[cur_voice][i] += chanval;			\
 	if (OPL->adlibreg[0x105]&1) {						\
 		outbufl[i] += chanval*cptr[chn].left_pan;		\
 		outbufr[i] += chanval*cptr[chn].right_pan;	\
@@ -1178,6 +1185,8 @@ UINT8 ADLIBEMU(reg_read)(void *chip, UINT8 port)
 	}
 #else
 #define CHANVAL_OUT(chn)								\
+	if (OPL->voicesCb)									\
+		OPL->voicebuf[cur_voice][i] += chanval;			\
 	outbufl[i] += chanval;							\
 	outbufr[i] += chanval;
 #endif
@@ -1200,6 +1209,7 @@ void ADLIBEMU(getsample)(void *chip, UINT32 numsamples, DEV_SMPL** sndptr)
 	Bit32s vib_tshift;
 	Bits max_channel = NUM_CHANNELS;
 	Bits cur_ch;
+	Bits cur_voice = 0;
 	
 	Bit32s *vibval1, *vibval2, *vibval3, *vibval4;
 	Bit32s *tremval1, *tremval2, *tremval3, *tremval4;
@@ -1246,6 +1256,8 @@ void ADLIBEMU(getsample)(void *chip, UINT32 numsamples, DEV_SMPL** sndptr)
 	{
 		endsamples = numsamples-cursmp;
 		if (endsamples>BLOCKBUF_SIZE) endsamples = BLOCKBUF_SIZE;
+		if (OPL->voicesCb)
+			memset(OPL->voicebuf, 0, sizeof(OPL->voicebuf));
 
 		// calculate vibrato/tremolo lookup tables
 		vib_tshift = ((OPL->adlibreg[ARC_PERC_MODE]&0x40)==0) ? 1 : 0;	// 14cents/7cents switching
@@ -1272,6 +1284,7 @@ void ADLIBEMU(getsample)(void *chip, UINT32 numsamples, DEV_SMPL** sndptr)
 			if (! (OPL->MuteChn[NUM_CHANNELS + 0]))
 			{
 			//BassDrum
+			cur_voice = NUM_CHANNELS + 0;
 			cptr = &OPL->op[6];
 			if (OPL->adlibreg[ARC_FEEDBACK+6]&1)
 			{
@@ -1358,6 +1371,7 @@ void ADLIBEMU(getsample)(void *chip, UINT32 numsamples, DEV_SMPL** sndptr)
 			//TomTom (j=8)
 			if (! (OPL->MuteChn[NUM_CHANNELS + 2]) && OPL->op[8].op_state != OF_TYPE_OFF)
 			{
+				cur_voice = NUM_CHANNELS + 2;
 				cptr = &OPL->op[8];
 				if (cptr[0].vibrato)
 				{
@@ -1465,8 +1479,14 @@ void ADLIBEMU(getsample)(void *chip, UINT32 numsamples, DEV_SMPL** sndptr)
 					//chanval = (OPL->op[7].cval + OPL->op[7+9].cval + OPL->op[8+9].cval)*2;
 					//CHANVAL_OUT(0)
 					// fix panning of the snare -Valley Bell
-					chanval = (OPL->op[7].cval + OPL->op[7+9].cval)*2;
+					// same output as (op[7] + op[7+9]) * 2, but separated for voices tap
+					cur_voice = NUM_CHANNELS + 4;
+					chanval = OPL->op[7].cval*2;
 					CHANVAL_OUT(7)
+					cur_voice = NUM_CHANNELS + 1;
+					chanval = OPL->op[7+9].cval*2;
+					CHANVAL_OUT(7)
+					cur_voice = NUM_CHANNELS + 3;
 					chanval = OPL->op[8+9].cval*2;
 					CHANVAL_OUT(8)
 				}
@@ -1479,6 +1499,7 @@ void ADLIBEMU(getsample)(void *chip, UINT32 numsamples, DEV_SMPL** sndptr)
 
 			if (OPL->MuteChn[cur_ch])
 				continue;
+			cur_voice = cur_ch;
 
 			// skip drum/percussion operators
 			if ((OPL->adlibreg[ARC_PERC_MODE]&0x20) && (cur_ch >= 6) && (cur_ch < 9)) continue;
@@ -1923,6 +1944,19 @@ void ADLIBEMU(getsample)(void *chip, UINT32 numsamples, DEV_SMPL** sndptr)
 			}
 		}
 
+		if (OPL->voicesCb)
+		{
+			INT32 voices[NUM_CHANNELS + 5];
+			Bitu ch;
+			for (i=0;i<endsamples;i++)
+			{
+				// single operator output is in -4096..4096 range, rhythm channels are doubled
+				for (ch = 0; ch < NUM_CHANNELS + 5; ch ++)
+					voices[ch] = OPL->voicebuf[ch][i] * 4 * OPL->master_vol_l >> 12;
+				OPL->voicesCb(OPL->voicesParam, NUM_CHANNELS + 5, voices);
+			}
+		}
+
 		outbufl += endsamples;
 		outbufr += endsamples;
 	}
@@ -1941,6 +1975,114 @@ void ADLIBEMU(set_update_handler)(void *chip, ADL_UPDATEHANDLER UpdateHandler, v
 	OPL->UpdateHandler = UpdateHandler;
 	OPL->UpdateParam = param;
 	return;
+}
+
+void ADLIBEMU(set_voices_cb)(void *chip, DEVCB_VOICES cb, void* param)
+{
+	OPL_DATA* OPL = (OPL_DATA*)chip;
+	OPL->voicesCb = cb;
+	OPL->voicesParam = param;
+}
+
+static fltype operator_level(const op_type* op_pt)
+{
+	// vol is 1/2^14 at maximum
+	return op_pt->op_state != OF_TYPE_OFF ? op_pt->step_amp * op_pt->vol * 16384.0 : 0.0;
+}
+
+static fltype max_level(fltype a, fltype b)
+{
+	return a > b ? a : b;
+}
+
+static void fill_voice_state(DEV_VOICE_STATE* state, fltype level, fltype freq, UINT8 flags)
+{
+	state->level = level > 0.0000158 ? (float)(20.0 * log10(level)) : -96.0f;
+	state->freq = (float)freq;
+	state->flags = flags | DEVVOICE_LEVEL;
+}
+
+UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	OPL_DATA* OPL = (OPL_DATA*)chip;
+	const UINT8 rhythm = OPL->adlibreg[ARC_PERC_MODE];
+	const UINT8 isRhythm = (rhythm & 0x20) != 0;
+	fltype freqs[NUM_CHANNELS];
+	UINT32 ch;
+
+	for (ch = 0; ch < NUM_CHANNELS; ch ++)
+	{
+		const Bitu k = ch < 9 ? ch : ch - 9 + 256;
+		const Bitu fnum = OPL->adlibreg[ARC_FREQ_NUM + k] | ((OPL->adlibreg[ARC_KON_BNUM + k] & 3) << 8);
+		const Bitu block = (OPL->adlibreg[ARC_KON_BNUM + k] >> 2) & 7;
+		// f = fnum * fsam * 2^block / 2^20
+		freqs[ch] = fnum * INTFREQU * (1 << block) / (fltype)(1 << 20);
+	}
+	for (ch = 0; ch < NUM_CHANNELS && ch < count; ch ++)
+	{
+		const Bitu k = ch < 9 ? ch : ch - 9 + 256;
+		const op_type* cptr = ch < 9 ? &OPL->op[ch] : &OPL->op[ch + 9];
+		const UINT8 keyOn = (OPL->adlibreg[ARC_KON_BNUM + k] & 0x20) != 0;
+		fltype level;
+
+		if (isRhythm && ch >= 6 && ch < 9)
+		{
+			fill_voice_state(&states[ch], 0.0, 0.0, 0);
+			continue;
+		}
+#if defined(OPLTYPE_IS_OPL3)
+		if (cptr->is_4op_attached)
+		{
+			// operators are used by 4op channel ch-3
+			fill_voice_state(&states[ch], 0.0, 0.0, 0);
+			continue;
+		}
+		if (cptr->is_4op)
+		{
+			// op1=cptr[0], op2=cptr[9], op3=cptr[3], op4=cptr[3+9]
+			const UINT8 alg = (OPL->adlibreg[ARC_FEEDBACK + k] & 1) | ((OPL->adlibreg[ARC_FEEDBACK + k + 3] & 1) << 1);
+			level = operator_level(&cptr[3+9]);
+			if (alg == 1 || alg == 3)
+				level = max_level(level, operator_level(&cptr[0]));
+			if (alg == 2)
+				level = max_level(level, operator_level(&cptr[9]));
+			if (alg == 3)
+				level = max_level(level, operator_level(&cptr[3]));
+			fill_voice_state(&states[ch], level, freqs[ch], DEVVOICE_FREQ | (keyOn ? DEVVOICE_KEYON : 0));
+			continue;
+		}
+#endif
+		level = operator_level(&cptr[9]);
+		if (OPL->adlibreg[ARC_FEEDBACK + k] & 1)
+			level = max_level(level, operator_level(&cptr[0]));	// additive synthesis
+		fill_voice_state(&states[ch], level, freqs[ch], DEVVOICE_FREQ | (keyOn ? DEVVOICE_KEYON : 0));
+	}
+	if (count > NUM_CHANNELS)
+	{
+		// BD, SD, TT, CY, HH
+		static const UINT8 OPS[5] = {6 + 9, 7 + 9, 8, 8 + 9, 7};
+		static const UINT8 KEYS[5] = {0x10, 0x08, 0x04, 0x02, 0x01};
+		for (ch = 0; ch < 5 && NUM_CHANNELS + ch < count; ch ++)
+		{
+			DEV_VOICE_STATE* state = &states[NUM_CHANNELS + ch];
+			if (! isRhythm)
+			{
+				fill_voice_state(state, 0.0, 0.0, 0);
+			}
+			else
+			{
+				const UINT8 keyOn = (rhythm & KEYS[ch]) ? DEVVOICE_KEYON : 0;
+				const fltype level = operator_level(&OPL->op[OPS[ch]]);
+				if (ch == 0)
+					fill_voice_state(state, level, freqs[6], DEVVOICE_FREQ | keyOn);
+				else if (ch == 2)
+					fill_voice_state(state, level, freqs[8], DEVVOICE_FREQ | keyOn);
+				else
+					fill_voice_state(state, level, 0.0, DEVVOICE_NOISE | keyOn);
+			}
+		}
+	}
+	return NUM_CHANNELS + 5;
 }
 
 void ADLIBEMU(set_mute_mask)(void *chip, UINT32 MuteMask)

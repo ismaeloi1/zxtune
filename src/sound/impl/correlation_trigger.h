@@ -90,6 +90,11 @@ namespace Sound
     //! @brief Forget all the accumulated state (e.g. after seek)
     void Reset();
 
+    //! @brief Estimate pitch period using the same autocorrelation as trigger
+    //! @param data subsampled (by stride) wave, size should not exceed 1.5 of kernel size
+    //! @return period in subsamples, 0 if unknown
+    uint_t EstimatePeriod(const float* data, uint_t size);
+
   private:
     class FFT;
     using Buffer = std::vector<float>;

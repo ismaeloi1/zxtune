@@ -3,6 +3,7 @@
 
 #include "../../stdtype.h"
 #include "../snddef.h"
+#include "../EmuStructs.h"
 
 #if defined(OPLTYPE_IS_OPL2)
 #define ADLIBEMU(name)			adlib_OPL2_##name
@@ -23,6 +24,8 @@ UINT8 ADLIBEMU(reg_read)(void *chip, UINT8 port);
 
 void ADLIBEMU(set_update_handler)(void *chip, ADL_UPDATEHANDLER UpdateHandler, void* param);
 void ADLIBEMU(set_mute_mask)(void *chip, UINT32 MuteMask);
+void ADLIBEMU(set_voices_cb)(void *chip, DEVCB_VOICES cb, void* param);
+UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 
 void ADLIBEMU(set_volume)(void *chip, INT32 volume);
 void ADLIBEMU(set_volume_lr)(void *chip, INT32 volL, INT32 volR);
