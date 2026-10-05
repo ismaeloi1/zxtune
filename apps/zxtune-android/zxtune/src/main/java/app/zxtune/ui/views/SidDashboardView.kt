@@ -28,7 +28,7 @@ private val LOG = Logger("SidDashboard")
  * Displays history of SID state for single chip:
  * - per voice: oscillator output, envelope (dB), frequency (log scale)
  * - global: master volume, resonance, filter cutoff
- * And multiline status text below. Tap switches chip for multi-SID tunes.
+ * And multiline status text below. Multi-SID tunes chips are displayed side by side.
  */
 class SidDashboardView @JvmOverloads constructor(
     context: Context,
@@ -57,7 +57,6 @@ class SidDashboardView @JvmOverloads constructor(
     @Volatile
     private var status = ""
     private var lastStatusTime = 0L
-    private var selectedChip = 0
 
     private val density = resources.displayMetrics.density
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -82,6 +81,10 @@ class SidDashboardView @JvmOverloads constructor(
         strokeWidth = TRACE_WIDTH * density
         strokeCap = Paint.Cap.BUTT
     }
+    private val separatorPaint = Paint().apply {
+        color = Color.argb(160, 255, 255, 255)
+        strokeWidth = density * 2
+    }
     private val rect = RectF()
     private val lines = FloatArray(ChipGauges.COLUMNS * 4)
 
@@ -98,10 +101,8 @@ class SidDashboardView @JvmOverloads constructor(
 
     init {
         setBackgroundColor(Color.BLACK)
-        setOnClickListener {
-            ++selectedChip
-            invalidate()
-        }
+        // consume taps to not toggle parent's visualizer or close fullscreen
+        isClickable = true
     }
 
     /**
@@ -168,27 +169,61 @@ class SidDashboardView @JvmOverloads constructor(
         }
     }
 
+    // Chips are placed side by side as in oscilloscope above: 3 gauges columns per chip
     private fun drawGauges(canvas: Canvas, areaHeight: Float) {
         val chips = readyChips
         if (chips == 0 || areaHeight < density * 40) {
             return
         }
-        val chip = selectedChip % chips
-        val gauges = ChipGauges(buffers[readyBuffer], chip * ChipGauges.SIZE)
-        val last = gauges.state
-        val cellW = width / 3f
+        val groupW = width.toFloat() / chips
+        val cellW = groupW / 3
         val cellH = areaHeight / 4
-        for (voice in 0 until 3) {
-            val top = cellH * voice
-            val voicePrefix = if (chips > 1) "S${chip + 1}V${voice + 1}" else "V${voice + 1}"
-            drawGauge(canvas, gauges, ChipGauges.wave(voice), 0f, top, cellW, cellH, "$voicePrefix ${waveTitle(last, voice)}")
-            drawGauge(canvas, gauges, ChipGauges.envelope(voice), cellW, top, cellW, cellH, "Env ${last.envelopeRegs(voice)}")
-            drawGauge(canvas, gauges, ChipGauges.frequency(voice), cellW * 2, top, cellW, cellH, "Freq ${hex4(last.frequency(voice))}")
+        for (chip in 0 until chips) {
+            val gauges = ChipGauges(buffers[readyBuffer], chip * ChipGauges.SIZE)
+            val last = gauges.state
+            val left = groupW * chip
+            val chipPrefix = if (chips > 1) "S${chip + 1}" else ""
+            for (voice in 0 until 3) {
+                val top = cellH * voice
+                drawGauge(
+                    canvas,
+                    gauges,
+                    ChipGauges.wave(voice),
+                    left,
+                    top,
+                    cellW,
+                    cellH,
+                    "${chipPrefix}V${voice + 1} ${waveTitle(last, voice)}"
+                )
+                drawGauge(
+                    canvas,
+                    gauges,
+                    ChipGauges.envelope(voice),
+                    left + cellW,
+                    top,
+                    cellW,
+                    cellH,
+                    "Env ${last.envelopeRegs(voice)}"
+                )
+                drawGauge(
+                    canvas,
+                    gauges,
+                    ChipGauges.frequency(voice),
+                    left + cellW * 2,
+                    top,
+                    cellW,
+                    cellH,
+                    "Freq ${hex4(last.frequency(voice))}"
+                )
+            }
+            val top = cellH * 3
+            drawGauge(canvas, gauges, ChipGauges.VOLUME, left, top, cellW, cellH, "Vol ${last.volume}")
+            drawGauge(canvas, gauges, ChipGauges.RESONANCE, left + cellW, top, cellW, cellH, "Res ${last.resonance}")
+            drawGauge(canvas, gauges, ChipGauges.CUTOFF, left + cellW * 2, top, cellW, cellH, filterTitle(last))
+            if (chip != 0) {
+                canvas.drawLine(left, 0f, left, areaHeight, separatorPaint)
+            }
         }
-        val top = cellH * 3
-        drawGauge(canvas, gauges, ChipGauges.VOLUME, 0f, top, cellW, cellH, "Volume ${last.volume}")
-        drawGauge(canvas, gauges, ChipGauges.RESONANCE, cellW, top, cellW, cellH, "Res ${last.resonance}")
-        drawGauge(canvas, gauges, ChipGauges.CUTOFF, cellW * 2, top, cellW, cellH, filterTitle(last))
     }
 
     // Each column is vertical line between min and max values, as in JSIDPlay2
@@ -230,7 +265,13 @@ class SidDashboardView @JvmOverloads constructor(
         tracePaint.strokeWidth = maxOf(columnWidth, density)
         canvas.drawLines(lines, tracePaint)
         tracePaint.strokeWidth = TRACE_WIDTH * density
+        // narrow cells of multi-SID tunes require smaller titles
+        val available = rect.width() - pad * 6
+        val titleWidth = titlePaint.measureText(title)
+        val baseSize = sp(TITLE_SIZE_SP)
+        titlePaint.textSize = if (titleWidth > available) maxOf(baseSize * available / titleWidth, sp(MIN_TITLE_SIZE_SP)) else baseSize
         canvas.drawText(title, rect.left + pad * 3, rect.top + pad - titlePaint.ascent(), titlePaint)
+        titlePaint.textSize = baseSize
     }
 
     private fun padding() = density * 4
@@ -240,6 +281,7 @@ class SidDashboardView @JvmOverloads constructor(
     companion object {
         private const val TRACE_WIDTH = 1f
         private const val TITLE_SIZE_SP = 13f
+        private const val MIN_TITLE_SIZE_SP = 9f
         private const val TEXT_SIZE_SP = 12f
         const val DEFAULT_WAVE_WINDOW_MS = 10
 
