@@ -103,6 +103,13 @@
     </PreferenceCategory>
     <!-- oscilloscope -->
     <PreferenceCategory android:title="@string/pref_oscilloscope_title">
+        <DropDownPreference
+                android:defaultValue="@string/pref_oscilloscope_gain_default"
+                android:entries="@array/pref_oscilloscope_gain_entries"
+                android:entryValues="@array/pref_oscilloscope_gain_values"
+                android:key="ui.oscilloscope.gain"
+                android:title="@string/pref_oscilloscope_gain_title"
+                app:useSimpleSummaryProvider="true" />
         <SeekBarPreference
                 android:defaultValue="@integer/pref_oscilloscope_window_default"
                 android:key="ui.oscilloscope.window_ms"

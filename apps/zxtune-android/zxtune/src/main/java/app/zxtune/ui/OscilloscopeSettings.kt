@@ -13,14 +13,17 @@ import kotlinx.coroutines.withContext
 internal object OscilloscopeSettings {
     private const val WINDOW_KEY = "ui.oscilloscope.window_ms"
     private const val GAUGE_WINDOW_KEY = "ui.oscilloscope.gauge_window_ms"
+    private const val GAIN_KEY = "ui.oscilloscope.gain"
 
     suspend fun apply(ctx: Context, oscilloscope: OscilloscopeView, dashboard: SidDashboardView) {
-        val (window, gaugeWindow) = withContext(Dispatchers.IO) {
-            val prefs = Preferences.getDataStore(ctx)
-            prefs.getInt(WINDOW_KEY, OscilloscopeView.DEFAULT_WINDOW_MS) to
-                prefs.getInt(GAUGE_WINDOW_KEY, SidDashboardView.DEFAULT_WAVE_WINDOW_MS)
+        val prefs = withContext(Dispatchers.IO) {
+            Preferences.getDataStore(ctx).also {
+                // load cache in background
+                it.getInt(WINDOW_KEY, 0)
+            }
         }
-        oscilloscope.windowMs = window
-        dashboard.waveWindowMs = gaugeWindow
+        oscilloscope.windowMs = prefs.getInt(WINDOW_KEY, OscilloscopeView.DEFAULT_WINDOW_MS)
+        oscilloscope.gainPercent = prefs.getString(GAIN_KEY, null)?.toIntOrNull() ?: OscilloscopeView.AUTO_GAIN
+        dashboard.waveWindowMs = prefs.getInt(GAUGE_WINDOW_KEY, SidDashboardView.DEFAULT_WAVE_WINDOW_MS)
     }
 }

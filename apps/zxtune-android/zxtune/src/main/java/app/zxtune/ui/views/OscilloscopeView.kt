@@ -27,6 +27,7 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
+import kotlin.math.abs
 import kotlin.math.sqrt
 
 private val LOG = Logger("Oscilloscope")
@@ -67,6 +68,12 @@ class OscilloscopeView @JvmOverloads constructor(
      */
     @Volatile
     var windowMs = DEFAULT_WINDOW_MS
+
+    /**
+     * Visual amplification in percents, [AUTO_GAIN] for automatic per-voice gain
+     */
+    @Volatile
+    var gainPercent = AUTO_GAIN
 
     /**
      * @return rendering statistics: real fps, frame interval, drawing time (including data request)
@@ -124,6 +131,8 @@ class OscilloscopeView @JvmOverloads constructor(
 
     private inner class ScopeRenderer : Renderer {
         private val samples = ShortArray(MAX_CHANNELS * POINTS)
+        private val values = FloatArray(POINTS)
+        private val smoothedPeaks = FloatArray(MAX_CHANNELS)
         private val vertices: FloatBuffer = allocateFloats(POINTS * 2 * 2)
         private val gridVertices: FloatBuffer = allocateFloats(MAX_CHANNELS * 4 * 2)
         private val quadVertices: FloatBuffer = allocateFloats(4 * 4).apply {
@@ -237,14 +246,19 @@ class OscilloscopeView @JvmOverloads constructor(
             val pxY = height / 2f
             val halfWidth = LINE_WIDTH_PX / 2f
             val offset = chan * POINTS
+            val gain = channelGain(chan, offset)
+            for (idx in 0 until POINTS) {
+                // amplified peaks are limited by voice's cell
+                values[idx] = (samples[offset + idx] * gain / 32768f).coerceIn(-1f, 1f)
+            }
             vertices.clear()
             for (idx in 0 until POINTS) {
                 val x = left + width * idx / (POINTS - 1)
-                val y = centerY + ampl * samples[offset + idx] / 32768f
+                val y = centerY + ampl * values[idx]
                 val prev = maxOf(idx - 1, 0)
                 val next = minOf(idx + 1, POINTS - 1)
                 val dx = width * (next - prev) / (POINTS - 1) * pxX
-                val dy = ampl * (samples[offset + next] - samples[offset + prev]) / 32768f * pxY
+                val dy = ampl * (values[next] - values[prev]) * pxY
                 val len = sqrt(dx * dx + dy * dy).coerceAtLeast(1e-3f)
                 val nx = -dy / len * halfWidth / pxX
                 val ny = dx / len * halfWidth / pxY
@@ -253,6 +267,24 @@ class OscilloscopeView @JvmOverloads constructor(
             vertices.flip()
             GLES20.glVertexAttribPointer(linePosAttr, 2, GLES20.GL_FLOAT, false, 0, vertices)
             GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, POINTS * 2)
+        }
+
+        // Automatic gain follows peak level: immediate attack to avoid clipping,
+        // slow release to avoid visible pumping. Limited to not amplify noise of silent voices
+        private fun channelGain(chan: Int, offset: Int): Float {
+            val fixed = gainPercent
+            if (fixed != AUTO_GAIN) {
+                return fixed / 100f
+            }
+            var peak = 0
+            for (idx in 0 until POINTS) {
+                peak = maxOf(peak, abs(samples[offset + idx].toInt()))
+            }
+            val level = peak / 32768f
+            val prev = smoothedPeaks[chan]
+            val smoothed = if (level > prev) level else prev + (level - prev) * AUTO_GAIN_RELEASE
+            smoothedPeaks[chan] = smoothed
+            return (AUTO_GAIN_TARGET / maxOf(smoothed, AUTO_GAIN_TARGET / AUTO_GAIN_MAX)).coerceAtLeast(1f)
         }
 
         private fun drawLabels(layout: ScopeLayout, grid: Grid) {
@@ -336,6 +368,12 @@ class OscilloscopeView @JvmOverloads constructor(
     companion object {
         const val POINTS = 512
         const val DEFAULT_WINDOW_MS = 40
+        const val AUTO_GAIN = 0
+        private const val AUTO_GAIN_TARGET = 0.9f
+        private const val AUTO_GAIN_MAX = 8f
+
+        // per frame, ~0.5s to rise at 120Hz
+        private const val AUTO_GAIN_RELEASE = 0.04f
         const val MAX_CHANNELS = 32
         private const val AMPLIFICATION = 0.95f
         private const val LINE_WIDTH_PX = 3f
