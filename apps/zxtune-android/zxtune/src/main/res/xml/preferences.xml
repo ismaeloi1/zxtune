@@ -127,6 +127,28 @@
                 app:min="2"
                 app:showSeekBarValue="true" />
     </PreferenceCategory>
+    <!-- mt32 -->
+    <PreferenceCategory android:title="@string/pref_zxtune_mt32_title">
+        <Preference
+                android:key="zxtune.core.mt32.roms_path"
+                android:persistent="false"
+                android:title="@string/pref_zxtune_mt32_roms_title"
+                android:summary="@string/pref_zxtune_mt32_roms_summary_empty" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_mt32_model_default"
+                android:entries="@array/pref_zxtune_mt32_model_entries"
+                android:entryValues="@array/pref_zxtune_mt32_model_values"
+                android:key="zxtune.core.mt32.model"
+                android:title="@string/pref_zxtune_mt32_model_title"
+                app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_mt32_voices_default"
+                android:entries="@array/pref_zxtune_mt32_voices_entries"
+                android:entryValues="@array/pref_zxtune_mt32_voices_values"
+                android:key="zxtune.core.mt32.voices"
+                android:title="@string/pref_zxtune_mt32_voices_title"
+                app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
     <!-- sid -->
     <PreferenceCategory android:title="@string/pref_zxtune_sid_title">
         <DropDownPreference
