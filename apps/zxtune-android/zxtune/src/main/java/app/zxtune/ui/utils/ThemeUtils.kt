@@ -24,11 +24,14 @@ object ThemeUtils {
             require(THEME_DEFAULT == ctx.getString(R.string.pref_ui_theme_default))
             require(
                 arrayOf(
-                    THEME_DARK, THEME_LIGHT, THEME_SYSTEM
+                    THEME_DARK,
+                    THEME_LIGHT,
+                    THEME_SYSTEM
                 ).contentEquals(ctx.resources.getStringArray(R.array.pref_ui_theme_values))
             )
             val value = Preferences.getDefaultSharedPreferences(ctx).getString(
-                PREF_KEY, THEME_DEFAULT
+                PREF_KEY,
+                THEME_DEFAULT
             )
             applyTheme(value!!)
         }
@@ -38,19 +41,16 @@ object ThemeUtils {
         getProviderClient(ctx).watchString(PREF_KEY).collect { applyTheme(it) }
     }
 
-    private fun needApplyTheme() =
-        AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_UNSPECIFIED
+    private fun needApplyTheme() = AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_UNSPECIFIED
 
     private fun applyTheme(theme: String) {
         val mode = themeToMode(theme)
         AppCompatDelegate.setDefaultNightMode(mode)
     }
 
-    private fun themeToMode(theme: String) = when (theme) {
-        THEME_LIGHT -> AppCompatDelegate.MODE_NIGHT_NO
-        THEME_SYSTEM -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-        else -> AppCompatDelegate.MODE_NIGHT_YES
-    }
+    // AMOLED black theme is the only one, so stored value is ignored
+    @Suppress("UNUSED_PARAMETER")
+    private fun themeToMode(theme: String) = AppCompatDelegate.MODE_NIGHT_YES
 }
 
 class ThemeInitializer : Initializer<Unit> {
