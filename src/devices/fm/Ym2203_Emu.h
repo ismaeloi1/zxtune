@@ -30,6 +30,10 @@ void YM2203ResetChip(void *chip);
 void YM2203UpdateOne(void *chip, int32_t *buffer, int length);
 
 void YM2203WriteRegs(void *chip, int reg, unsigned char val);
+/*
+** change clock and/or sampling rate keeping chip state
+*/
+void YM2203SetClock(void *chip, uint64_t baseclock, int rate);
 
 void YM2203SetMuteMask(void *chip, uint_t mask);
 

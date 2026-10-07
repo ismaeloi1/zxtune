@@ -375,6 +375,23 @@ int main()
     const auto again = RenderAll(seeked, FREQ);
     Check(Rms(again, 0, FREQ / 2) == 0 && Rms(again, FREQ * 6 / 10, FREQ) > 100, "seek back restarts");
   }
+  // settings changed while playing
+  {
+    const auto liveParams = Parameters::Container::Create();
+    Renderer live(tune, roms, FREQ, liveParams);
+    auto scope = std::make_shared<TestScope>();
+    live.SetVoicesScope(scope);
+    auto out = RenderAll(live, FREQ);
+    const auto partsCount = scope->Count;
+    liveParams->SetValue(VOICES, VOICES_PARTIALS);
+    // ROMs from unusable location should not break playback
+    liveParams->SetValue(ROMS_PATH, StringView("/nonexistent"));
+    const auto tail = RenderAll(live, total - FREQ);
+    out.insert(out.end(), tail.begin(), tail.end());
+    std::printf("voices switched while playing: %u -> %u\n", partsCount, scope->Count);
+    Check(partsCount == 9 && scope->Count > partsCount, "voices mode is applied while playing");
+    Check(out == plainOut, "output is not changed by settings switch");
+  }
   {
     // directory without ROMs
     const String dir = "/tmp/zxtune_mt32_test_roms";

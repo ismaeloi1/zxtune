@@ -1358,6 +1358,34 @@ void YM2203WriteRegs(void *chip, int reg, unsigned char val)
 	}
 }
 
+void YM2203SetClock(void *chip, uint64_t clock, int rate)
+{
+  auto* F2203 = (YM2203*)chip;
+  FM_OPN* OPN = &F2203->OPN;
+  FM_STATE* state = &F2203->State;
+  OPN->ST.clock = clock;
+  OPN->ST.rate = rate;
+  /* recalculate tables for current prescaler */
+  OPNPrescaler_w(OPN, 1, 1);
+  /* detune and phase increments are cached using tables above, so replay related registers to update them */
+  const uint_t fnh = OPN->ST.fn_h;
+  const uint_t sl3fnh = OPN->SL3.fn_h;
+  for (int reg = 0x30; reg < 0x40; ++reg)
+  {
+    OPNWriteReg(state, OPN, reg, F2203->REGS[reg]);
+  }
+  /* frequency latches should precede low parts */
+  for (int chan = 0; chan < 3; ++chan)
+  {
+    OPNWriteReg(state, OPN, 0xa4 + chan, F2203->REGS[0xa4 + chan]);
+    OPNWriteReg(state, OPN, 0xa0 + chan, F2203->REGS[0xa0 + chan]);
+    OPNWriteReg(state, OPN, 0xac + chan, F2203->REGS[0xac + chan]);
+    OPNWriteReg(state, OPN, 0xa8 + chan, F2203->REGS[0xa8 + chan]);
+  }
+  OPN->ST.fn_h = fnh;
+  OPN->SL3.fn_h = sl3fnh;
+}
+
 void YM2203SetMuteMask(void *chip, uint_t mask)
 {
   auto* F2203 = (YM2203*)chip;
