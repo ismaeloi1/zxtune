@@ -8,6 +8,7 @@
 #include "module/holder.h"
 #include "module/voices_scope.h"
 #include "parameters/container.h"
+#include "sound/scope.h"
 #include "sound/sound_parameters.h"
 
 #include <chrono>
@@ -16,8 +17,6 @@
 #include <fstream>
 #include <iterator>
 #include <vector>
-
-#include "apps/zxtune-android/zxtune/src/main/jni/scope.cpp"
 
 namespace
 {
@@ -223,9 +222,9 @@ int main(int argc, char** argv)
     std::printf("\n");
   }
   {
-    // Player::Scope gauges check
+    // Sound::Scope gauges check
     auto r = Module::CreatePipelinedRenderer(*holder, global);
-    auto sc = Player::Scope::Create(FREQ);
+    auto sc = Sound::Scope::Create(FREQ);
     dynamic_cast<Module::VoicesScopeSource*>(r.get())->SetVoicesScope(sc);
     uint64_t played = 0;
     std::vector<int16_t> wave(32 * 512);
@@ -250,7 +249,7 @@ int main(int argc, char** argv)
     }
     const auto layout = sc->Get(32, 256, played - FREQ / 10, 40, wave.data());
     std::printf("scope layout id=%u channels=%u:\n%s\n", layout.Id, layout.Channels, sc->GetLayout().c_str());
-    std::vector<uint8_t> gauges(32 * Player::Scope::VOICE_GAUGES_SIZE);
+    std::vector<uint8_t> gauges(32 * Sound::Scope::VOICE_GAUGES_SIZE);
     for (int pass = 0; pass < 20; ++pass)
     {
       sc->GetVoiceGauges(32, played - FREQ / 10, 10, gauges.data());
@@ -258,9 +257,9 @@ int main(int argc, char** argv)
     const auto voices = sc->GetVoiceGauges(32, played - FREQ / 10, 10, gauges.data());
     for (uint_t v = 0; v < voices; ++v)
     {
-      const auto* g = gauges.data() + v * Player::Scope::VOICE_GAUGES_SIZE;
-      auto col = [g](uint_t gauge, uint_t c) { return g + (gauge * Player::Scope::GAUGE_COLUMNS + c) * 2; };
-      const auto* st = g + Player::Scope::VOICE_GAUGES_COUNT * Player::Scope::GAUGE_COLUMNS * 2;
+      const auto* g = gauges.data() + v * Sound::Scope::VOICE_GAUGES_SIZE;
+      auto col = [g](uint_t gauge, uint_t c) { return g + (gauge * Sound::Scope::GAUGE_COLUMNS + c) * 2; };
+      const auto* st = g + Sound::Scope::VOICE_GAUGES_COUNT * Sound::Scope::GAUGE_COLUMNS * 2;
       float freq, level;
       std::memcpy(&freq, st, 4);
       std::memcpy(&level, st + 4, 4);

@@ -17,7 +17,6 @@
 #include "apps/zxtune-android/zxtune/src/main/jni/global_options.h"
 #include "apps/zxtune-android/zxtune/src/main/jni/module.h"
 #include "apps/zxtune-android/zxtune/src/main/jni/properties.h"
-#include "apps/zxtune-android/zxtune/src/main/jni/scope.h"
 
 #include "module/players/pipeline.h"
 #include "sound/impl/fft_analyzer.h"
@@ -25,6 +24,7 @@
 #include "module/voices_scope.h"
 #include "parameters/merged_accessor.h"
 #include "sound/mixer_factory.h"
+#include "sound/scope.h"
 #include "time/timer.h"
 
 #include "contract.h"
@@ -238,7 +238,7 @@ namespace
       , LocalParameters(Parameters::CreateSynchronizedContainer())
       , Renderer(Module::CreatePipelinedRenderer(
             holder, samplerate, Parameters::CreateMergedAccessor(LocalParameters, std::move(globalParams))))
-      , ScopeData(Player::Scope::Create(samplerate))
+      , ScopeData(Sound::Scope::Create(samplerate))
     {
       Require(Duration.Get() != 0);
       if (auto* const voices = dynamic_cast<Module::VoicesScopeSource*>(Renderer.get()))
@@ -354,7 +354,7 @@ namespace
     BufferTarget Buffer;
     RenderingPerformanceAccountant RenderingPerformance;
     AnalyzerControl Analyzer;
-    const Player::Scope::Ptr ScopeData;
+    const Sound::Scope::Ptr ScopeData;
     uint64_t PlayedSamples = 0;
   };
 
@@ -454,7 +454,7 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeGauges(JNIEnv* env
     const Jni::AutoByteArray rawData(env, data);
     if (rawData && player)
     {
-      const auto maxChips = rawData.Size() / Player::Scope::GAUGES_SIZE;
+      const auto maxChips = rawData.Size() / Sound::Scope::GAUGES_SIZE;
       return player->GetScopeGauges(maxChips, playing, waveWindowMs, rawData.Data());
     }
     else
@@ -474,7 +474,7 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniPlayer_scopeVoiceGauges(JNIEnv
     const Jni::AutoByteArray rawData(env, data);
     if (rawData && player)
     {
-      const auto maxVoices = rawData.Size() / Player::Scope::VOICE_GAUGES_SIZE;
+      const auto maxVoices = rawData.Size() / Sound::Scope::VOICE_GAUGES_SIZE;
       return player->GetScopeVoiceGauges(maxVoices, playing, waveWindowMs, rawData.Data());
     }
     else

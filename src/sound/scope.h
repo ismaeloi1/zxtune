@@ -18,7 +18,7 @@
 
 #include <memory>
 
-namespace Player
+namespace Sound
 {
   //! @brief Collects separate voices (if supported) or master output and provides triggered waveforms
   class Scope : public Module::VoicesScope
@@ -27,7 +27,7 @@ namespace Player
     using Ptr = std::shared_ptr<Scope>;
 
     //! @brief Called after each rendered chunk of module, flushes collected voices data
-    virtual void Commit(const Sound::Chunk& master) = 0;
+    virtual void Commit(const Chunk& master) = 0;
 
     //! @brief Called on each output buffer request
     //! @param start index of first sample in buffer (in samples since start)
@@ -96,4 +96,4 @@ namespace Player
 
     static Ptr Create(uint_t samplerate);
   };
-}  // namespace Player
+}  // namespace Sound
