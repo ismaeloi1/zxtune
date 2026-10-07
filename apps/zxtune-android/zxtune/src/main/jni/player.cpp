@@ -235,7 +235,7 @@ namespace
     PlayerControl(const Module::Holder& holder, uint_t samplerate, Parameters::Accessor::Ptr globalParams)
       : Duration(holder.GetModuleInformation().Duration)
       , Samplerate(samplerate)
-      , LocalParameters(Parameters::Container::Create())
+      , LocalParameters(Parameters::CreateSynchronizedContainer())
       , Renderer(Module::CreatePipelinedRenderer(
             holder, samplerate, Parameters::CreateMergedAccessor(LocalParameters, std::move(globalParams))))
       , ScopeData(Player::Scope::Create(samplerate))

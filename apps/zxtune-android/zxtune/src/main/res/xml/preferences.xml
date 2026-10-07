@@ -78,11 +78,54 @@
                 android:key="zxtune.core.aym.layout"
                 android:title="@string/pref_zxtune_aym_layout_title"
                 app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_aym_duty_cycle_mask_default"
+                android:entries="@array/pref_zxtune_aym_duty_cycle_mask_entries"
+                android:entryValues="@array/pref_zxtune_aym_duty_cycle_mask_values"
+                android:key="zxtune.core.aym.duty_cycle_mask"
+                android:title="@string/pref_zxtune_aym_duty_cycle_mask_title"
+                app:useSimpleSummaryProvider="true" />
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_zxtune_aym_duty_cycle_default"
+                android:key="zxtune.core.aym.duty_cycle"
+                android:max="99"
+                android:summary="@string/pref_zxtune_aym_duty_cycle_summary"
+                android:title="@string/pref_zxtune_aym_duty_cycle_title"
+                app:min="1"
+                app:showSeekBarValue="true" />
         <!-- 3-channel mixer -->
         <Preference
                 android:fragment="app.zxtune.PreferencesActivity$Fragment"
                 android:key="zxtune.sound.mixer.3"
                 android:title="@string/pref_zxtune_sound_mixer_3_x_x_title" />
+    </PreferenceCategory>
+    <!-- z80 -->
+    <PreferenceCategory android:title="@string/pref_zxtune_z80_title">
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_z80_clockrate_default"
+                android:entries="@array/pref_zxtune_z80_clockrate_entries"
+                android:entryValues="@array/pref_zxtune_z80_clockrate_values"
+                android:key="zxtune.core.z80.clockrate"
+                android:title="@string/pref_zxtune_z80_clockrate_title"
+                app:useSimpleSummaryProvider="true" />
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_zxtune_z80_int_ticks_default"
+                android:key="zxtune.core.z80.int_ticks"
+                android:max="100"
+                android:summary="@string/pref_zxtune_z80_int_ticks_summary"
+                android:title="@string/pref_zxtune_z80_int_ticks_title"
+                app:min="1"
+                app:showSeekBarValue="true" />
+    </PreferenceCategory>
+    <!-- fm -->
+    <PreferenceCategory android:title="@string/pref_zxtune_fm_title">
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_fm_clockrate_default"
+                android:entries="@array/pref_zxtune_fm_clockrate_entries"
+                android:entryValues="@array/pref_zxtune_fm_clockrate_values"
+                android:key="zxtune.core.fm.clockrate"
+                android:title="@string/pref_zxtune_fm_clockrate_title"
+                app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <!-- dac -->
     <PreferenceCategory app:title="@string/pref_zxtune_dac_title">
@@ -93,6 +136,13 @@
     </PreferenceCategory>
     <!-- saa -->
     <PreferenceCategory app:title="@string/pref_zxtune_saa_title">
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_saa_clockrate_default"
+                android:entries="@array/pref_zxtune_saa_clockrate_entries"
+                android:entryValues="@array/pref_zxtune_saa_clockrate_values"
+                android:key="zxtune.core.saa.clockrate"
+                android:title="@string/pref_zxtune_saa_clockrate_title"
+                app:useSimpleSummaryProvider="true" />
         <DropDownPreference
                 android:defaultValue="@integer/pref_zxtune_saa_interpolation_default"
                 android:entries="@array/pref_interpolation_entries"

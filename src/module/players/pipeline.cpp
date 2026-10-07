@@ -39,9 +39,10 @@ namespace Module
 
   struct FadeInfo
   {
-    const Time::Duration<TimeUnit> FadeIn;
-    const Time::Duration<TimeUnit> FadeOut;
-    const Time::Duration<TimeUnit> Duration;
+    // not constant to be updated while playing
+    Time::Duration<TimeUnit> FadeIn;
+    Time::Duration<TimeUnit> FadeOut;
+    Time::Duration<TimeUnit> Duration;
 
     FadeInfo(Time::Duration<TimeUnit> fadeIn, Time::Duration<TimeUnit> fadeOut, Time::Duration<TimeUnit> duration)
       : FadeIn(fadeIn)
@@ -105,22 +106,17 @@ namespace Module
       Counter = 0;
     }
 
-    static SilenceDetector Create(uint_t samplerate, const Parameters::Accessor& params)
+    // Already counted silence is kept to apply new limit immediately
+    void SetParameters(uint_t samplerate, const Parameters::Accessor& params)
     {
       using namespace Parameters::ZXTune::Sound;
       const auto duration = GetDurationValue(params, SILENCE_LIMIT, SILENCE_LIMIT_DEFAULT, SILENCE_LIMIT_PRECISION);
-      const auto limit = std::size_t(samplerate) * duration.Get() / duration.PER_SECOND;
-      Debug("Silence detection: {} ms ({} samples)", duration.Get(), limit);
-      return SilenceDetector(limit);
+      Limit = std::size_t(samplerate) * duration.Get() / duration.PER_SECOND;
+      Debug("Silence detection: {} ms ({} samples)", duration.Get(), Limit);
     }
 
   private:
-    explicit SilenceDetector(std::size_t limit)
-      : Limit(limit)
-    {}
-
-  private:
-    const std::size_t Limit;
+    std::size_t Limit = 0;
     std::size_t Counter = 0;
     Sound::Sample LastSample;
   };
@@ -133,10 +129,13 @@ namespace Module
     PipelinedRenderer(const Holder& holder, uint_t samplerate, Parameters::Accessor::Ptr params)
       : Delegate(holder.CreateRenderer(samplerate, params))
       , Params(std::move(params))
-      , Fading(FadeInfo::Create(holder.GetModuleInformation().Duration, *Params))
+      , Samplerate(samplerate)
+      , TrackDuration(holder.GetModuleInformation().Duration)
+      , Fading(FadeInfo::Create(TrackDuration, *Params))
       , Gainer(Sound::CreateGainer())
-      , Silence(SilenceDetector::Create(samplerate, *Params))
-    {}
+    {
+      Silence.SetParameters(Samplerate, *Params);
+    }
 
     Module::State GetState() const override
     {
@@ -190,6 +189,8 @@ namespace Module
         Preamp = Sound::Gain::Type(val, GAIN_PRECISION);
         Debug("Preamp: {}%", val);
         Loop = Sound::GetLoopParameters(*Params);
+        Fading = FadeInfo::Create(TrackDuration, *Params);
+        Silence.SetParameters(Samplerate, *Params);
       }
     }
 
@@ -215,7 +216,9 @@ namespace Module
   private:
     const Renderer::Ptr Delegate;
     Parameters::TrackingHelper<Parameters::Accessor> Params;
-    const FadeInfo Fading;
+    const uint_t Samplerate;
+    const Time::Milliseconds TrackDuration;
+    FadeInfo Fading;
     const Sound::Gainer::Ptr Gainer;
     SilenceDetector Silence;
     Sound::Gain::Type Preamp;

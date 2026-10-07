@@ -865,8 +865,11 @@ namespace Module::MT32
       , Target(Sound::CreateResampler(SAMPLERATE, samplerate))
     {
       using namespace Parameters::ZXTune::Core::MT32;
-      const auto voices = Parameters::GetInteger(*Params, VOICES, VOICES_DEFAULT);
-      Tap = std::make_unique<VoicesTap>(Delegate->GetSynth(), voices == VOICES_PARTIALS);
+      // ROMs are already loaded by holder using the same parameters
+      RomsPath = Parameters::GetString(*Params, ROMS_PATH);
+      RomsModel = Parameters::GetInteger(*Params, MODEL, MODEL_DEFAULT);
+      Voices = Parameters::GetInteger(*Params, VOICES, VOICES_DEFAULT);
+      Tap = std::make_unique<VoicesTap>(Delegate->GetSynth(), Voices == VOICES_PARTIALS);
     }
 
     ~Renderer() override
@@ -881,6 +884,7 @@ namespace Module::MT32
 
     Sound::Chunk Render() override
     {
+      ApplyParameters();
       UpdateVoicesTap();
       const auto avail = State.ConsumeUpTo(FRAME_DURATION);
       auto result = Target->Apply(Delegate->Render(GetSamples(avail)));
@@ -908,16 +912,78 @@ namespace Module::MT32
     bool SetVoicesScope(VoicesScope::Ptr scope) override
     {
       Scope = std::move(scope);
-      if (Scope)
-      {
-        Scope->SetVoicesGroups(Tap->GetGroups(), false);
-        Scope->SetDescription(Delegate->GetRoms().Description + ", Munt " + MT32Emu::Synth::getLibraryVersionString());
-      }
+      DescribeVoices();
       UpdateVoicesTap();
       return true;
     }
 
   private:
+    void DescribeVoices()
+    {
+      if (Scope)
+      {
+        Scope->SetVoicesGroups(Tap->GetGroups(), false);
+        Scope->SetDescription(Delegate->GetRoms().Description + ", Munt " + MT32Emu::Synth::getLibraryVersionString());
+      }
+    }
+
+    // Settings are applied while playing by recreating synth or voices tap at the current position
+    void ApplyParameters()
+    {
+      if (!Params.IsChanged())
+      {
+        return;
+      }
+      using namespace Parameters::ZXTune::Core::MT32;
+      const auto path = Parameters::GetString(*Params, ROMS_PATH);
+      const auto model = Parameters::GetInteger(*Params, MODEL, MODEL_DEFAULT);
+      const auto voices = Parameters::GetInteger(*Params, VOICES, VOICES_DEFAULT);
+      bool reloaded = false;
+      if (path != RomsPath || model != RomsModel)
+      {
+        RomsPath = path;
+        RomsModel = model;
+        reloaded = ReloadEngine();
+      }
+      // tap is bound to synth instance
+      if (reloaded || voices != Voices)
+      {
+        Voices = voices;
+        RecreateVoicesTap();
+      }
+    }
+
+    bool ReloadEngine()
+    {
+      try
+      {
+        // missing or broken ROMs should not interrupt playback with the current ones
+        auto roms = RomsPath.empty() ? RomSet::Ptr() : RomSet::Load(RomsPath, RomsModel);
+        if (!roms || roms.get() == &Delegate->GetRoms())
+        {
+          return false;
+        }
+        auto engine = MakePtr<Engine>(Tune, std::move(roms));
+        const auto pos = State.Get().At;
+        engine->Seek(uint64_t(pos.Get()) * SAMPLERATE / pos.PER_SECOND);
+        Delegate = std::move(engine);
+        return true;
+      }
+      catch (const std::exception&)
+      {
+        return false;
+      }
+    }
+
+    void RecreateVoicesTap()
+    {
+      Delegate->SetVoicesTap(nullptr);
+      Tap =
+          std::make_unique<VoicesTap>(Delegate->GetSynth(), Voices == Parameters::ZXTune::Core::MT32::VOICES_PARTIALS);
+      TapActive = false;
+      DescribeVoices();
+    }
+
     // separate voices are rendered only while consumed
     void UpdateVoicesTap()
     {
@@ -988,8 +1054,11 @@ namespace Module::MT32
 
   private:
     const Model::Ptr Tune;
-    const Parameters::Accessor::Ptr Params;
-    const Engine::Ptr Delegate;
+    Parameters::TrackingHelper<Parameters::Accessor> Params;
+    String RomsPath;
+    Parameters::IntType RomsModel = 0;
+    Parameters::IntType Voices = 0;
+    Engine::Ptr Delegate;
     TimedState State;
     const uint_t Samplerate;
     const Sound::Converter::Ptr Target;

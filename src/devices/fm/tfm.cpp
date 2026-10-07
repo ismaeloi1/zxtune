@@ -26,8 +26,17 @@ namespace Devices::TFM
     {
       if (Helper.SetNewParams(clock, sndFreq))
       {
-        Chips[0] = Helper.CreateChip();
-        Chips[1] = Helper.CreateChip();
+        if (Chips[0])
+        {
+          // recreated chips lose registers written once (e.g. instruments), so they are updated in place
+          ::YM2203SetClock(Chips[0].get(), clock, sndFreq);
+          ::YM2203SetClock(Chips[1].get(), clock, sndFreq);
+        }
+        else
+        {
+          Chips[0] = Helper.CreateChip();
+          Chips[1] = Helper.CreateChip();
+        }
       }
       SetMuteMask(muteMask);
     }
