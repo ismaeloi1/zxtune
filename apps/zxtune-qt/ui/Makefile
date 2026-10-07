@@ -18,7 +18,8 @@ ui_files += controls/playback_controls \
             controls/volume_control \
             controls/playback_options
 
-moc_files += controls/analyzer_control controls/overlay_progress
+moc_files += controls/analyzer_control controls/overlay_progress \
+             controls/oscilloscope_view controls/dashboard_view
 
 #other
 moc_files += tools/parameters_helpers

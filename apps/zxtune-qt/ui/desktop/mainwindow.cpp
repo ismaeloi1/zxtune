@@ -13,6 +13,8 @@
 #include "apps/zxtune-qt/playlist/ui/container_view.h"
 #include "apps/zxtune-qt/supp/playback_supp.h"
 #include "apps/zxtune-qt/ui/controls/analyzer_control.h"
+#include "apps/zxtune-qt/ui/controls/dashboard_view.h"
+#include "apps/zxtune-qt/ui/controls/oscilloscope_view.h"
 #include "apps/zxtune-qt/ui/controls/playback_controls.h"
 #include "apps/zxtune-qt/ui/controls/playback_options.h"
 #include "apps/zxtune-qt/ui/controls/seek_controls.h"
@@ -42,6 +44,7 @@
 #include <QtGui/QCloseEvent>
 #include <QtGui/QDesktopServices>
 #include <QtWidgets/QApplication>
+#include <QtWidgets/QDockWidget>
 #include <QtWidgets/QMessageBox>
 #include <QtWidgets/QToolBar>
 
@@ -74,6 +77,8 @@ namespace
       , Status(StatusControl::Create(*this, *Playback))
       , Seeking(SeekControls::Create(*this, *Playback))
       , Analyzer(AnalyzerControl::Create(*this, *Playback))
+      , Oscilloscope(OscilloscopeView::Create(*this, *Playback, Options))
+      , Dashboard(DashboardView::Create(*this, *Playback))
       , MultiPlaylist(Playlist::UI::ContainerView::Create(*this, Options))
     {
       setupUi(this);
@@ -92,6 +97,11 @@ namespace
         Toolbars.push_back(AddWidgetOnToolbar(Analyzer, false));
         // playlist is mandatory and cannot be hidden
         AddWidgetOnLayout(MultiPlaylist);
+        // visualizations share the same space, only visible one consumes resources
+        Docks.push_back(AddWidgetOnDock(Oscilloscope));
+        Docks.push_back(AddWidgetOnDock(Dashboard));
+        tabifyDockWidget(Docks.front().second, Docks.back().second);
+        Docks.front().second->raise();
         State->Load();
         FillLayoutMenu();
       }
@@ -183,6 +193,7 @@ namespace
 
   private:
     using WidgetOnToolbar = std::pair<QWidget*, QToolBar*>;
+    using WidgetOnDock = std::pair<QWidget*, QDockWidget*>;
 
     WidgetOnToolbar AddWidgetOnToolbar(QWidget* widget, bool lastInRow)
     {
@@ -206,6 +217,17 @@ namespace
       return {widget, toolBar};
     }
 
+    WidgetOnDock AddWidgetOnDock(QWidget* widget)
+    {
+      auto* const dock = new QDockWidget(this);
+      dock->setObjectName(widget->objectName());
+      dock->setWindowTitle(widget->windowTitle());
+      dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+      dock->setWidget(widget);
+      addDockWidget(Qt::BottomDockWidgetArea, dock);
+      return {widget, dock};
+    }
+
     QWidget* AddWidgetOnLayout(QWidget* widget)
     {
       centralWidget()->layout()->addWidget(widget);
@@ -219,6 +241,14 @@ namespace
       {
         toolbar.second->setWindowTitle(toolbar.first->windowTitle());
         auto* action = toolbar.second->toggleViewAction();
+        action->setMenuRole(QAction::NoRole);
+        menuLayout->addAction(action);
+      }
+      menuLayout->addSeparator();
+      for (const auto& dock : Docks)
+      {
+        dock.second->setWindowTitle(dock.first->windowTitle());
+        auto* action = dock.second->toggleViewAction();
         action->setMenuRole(QAction::NoRole);
         menuLayout->addAction(action);
       }
@@ -293,9 +323,12 @@ namespace
     StatusControl* const Status;
     SeekControls* const Seeking;
     AnalyzerControl* const Analyzer;
+    OscilloscopeView* const Oscilloscope;
+    DashboardView* const Dashboard;
     Playlist::UI::ContainerView* const MultiPlaylist;
     bool Playing = false;
     std::vector<WidgetOnToolbar> Toolbars;
+    std::vector<WidgetOnDock> Docks;
   };
 }  // namespace
 
