@@ -61,8 +61,8 @@
         <item>ACB</item>
         <item>BAC</item>
         <item>BCA</item>
-        <item>CBA</item>
         <item>CAB</item>
+        <item>CBA</item>
         <item>Mono</item>
     </string-array>
     <string-array name="pref_zxtune_aym_layout_values" translatable="false">
@@ -75,6 +75,73 @@
         <item>6</item>
     </string-array>
     <integer name="pref_zxtune_aym_layout_default">0</integer>
+    <!-- zxtune.core.aym.duty_cycle_mask -->
+    <string name="pref_zxtune_aym_duty_cycle_mask_title">Duty cycle channels</string>
+    <string-array name="pref_zxtune_aym_duty_cycle_mask_entries">
+        <item>None</item>
+        <item>A</item>
+        <item>B</item>
+        <item>C</item>
+        <item>A, B</item>
+        <item>A, C</item>
+        <item>B, C</item>
+        <item>All</item>
+    </string-array>
+    <string-array name="pref_zxtune_aym_duty_cycle_mask_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>4</item>
+        <item>3</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+    </string-array>
+    <string name="pref_zxtune_aym_duty_cycle_mask_default" translatable="false">0</string>
+    <!-- zxtune.core.aym.duty_cycle -->
+    <string name="pref_zxtune_aym_duty_cycle_title">Duty cycle, %</string>
+    <string name="pref_zxtune_aym_duty_cycle_summary">Tone pulse width for selected channels, 50 - square wave</string>
+    <integer name="pref_zxtune_aym_duty_cycle_default">50</integer>
+
+    <!-- z80 -->
+    <string name="pref_zxtune_z80_title">Z80 CPU (AY files with player code)</string>
+    <!-- zxtune.core.z80.clockrate -->
+    <string name="pref_zxtune_z80_clockrate_title">Clockrate</string>
+    <string-array name="pref_zxtune_z80_clockrate_entries">
+        <item>ZX Spectrum 48K, Pentagon (3.5 MHz)</item>
+        <item>ZX Spectrum 128K (3.5469 MHz)</item>
+        <item>Amstrad CPC (4 MHz)</item>
+        <item>Turbo (7 MHz)</item>
+    </string-array>
+    <string-array name="pref_zxtune_z80_clockrate_values" translatable="false">
+        <item>3500000</item>
+        <item>3546900</item>
+        <item>4000000</item>
+        <item>7000000</item>
+    </string-array>
+    <string name="pref_zxtune_z80_clockrate_default" translatable="false">3500000</string>
+    <!-- zxtune.core.z80.int_ticks -->
+    <string name="pref_zxtune_z80_int_ticks_title">Interrupt duration, T-states</string>
+    <string name="pref_zxtune_z80_int_ticks_summary">How long interrupt request is active each frame</string>
+    <integer name="pref_zxtune_z80_int_ticks_default">24</integer>
+
+    <!-- fm -->
+    <string name="pref_zxtune_fm_title" translatable="false">YM2203 (TurboFM)</string>
+    <!-- zxtune.core.fm.clockrate -->
+    <string name="pref_zxtune_fm_clockrate_title">Clockrate</string>
+    <string-array name="pref_zxtune_fm_clockrate_entries">
+        <item>1.75 MHz</item>
+        <item>TurboFM (3.5 MHz)</item>
+        <item>NTSC (3.58 MHz)</item>
+        <item>4 MHz</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_clockrate_values" translatable="false">
+        <item>1750000</item>
+        <item>3500000</item>
+        <item>3579545</item>
+        <item>4000000</item>
+    </string-array>
+    <string name="pref_zxtune_fm_clockrate_default" translatable="false">3500000</string>
 
     <!-- dac -->
     <string name="pref_zxtune_dac_title">Digital samples</string>
@@ -83,6 +150,17 @@
 
     <!-- saa -->
     <string name="pref_zxtune_saa_title" translatable="false">Philips SAA1099</string>
+    <!-- zxtune.core.saa.clockrate -->
+    <string name="pref_zxtune_saa_clockrate_title">Clockrate</string>
+    <string-array name="pref_zxtune_saa_clockrate_entries">
+        <item>SAM Coupé (8 MHz)</item>
+        <item>Creative Music System (7.16 MHz)</item>
+    </string-array>
+    <string-array name="pref_zxtune_saa_clockrate_values" translatable="false">
+        <item>8000000</item>
+        <item>7159090</item>
+    </string-array>
+    <string name="pref_zxtune_saa_clockrate_default" translatable="false">8000000</string>
     <!-- zxtune.core.saa.interpolation -->
     <integer name="pref_zxtune_saa_interpolation_default">1</integer>
 
