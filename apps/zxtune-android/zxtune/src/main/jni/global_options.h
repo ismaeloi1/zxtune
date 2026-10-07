@@ -15,4 +15,7 @@
 namespace Parameters
 {
   Container& GlobalOptions();
-}
+
+  // For options modified from UI thread while being polled by rendering thread
+  Container::Ptr CreateSynchronizedContainer();
+}  // namespace Parameters
