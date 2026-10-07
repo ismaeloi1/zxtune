@@ -1,0 +1,211 @@
+name: Desktop
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+    paths-ignore:
+      - 'apps/zxtune-android/**'
+  workflow_dispatch:
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            # SSE4.2/POPCNT, supported by all x86_64 CPUs since ~2009
+            march: -march=x86-64-v2
+            appimage_arch: x86_64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            march: -march=armv8-a
+            appimage_arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            make g++ python3 file \
+            qtbase5-dev qtbase5-dev-tools qttools5-dev-tools \
+            libboost-locale-dev libboost-program-options-dev libicu-dev \
+            libpulse-dev libasound2-dev zlib1g-dev
+
+      - name: Configure build
+        run: |
+          # Shallow clone has no tags for 'git describe', so pass version explicitly
+          REVISION=$(git ls-remote --tags origin 'r*' | grep -o 'refs/tags/r[0-9]*$' | sed 's|refs/tags/r||' | sort -n | tail -1)
+          echo "MAKEFLAGS=root.version=r${REVISION}-scope-${GITHUB_SHA::9} root.version.index=${REVISION}" >> "$GITHUB_ENV"
+          echo "VERSION=r${REVISION}-scope-${GITHUB_SHA::9}" >> "$GITHUB_ENV"
+          TRIPLET=$(gcc -dumpmachine)
+          {
+            echo "platform=linux"
+            echo "tools.python=python3"
+            echo "jumbo.enabled=1"
+            echo "system.zlib=1"
+            echo "qt.includes=/usr/include/${TRIPLET}/qt5"
+            echo "qt.bin=/usr/lib/qt5/bin/"
+            # system Qt is built with -reduce-relocations
+            echo "cxx_flags=-fPIC ${{ matrix.march }}"
+            echo "boost.force_static=1"
+            echo "libraries.linux=icuuc icudata"
+          } > variables.mak
+
+      - name: Build
+        run: make -j$(nproc) -C apps/zxtune-qt
+
+      - name: Package binary
+        run: |
+          DIST=zxtune-qt-${VERSION}-linux-${{ matrix.arch }}
+          mkdir -p "dist/${DIST}"
+          cp bin/linux/release/zxtune-qt "dist/${DIST}/"
+          cp apps/zxtune-qt/dist/linux/zxTune.desktop apps/zxtune-qt/res/theme_restorer/zxtune.svg "dist/${DIST}/"
+          cat > "dist/${DIST}/README.txt" <<EOF
+          zxtune-qt ${VERSION} for Linux ${{ matrix.arch }}, built on ${{ matrix.runner }}.
+          Requires system Qt5 (e.g. 'sudo apt install libqt5widgets5 libqt5network5' on Debian/Ubuntu)
+          and glibc/libstdc++ not older than Ubuntu 24.04 ones. Use AppImage for other systems.
+          Oscilloscope and Dashboard panels are available via Layout menu.
+          EOF
+          tar -C dist -czf "dist/${DIST}.tar.gz" "${DIST}"
+          file "dist/${DIST}/zxtune-qt"
+          ldd "dist/${DIST}/zxtune-qt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zxtune-qt-linux-${{ matrix.arch }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+      # Self-contained bundle with Qt libraries, audio libraries are loaded from host system at runtime
+      - name: Build AppImage
+        id: appimage
+        continue-on-error: true
+        env:
+          # no FUSE on runners
+          APPIMAGE_EXTRACT_AND_RUN: 1
+          QMAKE: /usr/lib/qt5/bin/qmake
+          ARCH: ${{ matrix.appimage_arch }}
+        run: |
+          export LDAI_OUTPUT="zxtune-qt-${VERSION}-${ARCH}.AppImage"
+          TOOLS="$RUNNER_TEMP/linuxdeploy"
+          mkdir -p "$TOOLS"
+          wget -q -O "$TOOLS/linuxdeploy" "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${ARCH}.AppImage"
+          wget -q -O "$TOOLS/linuxdeploy-plugin-qt" "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${ARCH}.AppImage"
+          chmod +x "$TOOLS"/*
+          export PATH="$TOOLS:$PATH"
+          make -C apps/zxtune-qt install_linux_binary DESTDIR="$PWD/AppDir"
+          linuxdeploy --appdir AppDir --plugin qt --output appimage \
+            --desktop-file AppDir/usr/share/applications/zxtune-qt.desktop \
+            --icon-file AppDir/usr/share/icons/hicolor/scalable/apps/zxtune.svg
+          mkdir -p appimage
+          mv ./*.AppImage appimage/
+
+      - uses: actions/upload-artifact@v4
+        if: steps.appimage.outcome == 'success'
+        with:
+          name: zxtune-qt-linux-${{ matrix.arch }}-appimage
+          path: appimage/*.AppImage
+          if-no-files-found: error
+
+  windows:
+    # Cross build with llvm-mingw and static Qt, as make/docker/builds/Dockerfile.mingw does
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    env:
+      ARCH: x86_64
+      LLVM_MINGW: '20230614'
+      BOOST_VERSION: 1.82.0
+      QT_VERSION: 5.15.2
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends make g++ python3 perl wget xz-utils zip git
+
+      - name: Restore toolchain and prebuilt libraries
+        id: prebuilt-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/mingw
+          key: mingw-${{ env.ARCH }}-llvm${{ env.LLVM_MINGW }}-boost${{ env.BOOST_VERSION }}-qt${{ env.QT_VERSION }}-${{ hashFiles('.github/scripts/mingw-*.sh') }}
+
+      - name: Build toolchain and prebuilt libraries
+        if: steps.prebuilt-cache.outputs.cache-hit != 'true'
+        env:
+          arch: ${{ env.ARCH }}
+          llvm_mingw: ${{ env.LLVM_MINGW }}
+          boost: ${{ env.BOOST_VERSION }}
+          qt: ${{ env.QT_VERSION }}
+          work: ${{ runner.temp }}/mingw-work
+        run: |
+          .github/scripts/mingw-toolchain.sh "$RUNNER_TEMP/mingw/toolchains"
+          .github/scripts/mingw-prebuilt.sh "$RUNNER_TEMP/mingw/prebuilt" "$RUNNER_TEMP/mingw/toolchains"
+          rm -Rf "$work"
+
+      # Saved separately to reuse ~40 minutes of Qt build even if application build fails
+      - name: Save toolchain and prebuilt libraries
+        if: steps.prebuilt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/mingw
+          key: ${{ steps.prebuilt-cache.outputs.cache-primary-key }}
+
+      - name: Configure build
+        run: |
+          # Shallow clone has no tags for 'git describe', so pass version explicitly
+          REVISION=$(git ls-remote --tags origin 'r*' | grep -o 'refs/tags/r[0-9]*$' | sed 's|refs/tags/r||' | sort -n | tail -1)
+          echo "MAKEFLAGS=root.version=r${REVISION}-scope-${GITHUB_SHA::9} root.version.index=${REVISION}" >> "$GITHUB_ENV"
+          echo "VERSION=r${REVISION}-scope-${GITHUB_SHA::9}" >> "$GITHUB_ENV"
+          echo "$RUNNER_TEMP/mingw/toolchains/llvm-mingw/bin" >> "$GITHUB_PATH"
+          {
+            echo "platform=mingw"
+            echo "arch=${ARCH}"
+            echo "execprefix=${ARCH}-w64-mingw32-"
+            echo "host=linux"
+            echo "compiler=clang"
+            echo "tools.python=python3"
+            echo "jumbo.enabled=1"
+            echo "prebuilt.dir=$RUNNER_TEMP/mingw/prebuilt"
+            echo "boost.version=${BOOST_VERSION}"
+            echo "qt.version=${QT_VERSION}"
+            # SSE4.2/POPCNT, supported by all x86_64 CPUs since ~2009
+            echo "cxx_flags=-march=x86-64-v2"
+            echo 'embed_file_cmd=cat $(embedded_files) >> $@'
+            echo "qt.plugins=QWindowsIntegrationPlugin QWindowsVistaStylePlugin QJpegPlugin"
+            echo "libraries.qt.system.mingw=qwindows qwindowsvistastyle qtfreetype qjpeg qtlibpng qtpcre2 qtharfbuzz userenv netapi32 version winmm oleaut32 wtsapi32 dwmapi uxtheme iphlpapi secur32 crypt32 bcrypt"
+            echo "libraries.qt.mingw=FontDatabaseSupport EventDispatcherSupport ThemeSupport WindowsUIAutomationSupport"
+          } > variables.mak
+
+      - name: Build
+        run: make -j$(nproc) -C apps/zxtune-qt
+
+      - name: Package binary
+        run: |
+          DIST=zxtune-qt-${VERSION}-windows-${ARCH}
+          mkdir -p "dist/${DIST}"
+          # Qt and C++ runtime are linked statically
+          cp bin/mingw_${ARCH}/release/zxtune-qt.exe "dist/${DIST}/"
+          cat > "dist/${DIST}/README.txt" <<EOF
+          zxtune-qt ${VERSION} for Windows ${ARCH} (Windows 7 or newer).
+          Oscilloscope and Dashboard panels are available via Layout menu.
+          EOF
+          (cd dist && zip -9r "${DIST}.zip" "${DIST}")
+          ${ARCH}-w64-mingw32-objdump -p "dist/${DIST}/zxtune-qt.exe" | grep 'DLL Name' | sort -u
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zxtune-qt-windows-${{ env.ARCH }}
+          path: dist/*.zip
+          if-no-files-found: error
