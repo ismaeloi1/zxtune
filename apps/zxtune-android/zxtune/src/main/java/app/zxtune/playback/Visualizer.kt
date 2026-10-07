@@ -197,7 +197,7 @@ class VoiceGauges(private val data: ByteArray, private val offset: Int) : Gauges
     }
 
     companion object {
-        // see Player::Scope::VOICE_GAUGES_SIZE
+        // see Sound::Scope::VOICE_GAUGES_SIZE
         const val GAUGES = 3
         const val COLUMNS = 256
         private const val FIELDS = 12
@@ -224,7 +224,7 @@ class ChipGauges(private val data: ByteArray, private val offset: Int) : GaugesD
         get() = ChipState(data, offset + GAUGES * COLUMNS * 2)
 
     companion object {
-        // see Player::Scope::GAUGES_SIZE
+        // see Sound::Scope::GAUGES_SIZE
         const val GAUGES = 12
         const val COLUMNS = 256
         const val SIZE = GAUGES * COLUMNS * 2 + ChipState.SIZE
