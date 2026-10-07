@@ -29,13 +29,15 @@ public class MediaSessionControl implements Releaseable {
 
   private final MediaSessionCompat session;
   private final Releaseable callback;
+  private final ControlCallback control;
 
   private MediaSessionControl(Context ctx, PlaybackServiceLocal svc) {
     final ComponentName mbrComponent = new ComponentName(ctx, MediaButtonReceiver.class);
     session = new MediaSessionCompat(ctx, TAG, mbrComponent, null);
     session.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS | MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS | MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS);
     callback = StatusCallback.subscribe(ctx, svc, session);
-    session.setCallback(new ControlCallback(ctx, svc, session));
+    control = new ControlCallback(ctx, svc, session);
+    session.setCallback(control);
     session.setMediaButtonReceiver(PendingIntent.getBroadcast(ctx, 0,
         new Intent(Intent.ACTION_MEDIA_BUTTON).setComponent(mbrComponent),
         MainActivity.PENDING_INTENT_FLAG));
@@ -65,6 +67,7 @@ public class MediaSessionControl implements Releaseable {
   public void release() {
     session.release();
     callback.release();
+    control.release();
   }
 
 }

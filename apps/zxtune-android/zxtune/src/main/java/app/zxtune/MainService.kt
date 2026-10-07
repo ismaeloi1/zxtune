@@ -11,14 +11,17 @@ import androidx.media.session.MediaButtonReceiver
 import app.zxtune.analytics.Analytics
 import app.zxtune.core.jni.Api
 import app.zxtune.device.media.AudioFocusConnection
+import app.zxtune.device.media.BrowseTree
 import app.zxtune.device.media.MediaSessionControl
 import app.zxtune.device.media.NoisyAudioConnection
 import app.zxtune.device.ui.StatusNotification
 import app.zxtune.device.ui.WidgetHandler
 import app.zxtune.playback.service.PlaybackServiceLocal
+import app.zxtune.playlist.ProviderClient
 import app.zxtune.preferences.Preferences
 import app.zxtune.preferences.Preferences.getDefaultSharedPreferences
 import app.zxtune.preferences.SharedPreferencesBridge.subscribe
+import app.zxtune.ui.playlist.Entry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,7 +44,7 @@ class MainService : MediaBrowserServiceCompat() {
     private var weakDelegate: Delegate? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        LOG.d { "onStartCommand(${intent})" }
+        LOG.d { "onStartCommand($intent)" }
         when (intent?.action) {
             Intent.ACTION_MEDIA_BUTTON -> MediaButtonReceiver.handleIntent(delegate.session, intent)
         }
@@ -49,20 +52,52 @@ class MainService : MediaBrowserServiceCompat() {
     }
 
     override fun onGetRoot(
-        clientPackageName: String, clientUid: Int, rootHints: Bundle?
+        clientPackageName: String,
+        clientUid: Int,
+        rootHints: Bundle?
     ): BrowserRoot? {
-        LOG.d { "onGetRoot(${clientPackageName})" }
-        return if (clientPackageName == packageName) {
-            delegate // preload
-            BrowserRoot(getString(R.string.app_name), null)
-        } else {
-            null
+        LOG.d { "onGetRoot($clientPackageName)" }
+        // Playback resumption (System UI) expects the last played item as a child of the recent
+        // root, which is not tracked yet
+        if (rootHints?.getBoolean(BrowserRoot.EXTRA_RECENT) == true) {
+            return null
         }
+        delegate // preload, also required to have session token for external clients
+        // Any client (Android Auto, Wear, assistants) is allowed: tree exposes playlist only
+        return BrowserRoot(BrowseTree.ROOT_ID, BrowseTree.createRootExtras())
     }
 
     override fun onLoadChildren(
-        parentId: String, result: Result<List<MediaBrowserCompat.MediaItem>>
-    ) = result.sendError(null)
+        parentId: String,
+        result: Result<List<MediaBrowserCompat.MediaItem>>
+    ) = when (parentId) {
+        BrowseTree.ROOT_ID -> result.sendResult(BrowseTree.getRootChildren(this))
+        BrowseTree.PLAYLIST_ID -> loadPlaylist(result) { BrowseTree.getPlaylistChildren(it) }
+        else -> result.sendResult(null)
+    }
+
+    override fun onSearch(
+        query: String,
+        extras: Bundle?,
+        result: Result<List<MediaBrowserCompat.MediaItem>>
+    ) = loadPlaylist(result) {
+        BrowseTree.getPlaylistChildren(BrowseTree.search(it, query))
+    }
+
+    private fun loadPlaylist(
+        result: Result<List<MediaBrowserCompat.MediaItem>>,
+        convert: (List<Entry>) -> List<MediaBrowserCompat.MediaItem>,
+    ) {
+        result.detach()
+        scope.launch {
+            val items = runCatching {
+                ProviderClient.create(this@MainService).queryContent()
+            }.onFailure {
+                LOG.w(it) { "Failed to load playlist" }
+            }.getOrNull()
+            result.sendResult(items?.let(convert))
+        }
+    }
 
     override fun onDestroy() {
         weakDelegate?.release()
@@ -76,7 +111,9 @@ class MainService : MediaBrowserServiceCompat() {
     }
 
     private class Delegate(
-        svc: Service, trace: Analytics.BaseTrace, private val scope: CoroutineScope
+        svc: Service,
+        trace: Analytics.BaseTrace,
+        private val scope: CoroutineScope
     ) {
 
         private val resources = ArrayList<Releaseable>()
@@ -116,7 +153,7 @@ class MainService : MediaBrowserServiceCompat() {
             val api = Api.load().await()
             runCatching {
                 LOG.d { "JNI is ready" }
-                val prefs = getDefaultSharedPreferences(ctx);
+                val prefs = getDefaultSharedPreferences(ctx)
                 val options = api.getOptions()
                 addResource(subscribe(prefs, options))
             }.onFailure {
@@ -144,7 +181,6 @@ class MainService : MediaBrowserServiceCompat() {
         val COMMAND_SET_CURRENT_PARAMETERS = "$TAG.COMMAND_SET_CURRENT_PARAMETERS"
 
         @JvmStatic
-        fun createIntent(ctx: Context, action: String?) =
-            Intent(ctx, MainService::class.java).setAction(action)
+        fun createIntent(ctx: Context, action: String?) = Intent(ctx, MainService::class.java).setAction(action)
     }
 }

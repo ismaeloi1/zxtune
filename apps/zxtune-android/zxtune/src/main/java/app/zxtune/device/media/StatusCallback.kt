@@ -24,13 +24,14 @@ import app.zxtune.playback.PlayableItem
 import app.zxtune.playback.PlaybackControl
 import app.zxtune.playback.PlaybackService
 import app.zxtune.utils.getParcelableCompat
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
-import java.util.concurrent.atomic.AtomicReference
 
-//! Events gate from local service to mediasession
+// ! Events gate from local service to mediasession
 internal class StatusCallback private constructor(
-    private val ctx: Context, private val session: MediaSessionCompat
+    private val ctx: Context,
+    private val session: MediaSessionCompat
 ) : Callback {
     private val builder = PlaybackStateCompat.Builder()
     private val scope = MainScope()
@@ -42,12 +43,21 @@ internal class StatusCallback private constructor(
 
     init {
         builder.setActions(
-            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or PlaybackStateCompat.ACTION_PLAY_PAUSE or PlaybackStateCompat.ACTION_PLAY or PlaybackStateCompat.ACTION_PAUSE or PlaybackStateCompat.ACTION_STOP or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+            PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackStateCompat.ACTION_PLAY_PAUSE or
+                PlaybackStateCompat.ACTION_PLAY or
+                PlaybackStateCompat.ACTION_PAUSE or
+                PlaybackStateCompat.ACTION_STOP or
+                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                PlaybackStateCompat.ACTION_SEEK_TO or
+                // Required by external controllers (Android Auto) to enable browsing and voice
+                PlaybackStateCompat.ACTION_PLAY_FROM_URI or
+                PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
+                PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
         )
     }
 
-    override fun onInitialState(state: PlaybackControl.State) =
-        onStateChanged(state, TimeStamp.EMPTY)
+    override fun onInitialState(state: PlaybackControl.State) = onStateChanged(state, TimeStamp.EMPTY)
 
     override fun onStateChanged(state: PlaybackControl.State, pos: TimeStamp) {
         builder.setState(state.toState(), pos.toMilliseconds(), 1f)
@@ -97,7 +107,8 @@ internal class StatusCallback private constructor(
     }
 
     private fun fillObjectUrls(
-        dataId: Identifier, builder: MediaMetadataCompat.Builder
+        dataId: Identifier,
+        builder: MediaMetadataCompat.Builder
     ): Uri? = with(builder) {
         try {
             val obj = Vfs.resolve(dataId.dataLocation)
@@ -153,7 +164,9 @@ internal class StatusCallback private constructor(
 
         @JvmStatic
         fun subscribe(
-            ctx: Context, svc: PlaybackService, session: MediaSessionCompat
+            ctx: Context,
+            svc: PlaybackService,
+            session: MediaSessionCompat
         ) = svc.subscribe(StatusCallback(ctx, session).also {
             svc.playbackControl.run {
                 session.setShuffleMode(sequenceMode.toShuffleMode())

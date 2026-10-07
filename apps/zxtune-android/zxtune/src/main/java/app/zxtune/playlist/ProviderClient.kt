@@ -24,13 +24,16 @@ class ProviderClient @VisibleForTesting constructor(
     private val resolver: ContentResolver,
     private val dispatcher: CoroutineDispatcher,
 ) {
-    //should be name-compatible with Database
+    // should be name-compatible with Database
     enum class SortBy {
-        title, author, duration
+        title,
+        author,
+        duration
     }
 
     enum class SortOrder {
-        asc, desc
+        asc,
+        desc
     }
 
     fun addItem(item: Item) {
@@ -46,7 +49,6 @@ class ProviderClient @VisibleForTesting constructor(
         }
     }
 
-    @VisibleForTesting
     suspend fun queryContent() = resolver.query(PlaylistQuery.ALL) { cursor ->
         PlaylistContent(cursor.count).apply {
             while (cursor.moveToNext()) {
@@ -80,13 +82,15 @@ class ProviderClient @VisibleForTesting constructor(
         Provider.sort(resolver, by.name, order.name)
         notifyChanges()
         Analytics.sendPlaylistEvent(
-            Analytics.PlaylistAction.SORT, 100 * by.ordinal + order.ordinal
+            Analytics.PlaylistAction.SORT,
+            100 * by.ordinal + order.ordinal
         )
     }
 
     suspend fun statistics(ids: LongArray?) = withContext(dispatcher) {
         resolver.query(
-            PlaylistQuery.STATISTICS, selection = PlaylistQuery.selectionFor(ids)
+            PlaylistQuery.STATISTICS,
+            selection = PlaylistQuery.selectionFor(ids)
         ) { cursor ->
             if (cursor.moveToFirst()) {
                 Statistics(cursor)
@@ -99,7 +103,8 @@ class ProviderClient @VisibleForTesting constructor(
     // id => path
     suspend fun getSavedPlaylists(id: String? = null) = withContext(dispatcher) {
         resolver.query(
-            PlaylistQuery.SAVED, selection = id
+            PlaylistQuery.SAVED,
+            selection = id
         ) { cursor ->
             HashMap<String, String>().apply {
                 while (cursor.moveToNext()) {
@@ -132,7 +137,6 @@ class ProviderClient @VisibleForTesting constructor(
         fun createUri(id: Long): Uri = PlaylistQuery.uriFor(id)
 
         @JvmStatic
-        fun findId(uri: Uri) =
-            if (PlaylistQuery.isPlaylistUri(uri)) PlaylistQuery.idOf(uri) else null
+        fun findId(uri: Uri) = if (PlaylistQuery.isPlaylistUri(uri)) PlaylistQuery.idOf(uri) else null
     }
 }
