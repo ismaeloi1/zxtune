@@ -575,6 +575,8 @@ namespace Sound
 
       uint_t GetGauges(uint_t maxChips, int64_t playing, uint_t waveWindowMs, uint8_t* target) override
       {
+        // gauges may be displayed without waveforms
+        LastRequest = Clock::now().time_since_epoch().count();
         const std::scoped_lock guard(Lock);
         if (!HasPlayed || Chips.empty() || VoicesPerChip == 0)
         {
@@ -598,6 +600,8 @@ namespace Sound
 
       uint_t GetVoiceGauges(uint_t maxVoices, int64_t playing, uint_t waveWindowMs, uint8_t* target) override
       {
+        // gauges may be displayed without waveforms
+        LastRequest = Clock::now().time_since_epoch().count();
         const std::scoped_lock guard(Lock);
         if (!HasPlayed || Voices.empty() || VoicesPerChip != 0)
         {
