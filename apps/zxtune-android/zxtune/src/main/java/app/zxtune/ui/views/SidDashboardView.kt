@@ -24,8 +24,6 @@ import app.zxtune.playback.VoiceGauges
 import app.zxtune.playback.VoicesLayout
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.log2
-import kotlin.math.roundToInt
 
 private val LOG = Logger("SidDashboard")
 
@@ -33,7 +31,8 @@ private val LOG = Logger("SidDashboard")
  * Displays history of SID state for single chip:
  * - per voice: oscillator output, envelope (dB), frequency (log scale)
  * - global: master volume, resonance, filter cutoff
- * Other chips (e.g. YM2612, SN76489, OPL) are displayed per voice: output, level (dB), frequency (log scale).
+ * Other chips are displayed per voice as cards: title band with live summary, level and pitch history and
+ * hardware specific state (see [ChipWidgets]).
  * And multiline status text below. Chips are displayed side by side.
  */
 class SidDashboardView @JvmOverloads constructor(
@@ -98,8 +97,22 @@ class SidDashboardView @JvmOverloads constructor(
         color = Color.argb(160, 255, 255, 255)
         strokeWidth = density * 2
     }
+    private val summaryPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(200, 255, 255, 255)
+        textSize = sp(TEXT_SIZE_SP)
+        typeface = Typeface.MONOSPACE
+        textAlign = Paint.Align.RIGHT
+    }
+    private val dimTracePaint = Paint(tracePaint).apply {
+        color = Color.argb(110, 255, 255, 255)
+    }
     private val rect = RectF()
+    private val body = RectF()
+    private val history = RectF()
+    private val widget = RectF()
     private val lines = FloatArray(ChipGauges.COLUMNS * 4)
+    private val widgets = ChipWidgets(density, sp(TEXT_SIZE_SP))
+    private val smooth = Array(MAX_VOICES) { FloatArray(ChipWidgets.SMOOTH_SIZE) }
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
@@ -135,6 +148,14 @@ class SidDashboardView @JvmOverloads constructor(
             layout = VoicesLayout.MASTER
             invalidate()
         }
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun setVoicesData(voicesLayout: VoicesLayout, data: ByteArray, voices: Int, statusText: String) {
+        layout = voicesLayout
+        voiceBuffers[readyBuffer] = data
+        readyVoices = voices
+        status = statusText
     }
 
     override fun onDetachedFromWindow() {
@@ -267,7 +288,7 @@ class SidDashboardView @JvmOverloads constructor(
     }
 
     // Chips are placed side by side as in oscilloscope above (long chips are split to several columns),
-    // 3 gauges per voice
+    // card per voice
     private fun drawVoices(canvas: Canvas, areaHeight: Float) {
         val voices = readyVoices
         val current = layout
@@ -279,37 +300,138 @@ class SidDashboardView @JvmOverloads constructor(
             return
         }
         var totalCols = 0
-        var maxRows = 1
         for (group in current.groups) {
-            val cols = columnsOf(group.voices.size)
-            totalCols += cols
-            maxRows = maxOf(maxRows, rowsOf(group.voices.size))
+            totalCols += columnsOf(group.voices.size)
         }
-        val groupColW = width.toFloat() / maxOf(totalCols, 1)
-        val cellW = groupColW / 3
-        val cellH = areaHeight / maxRows
+        val cellW = width.toFloat() / maxOf(totalCols, 1)
         var voice = 0
         var col = 0
         for (group in current.groups) {
             val rows = rowsOf(group.voices.size)
+            // chips with less voices get taller cards
+            val cellH = areaHeight / rows
             if (col != 0) {
-                canvas.drawLine(groupColW * col, 0f, groupColW * col, areaHeight, separatorPaint)
+                canvas.drawLine(cellW * col, 0f, cellW * col, areaHeight, separatorPaint)
             }
             group.voices.forEachIndexed { idx, name ->
                 if (voice >= voices) {
                     return
                 }
                 val gauges = VoiceGauges(data, voice * VoiceGauges.SIZE)
-                val left = groupColW * (col + idx / rows)
+                val left = cellW * (col + idx / rows)
                 val top = cellH * (idx % rows)
-                val wave = "${group.name} $name${if (gauges.isKeyOn) " \u25CF" else ""}"
-                drawGauge(canvas, gauges, VoiceGauges.WAVE, left, top, cellW, cellH, wave)
-                drawGauge(canvas, gauges, VoiceGauges.LEVEL, left + cellW, top, cellW, cellH, levelTitle(gauges))
-                drawGauge(canvas, gauges, VoiceGauges.FREQUENCY, left + cellW * 2, top, cellW, cellH, frequencyTitle(gauges))
+                drawVoiceCard(canvas, gauges, group.name, name, left, top, cellW, cellH, smooth[voice % MAX_VOICES])
                 ++voice
             }
             col += columnsOf(group.voices.size)
         }
+    }
+
+    private fun drawVoiceCard(
+        canvas: Canvas,
+        gauges: VoiceGauges,
+        group: String,
+        name: String,
+        left: Float,
+        top: Float,
+        w: Float,
+        h: Float,
+        smoothValues: FloatArray
+    ) {
+        val pad = density * 2
+        rect.set(left + pad, top + pad, left + w - pad, top + h - pad)
+        canvas.drawRect(rect, framePaint)
+        // title band is separated from graphs to keep both readable
+        val summary = widgets.summary(gauges)
+        val key = if (gauges.isKeyOn) " \u25CF" else ""
+        // group name is omitted if there's no space for it
+        val full = "$group $name$key"
+        val available = rect.width() - density * 9 - summaryPaint.measureText(summary)
+        val title = if (titlePaint.measureText(full) <= available) full else "$name$key"
+        val band = drawTitleBand(canvas, rect, title, summary)
+        body.set(rect.left + pad * 2, band + pad, rect.right - pad * 2, rect.bottom - pad * 2)
+        if (body.height() < density * 18) {
+            // no space for details, only current level
+            history.set(body)
+            drawHistory(canvas, history, gauges, false)
+            return
+        }
+        val wide = body.width() > body.height() * 2.2f
+        if (wide) {
+            // operators schemas need more space
+            val schema = gauges.kind == VoiceGauges.Kind.OPN_FM || gauges.kind == VoiceGauges.Kind.OPL_2OP ||
+                gauges.kind == VoiceGauges.Kind.OPL_4OP
+            val split = body.left + body.width() * (if (schema) 0.35f else 0.45f)
+            history.set(body.left, body.top, split - pad * 2, body.bottom)
+            widget.set(split + pad * 2, body.top, body.right, body.bottom)
+        } else {
+            val split = body.top + body.height() * 0.4f
+            history.set(body.left, body.top, body.right, split - pad)
+            widget.set(body.left, split + pad * 2, body.right, body.bottom)
+        }
+        if (widgets.draw(canvas, widget, gauges, smoothValues)) {
+            drawHistory(canvas, history, gauges, true)
+        } else {
+            drawHistory(canvas, body, gauges, true)
+        }
+    }
+
+    // @return bottom of title band
+    private fun drawTitleBand(canvas: Canvas, card: RectF, title: String, summary: String): Float {
+        val pad = density * 3
+        val baseline = card.top + pad - titlePaint.ascent()
+        val bottom = baseline + titlePaint.descent() + pad
+        val summaryWidth = summaryPaint.measureText(summary)
+        val available = card.width() - pad * 3 - summaryWidth
+        val baseSize = sp(TITLE_SIZE_SP)
+        val titleWidth = titlePaint.measureText(title)
+        titlePaint.textSize =
+            if (titleWidth > available) maxOf(baseSize * available / titleWidth, sp(MIN_TITLE_SIZE_SP)) else baseSize
+        canvas.drawText(title, card.left + pad, baseline, titlePaint)
+        titlePaint.textSize = baseSize
+        if (summary.isNotEmpty()) {
+            canvas.drawText(summary, card.right - pad, baseline, summaryPaint)
+        }
+        canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
+        return bottom
+    }
+
+    // level (dB) as filled columns, pitch (log scale) as line over it
+    private fun drawHistory(canvas: Canvas, area: RectF, gauges: VoiceGauges, withPitch: Boolean) {
+        if (area.height() <= 0 || area.width() <= 0) {
+            return
+        }
+        val columnWidth = area.width() / VoiceGauges.COLUMNS
+        for (col in 0 until VoiceGauges.COLUMNS) {
+            val x = area.left + columnWidth * (col + 0.5f)
+            val idx = col * 4
+            lines[idx] = x
+            lines[idx + 1] = area.bottom - area.height() * gauges.max(VoiceGauges.LEVEL, col) / 255f
+            lines[idx + 2] = x
+            lines[idx + 3] = area.bottom
+        }
+        dimTracePaint.strokeWidth = maxOf(columnWidth, density)
+        canvas.drawLines(lines, dimTracePaint)
+        if (!withPitch) {
+            return
+        }
+        var count = 0
+        for (col in 0 until VoiceGauges.COLUMNS) {
+            val value = gauges.max(VoiceGauges.FREQUENCY, col)
+            if (value == 0) {
+                continue
+            }
+            val x = area.left + columnWidth * (col + 0.5f)
+            val yMax = area.bottom - area.height() * value / 255f
+            val yMin = area.bottom - area.height() * gauges.min(VoiceGauges.FREQUENCY, col) / 255f
+            lines[count++] = x
+            lines[count++] = yMax - density
+            lines[count++] = x
+            lines[count++] = maxOf(yMin, yMax) + density
+        }
+        tracePaint.strokeWidth = maxOf(columnWidth, density * 1.5f)
+        canvas.drawLines(lines, 0, count, tracePaint)
+        tracePaint.strokeWidth = TRACE_WIDTH * density
     }
 
     // Each column is vertical line between min and max values, as in JSIDPlay2
@@ -326,8 +448,7 @@ class SidDashboardView @JvmOverloads constructor(
         val pad = density
         rect.set(left + pad, top + pad, left + w - pad, top + h - pad)
         canvas.drawRect(rect, framePaint)
-        // title is drawn over the plot to give more space to traces
-        val plotTop = rect.top + pad * 2
+        val plotTop = drawTitleBand(canvas, rect, title, "") + pad * 2
         val plotHeight = rect.bottom - pad * 2 - plotTop
         if (plotHeight <= 0) {
             return
@@ -351,13 +472,6 @@ class SidDashboardView @JvmOverloads constructor(
         tracePaint.strokeWidth = maxOf(columnWidth, density)
         canvas.drawLines(lines, tracePaint)
         tracePaint.strokeWidth = TRACE_WIDTH * density
-        // narrow cells of multi-SID tunes require smaller titles
-        val available = rect.width() - pad * 6
-        val titleWidth = titlePaint.measureText(title)
-        val baseSize = sp(TITLE_SIZE_SP)
-        titlePaint.textSize = if (titleWidth > available) maxOf(baseSize * available / titleWidth, sp(MIN_TITLE_SIZE_SP)) else baseSize
-        canvas.drawText(title, rect.left + pad * 3, rect.top + pad - titlePaint.ascent(), titlePaint)
-        titlePaint.textSize = baseSize
     }
 
     private fun padding() = density * 4
@@ -373,32 +487,13 @@ class SidDashboardView @JvmOverloads constructor(
 
         private fun hex4(value: Int) = String.format(java.util.Locale.US, "%04X", value)
         private const val MAX_CHIPS = 3
+        private const val MAX_VOICES = 64
 
         // same as in OscilloscopeView
         private const val MAX_ROWS = 8
         private fun columnsOf(voices: Int) = (voices + MAX_ROWS - 1) / MAX_ROWS
         private fun rowsOf(voices: Int) = (voices + columnsOf(voices) - 1) / maxOf(columnsOf(voices), 1)
 
-        private val NOTES = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
-
-        internal fun noteName(hz: Float): String {
-            val note = (12 * log2(hz / 440f) + 57).roundToInt()
-            return if (note in 0..131) "${NOTES[note % 12]}${note / 12}" else ""
-        }
-
-        // Estimated from audio if not provided by emulation core
-        internal fun levelTitle(gauges: VoiceGauges) = if (gauges.hasLevel) {
-            if (gauges.level > -96f) "Lvl ${gauges.level.roundToInt()}dB" else "Lvl off"
-        } else {
-            "Lvl ~"
-        }
-
-        internal fun frequencyTitle(gauges: VoiceGauges) = when {
-            !gauges.hasFrequency -> "Freq ~"
-            gauges.isNoise -> "Noise ${gauges.frequency.roundToInt()}Hz"
-            gauges.frequency <= 0f -> "Freq -"
-            else -> "${gauges.frequency.roundToInt()}Hz ${noteName(gauges.frequency)}"
-        }
         private const val STATUS_PERIOD_NS = 500_000_000L
 
         // Waveform bits and flags: Sync, Ring modulation, Test, Filtered

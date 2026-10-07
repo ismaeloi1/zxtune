@@ -161,7 +161,8 @@ class OscilloscopeView @JvmOverloads constructor(
         private val values = FloatArray(POINTS)
         private val smoothedPeaks = FloatArray(MAX_CHANNELS)
         private val vertices: FloatBuffer = allocateFloats(POINTS * 2 * 2)
-        private val gridVertices: FloatBuffer = allocateFloats(MAX_CHANNELS * 4 * 2)
+        private val gridVertices: FloatBuffer = allocateFloats(MAX_CHANNELS * 4 * 2 * 2)
+        private var points = POINTS
         private val quadVertices: FloatBuffer = allocateFloats(4 * 4).apply {
             // x, y, u, v for fullscreen quad
             put(
@@ -226,8 +227,11 @@ class OscilloscopeView @JvmOverloads constructor(
             GLES20.glClearColor(0f, 0f, 0f, 1f)
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val src = source ?: return
+            // narrow cells don't need many points, less data to transfer and draw for many voices
+            val points = (width / maxOf(grid?.cols ?: 1, 1)).coerceIn(MIN_POINTS, POINTS)
+            this.points = points
             val layout = runCatching {
-                ScopeLayout(src.getScope(samples, POINTS, windowMs))
+                ScopeLayout(src.getScope(samples, points, windowMs))
             }.getOrElse {
                 LOG.w(it) { "Failed to get scope data" }
                 return
@@ -266,20 +270,35 @@ class OscilloscopeView @JvmOverloads constructor(
             }
         }
 
-        // Center line of each cell
+        // Height of labels band in pixels, labels are drawn over traces only if cells are too small
+        private fun labelBand(grid: Grid): Float {
+            if (grid.labels.isEmpty()) {
+                return 0f
+            }
+            val band = labelTextSize + labelPadding
+            return if (height.toFloat() / grid.rows >= band * MIN_TRACE_TO_BAND) band else 0f
+        }
+
+        // Center line of trace area and bottom border of each cell
         private fun drawGrid(grid: Grid) {
             gridVertices.clear()
+            val band = 2f * labelBand(grid) / height
+            val cellH = 2f / grid.rows
             for (chan in 0 until grid.channels) {
                 val left = -1f + 2f * grid.column(chan) / grid.cols
                 val right = left + 2f / grid.cols
-                val centerY = 1f - 2f * (grid.row(chan) + 0.5f) / grid.rows
+                val top = 1f - cellH * grid.row(chan)
+                val centerY = (top - band + top - cellH) / 2
                 gridVertices.put(left).put(centerY).put(right).put(centerY)
+                if (band != 0f) {
+                    gridVertices.put(left).put(top - band).put(right).put(top - band)
+                }
             }
             gridVertices.flip()
             GLES20.glUniform4f(lineColorUniform, 1f, 1f, 1f, 0.15f)
             GLES20.glVertexAttribPointer(linePosAttr, 2, GLES20.GL_FLOAT, false, 0, gridVertices)
             GLES20.glLineWidth(1f)
-            GLES20.glDrawArrays(GLES20.GL_LINES, 0, grid.channels * 2)
+            GLES20.glDrawArrays(GLES20.GL_LINES, 0, gridVertices.limit() / 2)
         }
 
         // Builds thick line as triangle strip, thickness is computed in pixels
@@ -288,25 +307,30 @@ class OscilloscopeView @JvmOverloads constructor(
             val cellH = 2f / grid.rows
             val left = -1f + cellW * grid.column(chan) + cellW * CELL_MARGIN
             val width = cellW * (1 - 2 * CELL_MARGIN)
-            val centerY = 1f - cellH * (grid.row(chan) + 0.5f)
-            val ampl = cellH * 0.5f * AMPLIFICATION
+            // trace area is below the label band
+            val band = 2f * labelBand(grid) / height
+            val top = 1f - cellH * grid.row(chan) - band
+            val traceH = cellH - band
+            val centerY = top - traceH / 2
+            val ampl = traceH * 0.5f * AMPLIFICATION
+            val points = this@ScopeRenderer.points
             // ndc to pixels ratio
             val pxX = this.width / 2f
             val pxY = height / 2f
             val halfWidth = LINE_WIDTH_PX / 2f
-            val offset = chan * POINTS
-            val gain = channelGain(chan, offset)
-            for (idx in 0 until POINTS) {
+            val offset = chan * points
+            val gain = channelGain(chan, offset, points)
+            for (idx in 0 until points) {
                 // amplified peaks are limited by voice's cell
                 values[idx] = (samples[offset + idx] * gain / 32768f).coerceIn(-1f, 1f)
             }
             vertices.clear()
-            for (idx in 0 until POINTS) {
-                val x = left + width * idx / (POINTS - 1)
+            for (idx in 0 until points) {
+                val x = left + width * idx / (points - 1)
                 val y = centerY + ampl * values[idx]
                 val prev = maxOf(idx - 1, 0)
-                val next = minOf(idx + 1, POINTS - 1)
-                val dx = width * (next - prev) / (POINTS - 1) * pxX
+                val next = minOf(idx + 1, points - 1)
+                val dx = width * (next - prev) / (points - 1) * pxX
                 val dy = ampl * (values[next] - values[prev]) * pxY
                 val len = sqrt(dx * dx + dy * dy).coerceAtLeast(1e-3f)
                 val nx = -dy / len * halfWidth / pxX
@@ -315,18 +339,18 @@ class OscilloscopeView @JvmOverloads constructor(
             }
             vertices.flip()
             GLES20.glVertexAttribPointer(linePosAttr, 2, GLES20.GL_FLOAT, false, 0, vertices)
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, POINTS * 2)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, points * 2)
         }
 
         // Automatic gain follows peak level: immediate attack to avoid clipping,
         // slow release to avoid visible pumping. Limited to not amplify noise of silent voices
-        private fun channelGain(chan: Int, offset: Int): Float {
+        private fun channelGain(chan: Int, offset: Int, points: Int): Float {
             val fixed = gainPercent
             if (fixed != AUTO_GAIN) {
                 return fixed / 100f
             }
             var peak = 0
-            for (idx in 0 until POINTS) {
+            for (idx in 0 until points) {
                 peak = maxOf(peak, abs(samples[offset + idx].toInt()))
             }
             val level = peak / 32768f
@@ -371,7 +395,8 @@ class OscilloscopeView @JvmOverloads constructor(
             for (chan in 0 until grid.channels) {
                 val label = grid.labels[chan]
                 val x = cellW * grid.column(chan) + labelPadding
-                val y = cellH * grid.row(chan) + labelPadding - paint.ascent()
+                // centered in the band
+                val y = cellH * grid.row(chan) + labelPadding / 2 - paint.ascent()
                 canvas.drawText(label, x, y, paint)
             }
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, labelsTexture)
@@ -416,6 +441,10 @@ class OscilloscopeView @JvmOverloads constructor(
 
     companion object {
         const val POINTS = 512
+        private const val MIN_POINTS = 128
+
+        // separate labels band is used if trace area is at least this times higher
+        private const val MIN_TRACE_TO_BAND = 3f
         const val DEFAULT_WINDOW_MS = 40
         const val AUTO_GAIN = 0
         private const val AUTO_GAIN_TARGET = 0.9f

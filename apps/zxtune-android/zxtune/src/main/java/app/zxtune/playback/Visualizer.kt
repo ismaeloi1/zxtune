@@ -154,11 +154,55 @@ class VoiceGauges(private val data: ByteArray, private val offset: Int) : Gauges
     val isNoise
         get() = 0 != (flags and 8)
 
+    /** Chip specific voice kind, see [Kind] */
+    val kind
+        get() = data[stateOffset + 9].toInt() and 0xff
+
+    /** Chip specific field, meaning depends on [kind] (see Module::VoiceState) */
+    fun field(idx: Int) = data[stateOffset + 10 + idx].toInt() and 0xff
+
+    /** Signed chip specific field */
+    fun signedField(idx: Int) = data[stateOffset + 10 + idx].toInt()
+
+    /** Text of voice (e.g. instrument name), empty if not provided */
+    val text: String
+        get() {
+            val start = stateOffset + 10 + FIELDS
+            var end = start
+            while (end < start + TEXT && data[end].toInt() != 0) {
+                ++end
+            }
+            return String(data, start, end - start, Charsets.ISO_8859_1)
+        }
+
+    /**
+     * Mirrors Module::VoiceState::Kind
+     */
+    object Kind {
+        const val GENERIC = 0
+        const val OPN_FM = 1
+        const val OPN_DAC = 2
+        const val PSG_TONE = 3
+        const val PSG_NOISE = 4
+        const val OPL_2OP = 5
+        const val OPL_4OP = 6
+        const val OPL_RHYTHM = 7
+        const val SPC_DSP = 8
+        const val MT32_PART = 9
+        const val MT32_PARTIAL = 10
+        const val NES_PULSE = 11
+        const val NES_TRIANGLE = 12
+        const val NES_NOISE = 13
+        const val NES_DMC = 14
+    }
+
     companion object {
         // see Player::Scope::VOICE_GAUGES_SIZE
         const val GAUGES = 3
         const val COLUMNS = 256
-        const val SIZE = GAUGES * COLUMNS * 2 + 16
+        private const val FIELDS = 12
+        private const val TEXT = 16
+        const val SIZE = GAUGES * COLUMNS * 2 + 48
 
         const val WAVE = 0
         const val LEVEL = 1

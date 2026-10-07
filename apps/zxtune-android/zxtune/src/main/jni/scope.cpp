@@ -19,9 +19,12 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <mutex>
+#include <thread>
 #include <vector>
 
 namespace Player
@@ -190,6 +193,121 @@ namespace Player
     };
 
     using Clock = std::chrono::steady_clock;
+
+    // Persistent threads to process independent tasks, caller thread participates as well
+    class WorkersPool
+    {
+    public:
+      WorkersPool()
+      {
+        // leave cores for audio rendering and UI
+        const auto workers = std::clamp<uint_t>(std::thread::hardware_concurrency(), 2, 5) - 2;
+        for (uint_t idx = 0; idx < workers; ++idx)
+        {
+          Threads.emplace_back([this]() { Work(); });
+        }
+      }
+
+      ~WorkersPool()
+      {
+        {
+          const std::scoped_lock guard(Lock);
+          Stopping = true;
+        }
+        Wake.notify_all();
+        for (auto& thread : Threads)
+        {
+          thread.join();
+        }
+      }
+
+      void Run(uint_t count, const std::function<void(uint_t)>& task)
+      {
+        if (Threads.empty() || count < 2)
+        {
+          for (uint_t idx = 0; idx < count; ++idx)
+          {
+            task(idx);
+          }
+          return;
+        }
+        {
+          const std::scoped_lock guard(Lock);
+          Task = &task;
+          Count = count;
+          Next = 0;
+          Done = 0;
+          ++Generation;
+        }
+        Wake.notify_all();
+        Process(&task, count);
+        // no worker may touch the task after return
+        std::unique_lock guard(Lock);
+        Finished.wait(guard, [this]() { return Done == Count && Busy == 0; });
+        Task = nullptr;
+      }
+
+    private:
+      void Work()
+      {
+        uint64_t seen = 0;
+        for (;;)
+        {
+          const std::function<void(uint_t)>* task = nullptr;
+          uint_t count = 0;
+          {
+            std::unique_lock guard(Lock);
+            Wake.wait(guard, [&]() { return Stopping || Generation != seen; });
+            if (Stopping)
+            {
+              return;
+            }
+            seen = Generation;
+            task = Task;
+            count = Count;
+            ++Busy;
+          }
+          Process(task, count);
+          {
+            const std::scoped_lock guard(Lock);
+            --Busy;
+          }
+          Finished.notify_one();
+        }
+      }
+
+      void Process(const std::function<void(uint_t)>* task, uint_t count)
+      {
+        if (!task)
+        {
+          return;
+        }
+        uint_t processed = 0;
+        for (uint_t idx; (idx = Next.fetch_add(1)) < count; ++processed)
+        {
+          (*task)(idx);
+        }
+        if (processed)
+        {
+          const std::scoped_lock guard(Lock);
+          Done += processed;
+        }
+        Finished.notify_one();
+      }
+
+    private:
+      std::vector<std::thread> Threads;
+      std::mutex Lock;
+      std::condition_variable Wake;
+      std::condition_variable Finished;
+      bool Stopping = false;
+      uint64_t Generation = 0;
+      const std::function<void(uint_t)>* Task = nullptr;
+      uint_t Count = 0;
+      std::atomic<uint_t> Next = 0;
+      uint_t Done = 0;
+      uint_t Busy = 0;
+    };
   }  // namespace ScopeDetails
 
   using namespace ScopeDetails;
@@ -423,9 +541,9 @@ namespace Player
       }
       const int64_t renderSamples = Samplerate * std::clamp(windowMs, MIN_WINDOW_MS, MAX_WINDOW_MS) / 1000;
       const int64_t triggerSamples = Samplerate * TRIGGER_MS / 1000;
-      uint_t triggered = 0;
-      for (uint_t chan = 0; chan < channels; ++chan)
-      {
+      std::atomic<uint_t> triggered = 0;
+      // channels are independent, so triggered in parallel
+      Pool.Run(channels, [&](uint_t chan) {
         const auto& ring = Voices.empty() ? Master : Voices[chan].Samples;
         const auto offset = Voices.empty() ? 0 : Voices[chan].Offset;
         const RingWave wave(ring, offset);
@@ -440,7 +558,7 @@ namespace Player
         {
           out[idx] = ring.At(begin + int64_t(idx) * renderSamples / points);
         }
-      }
+      });
       LastComputeUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
       LastChannels = channels;
       LastTriggered = triggered;
@@ -689,9 +807,13 @@ namespace Player
       std::memset(state, 0, VOICE_STATE_SIZE);
       if (last)
       {
-        std::memcpy(state, &last->State.Frequency, sizeof(float));
-        std::memcpy(state + 4, &last->State.Level, sizeof(float));
-        state[8] = last->State.Flags;
+        const auto& st = last->State;
+        std::memcpy(state, &st.Frequency, sizeof(float));
+        std::memcpy(state + 4, &st.Level, sizeof(float));
+        state[8] = st.Flags;
+        state[9] = st.Kind;
+        std::copy(st.Fields.begin(), st.Fields.end(), state + 10);
+        std::copy(st.Text.begin(), st.Text.end(), state + 10 + Module::VoiceState::FIELDS);
       }
     }
 
@@ -721,18 +843,20 @@ namespace Player
       else if (peak)
       {
         --EstimatorBudget;
+        // pitch below ~4kHz is enough to show, so input is subsampled to make FFT cheaper
+        const auto stride = std::max<uint_t>(Samplerate / 12000, 1);
         if (!Estimator)
         {
-          Estimator = std::make_unique<Sound::CorrelationTrigger>(Samplerate * ESTIMATOR_MS / 1000 / Stride, Stride,
+          Estimator = std::make_unique<Sound::CorrelationTrigger>(Samplerate * ESTIMATOR_MS / 1000 / stride, stride,
                                                                   Samplerate);
         }
         // analyze window ending at column end, without DC
-        const auto size = Samplerate * ESTIMATOR_MS / 1000 / Stride;
+        const auto size = Samplerate * ESTIMATOR_MS / 1000 / stride;
         EstimatorData.resize(size);
         float mean = 0;
         for (uint_t idx = 0; idx < size; ++idx)
         {
-          EstimatorData[idx] = voice.Samples.At(to - int64_t(size - idx) * Stride) * (1.0f / 32768);
+          EstimatorData[idx] = voice.Samples.At(to - int64_t(size - idx) * stride) * (1.0f / 32768);
           mean += EstimatorData[idx];
         }
         mean /= size;
@@ -742,7 +866,7 @@ namespace Player
         }
         if (const auto period = Estimator->EstimatePeriod(EstimatorData.data(), size))
         {
-          cached.Frequency = LevelOfFrequency(float(Samplerate) / Stride / period);
+          cached.Frequency = LevelOfFrequency(float(Samplerate) / stride / period);
         }
       }
       cached.Index = complete ? colIdx : -1;
@@ -791,6 +915,7 @@ namespace Player
     uint_t TriggersStride = 0;
     int64_t LastPlayingHint = -1;
     String LayoutDescription;
+    WorkersPool Pool;
     uint_t LayoutId = 0;
     std::unique_ptr<Sound::CorrelationTrigger> Estimator;
     std::vector<float> EstimatorData;
