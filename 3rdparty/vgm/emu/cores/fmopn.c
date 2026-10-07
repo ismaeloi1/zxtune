@@ -4804,12 +4804,15 @@ void ym2612_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
 	F2612->voicesParam = param;
 }
 
+/* carriers mask per algorithm in SLOT1..SLOT4 order */
+static const UINT8 FM_CARRIERS[8] = {0x08, 0x08, 0x08, 0x08, 0x0a, 0x0e, 0x0e, 0x0f};
+static const UINT8 FM_SLOTS[4] = {SLOT1, SLOT2, SLOT3, SLOT4};
+
 /* attenuation of loudest carrier in dB, 0 if no carriers are sounding */
 static float fm_carriers_level(const FM_CH* CH, UINT8* keyOn)
 {
-	/* carriers mask per algorithm in SLOT1..SLOT4 order */
-	static const UINT8 CARRIERS[8] = {0x08, 0x08, 0x08, 0x08, 0x0a, 0x0e, 0x0e, 0x0f};
-	static const UINT8 SLOTS[4] = {SLOT1, SLOT2, SLOT3, SLOT4};
+	static const UINT8* CARRIERS = FM_CARRIERS;
+	static const UINT8* SLOTS = FM_SLOTS;
 	UINT32 minAtt = MAX_ATT_INDEX;
 	UINT8 op;
 
@@ -4842,12 +4845,34 @@ UINT32 ym2612_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states
 		const UINT32 fnum = CH->block_fnum & 0x7ff;
 		const UINT32 block = (CH->block_fnum >> 11) & 7;
 		DEV_VOICE_STATE* state = &states[ch];
+
+		/* raw registers, second half of channels is on port 1 */
+		const UINT8 algFb = F2612->REGS[(ch < 3 ? 0xb0 : 0x1b0 - 3) + ch];
+		const UINT8 panLfo = F2612->REGS[(ch < 3 ? 0xb4 : 0x1b4 - 3) + ch];
 		UINT8 keyOn;
+		UINT8 op;
 
 		state->level = fm_carriers_level(CH, &keyOn);
 		/* fnote = fnum * clock * 2^(block-1) / (144 * 2^20) */
 		state->freq = (float)(fnum * clock * (1 << block) / (144.0 * (1 << 21)));
 		state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
+		state->kind = DEVVOICE_KIND_OPN_FM;
+		memset(state->fields, 0, sizeof(state->fields));
+		state->fields[0] = algFb & 7;
+		state->fields[1] = (algFb >> 3) & 7;
+		state->fields[6] = FM_CARRIERS[algFb & 7];
+		state->fields[7] = panLfo >> 6;
+		state->fields[8] = (panLfo >> 4) & 3;
+		state->fields[9] = panLfo & 7;
+		for (op = 0; op < 4; op ++)
+		{
+			const FM_SLOT* slot = &CH->SLOT[FM_SLOTS[op]];
+			const UINT32 att = slot->vol_out < MAX_ATT_INDEX ? slot->vol_out : MAX_ATT_INDEX;
+			state->fields[2 + op] = (UINT8)(255 - att * 255 / MAX_ATT_INDEX);
+			if (slot->key)
+				state->fields[10] |= 1 << op;
+		}
+		state->fields[11] = (UINT8)block;
 		if (ch == 5 && F2612->dacen)
 		{
 			state->flags = 0;
@@ -4860,6 +4885,10 @@ UINT32 ym2612_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states
 		states[6].freq = 0.0f;
 		states[6].level = 0.0f;
 		states[6].flags = F2612->dacen ? DEVVOICE_KEYON : 0;
+		states[6].kind = DEVVOICE_KIND_OPN_DAC;
+		memset(states[6].fields, 0, sizeof(states[6].fields));
+		states[6].fields[0] = F2612->dacen;
+		states[6].fields[1] = (UINT8)((F2612->dacout >> 1) + 0x80);
 	}
 	return 7;
 }

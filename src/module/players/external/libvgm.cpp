@@ -307,6 +307,14 @@ namespace Module::LibVGM
     }
   }
 
+  static_assert(VoiceState::OPN_FM == DEVVOICE_KIND_OPN_FM && VoiceState::OPN_DAC == DEVVOICE_KIND_OPN_DAC
+                    && VoiceState::PSG_TONE == DEVVOICE_KIND_PSG_TONE
+                    && VoiceState::PSG_NOISE == DEVVOICE_KIND_PSG_NOISE && VoiceState::OPL_2OP == DEVVOICE_KIND_OPL_2OP
+                    && VoiceState::OPL_4OP == DEVVOICE_KIND_OPL_4OP
+                    && VoiceState::OPL_RHYTHM == DEVVOICE_KIND_OPL_RHYTHM,
+                "Voice kinds mismatch");
+  static_assert(VoiceState::FIELDS == sizeof(DEV_VOICE_STATE::fields), "Voice fields mismatch");
+
   // Separate voices output for oscilloscope.
   // Chips with per-channel output support in emulation core (see RWF_VOICES) are tapped directly (as Furnace does).
   // Others are rendered by solo players with all the other channels muted (as MultiDumper does).
@@ -755,6 +763,9 @@ namespace Module::LibVGM
                       | (in.flags & DEVVOICE_FREQ ? VoiceState::HAS_FREQUENCY : 0)
                       | (in.flags & DEVVOICE_LEVEL ? VoiceState::HAS_LEVEL : 0)
                       | (in.flags & DEVVOICE_NOISE ? VoiceState::NOISE : 0);
+          // libvgm kinds are mirrored
+          out.Kind = in.kind;
+          std::copy(std::begin(in.fields), std::end(in.fields), out.Fields.begin());
         }
       }
     };

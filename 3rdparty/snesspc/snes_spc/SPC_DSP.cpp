@@ -652,6 +652,12 @@ void SPC_DSP::get_voice_state( int voice, voice_state_t* out ) const
 	out->srcn = v_regs [v_srcn];
 	out->noise = (m.regs [r_non] >> voice) & 1;
 	out->noise_rate = m.regs [r_flg] & 0x1F;
+	out->env_mode = v.env_mode;
+	out->adsr0 = v_regs [v_adsr0];
+	out->adsr1 = v_regs [v_adsr1];
+	out->gain = v_regs [v_gain];
+	out->echo = (m.regs [r_eon] >> voice) & 1;
+	out->pmod = (m.regs [r_pmon] >> voice) & 1;
 }
 
 void SPC_DSP::mute_voices( int mask )

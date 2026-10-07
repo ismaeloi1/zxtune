@@ -1997,9 +1997,38 @@ static fltype max_level(fltype a, fltype b)
 
 static void fill_voice_state(DEV_VOICE_STATE* state, fltype level, fltype freq, UINT8 flags)
 {
+	memset(state->fields, 0, sizeof(state->fields));
+	state->kind = DEVVOICE_KIND_GENERIC;
 	state->level = level > 0.0000158 ? (float)(20.0 * log10(level)) : -96.0f;
 	state->freq = (float)freq;
 	state->flags = flags | DEVVOICE_LEVEL;
+}
+
+// operator level 0..255 over 96dB range
+static UINT8 level_field(fltype level)
+{
+	const fltype db = level > 0.0000158 ? 20.0 * log10(level) : -96.0;
+	return (UINT8)(db >= 0.0 ? 255 : (db <= -96.0 ? 0 : 255 * (1.0 + db / 96.0)));
+}
+
+// waveform of operator, ch is 0..NUM_CHANNELS-1
+static UINT8 wave_field(const OPL_DATA* OPL, UINT32 ch, UINT8 carrier)
+{
+	const UINT32 local = ch % 9;
+	Bitu offset = (local % 3) + (local / 3) * 8 + (carrier ? 3 : 0);
+	if (ch >= 9)
+		offset += 22;
+	return OPL->wave_sel[offset];
+}
+
+static UINT8 pan_field(const OPL_DATA* OPL, Bitu k)
+{
+#if defined(OPLTYPE_IS_OPL3)
+	const UINT8 reg = OPL->adlibreg[ARC_FEEDBACK + k];
+	return (OPL->adlibreg[0x105] & 1) ? (((reg >> 4) & 1) << 1) | ((reg >> 5) & 1) : 3;
+#else
+	return 3;
+#endif
 }
 
 UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* states)
@@ -2049,6 +2078,19 @@ UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* sta
 			if (alg == 3)
 				level = max_level(level, operator_level(&cptr[3]));
 			fill_voice_state(&states[ch], level, freqs[ch], DEVVOICE_FREQ | (keyOn ? DEVVOICE_KEYON : 0));
+			states[ch].kind = DEVVOICE_KIND_OPL_4OP;
+			states[ch].fields[0] = alg;
+			states[ch].fields[1] = (OPL->adlibreg[ARC_FEEDBACK + k] >> 1) & 7;
+			states[ch].fields[2] = level_field(operator_level(&cptr[0]));
+			states[ch].fields[3] = level_field(operator_level(&cptr[9]));
+			states[ch].fields[4] = level_field(operator_level(&cptr[3]));
+			states[ch].fields[5] = level_field(operator_level(&cptr[3+9]));
+			states[ch].fields[6] = wave_field(OPL, ch, 0);
+			states[ch].fields[7] = wave_field(OPL, ch, 1);
+			states[ch].fields[8] = wave_field(OPL, ch + 3, 0);
+			states[ch].fields[9] = wave_field(OPL, ch + 3, 1);
+			states[ch].fields[10] = keyOn;
+			states[ch].fields[11] = pan_field(OPL, k);
 			continue;
 		}
 #endif
@@ -2056,6 +2098,16 @@ UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* sta
 		if (OPL->adlibreg[ARC_FEEDBACK + k] & 1)
 			level = max_level(level, operator_level(&cptr[0]));	// additive synthesis
 		fill_voice_state(&states[ch], level, freqs[ch], DEVVOICE_FREQ | (keyOn ? DEVVOICE_KEYON : 0));
+		states[ch].kind = DEVVOICE_KIND_OPL_2OP;
+		states[ch].fields[0] = OPL->adlibreg[ARC_FEEDBACK + k] & 1;
+		states[ch].fields[1] = (OPL->adlibreg[ARC_FEEDBACK + k] >> 1) & 7;
+		states[ch].fields[2] = level_field(operator_level(&cptr[0]));
+		states[ch].fields[3] = level_field(operator_level(&cptr[9]));
+		states[ch].fields[4] = wave_field(OPL, ch, 0);
+		states[ch].fields[5] = wave_field(OPL, ch, 1);
+		states[ch].fields[6] = keyOn;
+		states[ch].fields[7] = pan_field(OPL, k);
+		states[ch].fields[8] = (OPL->adlibreg[ARC_KON_BNUM + k] >> 2) & 7;
 	}
 	if (count > NUM_CHANNELS)
 	{
@@ -2068,6 +2120,8 @@ UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* sta
 			if (! isRhythm)
 			{
 				fill_voice_state(state, 0.0, 0.0, 0);
+				state->kind = DEVVOICE_KIND_OPL_RHYTHM;
+				state->fields[0] = (UINT8)ch;
 			}
 			else
 			{
@@ -2079,6 +2133,11 @@ UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* sta
 					fill_voice_state(state, level, freqs[8], DEVVOICE_FREQ | keyOn);
 				else
 					fill_voice_state(state, level, 0.0, DEVVOICE_NOISE | keyOn);
+				state->kind = DEVVOICE_KIND_OPL_RHYTHM;
+				state->fields[0] = (UINT8)ch;
+				state->fields[1] = level_field(level);
+				state->fields[2] = keyOn != 0;
+				state->fields[3] = 1;
 			}
 		}
 	}

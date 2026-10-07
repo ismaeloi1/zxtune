@@ -112,6 +112,19 @@ public:
 	static float tnd_total_() { return 196.015f; }
 
 	void enable_w4011_( bool enable = true ) { enable_w4011 = enable; }
+
+	// zxtune extension: oscillators state for visualization
+	struct osc_state_t
+	{
+		unsigned char regs [4];
+		int length_counter;
+		int volume;         // current envelope/constant volume (square, noise)
+		int linear_counter; // triangle
+		int dac;            // DMC output level
+		int dmc_period;     // DMC rate index
+		bool enabled;
+	};
+	void get_osc_state( int index, osc_state_t* out ) const;
 	
 private:
 	friend struct Nes_Dmc;

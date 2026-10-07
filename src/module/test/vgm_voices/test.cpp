@@ -1,4 +1,4 @@
-// Usage: module_test_vgm_voices <file.vgm> [seconds]
+// Usage: module_test_vgm_voices <file> [seconds] [subpath, e.g. "#2" for multitrack]
 // Host check: separate voices of libvgm-based tunes match the mixed output
 #include "module/players/pipeline.h"
 // test real scope implementation too
@@ -105,8 +105,8 @@ int main(int argc, char** argv)
   const auto global = Parameters::Container::Create();
   global->SetValue(Parameters::ZXTune::Sound::FREQUENCY, FREQ);
   const auto service = ZXTune::Service::Create(global);
-  const auto holder = service->OpenModule(Binary::CreateContainer(Binary::View(data.data(), data.size())), "",
-                                          Parameters::Container::Create());
+  const auto holder = service->OpenModule(Binary::CreateContainer(Binary::View(data.data(), data.size())),
+                                          argc > 3 ? argv[3] : "", Parameters::Container::Create());
   std::vector<int32_t> mono;
   double plainMs = 0;
   {

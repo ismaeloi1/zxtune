@@ -79,6 +79,12 @@ namespace Sound
 
   using namespace CorrelationTriggerDetails;
 
+  // std::complex multiplication handles NaN/Inf specially (via __mulsc3 call) without -ffast-math, it's very slow
+  inline std::complex<float> Mul(std::complex<float> a, std::complex<float> b)
+  {
+    return {a.real() * b.real() - a.imag() * b.imag(), a.real() * b.imag() + a.imag() * b.real()};
+  }
+
   // Iterative radix-2 complex FFT
   class CorrelationTrigger::FFT
   {
@@ -136,7 +142,7 @@ namespace Sound
             const auto& tw = Twiddles[idx * step];
             const Complex w = inverse ? std::conj(tw) : tw;
             const Complex u = data[start + idx];
-            const Complex v = data[start + idx + half] * w;
+            const Complex v = Mul(data[start + idx + half], w);
             data[start + idx] = u + v;
             data[start + idx + half] = u - v;
           }
@@ -185,6 +191,8 @@ namespace Sound
     SlopeFinder.assign(kernelSize, 0.0f);
     PrevMean = 0;
     PrevPeriod = -1;
+    HasPeriod = false;
+    PeriodAge = 0;
     PrevTrigger = 0;
     HasPrevTrigger = false;
   }
@@ -220,7 +228,15 @@ namespace Sound
       }
     }
 
-    const auto period = GetPeriod(PeriodData);
+    // pitch changes slowly, so it's estimated not more often than corrscope does at 60fps
+    PeriodAge += samplesPerFrame;
+    if (PeriodAge >= Samplerate / PERIOD_RATE || !HasPeriod)
+    {
+      CachedPeriod = GetPeriod(PeriodData);
+      HasPeriod = true;
+      PeriodAge = 0;
+    }
+    const auto period = CachedPeriod;
     if (IsWindowInvalid(period))
     {
       CalcSlopeFinder(period);
@@ -232,7 +248,8 @@ namespace Sound
 
     if (corrEnabled)
     {
-      CorrelateValid(Data, CorrBuffer, CorrQuality);
+      // corr(data, slope + strength * buffer) == corr(data, slope) + strength * corr(data, buffer)
+      CorrelateValid2(Data, CorrBuffer, SlopeFinder, CorrQuality, Corr);
       if (Cfg.ResetBelow > 0)
       {
         const auto peakIdx = std::max_element(CorrQuality.begin(), CorrQuality.end()) - CorrQuality.begin();
@@ -260,15 +277,17 @@ namespace Sound
       CorrQuality.assign(corrSize, 0.0f);
     }
 
-    Kernel = SlopeFinder;
     if (corrEnabled)
     {
-      for (uint_t idx = 0; idx < kernelSize; ++idx)
+      for (uint_t idx = 0; idx < corrSize; ++idx)
       {
-        Kernel[idx] += CorrBuffer[idx] * Cfg.BufferStrength;
+        Corr[idx] += CorrQuality[idx] * Cfg.BufferStrength;
       }
     }
-    CorrelateValid(Data, Kernel, Corr);
+    else
+    {
+      CorrelateValid(Data, SlopeFinder, Corr);
+    }
 
     // peaks = corr_quality * buffer_strength - edge_strength * cumsum(data[A - 1 : len - B])
     auto& peaks = CorrQuality;
@@ -408,8 +427,10 @@ namespace Sound
       const auto x = TmpA[idx];
       const auto y = std::conj(TmpA[(fftSize - idx) % fftSize]);
       const auto spectrumData = (x + y) * 0.5f;
-      const auto spectrumKernel = (x - y) * FFT::Complex(0, -0.5f);
-      TmpB[idx] = spectrumData * std::conj(spectrumKernel);
+      // (x - y) * -0.5i
+      const auto diff = x - y;
+      const FFT::Complex spectrumKernel(diff.imag() * 0.5f, -diff.real() * 0.5f);
+      TmpB[idx] = Mul(spectrumData, std::conj(spectrumKernel));
     }
     CorrFFT->Transform(TmpB.data(), true);
     const auto size = data.size() - kernel.size() + 1;
@@ -417,6 +438,52 @@ namespace Sound
     for (std::size_t idx = 0; idx < size; ++idx)
     {
       result[idx] = TmpB[idx].real();
+    }
+  }
+
+  // Two correlations of the same data in one pass: results are real, so combined as real and imaginary parts
+  void CorrelationTrigger::CorrelateValid2(const Buffer& data, const Buffer& kernel1, const Buffer& kernel2,
+                                           Buffer& result1, Buffer& result2)
+  {
+    const auto fftSize = CorrFFT->GetSize();
+    TmpA.assign(fftSize, FFT::Complex());
+    for (std::size_t idx = 0; idx < data.size(); ++idx)
+    {
+      TmpA[idx].real(data[idx]);
+    }
+    for (std::size_t idx = 0; idx < kernel1.size(); ++idx)
+    {
+      TmpA[idx].imag(kernel1[idx]);
+    }
+    CorrFFT->Transform(TmpA.data(), false);
+    TmpC.assign(fftSize, FFT::Complex());
+    for (std::size_t idx = 0; idx < kernel2.size(); ++idx)
+    {
+      TmpC[idx].real(kernel2[idx]);
+    }
+    CorrFFT->Transform(TmpC.data(), false);
+    TmpB.resize(fftSize);
+    for (uint_t idx = 0; idx < fftSize; ++idx)
+    {
+      const auto x = TmpA[idx];
+      const auto y = std::conj(TmpA[(fftSize - idx) % fftSize]);
+      const auto spectrumData = (x + y) * 0.5f;
+      // (x - y) * -0.5i
+      const auto diff = x - y;
+      const FFT::Complex spectrumKernel1(diff.imag() * 0.5f, -diff.real() * 0.5f);
+      const auto corr1 = Mul(spectrumData, std::conj(spectrumKernel1));
+      const auto corr2 = Mul(spectrumData, std::conj(TmpC[idx]));
+      // corr1 + i * corr2
+      TmpB[idx] = FFT::Complex(corr1.real() - corr2.imag(), corr1.imag() + corr2.real());
+    }
+    CorrFFT->Transform(TmpB.data(), true);
+    const auto size = data.size() - kernel1.size() + 1;
+    result1.resize(size);
+    result2.resize(size);
+    for (std::size_t idx = 0; idx < size; ++idx)
+    {
+      result1[idx] = TmpB[idx].real();
+      result2[idx] = TmpB[idx].imag();
     }
   }
 

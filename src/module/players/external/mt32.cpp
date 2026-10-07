@@ -39,6 +39,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <fstream>
 #include <map>
 #include <mutex>
@@ -598,12 +599,27 @@ namespace Module::MT32
           {
             out.Flags |= VoiceState::KEY_ON;
           }
+          out.Kind = VoiceState::MT32_PARTIAL;
+          out.Fields[0] = static_cast<uint8_t>(st);
           if (st != MT32Emu::PartialState_INACTIVE)
           {
-            SetKey(Synth.getPartialOwnerPart(idx), Synth.getPartialKey(idx), out);
+            const auto owner = Synth.getPartialOwnerPart(idx);
+            const auto key = Synth.getPartialKey(idx);
+            SetKey(owner, key, out);
+            out.Fields[1] = static_cast<uint8_t>(owner + 1);
+            out.Fields[2] = static_cast<uint8_t>(std::max(key, 0));
           }
         }
         return;
+      }
+      // partials used by each part
+      std::array<uint8_t, PARTS> partials = {};
+      for (uint_t idx = 0, lim = Synth.getPartialCount(); idx < lim; ++idx)
+      {
+        if (const auto owner = Synth.getPartialOwnerPart(idx); owner >= 0 && owner < int(PARTS))
+        {
+          ++partials[owner];
+        }
       }
       for (uint_t part = 0; part < PARTS; ++part)
       {
@@ -611,6 +627,7 @@ namespace Module::MT32
         std::array<MT32Emu::Bit8u, 256> velocities;
         const auto notes = Synth.getPlayingNotes(static_cast<MT32Emu::Bit8u>(part), keys.data(), velocities.data());
         auto& out = states[part];
+        out.Kind = VoiceState::MT32_PART;
         if (notes)
         {
           out.Flags |= VoiceState::KEY_ON;
@@ -621,7 +638,36 @@ namespace Module::MT32
         {
           out.Flags |= VoiceState::NOISE;
         }
+        // the latest notes
+        const auto shown = std::min<uint_t>(notes, 8);
+        out.Fields[0] = static_cast<uint8_t>(std::min<uint_t>(notes, 255));
+        for (uint_t idx = 0; idx < shown; ++idx)
+        {
+          out.Fields[1 + idx] = keys[notes - shown + idx];
+        }
+        out.Fields[9] = partials[part];
+        GetPatchName(part, out.Text);
       }
+    }
+
+    // patch names are rarely changed, so cached
+    void GetPatchName(uint_t part, std::array<char, VoiceState::TEXT>& target)
+    {
+      const auto* name = Synth.getPatchName(static_cast<MT32Emu::Bit8u>(part));
+      auto& cached = PatchNames[part];
+      if (name && cached.Source != name)
+      {
+        cached.Source = name;
+        cached.Name.fill(0);
+        // patch names are space padded
+        const auto len = std::min<std::size_t>(std::strlen(name), cached.Name.size() - 1);
+        std::copy_n(name, len, cached.Name.begin());
+        for (auto idx = len; idx > 0 && cached.Name[idx - 1] == ' '; --idx)
+        {
+          cached.Name[idx - 1] = 0;
+        }
+      }
+      target = cached.Name;
     }
 
     // interleaved [count][Voices] at internal samplerate
@@ -657,6 +703,12 @@ namespace Module::MT32
     const bool Partials;
     const uint_t Voices;
     std::vector<int> Owners;
+    struct PatchName
+    {
+      String Source;
+      std::array<char, VoiceState::TEXT> Name = {};
+    };
+    std::array<PatchName, PARTS> PatchNames;
     std::vector<MT32Emu::PartialState> PartialStates;
   };
 

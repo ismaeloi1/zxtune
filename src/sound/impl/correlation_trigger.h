@@ -103,6 +103,8 @@ namespace Sound
     bool IsWindowInvalid(uint_t period) const;
     void CalcSlopeFinder(uint_t period);
     void CorrelateValid(const Buffer& data, const Buffer& kernel, Buffer& result);
+    void CorrelateValid2(const Buffer& data, const Buffer& kernel1, const Buffer& kernel2, Buffer& result1,
+                         Buffer& result2);
     uint_t FindPeak(Buffer& corr, const Buffer& peaks, int radius) const;
     void UpdateBuffer(Buffer& data, float resultMean, uint_t period);
 
@@ -122,6 +124,11 @@ namespace Sound
     Buffer SlopeFinder;
     float PrevMean = 0;
     int PrevPeriod = -1;  // undefined
+    uint_t CachedPeriod = 0;
+    uint_t PeriodAge = 0;
+    bool HasPeriod = false;
+    //! period estimations per second
+    static const uint_t PERIOD_RATE = 60;
     int64_t PrevTrigger = 0;
     bool HasPrevTrigger = false;
 
@@ -130,9 +137,9 @@ namespace Sound
     Buffer PeriodData;
     Buffer CorrQuality;
     Buffer Corr;
-    Buffer Kernel;
     Buffer Aligned;
     std::vector<std::complex<float>> TmpA;
     std::vector<std::complex<float>> TmpB;
+    std::vector<std::complex<float>> TmpC;
   };
 }  // namespace Sound

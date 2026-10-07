@@ -66,6 +66,9 @@ public:
 	// True if a track has reached its end
 	bool track_ended() const;
 	
+	// zxtune extension: number of samples emulated ahead of played ones
+	int samples_ahead() const;
+	
 	// Sets start time and length of track fade out. Once fade ends track_ended() returns
 	// true. Fade time must be set after track has been started, and can be changed
 	// at any time.
@@ -251,6 +254,7 @@ inline int Music_Emu::sample_rate() const           { return sample_rate_; }
 inline int Music_Emu::voice_count() const           { return voice_count_; }
 inline int Music_Emu::current_track() const         { return current_track_; }
 inline bool Music_Emu::track_ended() const          { return track_filter.track_ended(); }
+inline int Music_Emu::samples_ahead() const         { return track_filter.samples_ahead(); }
 inline const Music_Emu::equalizer_t& Music_Emu::equalizer() const { return equalizer_; }
 
 inline void Music_Emu::ignore_silence( bool b )     { track_filter.ignore_silence( b ); }

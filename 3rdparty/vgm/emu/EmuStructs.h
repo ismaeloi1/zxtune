@@ -103,11 +103,23 @@ typedef void (*DEVFUNC_SET_VOICES_CB)(void* info, DEVCB_VOICES cb, void* param);
 #define DEVVOICE_LEVEL		0x04	// level field is valid
 #define DEVVOICE_NOISE		0x08	// channel produces noise, freq is noise generator rate
 
+// chip specific voice kinds, define meaning of DEV_VOICE_STATE::fields
+#define DEVVOICE_KIND_GENERIC		0x00
+#define DEVVOICE_KIND_OPN_FM		0x01	// algorithm, feedback, op1..4 levels, carriers mask, pan (L=2, R=1), AMS, PMS, keys mask, block
+#define DEVVOICE_KIND_OPN_DAC		0x02	// enabled, last value (unsigned 8 bit)
+#define DEVVOICE_KIND_PSG_TONE		0x03	// attenuation 0..15, period low, period high, stereo (L=2, R=1)
+#define DEVVOICE_KIND_PSG_NOISE		0x04	// attenuation 0..15, white, rate 0..3 (3 - tone 3), stereo
+#define DEVVOICE_KIND_OPL_2OP		0x05	// connection (1 - additive), feedback, op1..2 levels, op1..2 waveforms, key, pan (L=2, R=1), block
+#define DEVVOICE_KIND_OPL_4OP		0x06	// algorithm 0..3, feedback, op1..4 levels, op1..4 waveforms, key, pan
+#define DEVVOICE_KIND_OPL_RHYTHM	0x07	// instrument (0 BD, 1 SD, 2 TT, 3 CY, 4 HH), level, key, enabled
+
 typedef struct _device_voice_state
 {
 	float freq;		// Hz
 	float level;	// dB relative to maximal channel volume (0 or negative)
 	UINT8 flags;	// see DEVVOICE_ constants
+	UINT8 kind;		// see DEVVOICE_KIND_ constants
+	UINT8 fields[12];	// operator levels are 0..255, 255 is maximal
 } DEV_VOICE_STATE;
 // fill state of up to count channels, returns channels count
 typedef UINT32 (*DEVFUNC_GET_VOICES_STATE)(void* info, UINT32 count, DEV_VOICE_STATE* states);

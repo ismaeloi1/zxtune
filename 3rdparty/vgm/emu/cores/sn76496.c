@@ -655,6 +655,21 @@ static UINT32 sn76496_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE
 		state->level = att == 15 ? -96.0f : -2.0f * att;
 		state->flags = DEVVOICE_LEVEL | (att != 15 ? DEVVOICE_KEYON : 0);
 		state->freq = 0.0f;
+		state->kind = i != 3 ? DEVVOICE_KIND_PSG_TONE : DEVVOICE_KIND_PSG_NOISE;
+		memset(state->fields, 0, sizeof(state->fields));
+		state->fields[0] = att;
+		if (i != 3)
+		{
+			state->fields[1] = R->Register[i * 2] & 0xff;
+			state->fields[2] = (R->Register[i * 2] >> 8) & 0x03;
+		}
+		else
+		{
+			state->fields[1] = in_noise_mode(R);
+			state->fields[2] = R->Register[6] & 3;
+		}
+		// Game Gear stereo
+		state->fields[3] = R->stereo ? (((R->stereo_mask >> (4 + i)) & 1) << 1) | ((R->stereo_mask >> i) & 1) : 3;
 		if (i != 3)
 		{
 			// square wave with half-period of 'period' samples, 0/1 - constant output (PCM)

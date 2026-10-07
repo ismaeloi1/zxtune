@@ -17,6 +17,29 @@ Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA */
 
 int const amp_range = 15;
 
+void Nes_Apu::get_osc_state( int index, osc_state_t* out ) const
+{
+	Nes_Osc const& osc = *oscs [index];
+	for ( int i = 0; i < 4; i++ )
+		out->regs [i] = osc.regs [i];
+	out->length_counter = osc.length_counter;
+	out->volume = 0;
+	out->linear_counter = 0;
+	out->dac = 0;
+	out->dmc_period = 0;
+	out->enabled = (osc_enables >> index) & 1;
+	if ( index < 2 || index == 3 )
+		out->volume = static_cast<Nes_Envelope const&>( osc ).volume();
+	else if ( index == 2 )
+		out->linear_counter = triangle.linear_counter;
+	else
+	{
+		out->dac = dmc.dac;
+		out->dmc_period = dmc.regs [0] & 15;
+		out->enabled = dmc.length_counter != 0 || !dmc.silence;
+	}
+}
+
 Nes_Apu::Nes_Apu() :
 	square1( &square_synth ),
 	square2( &square_synth )

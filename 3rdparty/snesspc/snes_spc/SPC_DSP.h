@@ -68,6 +68,10 @@ public:
 		int srcn;
 		int noise;    // voice outputs noise
 		int noise_rate; // noise generator rate index 0..0x1F
+		int env_mode; // see env_mode_t
+		int adsr0, adsr1, gain;
+		int echo;     // voice is sent to echo
+		int pmod;     // pitch is modulated by previous voice
 	};
 	void get_voice_state( int voice, voice_state_t* out ) const;
 

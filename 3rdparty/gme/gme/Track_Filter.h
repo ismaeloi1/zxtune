@@ -51,6 +51,9 @@ public:
 	
 	// Number of samples played/skipped since start_track()
 	int sample_count() const                    { return out_time; }
+
+	// zxtune extension: number of samples emulated ahead of output (silence lookahead)
+	int samples_ahead() const                   { return emu_time - out_time; }
 	
 	// True if track ended. Causes are end of source samples, end of fade,
 	// or excessive silence.
