@@ -16,6 +16,7 @@
 
 #include "async/worker.h"
 #include "debug/log.h"
+#include "module/voices_scope.h"
 #include "sound/render_params.h"
 #include "sound/sound_parameters.h"
 
@@ -83,12 +84,19 @@ namespace Sound::BackendBase
   public:
     using Ptr = std::shared_ptr<RendererWrapper>;
 
-    RendererWrapper(Module::Renderer::Ptr delegate, BackendCallback::Ptr callback)
+    RendererWrapper(Module::Renderer::Ptr delegate, BackendCallback::Ptr callback, uint_t samplerate)
       : Delegate(std::move(delegate))
       , Callback(std::move(callback))
       , SeekRequest(NO_SEEK)
       , Analyzer(FFTAnalyzer::Create())
-    {}
+      , ScopeData(Scope::Create(samplerate))
+    {
+      // separate voices are rendered by players only while scope data is requested
+      if (auto* const voices = dynamic_cast<Module::VoicesScopeSource*>(Delegate.get()))
+      {
+        voices->SetVoicesScope(ScopeData);
+      }
+    }
 
     Module::State GetState() const override
     {
@@ -100,17 +108,28 @@ namespace Sound::BackendBase
       return Analyzer;
     }
 
+    Scope::Ptr GetScope() const
+    {
+      return ScopeData;
+    }
+
     Sound::Chunk Render() override
     {
       const auto request = SeekRequest.exchange(NO_SEEK);
       if (request != NO_SEEK)
       {
         Delegate->SetPosition(Time::AtMillisecond(request));
+        ScopeData->Reset();
       }
       CurrentState = Delegate->GetState();
       Callback->OnFrame(CurrentState);
       auto result = Delegate->Render();
       Analyzer->FeedSound(result.data(), result.size());
+      // Result is going to be written to device, previous one is being played now (see Scope::Played).
+      // Further device buffering is compensated via Scope::SetLatency
+      ScopeData->Played(RenderedSamples, static_cast<uint_t>(result.size()));
+      RenderedSamples += result.size();
+      ScopeData->Commit(result);
       return result;
     }
 
@@ -118,6 +137,7 @@ namespace Sound::BackendBase
     {
       SeekRequest = NO_SEEK;
       Delegate->Reset();
+      ScopeData->Reset();
       CurrentState = {};
     }
 
@@ -132,6 +152,8 @@ namespace Sound::BackendBase
     const BackendCallback::Ptr Callback;
     std::atomic<uint_t> SeekRequest;
     const FFTAnalyzer::Ptr Analyzer;
+    const Scope::Ptr ScopeData;
+    uint64_t RenderedSamples = 0;
     Module::State CurrentState;
   };
 
@@ -367,6 +389,11 @@ namespace Sound::BackendBase
       return Worker->GetVolumeControl();
     }
 
+    Scope::Ptr GetScope() const override
+    {
+      return Renderer->GetScope();
+    }
+
   private:
     const BackendWorker::Ptr Worker;
     const RendererWrapper::Ptr Renderer;
@@ -379,9 +406,10 @@ namespace Sound
   Backend::Ptr CreateBackend(Parameters::Accessor::Ptr globalParams, const Module::Holder::Ptr& holder,
                              BackendCallback::Ptr origCallback, BackendWorker::Ptr worker)
   {
-    auto origRenderer = Module::CreatePipelinedRenderer(*holder, std::move(globalParams));
+    const auto samplerate = GetSoundFrequency(*globalParams);
+    auto origRenderer = Module::CreatePipelinedRenderer(*holder, samplerate, std::move(globalParams));
     auto callback = BackendBase::CreateCallback(std::move(origCallback), worker);
-    auto renderer = MakePtr<BackendBase::RendererWrapper>(std::move(origRenderer), callback);
+    auto renderer = MakePtr<BackendBase::RendererWrapper>(std::move(origRenderer), callback, samplerate);
     auto asyncWorker = MakePtr<BackendBase::AsyncWrapper>(std::move(callback), renderer, worker);
     auto job = Async::CreateJob(std::move(asyncWorker));
     return MakePtr<BackendBase::BackendInternal>(std::move(worker), std::move(renderer), std::move(job));

@@ -499,6 +499,11 @@ namespace Sound
         ResetTriggers();
       }
 
+      void SetLatency(uint_t ms) override
+      {
+        LatencySamples = int64_t(Samplerate) * ms / 1000;
+      }
+
       Layout Get(uint_t maxChannels, uint_t points, int64_t playing, uint_t windowMs, int16_t* target) override
       {
         const auto start = Clock::now();
@@ -880,7 +885,8 @@ namespace Sound
         const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - PlayedTime).count();
         const auto prevStart = int64_t(PlayedStart) - int64_t(PlayedSize);
         const auto pos = prevStart + elapsed * int64_t(Samplerate) / 1000000;
-        return std::clamp<int64_t>(pos, std::max<int64_t>(prevStart, 0), int64_t(PlayedStart));
+        const auto played = std::clamp<int64_t>(pos, std::max<int64_t>(prevStart, 0), int64_t(PlayedStart));
+        return std::max<int64_t>(played - LatencySamples, 0);
       }
 
       void ResetTriggers()
@@ -921,6 +927,7 @@ namespace Sound
       std::vector<float> EstimatorData;
       int64_t LastGaugesUs = 0;
       uint_t EstimatorBudget = 0;
+      std::atomic<int64_t> LatencySamples = 0;
     };
 
   }  // namespace ScopeDetails

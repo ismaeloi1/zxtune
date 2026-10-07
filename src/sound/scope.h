@@ -37,6 +37,10 @@ namespace Sound
     //! @brief Seek happened, reset all the state
     virtual void Reset() = 0;
 
+    //! @brief Output delay not covered by Played calls (e.g. device buffers filled by blocking writes)
+    //! @param ms compensated when currently playing sample is estimated internally
+    virtual void SetLatency(uint_t ms) = 0;
+
     struct Layout
     {
       //! channels count actually stored

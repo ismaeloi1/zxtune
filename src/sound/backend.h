@@ -14,6 +14,7 @@
 #include "sound/analyzer.h"
 #include "sound/backend_attrs.h"
 #include "sound/gain.h"
+#include "sound/scope.h"
 
 #include "error.h"
 
@@ -124,6 +125,9 @@ namespace Sound
     //! @brief Getting volume controller
     //! @return Pointer to volume control object if supported, empty pointer if not
     virtual VolumeControl::Ptr GetVolumeControl() const = 0;
+
+    //! @brief Getting separate voices waveforms and chips state of currently played module
+    virtual Scope::Ptr GetScope() const = 0;
   };
 
   class BackendCallback
