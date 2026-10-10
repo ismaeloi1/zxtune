@@ -248,6 +248,8 @@ class ChipState(private val data: ByteArray, private val offset: Int) {
     fun frequency(voice: Int) = reg(voice * 7) or (reg(voice * 7 + 1) shl 8)
     fun pulseWidth(voice: Int) = reg(voice * 7 + 2) or ((reg(voice * 7 + 3) and 0x0f) shl 8)
     fun control(voice: Int) = reg(voice * 7 + 4)
+    fun attackDecay(voice: Int) = reg(voice * 7 + 5)
+    fun sustainRelease(voice: Int) = reg(voice * 7 + 6)
 
     /**
      * Attack/Decay and Sustain/Release registers as ADSR hex digits

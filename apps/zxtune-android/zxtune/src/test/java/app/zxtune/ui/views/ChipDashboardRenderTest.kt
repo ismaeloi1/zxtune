@@ -4,10 +4,13 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import androidx.test.core.app.ApplicationProvider
+import app.zxtune.playback.ChipGauges
+import app.zxtune.playback.ChipState
 import app.zxtune.playback.VoiceGauges
 import app.zxtune.playback.VoicesLayout
 import java.io.File
 import kotlin.math.sin
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -70,6 +73,10 @@ class ChipDashboardRenderTest {
         val view = SidDashboardView(ApplicationProvider.getApplicationContext())
         val parsed = VoicesLayout.parse(layout)
         view.setVoicesData(parsed, makeData(voices), voices.size, "Emulation description\nscope: statistics")
+        render(name, view, width, height)
+    }
+
+    private fun render(name: String, view: View, width: Int, height: Int) {
         view.measure(
             View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
@@ -182,4 +189,109 @@ class ChipDashboardRenderTest {
             Voice(VoiceGauges.Kind.NES_DMC, intArrayOf(64, 15, 1, 0), 0f, 0f, 0),
         )
     )
+
+    // SID registers 0x00..0x18, oscillators 0x19..0x1b and envelopes 0x1c..0x1e
+    private fun makeSidData(chips: Int, regs: IntArray): ByteArray {
+        val data = ByteArray(chips * ChipGauges.SIZE)
+        for (chip in 0 until chips) {
+            val offset = chip * ChipGauges.SIZE
+            for (col in 0 until ChipGauges.COLUMNS) {
+                fun put(gauge: Int, min: Int, max: Int) {
+                    data[offset + (gauge * ChipGauges.COLUMNS + col) * 2] = min.coerceIn(0, 255).toByte()
+                    data[offset + (gauge * ChipGauges.COLUMNS + col) * 2 + 1] = max.coerceIn(0, 255).toByte()
+                }
+                // noise, pulse, triangle-like oscillators
+                val noise = (col * 7919 + chip * 31) % 256
+                put(ChipGauges.wave(0), noise, noise)
+                val pulse = if ((col / 20) % 3 == 0) 255 else 0
+                put(ChipGauges.wave(1), pulse, pulse)
+                val tri = (col * 8) % 512
+                put(ChipGauges.wave(2), if (tri < 256) tri else 511 - tri, if (tri < 256) tri else 511 - tri)
+                for (voice in 0 until 3) {
+                    val env = (240 - (col + voice * 40) % 80 * 3).coerceAtLeast(0)
+                    put(ChipGauges.envelope(voice), env - 5, env)
+                    val pitch = 120 + ((col / 24 + voice) % 4) * 15
+                    put(ChipGauges.frequency(voice), pitch, pitch)
+                }
+                put(ChipGauges.VOLUME, 255, 255)
+                put(ChipGauges.RESONANCE, 170, 170)
+                val cutoff = 40 + (col % 64)
+                put(ChipGauges.CUTOFF, cutoff - 2, cutoff)
+            }
+            // last envelope column is rising for voice 2 to show attack phase
+            data[offset + (ChipGauges.envelope(1) * ChipGauges.COLUMNS + 255) * 2] = 100
+            data[offset + (ChipGauges.envelope(1) * ChipGauges.COLUMNS + 255) * 2 + 1] = 235.toByte()
+            val state = offset + ChipGauges.GAUGES * ChipGauges.COLUMNS * 2
+            regs.forEachIndexed { idx, value -> data[state + idx] = value.toByte() }
+        }
+        return data
+    }
+
+    private val sidRegs = intArrayOf(
+        // V1: noise C5 (0x22D0 at PAL), filtered, sustain 60%
+        0xd0, 0x22, 0x00, 0x08, 0x81, 0x09, 0x9a,
+        // V2: pulse 37% with sync, attack
+        0x67, 0x11, 0xe8, 0x05, 0x43, 0x5a, 0xf4,
+        // V3: saw+triangle released
+        0xe7, 0x02, 0x00, 0x00, 0x30, 0x00, 0x09,
+        // cutoff 519, resonance 10, routing V1+V3, low-pass, volume 15
+        0x07, 0x40, 0xa5, 0x1f,
+        // oscillators
+        0x80, 0xff, 0x40,
+        // envelopes
+        0x99, 0xd0, 0x40
+    )
+
+    private fun renderSid(name: String, chips: Int, width: Int = 1080, height: Int = 1700) {
+        val view = SidDashboardView(ApplicationProvider.getApplicationContext())
+        view.setGaugesData(
+            makeSidData(chips, sidRegs),
+            chips,
+            "PAL, MOS6581, reSIDfp, resample\nPlaySID one-file format (PSID), 50 Hz VBI (PAL), $chips SID, song 1/1"
+        )
+        render(name, view, width, height)
+    }
+
+    @Test
+    fun sid() = renderSid("sid", 1)
+
+    @Test
+    fun sidSmall() = renderSid("sid-small", 1, 720, 800)
+
+    @Test
+    fun sid2() = renderSid("sid2", 2)
+
+    @Test
+    fun sidDescription() {
+        val state = ChipState(sidRegs.map { it.toByte() }.toByteArray(), 0)
+        val chip = SidDescription.Chip.fromStatus("PAL, MOS6581")
+        assertEquals("Noise \u25CF", SidDescription.waveSummary(state, 0))
+        assertEquals("Pulse 37% Sync \u25CF", SidDescription.waveSummary(state, 1))
+        assertEquals("Saw+Tri", SidDescription.waveSummary(state, 2))
+        assertEquals("60% Sus", SidDescription.envelopeSummary(state, 0, 0))
+        assertEquals("81% Atk", SidDescription.envelopeSummary(state, 1, 1))
+        assertEquals("25% Rel", SidDescription.envelopeSummary(state, 2, 0))
+        assertEquals("C5 523Hz", SidDescription.frequencySummary(state, 0, chip))
+        assertEquals("100%", SidDescription.volumeSummary(state))
+        assertEquals("66%", SidDescription.resonanceSummary(state))
+        assertEquals(
+            "Noise 523Hz rate, filtered low-pass ~440Hz, sustain 60%, release 1.5s",
+            SidDescription.voiceExplanation(state, 0, 0, chip)
+        )
+        assertEquals(
+            "Pulse 37% duty at C4, hard-synced to V1, attack 56ms then decay 1.5s to sustain 100%",
+            SidDescription.voiceExplanation(state, 1, 1, chip)
+        )
+        assertEquals(
+            "Sawtooth+triangle mix at F1, filtered low-pass ~440Hz, releasing 25% over 750ms",
+            SidDescription.voiceExplanation(state, 2, 0, chip)
+        )
+        assertEquals(
+            "Volume 100%, low-pass ~440Hz resonance 66% on V1+V3",
+            SidDescription.filterExplanation(state, chip)
+        )
+        assertEquals(SidDescription.NTSC_CLOCK, SidDescription.Chip.fromStatus("NTSC, MOS8580").clock)
+        assertEquals("2ms", SidDescription.formatMs(SidDescription.attackMs(0)))
+        assertEquals("24s", SidDescription.formatMs(SidDescription.decayMs(15)))
+    }
 }

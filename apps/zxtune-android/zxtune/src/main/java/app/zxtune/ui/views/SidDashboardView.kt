@@ -103,6 +103,19 @@ class SidDashboardView @JvmOverloads constructor(
         typeface = Typeface.MONOSPACE
         textAlign = Paint.Align.RIGHT
     }
+
+    // human readable values of registers are greyed to separate them from raw values
+    private val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(160, 255, 255, 255)
+        textSize = sp(TEXT_SIZE_SP)
+        textAlign = Paint.Align.RIGHT
+    }
+
+    // explanations are secondary information, so greyed and proportional to fit more words
+    private val explainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.argb(150, 255, 255, 255)
+        textSize = sp(EXPLAIN_SIZE_SP)
+    }
     private val dimTracePaint = Paint(tracePaint).apply {
         color = Color.argb(110, 255, 255, 255)
     }
@@ -155,6 +168,15 @@ class SidDashboardView @JvmOverloads constructor(
         layout = voicesLayout
         voiceBuffers[readyBuffer] = data
         readyVoices = voices
+        status = statusText
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun setGaugesData(data: ByteArray, chips: Int, statusText: String) {
+        layout = VoicesLayout.parse("registers")
+        data.copyInto(buffers[readyBuffer], 0, 0, minOf(data.size, buffers[readyBuffer].size))
+        readyVoices = 0
+        readyChips = chips
         status = statusText
     }
 
@@ -230,61 +252,150 @@ class SidDashboardView @JvmOverloads constructor(
         }
     }
 
-    // Chips are placed side by side as in oscilloscope above: 3 gauges columns per chip
+    // Chips are placed side by side as in oscilloscope above: 3 gauges columns per chip.
+    // Each row (voice or global filter/volume state) ends with plain language explanation strip, if fits.
     private fun drawGauges(canvas: Canvas, areaHeight: Float) {
         val chips = readyChips
         if (chips == 0 || areaHeight < density * 40) {
             return
         }
+        val chip = SidDescription.Chip.fromStatus(status)
         val groupW = width.toFloat() / chips
         val cellW = groupW / 3
-        val cellH = areaHeight / 4
-        for (chip in 0 until chips) {
-            val gauges = ChipGauges(buffers[readyBuffer], chip * ChipGauges.SIZE)
+        val rowH = areaHeight / 4
+        // explanation is less important than gauges themselves, so takes space only if it's enough;
+        // space is reserved regardless of current text to avoid layout jumping
+        val explainLines = (MAX_EXPLANATION_LINES downTo 1).firstOrNull {
+            rowH - explanationHeight(it) >= density * MIN_EXPLAINED_CELL_DP
+        } ?: 0
+        val cellH = rowH - explanationHeight(explainLines)
+        for (idx in 0 until chips) {
+            val gauges = ChipGauges(buffers[readyBuffer], idx * ChipGauges.SIZE)
             val last = gauges.state
-            val left = groupW * chip
-            val chipPrefix = if (chips > 1) "S${chip + 1}" else ""
+            val left = groupW * idx
+            val chipPrefix = if (chips > 1) "S${idx + 1}" else ""
             for (voice in 0 until 3) {
-                val top = cellH * voice
-                drawGauge(
-                    canvas,
-                    gauges,
-                    ChipGauges.wave(voice),
-                    left,
-                    top,
-                    cellW,
-                    cellH,
-                    "${chipPrefix}V${voice + 1} ${waveTitle(last, voice)}"
+                val trend = envelopeTrend(gauges, last, voice)
+                val cells = listOf(
+                    Cell(
+                        ChipGauges.wave(voice),
+                        "${chipPrefix}V${voice + 1} ${waveTitle(last, voice)}",
+                        SidDescription.waveSummary(last, voice)
+                    ),
+                    Cell(
+                        ChipGauges.envelope(voice),
+                        "Env ${last.envelopeRegs(voice)}",
+                        SidDescription.envelopeSummary(last, voice, trend)
+                    ),
+                    Cell(
+                        ChipGauges.frequency(voice),
+                        "Freq ${hex4(last.frequency(voice))}",
+                        SidDescription.frequencySummary(last, voice, chip)
+                    )
                 )
-                drawGauge(
-                    canvas,
-                    gauges,
-                    ChipGauges.envelope(voice),
-                    left + cellW,
-                    top,
-                    cellW,
-                    cellH,
-                    "Env ${last.envelopeRegs(voice)}"
-                )
-                drawGauge(
-                    canvas,
-                    gauges,
-                    ChipGauges.frequency(voice),
-                    left + cellW * 2,
-                    top,
-                    cellW,
-                    cellH,
-                    "Freq ${hex4(last.frequency(voice))}"
-                )
+                drawGaugesRow(canvas, gauges, cells, VOICE_TEMPLATE, left, rowH * voice, cellW, cellH)
+                val explanation = SidDescription.voiceExplanation(last, voice, trend, chip)
+                drawExplanation(canvas, explanation, left, rowH * voice + cellH, groupW, explainLines)
             }
-            val top = cellH * 3
-            drawGauge(canvas, gauges, ChipGauges.VOLUME, left, top, cellW, cellH, "Vol ${last.volume}")
-            drawGauge(canvas, gauges, ChipGauges.RESONANCE, left + cellW, top, cellW, cellH, "Res ${last.resonance}")
-            drawGauge(canvas, gauges, ChipGauges.CUTOFF, left + cellW * 2, top, cellW, cellH, filterTitle(last))
-            if (chip != 0) {
+            val cells = listOf(
+                Cell(ChipGauges.VOLUME, "Vol ${last.volume}", SidDescription.volumeSummary(last)),
+                Cell(ChipGauges.RESONANCE, "Res ${last.resonance}", SidDescription.resonanceSummary(last)),
+                Cell(ChipGauges.CUTOFF, filterTitle(last), SidDescription.filterSummary(last, chip))
+            )
+            drawGaugesRow(canvas, gauges, cells, GLOBAL_TEMPLATE, left, rowH * 3, cellW, cellH)
+            val explanation = SidDescription.filterExplanation(last, chip)
+            drawExplanation(canvas, explanation, left, rowH * 3 + cellH, groupW, explainLines)
+            if (idx != 0) {
                 canvas.drawLine(left, 0f, left, areaHeight, separatorPaint)
             }
         }
+    }
+
+    private class Cell(val gauge: Int, val title: String, val summary: String)
+
+    // Gauges in a row have the same title band height to keep plots aligned
+    private fun drawGaugesRow(
+        canvas: Canvas,
+        gauges: GaugesData,
+        cells: List<Cell>,
+        template: List<Cell>,
+        left: Float,
+        top: Float,
+        cellW: Float,
+        cellH: Float
+    ) {
+        // see drawGauge and drawTitleBand paddings
+        val inner = cellW - density * 11
+        // widest values are used instead of current ones to keep layout stable
+        val crowded = template.any {
+            titlePaint.measureText(it.title) * SHRINKED_TITLE + valuePaint.measureText(it.summary) > inner
+        }
+        // second line is used only if plot is still visible enough
+        val twoLines = crowded && cellH > (titlePaint.fontSpacing + valuePaint.fontSpacing) * 1.8f
+        cells.forEachIndexed { idx, cell ->
+            drawGauge(
+                canvas,
+                gauges,
+                cell.gauge,
+                left + cellW * idx,
+                top,
+                cellW,
+                cellH,
+                cell.title,
+                cell.summary,
+                twoLines
+            )
+        }
+    }
+
+    // Registers snapshot is not enough to distinguish attack from decay, so last history column is used
+    private fun envelopeTrend(gauges: ChipGauges, state: ChipState, voice: Int): Int {
+        val gauge = ChipGauges.envelope(voice)
+        val col = ChipGauges.COLUMNS - 1
+        val min = gauges.min(gauge, col)
+        val max = gauges.max(gauge, col)
+        val current = SidDescription.envelopeGaugeLevel(state.envelope(voice))
+        return when {
+            min == max -> 0
+            current >= max -> 1
+            current <= min -> -1
+            else -> 0
+        }
+    }
+
+    private fun explanationHeight(lines: Int) = if (lines == 0) 0f else explainPaint.fontSpacing * lines + density * 2
+
+    private fun explanationPadding() = density * 4
+
+    // Wraps text by words to the given lines count, the last line is shrunk (down to 70%) and cut to fit width
+    private fun drawExplanation(canvas: Canvas, text: String, left: Float, top: Float, w: Float, lines: Int) {
+        val pad = explanationPadding()
+        val maxWidth = w - pad * 2
+        if (maxWidth <= 0 || lines == 0) {
+            return
+        }
+        val baseSize = explainPaint.textSize
+        // whole text is scaled uniformly to look consistent, words wrapping wastes some space
+        val width = explainPaint.measureText(text)
+        if (width > maxWidth * lines) {
+            explainPaint.textSize = baseSize * maxOf(maxWidth * lines * 0.92f / width, 0.7f)
+        }
+        var rest = text
+        var y = top + density - explainPaint.ascent()
+        for (line in 1 until lines) {
+            if (explainPaint.measureText(rest) <= maxWidth) {
+                break
+            }
+            val count = explainPaint.breakText(rest, true, maxWidth, null)
+            // break at words boundary if possible
+            val space = rest.lastIndexOf(' ', count)
+            val end = if (space > 0) space else count
+            canvas.drawText(rest, 0, end, left + pad, y, explainPaint)
+            rest = rest.substring(end).trimStart()
+            y += explainPaint.fontSpacing
+        }
+        canvas.drawText(ellipsize(rest, maxWidth, explainPaint), left + pad, y, explainPaint)
+        explainPaint.textSize = baseSize
     }
 
     // Chips are placed side by side as in oscilloscope above (long chips are split to several columns),
@@ -376,24 +487,79 @@ class SidDashboardView @JvmOverloads constructor(
         }
     }
 
+    // Title has priority over summary: summary is placed at the second line (if requested) or shrunk and cut
+    // if both don't fit
     // @return bottom of title band
-    private fun drawTitleBand(canvas: Canvas, card: RectF, title: String, summary: String): Float {
+    private fun drawTitleBand(
+        canvas: Canvas,
+        card: RectF,
+        title: String,
+        summary: String,
+        valuePaint: Paint = summaryPaint,
+        secondLine: Boolean = false
+    ): Float {
         val pad = density * 3
         val baseline = card.top + pad - titlePaint.ascent()
-        val bottom = baseline + titlePaint.descent() + pad
-        val summaryWidth = summaryPaint.measureText(summary)
-        val available = card.width() - pad * 3 - summaryWidth
         val baseSize = sp(TITLE_SIZE_SP)
+        val minSize = sp(MIN_TITLE_SIZE_SP)
+        val titleWidth = titlePaint.measureText(title)
+        val inner = card.width() - pad * 3
+        val valueBaseSize = valuePaint.textSize
+        val bottom = if (!secondLine || summary.isEmpty()) {
+            val room = inner - minOf(titleWidth, titleWidth * minSize / baseSize)
+            val value = fitText(summary, room, valuePaint, 0.8f)
+            val available = inner - valuePaint.measureText(value)
+            drawTitle(canvas, title, card.left + pad, baseline, available)
+            if (value.isNotEmpty()) {
+                canvas.drawText(value, card.right - pad, baseline, valuePaint)
+            }
+            baseline + titlePaint.descent() + pad
+        } else {
+            drawTitle(canvas, title, card.left + pad, baseline, inner)
+            val valueBaseline = baseline + titlePaint.descent() - valuePaint.ascent()
+            val value = fitText(summary, card.width() - pad * 2, valuePaint, 0.8f)
+            canvas.drawText(value, card.right - pad, valueBaseline, valuePaint)
+            valueBaseline + valuePaint.descent() + pad
+        }
+        valuePaint.textSize = valueBaseSize
+        canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
+        return bottom
+    }
+
+    // shrinks title down to minimal size and then cuts it
+    private fun drawTitle(canvas: Canvas, fullTitle: String, x: Float, y: Float, available: Float) {
+        val baseSize = sp(TITLE_SIZE_SP)
+        // raw register values are more important than gauge name in narrow cells
+        val title = if (titlePaint.measureText(fullTitle) * sp(MIN_TITLE_SIZE_SP) / baseSize > available) {
+            fullTitle.replace(" Wave ", " ")
+        } else {
+            fullTitle
+        }
         val titleWidth = titlePaint.measureText(title)
         titlePaint.textSize =
             if (titleWidth > available) maxOf(baseSize * available / titleWidth, sp(MIN_TITLE_SIZE_SP)) else baseSize
-        canvas.drawText(title, card.left + pad, baseline, titlePaint)
+        canvas.drawText(ellipsize(title, available, titlePaint), x, y, titlePaint)
         titlePaint.textSize = baseSize
-        if (summary.isNotEmpty()) {
-            canvas.drawText(summary, card.right - pad, baseline, summaryPaint)
+    }
+
+    // Changes paint size (restoring is caller's responsibility), empty result if too little is left
+    private fun fitText(text: String, maxWidth: Float, paint: Paint, minScale: Float): String {
+        val width = paint.measureText(text)
+        if (width <= maxWidth) {
+            return text
         }
-        canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
-        return bottom
+        paint.textSize *= maxOf(maxWidth / width, minScale)
+        val result = ellipsize(text, maxWidth, paint)
+        // too short beginning is useless
+        return if (result.length < 4) "" else result
+    }
+
+    private fun ellipsize(text: String, maxWidth: Float, paint: Paint): String {
+        if (paint.measureText(text) <= maxWidth) {
+            return text
+        }
+        val count = paint.breakText(text, true, maxOf(maxWidth - paint.measureText(ELLIPSIS), 0f), null)
+        return if (count == 0) "" else text.substring(0, count).trimEnd(' ', ',') + ELLIPSIS
     }
 
     // level (dB) as filled columns, pitch (log scale) as line over it
@@ -443,12 +609,14 @@ class SidDashboardView @JvmOverloads constructor(
         top: Float,
         w: Float,
         h: Float,
-        title: String
+        title: String,
+        summary: String,
+        twoLines: Boolean
     ) {
         val pad = density
         rect.set(left + pad, top + pad, left + w - pad, top + h - pad)
         canvas.drawRect(rect, framePaint)
-        val plotTop = drawTitleBand(canvas, rect, title, "") + pad * 2
+        val plotTop = drawTitleBand(canvas, rect, title, summary, valuePaint, twoLines) + pad * 2
         val plotHeight = rect.bottom - pad * 2 - plotTop
         if (plotHeight <= 0) {
             return
@@ -483,6 +651,23 @@ class SidDashboardView @JvmOverloads constructor(
         private const val TITLE_SIZE_SP = 13f
         private const val MIN_TITLE_SIZE_SP = 9f
         private const val TEXT_SIZE_SP = 12f
+        private const val EXPLAIN_SIZE_SP = 11f
+        private const val MIN_EXPLAINED_CELL_DP = 56
+        private const val MAX_EXPLANATION_LINES = 2
+
+        // widest titles and values of gauges
+        private val VOICE_TEMPLATE = listOf(
+            Cell(0, "S1V1 Wave F SRTF", "Pulse 50% Sync \u25CF"),
+            Cell(0, "Env FFFF", "100% Atk"),
+            Cell(0, "Freq FFFF", "C#5 1047Hz")
+        )
+        private val GLOBAL_TEMPLATE = listOf(
+            Cell(0, "Vol 15", "100%"),
+            Cell(0, "Res 15", "100%"),
+            Cell(0, "Filter LBH 2047", "Notch ~18kHz")
+        )
+        private const val SHRINKED_TITLE = 0.85f
+        private const val ELLIPSIS = "\u2026"
         const val DEFAULT_WAVE_WINDOW_MS = 10
 
         private fun hex4(value: Int) = String.format(java.util.Locale.US, "%04X", value)
