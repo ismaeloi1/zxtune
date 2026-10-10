@@ -10,6 +10,7 @@
 
 #include "module/players/platforms.h"
 #include "module/players/properties_helper.h"
+#include "module/players/seek_snapshots.h"
 #include "module/players/streaming.h"
 #include "module/players/xsf/all.h"
 #include "module/players/xsf/psf_bios.h"
@@ -33,6 +34,7 @@
 #include "3rdparty/he/Core/r3000.h"
 #include "3rdparty/he/Core/spu.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace Module::PSF
@@ -156,9 +158,14 @@ namespace Module::PSF
   public:
     static std::unique_ptr<uint8_t[]> CreatePSX(int version)
     {
-      std::unique_ptr<uint8_t[]> res(new uint8_t[::psx_get_state_size(version)]);
+      std::unique_ptr<uint8_t[]> res(new uint8_t[GetStateSize(version)]);
       ::psx_clear_state(res.get(), version);
       return res;
+    }
+
+    static std::size_t GetStateSize(int version)
+    {
+      return ::psx_get_state_size(version);
     }
 
     static const HELibrary& Instance()
@@ -193,6 +200,7 @@ namespace Module::PSF
     {
       if (data.Exe)
       {
+        StateSize = HELibrary::GetStateSize(1);
         Emu = HELibrary::Instance().CreatePSX(1);
         SetupExe(*data.Exe);
         SoundFrequency = 44100;
@@ -200,6 +208,7 @@ namespace Module::PSF
       }
       else if (data.Vfs)
       {
+        StateSize = HELibrary::GetStateSize(2);
         Emu = HELibrary::Instance().CreatePSX(2);
         SetupIo(data.Vfs);
         SoundFrequency = 48000;
@@ -247,6 +256,24 @@ namespace Module::PSF
       }
     }
 
+    using Snapshot = std::vector<uint8_t>;
+
+    std::size_t GetStateSize() const
+    {
+      return StateSize;
+    }
+
+    std::unique_ptr<Snapshot> SaveState() const
+    {
+      return std::make_unique<Snapshot>(Emu.get(), Emu.get() + StateSize);
+    }
+
+    // state is location-independent, internal pointers are recomputed on execution
+    void LoadState(const Snapshot& state)
+    {
+      std::copy(state.begin(), state.end(), Emu.get());
+    }
+
   private:
     void SetupExe(const PsxExe& exe)
     {
@@ -283,11 +310,15 @@ namespace Module::PSF
   private:
     uint_t SoundFrequency = 0;
     std::vector<SpuTrait> Spus;
+    std::size_t StateSize = 0;
     std::unique_ptr<uint8_t[]> Emu;
     VfsIO Io;
   };
 
   const auto FRAME_DURATION = Time::Milliseconds(100);
+
+  // Restored state is fast-forwarded for up to this period initially
+  const auto SNAPSHOTS_PERIOD = Time::Seconds(2);
 
   class Renderer : public Module::Renderer
   {
@@ -298,6 +329,8 @@ namespace Module::PSF
       , State(Data->Meta->Duration)
       , Engine(*Data)
       , Target(Sound::CreateResampler(Engine.GetSoundFrequency(), samplerate))
+      , Timeline(GetSamples(SNAPSHOTS_PERIOD), GetSamples(Data->Meta->Duration), Engine.GetStateSize(),
+                 GetSeekSnapshotsMemoryLimit(*Params))
     {}
 
     Module::State GetState() const override
@@ -309,7 +342,10 @@ namespace Module::PSF
     {
       ApplyParameters();
       const auto avail = State.ConsumeUpTo(FRAME_DURATION);
-      return Target->Apply(Engine.Render(GetSamples(avail)));
+      const auto samples = GetSamples(avail);
+      auto result = Engine.Render(samples);
+      Timeline.Rendered(Engine, samples);
+      return Target->Apply(std::move(result));
     }
 
     void Reset() override
@@ -320,14 +356,9 @@ namespace Module::PSF
 
     void SetPosition(Time::AtMillisecond request) override
     {
-      if (request < State.At())
-      {
-        ResetEngine();
-      }
-      if (const auto toSkip = State.Seek(request))
-      {
-        Engine.Skip(GetSamples(toSkip));
-      }
+      const bool backward = request < State.At();
+      const auto toSkip = GetSamples(State.Seek(request));
+      Timeline.Seek(Engine, backward, toSkip, [this]() { ResetEngine(); });
     }
 
   private:
@@ -335,6 +366,7 @@ namespace Module::PSF
     {
       Engine.Initialize(*Data);
       Params.Reset();
+      Timeline.Reset();
     }
 
     void ApplyParameters()
@@ -343,6 +375,12 @@ namespace Module::PSF
       {
         using namespace Parameters::ZXTune::Core;
         const auto val = Parameters::GetInteger(*Params, CHANNELS_MASK, CHANNELS_MASK_DEFAULT);
+        // engine is reset with all the channels enabled, muted ones are not mixed to reverb in SPU RAM
+        if (val != ChannelsMask || val != CHANNELS_MASK_DEFAULT)
+        {
+          Timeline.Invalidate();
+          ChannelsMask = val;
+        }
         Engine.SetChannelsMask(val);
       }
     }
@@ -358,6 +396,8 @@ namespace Module::PSF
     TimedState State;
     PSXEngine Engine;
     const Sound::Converter::Ptr Target;
+    EngineTimeline<PSXEngine> Timeline;
+    Parameters::IntType ChannelsMask = Parameters::ZXTune::Core::CHANNELS_MASK_DEFAULT;
   };
 
   class Holder : public Module::Holder

@@ -25,6 +25,13 @@ namespace Parameters::ZXTune::Core
   const IntType CHANNELS_MASK_DEFAULT = 0;
   //@}
 
+  //@{
+  //! @name Memory limit in bytes for emulation state snapshots used to speed up backward seeking in single tune
+  //! 0 disables snapshots
+  const auto SEEK_SNAPSHOTS_MEMORY = PREFIX + "seek_snapshots_memory"_id;
+  const IntType SEEK_SNAPSHOTS_MEMORY_DEFAULT = 8 * 1024 * 1024;
+  //@}
+
   //! @brief AYM-chip related parameters namespace
   namespace AYM
   {

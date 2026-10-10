@@ -640,6 +640,41 @@ void SPC_DSP::set_voices_func( voices_func_t func, void* data )
 	m.voices_data = data;
 }
 
+void SPC_DSP::copy_state_from( SPC_DSP const& in )
+{
+	state_t const& s = in.m;
+	
+	// non-emulation state is kept
+	uint8_t* const ram = m.ram;
+	voices_func_t const voices_func = m.voices_func;
+	void* const voices_data = m.voices_data;
+	int const mute_mask = m.mute_mask;
+	int const surround_threshold = m.surround_threshold;
+	sample_t* const out = m.out;
+	sample_t* const out_end = m.out_end;
+	sample_t* const out_begin = m.out_begin;
+	
+	m = s;
+	
+	m.ram = ram;
+	m.voices_func = voices_func;
+	m.voices_data = voices_data;
+	m.surround_threshold = surround_threshold;
+	m.out = out;
+	m.out_end = out_end;
+	m.out_begin = out_begin;
+	
+	// pointers to own state
+	m.echo_hist_pos = m.echo_hist + (s.echo_hist_pos - s.echo_hist);
+	for ( int i = 0; i < voice_count; i++ )
+		m.voices [i].buf_pos = m.voices [i].buf + (s.voices [i].buf_pos - s.voices [i].buf);
+	for ( int i = 0; i < 32; i++ )
+		m.counter_select [i] = m.counters + (s.counter_select [i] - s.counters);
+	
+	// voices volumes depend on muting
+	mute_voices( mute_mask );
+}
+
 void SPC_DSP::get_voice_state( int voice, voice_state_t* out ) const
 {
 	voice_t const& v = m.voices [voice];

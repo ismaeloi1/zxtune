@@ -75,6 +75,12 @@ public:
 	};
 	void get_voice_state( int voice, voice_state_t* out ) const;
 
+// Emulation state copy (zxtune extension)
+
+	// Copies emulation state of other DSP. Keeps own RAM, output buffer, voices function,
+	// surround setting and muting.
+	void copy_state_from( SPC_DSP const& );
+
 // State
 	
 	// Resets DSP and uses supplied values to initialize registers
