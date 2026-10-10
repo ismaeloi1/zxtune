@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Visualizer controls placed into now playing toolbar to save vertical space -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools">
+    <item
+            android:id="@+id/action_visualizer_fullscreen"
+            android:icon="@drawable/ic_fullscreen"
+            android:title="@string/visualizer_fullscreen"
+            android:visible="false"
+            app:showAsAction="always"
+            tools:ignore="AlwaysShowAction" />
+    <item
+            android:id="@+id/action_visualizer_mode"
+            android:icon="@drawable/ic_oscilloscope"
+            android:title="@string/visualizer_oscilloscope"
+            app:showAsAction="always"
+            tools:ignore="AlwaysShowAction" />
+</menu>

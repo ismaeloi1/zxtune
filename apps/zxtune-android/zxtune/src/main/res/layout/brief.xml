@@ -51,7 +51,9 @@
                 android:singleLine="true"
                 android:textAlignment="gravity"
                 android:textAppearance="?textAppearanceListItemSecondary"
-                tools:text="@tools:sample/full_names" />
+                android:visibility="gone"
+                tools:text="@tools:sample/full_names"
+                tools:visibility="visible" />
 
         <ImageButton
                 android:id="@+id/brief_details_toggle"

@@ -13,10 +13,14 @@ import androidx.fragment.app.Fragment
 import app.zxtune.R
 import app.zxtune.core.ModuleAttributes
 import app.zxtune.device.media.MediaModel
+import app.zxtune.preferences.Preferences
 import app.zxtune.ui.utils.UiUtils
 import app.zxtune.ui.utils.whenLifecycleStarted
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val MAX_LINES = 8
+private const val SHOW_AUTHOR_KEY = "ui.brief.show_author"
 
 class BriefFragment : Fragment() {
     private class DetailsView(private val view: TextView) {
@@ -83,7 +87,9 @@ class BriefFragment : Fragment() {
     private lateinit var detailsToggle: ImageButton
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
     ) = container?.let {
         inflater.inflate(R.layout.brief, it, false).apply {
             title = findViewById(R.id.brief_title)
@@ -98,26 +104,30 @@ class BriefFragment : Fragment() {
         }
     }
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) =
-        MediaModel.of(requireActivity()).run {
-            viewLifecycleOwner.whenLifecycleStarted {
-                metadata.collect { metadata ->
-                    UiUtils.setViewEnabled(view, metadata != null)
-                    metadata?.run {
-                        title.updateText(description.title)
-                        subtitle.updateText(description.subtitle)
-                        val strings = getString(ModuleAttributes.STRINGS)
-                        val comment = getString(ModuleAttributes.COMMENT)
-                        if (strings != null) {
-                            details.setText(strings, Typeface.MONOSPACE)
-                        } else {
-                            details.setText(comment, Typeface.DEFAULT)
-                        }
-                        detailsToggle.updateVisibility(!strings.isNullOrEmpty() || !comment.isNullOrEmpty())
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) = MediaModel.of(requireActivity()).run {
+        viewLifecycleOwner.whenLifecycleStarted {
+            // re-read on each start, may be changed in preferences
+            val showAuthor = withContext(Dispatchers.IO) {
+                Preferences.getDataStore(requireContext()).getBoolean(SHOW_AUTHOR_KEY, false)
+            }
+            metadata.collect { metadata ->
+                UiUtils.setViewEnabled(view, metadata != null)
+                metadata?.run {
+                    title.updateText(description.title)
+                    // author is hidden by default to give more space to visualizer
+                    subtitle.updateText(description.subtitle.takeIf { showAuthor })
+                    val strings = getString(ModuleAttributes.STRINGS)
+                    val comment = getString(ModuleAttributes.COMMENT)
+                    if (strings != null) {
+                        details.setText(strings, Typeface.MONOSPACE)
+                    } else {
+                        details.setText(comment, Typeface.DEFAULT)
                     }
+                    detailsToggle.updateVisibility(!strings.isNullOrEmpty() || !comment.isNullOrEmpty())
                 }
             }
         }
+    }
 }
 
 // TODO: extract to animation utils

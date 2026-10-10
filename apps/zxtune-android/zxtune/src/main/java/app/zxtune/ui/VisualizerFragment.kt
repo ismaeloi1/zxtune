@@ -5,12 +5,17 @@ import android.graphics.Color
 import android.os.Bundle
 import android.support.v4.media.session.PlaybackStateCompat
 import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuInflater
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageButton
 import android.widget.ImageView
+import androidx.core.view.MenuHost
+import androidx.core.view.MenuProvider
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import app.zxtune.R
 import app.zxtune.coverart.withFadeout
@@ -18,6 +23,7 @@ import app.zxtune.device.media.MediaModel
 import app.zxtune.playback.Visualizer
 import app.zxtune.playback.stubs.VisualizerStub
 import app.zxtune.preferences.Preferences
+import app.zxtune.ui.utils.item
 import app.zxtune.ui.utils.whenLifecycleStarted
 import app.zxtune.ui.views.OscilloscopeView
 import app.zxtune.ui.views.SidDashboardView
@@ -66,11 +72,6 @@ class VisualizerFragment : Fragment() {
         dashboard = view.findViewById(R.id.dashboard)
         val oscilloscopePanel = view.findViewById<View>(R.id.oscilloscope_panel)
         val coverArtView = view.findViewById<ImageView>(R.id.coverart)
-        val modeButton = view.findViewById<ImageButton>(R.id.visualizer_mode)
-        val fullscreenButton = view.findViewById<ImageButton>(R.id.visualizer_fullscreen)
-        fullscreenButton.setOnClickListener {
-            OscilloscopeActivity.start(requireContext())
-        }
         // TODO: use clicks stream, state may switch different modes
         val state = callbackFlow {
             val storage = StateStorage(requireContext())
@@ -92,12 +93,12 @@ class VisualizerFragment : Fragment() {
             view.setOnClickListener {
                 switchTo(if (state.isVisible) State.OFF else lastMode)
             }
-            modeButton.setOnClickListener {
+            switchMode = {
                 switchTo(state.nextModeOf())
             }
             awaitClose {
                 view.setOnClickListener(null)
-                modeButton.setOnClickListener(null)
+                switchMode = null
             }
         }.stateIn(scope, SharingStarted.WhileSubscribed(1000), DEFAULT_STATE)
         val playingSource: Flow<Visualizer?> =
@@ -141,18 +142,12 @@ class VisualizerFragment : Fragment() {
                 state.collect {
                     analyzer.isVisible = it == State.SPECTRUM
                     oscilloscopePanel.isVisible = it == State.OSCILLOSCOPE
-                    fullscreenButton.isVisible = it == State.OSCILLOSCOPE
-                    modeButton.isVisible = it.isVisible
                     val isScope = it == State.OSCILLOSCOPE
                     // oscilloscope is displayed on black background instead of cover art
                     coverArtView.isVisible = !isScope
                     view.setBackgroundColor(if (isScope) Color.BLACK else Color.TRANSPARENT)
-                    modeButton.setImageResource(
-                        if (isScope) R.drawable.ic_spectrum else R.drawable.ic_oscilloscope
-                    )
-                    modeButton.contentDescription = getString(
-                        if (isScope) R.string.visualizer_spectrum else R.string.visualizer_oscilloscope
-                    )
+                    controlsState = it
+                    updateControls()
                 }
             }
             launch {
@@ -166,6 +161,50 @@ class VisualizerFragment : Fragment() {
                     }
                 }
             }
+        }
+    }
+
+    private var controlsState = State.OFF
+    private var switchMode: (() -> Unit)? = null
+    private var fullscreenItem: MenuItem? = null
+    private var modeItem: MenuItem? = null
+
+    // Items are updated directly, invalidating menu would recreate items of all the host's providers
+    private val controls = object : MenuProvider {
+        override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
+            menuInflater.inflate(R.menu.visualizer, menu)
+            fullscreenItem = menu.item(R.id.action_visualizer_fullscreen)
+            modeItem = menu.item(R.id.action_visualizer_mode)
+            updateControls()
+        }
+
+        override fun onMenuItemSelected(menuItem: MenuItem) = when (menuItem.itemId) {
+            R.id.action_visualizer_fullscreen -> {
+                OscilloscopeActivity.start(requireContext())
+                true
+            }
+
+            R.id.action_visualizer_mode -> {
+                switchMode?.invoke()
+                true
+            }
+
+            else -> false
+        }
+    }
+
+    /**
+     * Visualizer controls are placed into host's (e.g. toolbar) menu to not take separate row of screen
+     */
+    fun addControlsTo(host: MenuHost, owner: LifecycleOwner) = host.addMenuProvider(controls, owner)
+
+    private fun updateControls() {
+        val isScope = controlsState == State.OSCILLOSCOPE
+        fullscreenItem?.isVisible = isScope
+        modeItem?.run {
+            isVisible = controlsState.isVisible
+            setIcon(if (isScope) R.drawable.ic_spectrum else R.drawable.ic_oscilloscope)
+            title = getString(if (isScope) R.string.visualizer_spectrum else R.string.visualizer_oscilloscope)
         }
     }
 

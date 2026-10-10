@@ -79,4 +79,9 @@
   <string name="pref_zxtune_fadeout_title">淡出</string>
   <!-- zxtune.sound.gain -->
   <string name="pref_zxtune_gain_title">前置放大器</string>
+  <!-- main screen -->
+  <string name="pref_main_screen_title">主屏幕</string>
+  <!-- ui.brief.show_author -->
+  <string name="pref_main_screen_show_author_title">显示作者</string>
+  <string name="pref_main_screen_show_author_summary">在曲目标题下方显示作者</string>
 </resources>

@@ -63,4 +63,9 @@
   <string name="pref_zxtune_fadeout_title">Fade-out</string>
   <!-- zxtune.sound.gain -->
   <string name="pref_zxtune_gain_title">Gain</string>
+  <!-- main screen -->
+  <string name="pref_main_screen_title">Hauptbildschirm</string>
+  <!-- ui.brief.show_author -->
+  <string name="pref_main_screen_show_author_title">Autor anzeigen</string>
+  <string name="pref_main_screen_show_author_summary">Autor unter dem Titel anzeigen</string>
 </resources>

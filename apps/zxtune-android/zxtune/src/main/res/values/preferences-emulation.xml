@@ -164,6 +164,12 @@
     <!-- zxtune.core.saa.interpolation -->
     <integer name="pref_zxtune_saa_interpolation_default">1</integer>
 
+    <!-- main screen -->
+    <string name="pref_main_screen_title">Main screen</string>
+    <!-- ui.brief.show_author -->
+    <string name="pref_main_screen_show_author_title">Show author</string>
+    <string name="pref_main_screen_show_author_summary">Display author under the track title</string>
+
     <!-- oscilloscope -->
     <string name="pref_oscilloscope_title">Oscilloscope</string>
     <string name="pref_oscilloscope_gain_title">Visual amplification</string>

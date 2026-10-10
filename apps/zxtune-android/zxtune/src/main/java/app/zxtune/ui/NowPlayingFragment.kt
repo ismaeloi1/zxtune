@@ -14,22 +14,28 @@ import androidx.fragment.app.Fragment
 import app.zxtune.MainActivity.PagerTabListener
 import app.zxtune.R
 
-class NowPlayingFragment : Fragment(), PagerTabListener {
+class NowPlayingFragment :
+    Fragment(),
+    PagerTabListener {
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
     ) = container?.let {
         inflater.inflate(R.layout.now_playing, it, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        view.findViewById<Toolbar>(R.id.main_top_panel)
-            .addMenuProvider(ApplicationMenu(requireActivity()))
+        view.findViewById<Toolbar>(R.id.main_top_panel).run {
+            addMenuProvider(ApplicationMenu(requireActivity()))
+            visualizer.addControlsTo(this, viewLifecycleOwner)
+        }
     }
 
-    override fun onTabVisibilityChanged(isVisible: Boolean) =
-        (childFragmentManager.findFragmentById(R.id.visualizer) as VisualizerFragment).setIsVisible(
-            isVisible
-        )
+    override fun onTabVisibilityChanged(isVisible: Boolean) = visualizer.setIsVisible(isVisible)
+
+    private val visualizer
+        get() = childFragmentManager.findFragmentById(R.id.visualizer) as VisualizerFragment
 }
