@@ -111,11 +111,11 @@ class VisualizerFragment : Fragment() {
                     }
                 }
             }.distinctUntilChanged { old, new -> old === new }
-        // oscilloscope keeps last picture while paused instead of being blanked like spectrum
+        // oscilloscope keeps last picture while paused (pause is implemented as stop) instead of being blanked like spectrum
         val scopeSource: Flow<Visualizer?> =
             visualizer.combine(playbackState) { visualizer, playbackState ->
                 ifNotNulls(visualizer, playbackState?.state) { src, state ->
-                    if (PlaybackStateCompat.STATE_PLAYING == state || PlaybackStateCompat.STATE_PAUSED == state) {
+                    if (state in SCOPE_STATES) {
                         src
                     } else {
                         VisualizerStub
@@ -276,6 +276,11 @@ class VisualizerFragment : Fragment() {
     }
 
     companion object {
+        private val SCOPE_STATES = setOf(
+            PlaybackStateCompat.STATE_PLAYING,
+            PlaybackStateCompat.STATE_PAUSED,
+            PlaybackStateCompat.STATE_STOPPED,
+        )
         private const val PREF_KEY = "ui.visualizer"
         private const val PREF_MODE_KEY = "ui.visualizer.mode"
         private val DEFAULT_STATE = State.SPECTRUM
