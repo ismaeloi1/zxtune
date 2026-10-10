@@ -14,6 +14,7 @@
 #include "module/players/duration.h"
 #include "module/players/platforms.h"
 #include "module/players/properties_meta.h"
+#include "module/players/seek_snapshots.h"
 #include "module/players/streaming.h"
 
 #include "binary/container_factories.h"
@@ -130,6 +131,29 @@ namespace Module::SPC
       SetVoicesTarget(voices);
     }
 
+    using Snapshot = ::SNES_SPC;
+
+    std::unique_ptr<Snapshot> SaveState() const
+    {
+      auto result = std::make_unique<Snapshot>();
+      CheckError(result->init());
+      result->copy_state_from(Spc);
+      return result;
+    }
+
+    // Filter is not affected, it's not run while skipping anyway
+    void LoadState(const Snapshot& state)
+    {
+      Spc.copy_state_from(state);
+      // as after skip() to match the state after it exactly
+      Spc.set_output(nullptr, 0);
+    }
+
+    void ClearFilter()
+    {
+      Filter.clear();
+    }
+
   private:
     inline static void CheckError(::blargg_err_t err)
     {
@@ -202,6 +226,9 @@ namespace Module::SPC
     return period.Get() * ::SNES_SPC::sample_rate / period.PER_SECOND;
   }
 
+  // Restored state is fast-forwarded for up to this period initially
+  const auto SNAPSHOTS_PERIOD = Time::Seconds(2);
+
   class Renderer
     : public Module::Renderer
     , public VoicesScopeSource
@@ -214,6 +241,8 @@ namespace Module::SPC
       , State(Tune->Duration)
       , Samplerate(samplerate)
       , Target(Sound::CreateResampler(::SNES_SPC::sample_rate, samplerate))
+      , Timeline(GetSamples(SNAPSHOTS_PERIOD), GetSamples(Tune->Duration), sizeof(SPC::Snapshot),
+                 GetSeekSnapshotsMemoryLimit(*Params))
     {}
 
     bool SetVoicesScope(VoicesScope::Ptr scope) override
@@ -244,11 +273,13 @@ namespace Module::SPC
       ApplyParameters();
       UpdateVoicesTap();
       const auto avail = State.ConsumeUpTo(FRAME_DURATION);
-      auto result = Target->Apply(Engine->Render(GetSamples(avail)));
+      const auto samples = GetSamples(avail);
+      auto result = Target->Apply(Engine->Render(samples));
       if (VoicesTarget)
       {
         FeedVoices(static_cast<uint_t>(result.size()));
       }
+      Timeline.Rendered(*Engine, samples);
       return result;
     }
 
@@ -260,13 +291,13 @@ namespace Module::SPC
 
     void SetPosition(Time::AtMillisecond request) override
     {
-      if (request < State.At())
+      const bool backward = request < State.At();
+      const auto toSkip = GetSamples(State.Seek(request));
+      if (Timeline.Seek(*Engine, backward, toSkip, [this]() { ResetEngine(); }) && backward)
       {
-        ResetEngine();
-      }
-      if (const auto toSkip = State.Seek(request))
-      {
-        Engine->Skip(GetSamples(toSkip));
+        // the rest of reset not covered by snapshot
+        Engine->ClearFilter();
+        Params.Reset();
       }
     }
 
@@ -275,6 +306,7 @@ namespace Module::SPC
     {
       Engine->Reset();
       Params.Reset();
+      Timeline.Reset();
     }
 
     // separate voices are rendered only while consumed
@@ -345,6 +377,12 @@ namespace Module::SPC
       {
         using namespace Parameters::ZXTune::Core;
         const auto val = Parameters::GetInteger(*Params, CHANNELS_MASK, CHANNELS_MASK_DEFAULT);
+        if (val != ChannelsMask)
+        {
+          // muted voices are not mixed into echo buffer in emulated RAM, mask is kept on reset
+          Timeline.Invalidate();
+          ChannelsMask = val;
+        }
         Engine->SetChannelsMask(val);
       }
     }
@@ -362,6 +400,8 @@ namespace Module::SPC
     std::array<Sound::Converter::Ptr, SPC::VOICES / 2> VoicesResamplers;
     std::vector<int16_t> Output;
     std::array<VoiceState, SPC::VOICES> LastStates;
+    EngineTimeline<SPC> Timeline;
+    Parameters::IntType ChannelsMask = Parameters::ZXTune::Core::CHANNELS_MASK_DEFAULT;
   };
 
   class Holder : public Module::Holder

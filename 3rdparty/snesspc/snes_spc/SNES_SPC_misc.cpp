@@ -348,6 +348,17 @@ blargg_err_t SNES_SPC::play( int count, sample_t* out )
 	return err;
 }
 
+void SNES_SPC::copy_state_from( SNES_SPC const& in )
+{
+	// DSP keeps pointer to own RAM
+	dsp.copy_state_from( in.dsp );
+	m = in.m;
+	m.extra_pos = m.extra_buf + (in.m.extra_pos - in.m.extra_buf);
+	// output buffer of other emulator is not valid here
+	m.buf_begin = 0;
+	m.buf_end   = 0;
+}
+
 blargg_err_t SNES_SPC::skip( int count )
 {
 	#if SPC_LESS_ACCURATE

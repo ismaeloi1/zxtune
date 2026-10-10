@@ -112,6 +112,11 @@ namespace
       return TotalSamples.load();
     }
 
+    void Clear()
+    {
+      Buffers.clear();
+    }
+
   private:
     struct Buff
     {
@@ -321,6 +326,8 @@ namespace
     void Seek(uint_t pos) override
     {
       Renderer->SetPosition(Time::Instant<Player::TimeBase>(pos));
+      // rest of the frame rendered before seeking should not be heard after it
+      Buffer.Clear();
       ScopeData->Reset();
     }
 

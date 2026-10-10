@@ -86,6 +86,12 @@ public:
 	
 	// Skips count samples. Several times faster than play() when using fast DSP.
 	blargg_err_t skip( int count );
+
+// Emulation state copy (zxtune extension)
+
+	// Copies emulation state of other emulator including RAM. Output buffer is reset,
+	// so you must call set_output() after this. Muting and surround settings are kept.
+	void copy_state_from( SNES_SPC const& );
 	
 // State save/load (only available with accurate DSP)
 
