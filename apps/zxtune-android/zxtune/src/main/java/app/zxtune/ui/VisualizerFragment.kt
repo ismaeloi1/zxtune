@@ -111,6 +111,17 @@ class VisualizerFragment : Fragment() {
                     }
                 }
             }.distinctUntilChanged { old, new -> old === new }
+        // oscilloscope keeps last picture while paused instead of being blanked like spectrum
+        val scopeSource: Flow<Visualizer?> =
+            visualizer.combine(playbackState) { visualizer, playbackState ->
+                ifNotNulls(visualizer, playbackState?.state) { src, state ->
+                    if (PlaybackStateCompat.STATE_PLAYING == state || PlaybackStateCompat.STATE_PAUSED == state) {
+                        src
+                    } else {
+                        VisualizerStub
+                    }
+                }
+            }.distinctUntilChanged { old, new -> old === new }
         viewLifecycleOwner.whenLifecycleStarted {
             launch {
                 // may be changed in preferences
@@ -124,7 +135,7 @@ class VisualizerFragment : Fragment() {
                 }
             }
             launch {
-                combine(playingSource, state, isTabVisible) { src, state, isTabVisible ->
+                combine(scopeSource, state, isTabVisible) { src, state, isTabVisible ->
                     src.takeIf { state == State.OSCILLOSCOPE && isTabVisible && it !== VisualizerStub }
                 }.distinctUntilChanged { old, new -> old === new }.collect {
                     oscilloscope.setSource(it)
