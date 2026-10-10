@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android Auto / car settings -->
+    <string name="pref_car_title">Android Auto</string>
+    <string name="pref_car_summary">Car display options</string>
+    <string name="pref_car_visualization_title">Show oscilloscope / dashboard in car</string>
+    <string name="pref_car_visualization_summary">Replaces the cover art on the car screen with live visualization while playing. Read the legal notice before enabling.</string>
+    <string name="pref_car_visualization_fps_title">Car visualization frame rate</string>
+    <string-array name="pref_car_visualization_fps_entries">
+        <item>1 fps</item>
+        <item>2 fps</item>
+        <item>5 fps</item>
+        <item>10 fps</item>
+        <item>15 fps</item>
+    </string-array>
+    <string-array name="pref_car_visualization_fps_values" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>5</item>
+        <item>10</item>
+        <item>15</item>
+    </string-array>
+    <string name="pref_car_visualization_fps_default" translatable="false">5</string>
+    <string name="pref_car_visualization_mode_title">Car visualization content</string>
+    <string-array name="pref_car_visualization_mode_entries">
+        <item>Oscilloscope</item>
+        <item>Chips dashboard</item>
+        <item>Both</item>
+    </string-array>
+    <string-array name="pref_car_visualization_mode_values" translatable="false">
+        <item>scope</item>
+        <item>dashboard</item>
+        <item>both</item>
+    </string-array>
+    <string name="pref_car_visualization_mode_default" translatable="false">scope</string>
+    <string name="pref_car_legal_title">Legal notice</string>
+    <string name="pref_car_legal_summary">Rules about screens visible to the driver in your country</string>
+
+    <!-- Legal notice dialog -->
+    <string name="car_disclaimer_title">Moving pictures while driving</string>
+    <string name="car_disclaimer_intro">This option displays constantly moving graphics (oscilloscope, chips activity) on the car screen. In many countries it is illegal for a screen in the driver\'s field of view to show content that is not related to driving or navigation while the vehicle is moving, and such content is a dangerous distraction.</string>
+    <string name="car_disclaimer_region_fr">France: article R412-6-2 of the Code de la route prohibits placing in the field of view of the driver of a moving vehicle an operating device with a screen that is not a driving or navigation aid. It is a 5th class offence with the loss of 3 licence points and possible confiscation of the device.</string>
+    <string name="car_disclaimer_region_de">Germany: § 23 (1a) StVO allows the driver to look at electronic devices, screens included, only briefly and as adapted to the traffic situation. Watching moving pictures while driving is subject to a fine and penalty points.</string>
+    <string name="car_disclaimer_region_gb">United Kingdom: regulation 109 of the Road Vehicles (Construction and Use) Regulations 1986 prohibits driving while a screen showing anything other than vehicle, road, navigation or driver assistance information is visible to the driver.</string>
+    <string name="car_disclaimer_region_us">United States: many states prohibit operating a vehicle while a video screen showing entertainment is visible to the driver (for example California Vehicle Code § 27602). Distracted driving laws apply in every state.</string>
+    <string name="car_disclaimer_region_eu">Europe: national road codes require the driver to keep full attention on the road and most of them restrict screens showing content unrelated to driving that are visible to the driver.</string>
+    <string name="car_disclaimer_region_other">Road rules about screens and distraction differ between countries and regions. Check the regulations where you drive.</string>
+    <string name="car_disclaimer_outro">This notice is general information, not legal advice. You remain solely responsible for using this option in compliance with local law: keep it for passengers or for when the vehicle is parked. Android Auto may also ignore or slow down the updates.</string>
+    <string name="car_disclaimer_country">Detected country: %s</string>
+    <string name="car_disclaimer_wait">Please read (%d s)</string>
+    <string name="car_disclaimer_accept">I understand, enable</string>
+    <string name="car_disclaimer_cancel">Cancel</string>
+    <string name="car_restart_title">Restart required</string>
+    <string name="car_restart_message">Restart the application now so the playback service picks the new setting up? Playback will be stopped.</string>
+    <string name="car_restart_now">Restart</string>
+    <string name="car_restart_later">Later</string>
+
+    <!-- Media browser for cars -->
+    <string name="car_recent">Recently played</string>
+    <string name="car_queue_title">Playlist</string>
+    <string name="car_action_shuffle">Shuffle</string>
+    <string name="car_action_repeat">Repeat track</string>
+    <string name="car_error_not_found">Nothing found for \"%s\"</string>
+    <string name="car_error_unsupported">This item cannot be played</string>
+    <string name="car_error_empty_playlist">Playlist is empty. Add tracks using the phone when the vehicle is parked.</string>
+</resources>

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android Auto / car settings -->
+    <string name="pref_car_title">Android Auto</string>
+    <string name="pref_car_summary">Options de l\'écran de la voiture</string>
+    <string name="pref_car_visualization_title">Afficher l\'oscilloscope / le tableau de bord dans la voiture</string>
+    <string name="pref_car_visualization_summary">Remplace la pochette sur l\'écran de la voiture par une visualisation animée pendant la lecture. Lisez l\'avertissement légal avant d\'activer.</string>
+    <string name="pref_car_visualization_fps_title">Fréquence d\'images dans la voiture</string>
+    <string-array name="pref_car_visualization_fps_entries">
+        <item>1 img/s</item>
+        <item>2 img/s</item>
+        <item>5 img/s</item>
+        <item>10 img/s</item>
+        <item>15 img/s</item>
+    </string-array>
+    <string name="pref_car_visualization_mode_title">Contenu affiché dans la voiture</string>
+    <string-array name="pref_car_visualization_mode_entries">
+        <item>Oscilloscope</item>
+        <item>Tableau de bord des puces</item>
+        <item>Les deux</item>
+    </string-array>
+    <string name="pref_car_legal_title">Avertissement légal</string>
+    <string name="pref_car_legal_summary">Règles sur les écrans visibles par le conducteur dans votre pays</string>
+
+    <!-- Legal notice dialog -->
+    <string name="car_disclaimer_title">Images animées pendant la conduite</string>
+    <string name="car_disclaimer_intro">Cette option affiche des graphismes en mouvement permanent (oscilloscope, activité des puces) sur l\'écran de la voiture. Dans de nombreux pays, il est interdit qu\'un écran situé dans le champ de vision du conducteur affiche, véhicule en circulation, un contenu sans rapport avec la conduite ou la navigation, et un tel contenu est une source de distraction dangereuse.</string>
+    <string name="car_disclaimer_region_fr">France : l\'article R412-6-2 du Code de la route interdit le placement dans le champ de vision du conducteur d\'un véhicule en circulation d\'un appareil en fonctionnement doté d\'un écran et ne constituant pas une aide à la conduite ou à la navigation. Il s\'agit d\'une contravention de 5e classe entraînant le retrait de 3 points du permis et pouvant conduire à la confiscation de l\'appareil.</string>
+    <string name="car_disclaimer_region_de">Allemagne : le § 23 (1a) de la StVO n\'autorise le conducteur à regarder un appareil électronique, écrans compris, que brièvement et de façon adaptée à la circulation. Regarder des images animées en conduisant est passible d\'une amende et de points.</string>
+    <string name="car_disclaimer_region_gb">Royaume-Uni : la regulation 109 des Road Vehicles (Construction and Use) Regulations 1986 interdit de conduire lorsqu\'un écran affichant autre chose que des informations sur le véhicule, la route, la navigation ou l\'aide à la conduite est visible par le conducteur.</string>
+    <string name="car_disclaimer_region_us">États-Unis : de nombreux États interdisent de conduire lorsqu\'un écran vidéo de divertissement est visible par le conducteur (par exemple le California Vehicle Code § 27602). Des lois contre la distraction au volant s\'appliquent dans tous les États.</string>
+    <string name="car_disclaimer_region_eu">Europe : les codes de la route nationaux imposent au conducteur de rester attentif à la route et la plupart limitent les écrans visibles par le conducteur affichant un contenu sans rapport avec la conduite.</string>
+    <string name="car_disclaimer_region_other">Les règles relatives aux écrans et à la distraction au volant varient selon les pays et les régions. Vérifiez la réglementation là où vous conduisez.</string>
+    <string name="car_disclaimer_outro">Cet avertissement est une information générale et non un conseil juridique. Vous restez seul responsable de l\'utilisation de cette option dans le respect de la loi locale : réservez-la aux passagers ou au véhicule à l\'arrêt. Android Auto peut aussi ignorer ou ralentir les mises à jour.</string>
+    <string name="car_disclaimer_country">Pays détecté : %s</string>
+    <string name="car_disclaimer_wait">Veuillez lire (%d s)</string>
+    <string name="car_disclaimer_accept">J\'ai compris, activer</string>
+    <string name="car_disclaimer_cancel">Annuler</string>
+    <string name="car_restart_title">Redémarrage nécessaire</string>
+    <string name="car_restart_message">Redémarrer l\'application maintenant pour que le service de lecture prenne en compte le nouveau réglage ? La lecture sera arrêtée.</string>
+    <string name="car_restart_now">Redémarrer</string>
+    <string name="car_restart_later">Plus tard</string>
+
+    <!-- Media browser for cars -->
+    <string name="car_recent">Écoutés récemment</string>
+    <string name="car_queue_title">Liste de lecture</string>
+    <string name="car_action_shuffle">Lecture aléatoire</string>
+    <string name="car_action_repeat">Répéter le morceau</string>
+    <string name="car_error_not_found">Aucun résultat pour « %s »</string>
+    <string name="car_error_unsupported">Cet élément ne peut pas être lu</string>
+    <string name="car_error_empty_playlist">La liste de lecture est vide. Ajoutez des morceaux avec le téléphone lorsque le véhicule est à l\'arrêt.</string>
+</resources>

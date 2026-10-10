@@ -10,10 +10,12 @@ import android.app.PendingIntent;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.media.session.MediaSessionCompat;
 
+import androidx.annotation.Nullable;
 import androidx.media.session.MediaButtonReceiver;
 
 import app.zxtune.MainActivity;
@@ -28,6 +30,7 @@ public class MediaSessionControl implements Releaseable {
   private static final String TAG = MediaSessionControl.class.getName();
 
   private final MediaSessionCompat session;
+  private final StatusCallback status;
   private final Releaseable callback;
   private final ControlCallback control;
 
@@ -35,8 +38,9 @@ public class MediaSessionControl implements Releaseable {
     final ComponentName mbrComponent = new ComponentName(ctx, MediaButtonReceiver.class);
     session = new MediaSessionCompat(ctx, TAG, mbrComponent, null);
     session.setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS | MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS | MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS);
-    callback = StatusCallback.subscribe(ctx, svc, session);
-    control = new ControlCallback(ctx, svc, session);
+    status = StatusCallback.Companion.create(ctx, svc, session);
+    callback = svc.subscribe(status);
+    control = new ControlCallback(ctx, svc, status);
     session.setCallback(control);
     session.setMediaButtonReceiver(PendingIntent.getBroadcast(ctx, 0,
         new Intent(Intent.ACTION_MEDIA_BUTTON).setComponent(mbrComponent),
@@ -61,6 +65,13 @@ public class MediaSessionControl implements Releaseable {
 
   public final MediaSessionCompat getSession() {
     return session;
+  }
+
+  /**
+   * @param art live picture replacing artwork (e.g. oscilloscope for car screen), null to restore
+   */
+  public final void setLiveArt(@Nullable Bitmap art) {
+    status.setLiveArt(art);
   }
 
   @Override

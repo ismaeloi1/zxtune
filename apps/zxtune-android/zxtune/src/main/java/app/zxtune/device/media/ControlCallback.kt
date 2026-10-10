@@ -6,15 +6,20 @@ import android.os.Bundle
 import android.os.ResultReceiver
 import android.provider.MediaStore
 import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import android.support.v4.media.session.PlaybackStateCompat.RepeatMode
 import android.support.v4.media.session.PlaybackStateCompat.ShuffleMode
 import app.zxtune.Logger
 import app.zxtune.MainService
+import app.zxtune.R
 import app.zxtune.Releaseable
 import app.zxtune.ScanService
 import app.zxtune.TimeStamp.Companion.fromMilliseconds
 import app.zxtune.core.PropertiesAccessor
 import app.zxtune.core.PropertiesModifier
+import app.zxtune.fs.Vfs
+import app.zxtune.fs.VfsFile
+import app.zxtune.playback.PlaybackControl
 import app.zxtune.playback.service.PlaybackServiceLocal
 import app.zxtune.playback.stubs.PlayableItemStub
 import app.zxtune.playlist.PlaylistQuery
@@ -32,7 +37,7 @@ import kotlinx.coroutines.launch
 internal class ControlCallback(
     private val ctx: Context,
     private val svc: PlaybackServiceLocal,
-    private val session: MediaSessionCompat,
+    private val status: StatusCallback,
 ) : MediaSessionCompat.Callback(),
     Releaseable {
     // Session callbacks are called on main thread, so database queries are moved out of it
@@ -67,6 +72,24 @@ internal class ControlCallback(
             ScanService.add(ctx, Array(it.size) { idx -> it[idx] as Uri })
         } ?: Unit
 
+        StatusCallback.CUSTOM_ACTION_TOGGLE_SHUFFLE -> {
+            ctrl.sequenceMode = if (ctrl.sequenceMode == PlaybackControl.SequenceMode.SHUFFLE) {
+                PlaybackControl.SequenceMode.ORDERED
+            } else {
+                PlaybackControl.SequenceMode.SHUFFLE
+            }
+            status.updateModes()
+        }
+
+        StatusCallback.CUSTOM_ACTION_TOGGLE_REPEAT -> {
+            ctrl.trackMode = if (ctrl.trackMode == PlaybackControl.TrackMode.LOOPED) {
+                PlaybackControl.TrackMode.REGULAR
+            } else {
+                PlaybackControl.TrackMode.LOOPED
+            }
+            status.updateModes()
+        }
+
         else -> Unit
     }
 
@@ -97,44 +120,77 @@ internal class ControlCallback(
 
     override fun onSetShuffleMode(@ShuffleMode mode: Int) = fromShuffleMode(mode)?.let {
         ctrl.sequenceMode = it
-        session.setShuffleMode(mode)
+        status.updateModes()
     } ?: Unit
 
     override fun onSetRepeatMode(@RepeatMode mode: Int) = fromRepeatMode(mode)?.let {
         ctrl.trackMode = it
-        session.setRepeatMode(mode)
+        status.updateModes()
     } ?: Unit
 
     override fun onPlayFromUri(uri: Uri, extras: Bundle?) = svc.setNowPlaying(uri)
 
+    // Queue is the playlist, see BrowseTree.getQueue
+    override fun onSkipToQueueItem(id: Long) = svc.setNowPlaying(PlaylistQuery.uriFor(id))
+
     // Called by external browsers (Android Auto etc) with ids from BrowseTree
     override fun onPlayFromMediaId(mediaId: String, extras: Bundle?) {
         val uri = BrowseTree.getPlayableUri(mediaId)
-        if (uri != null) {
-            svc.setNowPlaying(uri)
-        } else {
-            LOG.d { "Ignore unsupported media id '$mediaId'" }
+        when {
+            uri == null -> reportUnsupported(mediaId)
+
+            BrowseTree.getVfsUri(mediaId) == null -> svc.setNowPlaying(uri)
+
+            // resolving may require network access
+            else -> scope.launch {
+                val isFile = runCatching { Vfs.resolve(uri) is VfsFile }.onFailure {
+                    LOG.w(it) { "Failed to resolve $uri" }
+                }.getOrDefault(false)
+                if (isFile) {
+                    svc.setNowPlaying(uri)
+                } else {
+                    reportUnsupported(mediaId)
+                }
+            }
         }
+    }
+
+    private fun reportUnsupported(mediaId: String) {
+        LOG.d { "Ignore unsupported media id '$mediaId'" }
+        status.reportError(
+            PlaybackStateCompat.ERROR_CODE_NOT_SUPPORTED,
+            ctx.getString(R.string.car_error_unsupported)
+        )
     }
 
     // Voice requests like "play <title> on zxtune". Empty query means "play anything".
     override fun onPlayFromSearch(query: String?, extras: Bundle?) {
         val title = extras?.getString(MediaStore.EXTRA_MEDIA_TITLE)?.takeIf { it.isNotBlank() }
         val filter = title ?: query?.takeIf { it.isNotBlank() }
-        if (filter == null) {
-            svc.setNowPlaying(PlaylistQuery.ALL)
-            return
-        }
         scope.launch {
-            runCatching {
-                ProviderClient.create(ctx).queryContent()?.let {
-                    BrowseTree.search(it, filter).firstOrNull()
-                }
+            val content = runCatching {
+                ProviderClient.create(ctx).queryContent()
             }.onFailure {
                 LOG.w(it) { "Failed to search in playlist" }
-            }.getOrNull()?.let {
-                svc.setNowPlaying(BrowseTree.getPlayableUri(it))
-            } ?: LOG.d { "Nothing found for '$filter'" }
+            }.getOrNull().orEmpty()
+            when {
+                content.isEmpty() -> status.reportError(
+                    PlaybackStateCompat.ERROR_CODE_END_OF_QUEUE,
+                    ctx.getString(R.string.car_error_empty_playlist)
+                )
+
+                filter == null -> svc.setNowPlaying(PlaylistQuery.ALL)
+
+                else -> BrowseTree.search(content, filter).firstOrNull()?.let {
+                    svc.setNowPlaying(BrowseTree.getPlayableUri(it))
+                } ?: run {
+                    LOG.d { "Nothing found for '$filter'" }
+                    status.reportError(
+                        PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR,
+                        ctx.getString(R.string.car_error_not_found, filter)
+                    )
+                }
+            }
         }
     }
 

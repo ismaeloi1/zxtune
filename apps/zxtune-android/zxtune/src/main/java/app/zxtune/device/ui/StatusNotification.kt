@@ -24,11 +24,13 @@ import app.zxtune.Logger
 import app.zxtune.MainService
 import app.zxtune.R
 import app.zxtune.Releaseable
+import app.zxtune.device.media.isLiveArtFrame
 
 private val LOG = Logger(StatusNotification::class.java.name)
 
 class StatusNotification private constructor(
-    private val service: Service, session: MediaSessionCompat
+    private val service: Service,
+    session: MediaSessionCompat
 ) : MediaControllerCompat.Callback() {
 
     companion object {
@@ -53,6 +55,7 @@ class StatusNotification private constructor(
         Notifications.createForService(service, R.drawable.ic_stat_notify_play)
     private var isPlaying = false
     private var isForeground = false
+    private var lastMediaId: String? = null
 
     init {
         notification.builder.run {
@@ -82,18 +85,15 @@ class StatusNotification private constructor(
         addAction(createAction(R.drawable.ic_next, PlaybackStateCompat.ACTION_SKIP_TO_NEXT))
     }
 
-    private fun createAction(@DrawableRes icon: Int, @MediaKeyAction action: Long) =
-        NotificationCompat.Action(
-            icon,
-            "",
-            MediaButtonReceiver.buildMediaButtonPendingIntent(service, action)
-        )
+    private fun createAction(@DrawableRes icon: Int, @MediaKeyAction action: Long) = NotificationCompat.Action(
+        icon,
+        "",
+        MediaButtonReceiver.buildMediaButtonPendingIntent(service, action)
+    )
 
-    private fun createPauseAction() =
-        createAction(R.drawable.ic_pause, PlaybackStateCompat.ACTION_STOP)
+    private fun createPauseAction() = createAction(R.drawable.ic_pause, PlaybackStateCompat.ACTION_STOP)
 
-    private fun createPlayAction() =
-        createAction(R.drawable.ic_play, PlaybackStateCompat.ACTION_PLAY)
+    private fun createPlayAction() = createAction(R.drawable.ic_play, PlaybackStateCompat.ACTION_PLAY)
 
     private fun startForeground() = try {
         ContextCompat.startForegroundService(service, MainService.createIntent(service, null))
@@ -132,10 +132,17 @@ class StatusNotification private constructor(
     } ?: Unit
 
     override fun onMetadataChanged(metadata: MediaMetadataCompat) = metadata.description.run {
+        // live artwork for car screen changes several times per second, system throttles
+        // notification updates and the picture is useless in the small icon anyway
+        val isLive = metadata.isLiveArtFrame()
+        if (isLive && mediaId == lastMediaId) {
+            return@run
+        }
+        lastMediaId = mediaId
         notification.builder
             .setContentTitle(title)
             .setContentText(subtitle)
-            .setLargeIcon(iconBitmap)
+            .setLargeIcon(if (isLive) null else iconBitmap)
         if (isPlaying) {
             notification.show()
         }

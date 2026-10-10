@@ -43,7 +43,8 @@ android {
         applicationId "app.zxtune"
         targetSdk = 36
         //supported languages
-        resourceConfigurations += ['en', 'de', 'ru', 'es', 'cs', 'zh', 'ja', 'pt']
+        // 'fr' only has car legal notice translated: it refers to french road code
+        resourceConfigurations += ['en', 'de', 'ru', 'es', 'cs', 'zh', 'ja', 'pt', 'fr']
         //supported densities for vector drawables rasterization
         vectorDrawables.generatedDensities  "mdpi", "hdpi", "xhdpi", "xxhdpi"
 

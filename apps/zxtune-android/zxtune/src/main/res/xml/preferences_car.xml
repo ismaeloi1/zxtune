@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="@string/pref_car_title">
+        <!-- Disabled by default, enabling is confirmed by legal notice, see PreferencesActivity -->
+        <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="ui.car.visualization"
+                android:summary="@string/pref_car_visualization_summary"
+                android:title="@string/pref_car_visualization_title" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_car_visualization_mode_default"
+                android:dependency="ui.car.visualization"
+                android:entries="@array/pref_car_visualization_mode_entries"
+                android:entryValues="@array/pref_car_visualization_mode_values"
+                android:key="ui.car.visualization.mode"
+                android:title="@string/pref_car_visualization_mode_title"
+                app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_car_visualization_fps_default"
+                android:dependency="ui.car.visualization"
+                android:entries="@array/pref_car_visualization_fps_entries"
+                android:entryValues="@array/pref_car_visualization_fps_values"
+                android:key="ui.car.visualization.fps"
+                android:title="@string/pref_car_visualization_fps_title"
+                app:useSimpleSummaryProvider="true" />
+        <Preference
+                android:key="ui.car.legal"
+                android:persistent="false"
+                android:summary="@string/pref_car_legal_summary"
+                android:title="@string/pref_car_legal_title" />
+    </PreferenceCategory>
+</PreferenceScreen>
