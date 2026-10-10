@@ -82,6 +82,11 @@ namespace Devices::FM::Details
       return {::YM2203Init(LastClockrate, LastSoundFreq), &::YM2203Shutdown};
     }
 
+    uint64_t GetClock() const
+    {
+      return LastClockrate;
+    }
+
     static void ConvertSamples(const YM2203SampleType* inBegin, const YM2203SampleType* inEnd, Sound::Sample* out)
     {
       std::transform(inBegin, inEnd, out, &ConvertToSample);
@@ -128,9 +133,25 @@ namespace Devices::FM::Details
     {
       const auto samples = Clock.AdvanceTo(stamp);
       Require(samples);
-      auto result = Adapter.RenderSamples(samples);
+      auto result = Adapter.RenderSamples(samples, ChannelsEnabled ? &ChannelsOutput : nullptr);
       SynchronizeParameters();
       return result;
+    }
+
+    void SetChannelsOutput(bool enabled) override
+    {
+      ChannelsEnabled = enabled;
+      ChannelsOutput.clear();
+    }
+
+    const std::vector<int16_t>& GetChannelsOutput() const override
+    {
+      return ChannelsOutput;
+    }
+
+    void GetChannelsState(ChannelState* target) const override
+    {
+      Adapter.GetChannelsState(target);
     }
 
   private:
@@ -150,5 +171,7 @@ namespace Devices::FM::Details
     Parameters::TrackingHelper<ChipParameters> Params;
     typename ChipTraits::AdapterType Adapter;
     ClockSource Clock;
+    bool ChannelsEnabled = false;
+    std::vector<int16_t> ChannelsOutput;
   };
 }  // namespace Devices::FM::Details
