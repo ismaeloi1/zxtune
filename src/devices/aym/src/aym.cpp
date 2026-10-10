@@ -26,6 +26,7 @@ namespace Devices::AYM
     using PSGType = PSG;
     using ChipBaseType = Chip;
     static const uint_t VOICES = AYM::VOICES;
+    static const uint_t CHIPS = 1;
   };
 
   Chip::Ptr CreateChip(ChipParameters::Ptr params, MixerType::Ptr mixer)

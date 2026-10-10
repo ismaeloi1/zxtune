@@ -48,6 +48,13 @@ namespace Devices::AYM
       return Lookup[in];
     }
 
+    //! @param level single channel level 0..31
+    //! @return channel's DAC output before mixing
+    Sound::Sample::Type GetChannelLevel(uint_t level) const
+    {
+      return Table[level];
+    }
+
   private:
     static const Sound::Sample::Type* GetVolumeTable(ChipType type)
     {

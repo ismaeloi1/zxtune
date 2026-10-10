@@ -13,6 +13,7 @@
 #include "formats/chiptune/emulation/ay.h"
 #include "module/players/aym/aym_base.h"
 #include "module/players/aym/aym_properties_helper.h"
+#include "module/players/aym/aym_voices.h"
 #include "module/players/duration.h"
 #include "module/players/properties_helper.h"
 #include "module/players/properties_meta.h"
@@ -93,6 +94,11 @@ namespace Module::AYEMUL
       Chip->RenderData(Chunks);
       Chunks.clear();
       return Chip->RenderTill(till);
+    }
+
+    Devices::AYM::ChannelsSource& GetChannels() const
+    {
+      return *Chip;
     }
 
   private:
@@ -219,6 +225,11 @@ namespace Module::AYEMUL
     void SetBeeperValue(const Devices::Z80::Stamp& timeStamp, bool val)
     {
       Beeper.SetLevel(timeStamp.CastTo<Devices::Beeper::TimeUnit>(), val);
+    }
+
+    Devices::AYM::ChannelsSource& GetAyChannels() const
+    {
+      return Ay.GetChannels();
     }
 
     Sound::Chunk RenderFrameTill(Time::AtMicrosecond till)
@@ -539,15 +550,25 @@ namespace Module::AYEMUL
     Devices::Z80::Chip::Ptr CPU;
   };
 
-  class Renderer : public Module::Renderer
+  class Renderer
+    : public Module::Renderer
+    , public VoicesScopeSource
   {
   public:
-    Renderer(const ModuleData& data, Computer::Ptr comp, DataChannel::Ptr device)
+    Renderer(const ModuleData& data, Computer::Ptr comp, DataChannel::Ptr device, Parameters::Accessor::Ptr params)
       : State((data.FrameDuration * data.Frames).CastTo<Time::Millisecond>())
       , Comp(std::move(comp))
       , Device(std::move(device))
       , FrameDuration(data.FrameDuration)
+      , Voices(std::move(params), 1)
     {}
+
+    // beeper is not a separate voice, it's rarely used together with AY
+    bool SetVoicesScope(VoicesScope::Ptr scope) override
+    {
+      Voices.SetScope(std::move(scope), Device->GetAyChannels());
+      return true;
+    }
 
     Module::State GetState() const override
     {
@@ -558,8 +579,11 @@ namespace Module::AYEMUL
     {
       State.ConsumeUpTo(FrameDuration);
       DeviceTime += FrameDuration;
+      Voices.Prepare(Device->GetAyChannels());
       Comp->ExecuteFrameTill(DeviceTime);
-      return Device->RenderFrameTill(DeviceTime);
+      auto result = Device->RenderFrameTill(DeviceTime);
+      Voices.Rendered(Device->GetAyChannels());
+      return result;
     }
 
     void Reset() override
@@ -596,6 +620,7 @@ namespace Module::AYEMUL
     const Time::Microseconds FrameDuration;
     // Monotonic time, does not change on fast-forward
     Time::AtMicrosecond DeviceTime;
+    AYM::VoicesFeed Voices;
   };
 
   class DataBuilder : public Formats::Chiptune::AY::Builder
@@ -739,11 +764,11 @@ namespace Module::AYEMUL
     Renderer::Ptr CreateRenderer(Parameters::Accessor::Ptr params, Devices::AYM::Chip::Ptr ay,
                                  Devices::Beeper::Chip::Ptr beep) const
     {
-      auto cpuParams = MakePtr<CPUParameters>(std::move(params));
+      auto cpuParams = MakePtr<CPUParameters>(params);
       auto channel = MakePtr<DataChannel>(std::move(ay), std::move(beep));
       auto cpuPorts = PortsPlexer::Create(channel);
       auto comp = MakePtr<Computer>(Data, std::move(cpuParams), std::move(cpuPorts));
-      return MakePtr<Renderer>(*Data, std::move(comp), std::move(channel));
+      return MakePtr<Renderer>(*Data, std::move(comp), std::move(channel), std::move(params));
     }
 
   private:

@@ -10,6 +10,7 @@
 
 #include "module/players/aym/turbosound.h"
 
+#include "module/players/aym/aym_voices.h"
 #include "module/players/streaming.h"
 #include "parameters/src/names_set.h"
 
@@ -189,14 +190,24 @@ namespace Module::TurboSound
     const AYM::DataIterator::Ptr Second;
   };
 
-  class Renderer : public Module::Renderer
+  class Renderer
+    : public Module::Renderer
+    , public VoicesScopeSource
   {
   public:
-    Renderer(Time::Microseconds frameDuration, DataIterator::Ptr iterator, Devices::TurboSound::Chip::Ptr device)
+    Renderer(Time::Microseconds frameDuration, DataIterator::Ptr iterator, Devices::TurboSound::Chip::Ptr device,
+             Parameters::Accessor::Ptr params)
       : Iterator(std::move(iterator))
       , Device(std::move(device))
       , FrameDuration(frameDuration)
+      , Voices(std::move(params), Devices::TurboSound::CHIPS)
     {}
+
+    bool SetVoicesScope(VoicesScope::Ptr scope) override
+    {
+      Voices.SetScope(std::move(scope), *Device);
+      return true;
+    }
 
     State GetState() const override
     {
@@ -205,10 +216,13 @@ namespace Module::TurboSound
 
     Sound::Chunk Render() override
     {
+      Voices.Prepare(*Device);
       TransferChunk();
       Iterator->NextFrame();
       LastChunk.TimeStamp += FrameDuration;
-      return Device->RenderTill(LastChunk.TimeStamp);
+      auto result = Device->RenderTill(LastChunk.TimeStamp);
+      Voices.Rendered(*Device);
+      return result;
     }
 
     void Reset() override
@@ -245,6 +259,7 @@ namespace Module::TurboSound
     const Devices::TurboSound::Chip::Ptr Device;
     const Time::Duration<Devices::TurboSound::TimeUnit> FrameDuration;
     Devices::TurboSound::DataChunk LastChunk;
+    AYM::VoicesFeed Voices;
   };
 
   class MergedChiptune : public Chiptune
@@ -327,9 +342,9 @@ namespace Module::TurboSound
     {
       auto iterator =
           Tune->CreateDataIterator(AYM::TrackParameters::Create(params, 0), AYM::TrackParameters::Create(params, 1));
-      auto chip = CreateChip(samplerate, std::move(params));
-      return MakePtr<Renderer>(Tune->GetFrameDuration() /*TODO: speed variation*/, std::move(iterator),
-                               std::move(chip));
+      auto chip = CreateChip(samplerate, params);
+      return MakePtr<Renderer>(Tune->GetFrameDuration() /*TODO: speed variation*/, std::move(iterator), std::move(chip),
+                               std::move(params));
     }
 
   private:

@@ -65,6 +65,19 @@ namespace Devices::TurboSound
       return Sound::Sample::FastAdd(s0, s1);
     }
 
+    // chips levels are stored interleaved
+    void SetLevelsRecord(std::vector<uint16_t>* target)
+    {
+      Chip0.SetLevelsRecord(target);
+      Chip1.SetLevelsRecord(target);
+    }
+
+    void GetChannelsState(uint64_t clockFreq, AYM::ChannelState* target) const
+    {
+      Chip0.GetChannelsState(clockFreq, target);
+      Chip1.GetChannelsState(clockFreq, target + AYM::SOUND_CHANNELS);
+    }
+
   private:
     AYM::PSG Chip0;
     AYM::PSG Chip1;
@@ -76,6 +89,7 @@ namespace Devices::TurboSound
     using PSGType = PSG;
     using ChipBaseType = Chip;
     static const uint_t VOICES = TurboSound::VOICES;
+    static const uint_t CHIPS = TurboSound::CHIPS;
   };
 
   class HalfLevelMixer : public MixerType

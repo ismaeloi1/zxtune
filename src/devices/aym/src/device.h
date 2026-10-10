@@ -130,6 +130,11 @@ namespace Devices::AYM
       return level & toneA & toneB & toneC & noise;
     }
 
+    uint_t GetEnvelopeLevel() const
+    {
+      return GenE.GetLevel();
+    }
+
   private:
     void SetLevel(uint_t chan, uint_t reg)
     {
