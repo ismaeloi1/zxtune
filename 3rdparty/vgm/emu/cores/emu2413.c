@@ -30,6 +30,9 @@ static UINT8 device_start_ym2413_emu(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf
 static void ym2413_update_emu(void *chip, UINT32 samples, DEV_SMPL **out);
 static void ym2413_set_mute_mask_emu(void *chip, UINT32 MuteMask);
 static void ym2413_pan_emu(void* chip, const INT16* PanVals);
+static void ym2413_set_voices_cb_emu(void *chip, DEVCB_VOICES cb, void* param);
+static UINT32 ym2413_get_voices_state_emu(void *chip, UINT32 count, DEV_VOICE_STATE* states);
+static void ym2413_output_voices(EOPLL *opll);
 
 
 static DEVDEF_RWFUNC devFunc[] =
@@ -38,6 +41,8 @@ static DEVDEF_RWFUNC devFunc[] =
 	{RWF_REGISTER | RWF_QUICKWRITE, DEVRW_A8D8, 0, EOPLL_writeReg},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, ym2413_set_mute_mask_emu},
 	{RWF_CHN_PAN | RWF_WRITE, DEVRW_ALL, 0, ym2413_pan_emu},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, ym2413_set_voices_cb_emu},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, ym2413_get_voices_state_emu},
 	{0x00, 0x00, 0, NULL}
 };
 DEV_DEF devDef_YM2413_Emu =
@@ -1521,6 +1526,8 @@ void EOPLL_calcStereo(EOPLL *opll, int32_t out[2]) {
     opll->out_time += opll->inp_step;
     update_output(opll);
     mix_output_stereo(opll);
+    if (opll->voicesCb)
+      ym2413_output_voices(opll);
   }
   opll->out_time -= opll->out_step;
   if (opll->conv) {
@@ -1616,6 +1623,80 @@ static const uint8_t PAN_MAP[14] = {
 	0, 1, 2, 3, 4, 5, 6, 7, 8,
 	9, 11, 12, 13, 10
 };
+
+static void ym2413_set_voices_cb_emu(void *chip, DEVCB_VOICES cb, void* param)
+{
+	EOPLL *opll = (EOPLL *)chip;
+	opll->voicesCb = cb;
+	opll->voicesParam = param;
+}
+
+static void ym2413_output_voices(EOPLL *opll)
+{
+	INT32 voices[14];
+	uint8_t curChn;
+	
+	// real chip's output polarity (melodic channels are inverted) is kept, so voices sum matches mixed output
+	for (curChn = 0; curChn < 14; curChn ++)
+		voices[curChn] = opll->ch_out[PAN_MAP[curChn]] * 8;
+	opll->voicesCb(opll->voicesParam, 14, voices);
+}
+
+static void ym2413_fill_voice_state(DEV_VOICE_STATE* state, const EOPLL_SLOT* slot, float freq, UINT8 flags)
+{
+	// envelope and total level are in 0.375dB steps
+	uint32_t att = slot->eg_out + slot->tll;
+	if (att > EG_MUTE)
+		att = EG_MUTE;
+	state->freq = freq;
+	state->level = att >= EG_MUTE ? -96.0f : -(float)(att * EG_STEP);
+	state->flags = flags | DEVVOICE_LEVEL;
+	state->kind = DEVVOICE_KIND_GENERIC;
+	memset(state->fields, 0, sizeof(state->fields));
+}
+
+static UINT32 ym2413_get_voices_state_emu(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	// BD, SD, TOM, CYM, HH slots and key bits in register 0x0E
+	static const uint8_t RHYTHM_SLOTS[5] = {13, 15, 16, 17, 14};
+	static const uint8_t RHYTHM_KEYS[5] = {0x10, 0x08, 0x04, 0x02, 0x01};
+	EOPLL *opll = (EOPLL *)chip;
+	const double rate = opll->clk / 72.0;
+	float freqs[9];
+	uint8_t curChn;
+	
+	for (curChn = 0; curChn < 9; curChn ++)
+	{
+		const uint32_t fnum = opll->reg[0x10 + curChn] | ((opll->reg[0x20 + curChn] & 1) << 8);
+		const uint32_t block = (opll->reg[0x20 + curChn] >> 1) & 7;
+		// fnote = fnum * rate * 2^(block-1) / 2^18
+		freqs[curChn] = (float)(fnum * rate * (1 << block) / (double)(1 << 19));
+	}
+	for (curChn = 0; curChn < 9 && curChn < count; curChn ++)
+	{
+		const uint8_t keyOn = (opll->reg[0x20 + curChn] & 0x10) ? DEVVOICE_KEYON : 0;
+		if (opll->rhythm_mode && curChn >= 6)
+			ym2413_fill_voice_state(&states[curChn], CAR(opll, curChn), 0.0f, 0);
+		else
+			ym2413_fill_voice_state(&states[curChn], CAR(opll, curChn), freqs[curChn], DEVVOICE_FREQ | keyOn);
+		if (opll->rhythm_mode && curChn >= 6)
+			states[curChn].level = -96.0f;
+	}
+	for (curChn = 0; curChn < 5 && 9 + curChn < count; curChn ++)
+	{
+		DEV_VOICE_STATE* state = &states[9 + curChn];
+		const uint8_t keyOn = (opll->rhythm_mode && (opll->reg[0x0e] & RHYTHM_KEYS[curChn])) ? DEVVOICE_KEYON : 0;
+		if (curChn == 0)
+			ym2413_fill_voice_state(state, &opll->slot[RHYTHM_SLOTS[curChn]], freqs[6], DEVVOICE_FREQ | keyOn);
+		else if (curChn == 2)
+			ym2413_fill_voice_state(state, &opll->slot[RHYTHM_SLOTS[curChn]], freqs[8], DEVVOICE_FREQ | keyOn);
+		else
+			ym2413_fill_voice_state(state, &opll->slot[RHYTHM_SLOTS[curChn]], 0.0f, DEVVOICE_NOISE | keyOn);
+		if (! opll->rhythm_mode)
+			state->level = -96.0f;
+	}
+	return 14;
+}
 
 static void ym2413_pan_emu(void* chip, const INT16* PanVals)
 {

@@ -43,7 +43,9 @@ namespace Devices::TurboSound
     virtual void Reset() = 0;
   };
 
-  class Chip : public Device
+  class Chip
+    : public Device
+    , public AYM::ChannelsSource
   {
   public:
     using Ptr = std::unique_ptr<Chip>;

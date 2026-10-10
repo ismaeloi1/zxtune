@@ -54,6 +54,8 @@ static void ym2151_shutdown(void *_chip);
 static void ym2151_reset_chip(void *_chip);
 static void ym2151_update_one(void *chip, UINT32 length, DEV_SMPL **buffers);
 static void ym2151_set_mute_mask(void *chip, UINT32 MuteMask);
+static void ym2151_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+static UINT32 ym2151_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 static UINT8 device_start_ym2151(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf);
 static UINT8 ym2151_r(void *chip, UINT8 offset);
 static void ym2151_w(void *chip, UINT8 offset, UINT8 data);
@@ -65,6 +67,8 @@ static DEVDEF_RWFUNC devFunc_MAME[] =
 	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, ym2151_r},
 	{RWF_REGISTER | RWF_QUICKWRITE, DEVRW_A8D8, 0, ym2151_write_reg},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, ym2151_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, ym2151_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, ym2151_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 DEV_DEF devDef_YM2151_MAME =
@@ -230,6 +234,9 @@ typedef struct
 	UINT8       lastreg;
 	void (*irqhandler)(void *param, UINT8 irq);
 	void (*portwritehandler)(void *param, UINT8 ofs, UINT8 data);
+
+	DEVCB_VOICES voicesCb;
+	void*       voicesParam;
 } YM2151;
 
 
@@ -1982,6 +1989,12 @@ static void ym2151_update_one(void *chip, UINT32 length, DEV_SMPL **buffers)
 		buffers[0][i] = outl;
 		buffers[1][i] = outr;
 
+		if (PSG->voicesCb)
+		{
+			/* channels outputs before panning */
+			PSG->voicesCb(PSG->voicesParam, 8, PSG->chanout);
+		}
+
 		advance(PSG);
 
 		/* calculate timer A */
@@ -2023,6 +2036,65 @@ void ym2151_set_irq_handler(void *chip, void(*handler)(void *param, UINT8 irq))
 {
 	YM2151 *PSG = (YM2151 *)chip;
 	PSG->irqhandler = handler;
+}
+
+static void ym2151_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	YM2151 *PSG = (YM2151 *)chip;
+	PSG->voicesCb = cb;
+	PSG->voicesParam = param;
+}
+
+static UINT32 ym2151_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	/* carriers per algorithm in OPN operators order (M1, C1, M2, C2), as OPN_FM voice kind requires */
+	static const UINT8 CARRIERS[8] = {0x08, 0x08, 0x08, 0x08, 0x0a, 0x0e, 0x0e, 0x0f};
+	/* operators indices in OPN order, chip stores them as M1, M2, C1, C2 */
+	static const UINT8 OPS[4] = {0, 2, 1, 3};
+	YM2151 *PSG = (YM2151 *)chip;
+	UINT32 ch;
+
+	for (ch = 0; ch < 8 && ch < count; ch ++)
+	{
+		const YM2151Operator* op = &PSG->oper[ch * 4];
+		const UINT8 alg = PSG->connect[ch] & 7;
+		DEV_VOICE_STATE* state = &states[ch];
+		UINT32 minAtt = MAX_ATT_INDEX;
+		UINT8 keyOn = 0;
+		UINT8 idx;
+
+		memset(state->fields, 0, sizeof(state->fields));
+		for (idx = 0; idx < 4; idx ++)
+		{
+			const YM2151Operator* slot = &op[OPS[idx]];
+			UINT32 att = (UINT32)slot->volume + slot->tl;
+			if (att > MAX_ATT_INDEX)
+				att = MAX_ATT_INDEX;
+			state->fields[2 + idx] = (UINT8)(255 - att * 255 / MAX_ATT_INDEX);
+			if (slot->key)
+				state->fields[10] |= 1 << idx;
+			if (CARRIERS[alg] & (1 << idx))
+			{
+				if (slot->key)
+					keyOn = 1;
+				if (att < minAtt)
+					minAtt = att;
+			}
+		}
+		/* kc_i is 64 steps per semitone starting from C#0 at 768, A4 (KC=0x4A) is 440Hz at 3.58MHz */
+		state->freq = (float)(440.0 * pow(2.0, ((INT32)op->kc_i - 768 - 56 * 64) / (12.0 * 64)) * PSG->clock / 3579545.0);
+		state->level = -(float)(minAtt * ENV_STEP);
+		state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
+		state->kind = DEVVOICE_KIND_OPN_FM;
+		state->fields[0] = alg;
+		state->fields[1] = (UINT8)(op->fb_shift ? op->fb_shift - 6 : 0);
+		state->fields[6] = CARRIERS[alg];
+		state->fields[7] = (PSG->pan[2 * ch] ? 2 : 0) | (PSG->pan[2 * ch + 1] ? 1 : 0);
+		state->fields[8] = (UINT8)op->ams;
+		state->fields[9] = (UINT8)op->pms;
+		state->fields[11] = (UINT8)((op->kc >> 4) & 7);
+	}
+	return 8;
 }
 
 static void ym2151_set_mute_mask(void *chip, UINT32 MuteMask)

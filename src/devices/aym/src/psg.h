@@ -14,6 +14,7 @@
 #include "devices/aym/src/volume_table.h"
 
 #include <array>
+#include <vector>
 
 namespace Devices::AYM
 {
@@ -120,7 +121,47 @@ namespace Devices::AYM
 
     Sound::Sample GetLevels() const
     {
-      return Table.Get(Device.GetLevels());
+      const auto levels = Device.GetLevels();
+      if (LevelsRecord)
+      {
+        // called at the same rate as output is calculated (each PSG tick for HQ renderer), so separate channels
+        // may be filtered/decimated to output rate exactly as mixed output
+        LevelsRecord->push_back(static_cast<uint16_t>(levels));
+      }
+      return Table.Get(levels);
+    }
+
+    //! @param target packed channels levels (as in volume table index) storage on each GetLevels call, nullptr to stop
+    void SetLevelsRecord(std::vector<uint16_t>* target)
+    {
+      LevelsRecord = target;
+    }
+
+    //! @param clockFreq PSG ticks frequency
+    void GetChannelsState(uint64_t clockFreq, ChannelState* target) const
+    {
+      const auto mixer = GetMixer();
+      const uint_t tones[] = {GetToneA(), GetToneB(), GetToneC()};
+      const auto envType = GetEnvType();
+      const auto envPeriod = std::max<uint_t>(GetToneE(), 1);
+      // saw-like envelopes have 32 steps per period, triangle-like - 64
+      const bool envPeriodic = envType >= 8 && 0 == (envType & 1);
+      const auto envFreq = envPeriodic ? float(clockFreq) / (envPeriod * (envType & 2 ? 64 : 32)) : 0.0f;
+      const auto maxLevel = float(Table.GetChannelLevel(HIGH_LEVEL_A));
+      for (uint_t chan = 0; chan < SOUND_CHANNELS; ++chan)
+      {
+        auto& out = target[chan];
+        const auto vol = Regs[Registers::VOLA + chan];
+        out.Tone = 0 == (mixer & (Registers::MASK_TONEA << chan));
+        out.Noise = 0 == (mixer & (Registers::MASK_NOISEA << chan));
+        out.Envelope = 0 != (vol & Registers::MASK_ENV);
+        // tone period is counted in half-periods
+        out.Frequency = out.Tone ? float(clockFreq) / (2 * std::max<uint_t>(tones[chan], 1))
+                                 : (out.Envelope && !out.Noise ? envFreq : 0.0f);
+        const auto level = out.Envelope ? (envPeriodic ? HIGH_LEVEL_A : Device.GetEnvelopeLevel())
+                                        : ((vol & Registers::MASK_VOL) << 1) + 1;
+        out.Level = Table.GetChannelLevel(level) / maxLevel;
+      }
     }
 
   private:
@@ -165,5 +206,6 @@ namespace Devices::AYM
     std::array<uint_t, Registers::TOTAL> Regs;
     // device
     AYMDevice Device;
+    std::vector<uint16_t>* LevelsRecord = nullptr;
   };
 }  // namespace Devices::AYM

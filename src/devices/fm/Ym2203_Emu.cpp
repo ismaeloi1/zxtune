@@ -24,6 +24,8 @@
 #include <stdarg.h>
 #include <math.h>
 
+#include <algorithm>
+
 
 #define FREQ_SH			16  /* 16.16 fixed point (frequency calculations) */
 #define EG_SH			16  /* 16.16 fixed point (envelope generator timing) */
@@ -1222,6 +1224,11 @@ using YM2203 = struct
 /* Generate samples for one of the YM2203s */
 void YM2203UpdateOne(void *chip, int32_t *buffer, int length)
 {
+  YM2203UpdateOneVoices(chip, buffer, nullptr, 0, length);
+}
+
+void YM2203UpdateOneVoices(void *chip, int32_t *buffer, int16_t *voices, int stride, int length)
+{
   auto* F2203 = (YM2203*)chip;
   FM_OPN* OPN = &F2203->OPN;
   FM_STATE* state = &F2203->State;
@@ -1274,6 +1281,17 @@ void YM2203UpdateOne(void *chip, int32_t *buffer, int length)
 		if (F2203->MuteMask & 4) state->out_fm[2] = 0;
 
 		*buf += state->out_fm[0] + state->out_fm[1] + state->out_fm[2];
+
+		if (voices)
+		{
+		  /* channels outputs before mixing, as Furnace takes them for its per-channel oscilloscope */
+		  for (int c = 0; c < 3; ++c)
+		  {
+		    const int32_t out = state->out_fm[c];
+		    voices[c] = static_cast<int16_t>(out > 32767 ? 32767 : (out < -32768 ? -32768 : out));
+		  }
+		  voices += stride;
+		}
 	}
 }
 
@@ -1417,25 +1435,16 @@ void YM2203GetState(void *chip, uint_t *attenuations, uint_t *periods)
 	for (uint_t c = 0; c < 3; ++c)
 	{
 		const uint_t algo = slotMap[F2203->CH[c].ALGO&7];
-		uint_t att = 0;
-		uint_t div = 0;
-		if(algo&1)
+		static const uint_t slots[4] = { SLOT1, SLOT2, SLOT3, SLOT4 };
+		/* loudest carrier, silent ones may have attenuation above 1023 including TL */
+		uint_t att = MAX_ATT_INDEX;
+		for (uint_t s = 0; s < 4; ++s)
 		{
-		  att += F2203->CH[c].SLOT[SLOT1].vol_out; div++;
+		  if (algo & (1 << s))
+		  {
+		    att = std::min<uint_t>(att, F2203->CH[c].SLOT[slots[s]].vol_out);
+		  }
 		}
-		if(algo&2)
-		{
-		  att += F2203->CH[c].SLOT[SLOT2].vol_out; div++;
-		}
-		if(algo&4)
-		{
-		  att += F2203->CH[c].SLOT[SLOT3].vol_out; div++;
-		}
-		if(algo&8)
-		{
-		  att += F2203->CH[c].SLOT[SLOT4].vol_out; div++;
-		}
-		att /= div;
     attenuations[c] = att;
 		if (att < 1024)
 		{

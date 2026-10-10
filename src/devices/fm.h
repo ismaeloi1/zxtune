@@ -18,6 +18,7 @@
 
 #include <array>
 #include <memory>
+#include <vector>
 
 namespace Devices::FM
 {
@@ -70,6 +71,31 @@ namespace Devices::FM
 
     /// reset internal state to initial
     virtual void Reset() = 0;
+  };
+
+  //! @brief Single FM channel state for visualization
+  struct ChannelState
+  {
+    //! Hz, 0 if silent
+    float Frequency = 0;
+    //! dB of carriers' envelope attenuation, 0 is maximal level
+    float Level = -96.0f;
+  };
+
+  //! @brief Separate channels output for visualization (e.g. oscilloscope)
+  class ChannelsSource
+  {
+  public:
+    virtual ~ChannelsSource() = default;
+
+    //! @brief Disabled by default to save resources
+    virtual void SetChannelsOutput(bool enabled) = 0;
+
+    //! @return interleaved [samples][channels] outputs of separate channels (before mixing) for the last RenderTill call
+    virtual const std::vector<int16_t>& GetChannelsOutput() const = 0;
+
+    //! @param target [channels] current states
+    virtual void GetChannelsState(ChannelState* target) const = 0;
   };
 
   // Describes real device

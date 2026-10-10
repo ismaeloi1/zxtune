@@ -139,6 +139,8 @@ UINT8 ym2203_timer_over(void *chip, UINT8 c);
 **  Channel Muting
 */
 void ym2203_set_mute_mask(void *chip, UINT32 MuteMask);
+void ym2203_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+UINT32 ym2203_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 
 /*
 **  logging function

@@ -14,8 +14,10 @@
 
 #include "make_ptr.h"
 
+#include <algorithm>
 #include <array>
 #include <functional>
+#include <vector>
 
 namespace Devices::TFM
 {
@@ -67,15 +69,48 @@ namespace Devices::TFM
       }
     }
 
-    Sound::Chunk RenderSamples(uint_t count)
+    //! @param voices storage for separate channels output, [count][TFM::VOICES], may be nullptr
+    Sound::Chunk RenderSamples(uint_t count, std::vector<int16_t>* voices)
     {
       Sound::Chunk result(count);
       auto* const outRaw = safe_ptr_cast<FM::Details::YM2203SampleType*>(result.data());
-      ::YM2203UpdateOne(Chips[0].get(), outRaw, count);
-      ::YM2203UpdateOne(Chips[1].get(), outRaw, count);
+      if (voices)
+      {
+        voices->resize(std::size_t(count) * TFM::VOICES);
+        ::YM2203UpdateOneVoices(Chips[0].get(), outRaw, voices->data(), TFM::VOICES, count);
+        ::YM2203UpdateOneVoices(Chips[1].get(), outRaw, voices->data() + FM::VOICES, TFM::VOICES, count);
+      }
+      else
+      {
+        ::YM2203UpdateOne(Chips[0].get(), outRaw, count);
+        ::YM2203UpdateOne(Chips[1].get(), outRaw, count);
+      }
       std::transform(outRaw, outRaw + count, outRaw, [](FM::Details::YM2203SampleType s) { return s / 2; });
       Helper.ConvertSamples(outRaw, outRaw + count, result.data());
       return result;
+    }
+
+    void GetChannelsState(FM::ChannelState* target) const
+    {
+      if (!Chips[0])
+      {
+        return;
+      }
+      const auto clock = Helper.GetClock();
+      for (uint_t chip = 0; chip < TFM::CHIPS; ++chip)
+      {
+        std::array<uint_t, FM::VOICES> attenuations = {};
+        std::array<uint_t, FM::VOICES> periods = {};
+        ::YM2203GetState(Chips[chip].get(), attenuations.data(), periods.data());
+        for (uint_t chan = 0; chan < FM::VOICES; ++chan)
+        {
+          auto& out = target[chip * FM::VOICES + chan];
+          // 10-bit envelope attenuation, 96dB range
+          const auto att = std::min<uint_t>(attenuations[chan], 1023);
+          out.Level = -float(att) * 96.0f / 1024;
+          out.Frequency = att < 1023 && periods[chan] ? float(clock) / periods[chan] : 0.0f;
+        }
+      }
     }
 
   private:

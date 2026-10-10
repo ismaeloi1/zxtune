@@ -1,4 +1,6 @@
-// Usage: module_test_vgm_voices <file> [seconds] [subpath, e.g. "#2" for multitrack]
+// Usage: module_test_vgm_voices <file> [seconds] [subpath, e.g. "#2" for multitrack] [dump prefix]
+// Dump writes <prefix>.names (voices names by lines), <prefix>.voices (int16 [samples][voices]) and
+// <prefix>.master (int16 [samples] of left+right sum / 2) for visual inspection
 // Host check: separate voices of libvgm-based tunes match the mixed output
 #include "module/players/pipeline.h"
 // test real scope implementation too
@@ -16,6 +18,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iterator>
+#include <string>
 #include <vector>
 
 namespace
@@ -191,6 +194,29 @@ int main(int argc, char** argv)
     }
   }
   std::printf("correlation(sum of voices, output) = %.4f at lag %d samples\n", best, bestLag);
+  if (argc > 4)
+  {
+    const std::string prefix = argv[4];
+    std::ofstream names(prefix + ".names");
+    for (const auto& name : scope->Names)
+    {
+      names << name << '\n';
+    }
+    std::ofstream voices(prefix + ".voices", std::ios::binary);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+      for (const auto& v : scope->Samples)
+      {
+        voices.write(reinterpret_cast<const char*>(&v[i]), sizeof(v[i]));
+      }
+    }
+    std::ofstream master(prefix + ".master", std::ios::binary);
+    for (std::size_t i = 0; i < count; ++i)
+    {
+      const auto smp = static_cast<int16_t>(mono2[i] / 2);
+      master.write(reinterpret_cast<const char*>(&smp), sizeof(smp));
+    }
+  }
   for (std::size_t v = 0; v < scope->Names.size(); ++v)
   {
     const auto& smp = scope->Samples[v];
@@ -249,6 +275,12 @@ int main(int argc, char** argv)
     }
     const auto layout = sc->Get(32, 256, played - FREQ / 10, 40, wave.data());
     std::printf("scope layout id=%u channels=%u:\n%s\n", layout.Id, layout.Channels, sc->GetLayout().c_str());
+    if (argc > 4)
+    {
+      // traces as displayed: [channels][256] for 40ms window
+      std::ofstream traces(std::string(argv[4]) + ".scope", std::ios::binary);
+      traces.write(reinterpret_cast<const char*>(wave.data()), layout.Channels * 256 * sizeof(wave.front()));
+    }
     std::vector<uint8_t> gauges(32 * Sound::Scope::VOICE_GAUGES_SIZE);
     for (int pass = 0; pass < 20; ++pass)
     {

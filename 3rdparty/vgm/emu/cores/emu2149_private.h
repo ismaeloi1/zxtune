@@ -76,6 +76,10 @@ extern "C"
     uint8_t chp_type;
     uint8_t chp_flags;
     uint8_t pcm3ch_detect;
+
+    /* per-channel output tap (zxtune extension) */
+    DEVCB_VOICES voicesCb;
+    void *voicesParam;
   } EPSG;
 
   void EPSG_set_quality (EPSG * psg, uint32_t q);

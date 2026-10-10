@@ -13,11 +13,44 @@
 #include "devices/aym.h"
 #include "sound/mixer.h"
 
+#include <vector>
+
 // supporting for AY/YM-based modules
 namespace Devices::AYM
 {
+  //! @brief Single sound channel state for visualization
+  struct ChannelState
+  {
+    //! Hz of tone or periodic envelope, 0 if not periodic
+    float Frequency = 0;
+    //! Amplitude relative to maximal channel output, 0..1
+    float Level = 0;
+    bool Tone = false;
+    bool Noise = false;
+    bool Envelope = false;
+  };
+
+  //! @brief Separate sound channels output for visualization (e.g. oscilloscope)
+  class ChannelsSource
+  {
+  public:
+    virtual ~ChannelsSource() = default;
+
+    //! @brief Disabled by default to save resources
+    virtual void SetChannelsOutput(bool enabled) = 0;
+
+    //! @return interleaved [samples][SOUND_CHANNELS * chips] outputs of separate channels for the last RenderTill call,
+    //!         as real channels DACs levels (0..32767)
+    virtual const std::vector<int16_t>& GetChannelsOutput() const = 0;
+
+    //! @param target [SOUND_CHANNELS * chips] current states
+    virtual void GetChannelsState(ChannelState* target) const = 0;
+  };
+
   // Describes real device
-  class Chip : public Device
+  class Chip
+    : public Device
+    , public ChannelsSource
   {
   public:
     using Ptr = std::unique_ptr<Chip>;

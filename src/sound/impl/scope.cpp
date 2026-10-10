@@ -563,6 +563,9 @@ namespace Sound
           {
             out[idx] = ring.At(begin + int64_t(idx) * renderSamples / points);
           }
+          // Some chips' voices are unipolar (e.g. AY/YM channels are DAC levels of 0..max) or have DC offset (e.g. idle
+          // YM2612 DAC), so traces are centered by displayed range as Furnace's default DC offset correction does
+          RemoveOffset(out, points);
         });
         LastComputeUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
         LastChannels = channels;
@@ -715,16 +718,37 @@ namespace Sound
         }
       }
 
+      // constant level (e.g. AY/YM channel with tone and noise disabled) is silent too
       static bool IsSilent(const Ring& ring, int64_t from, int64_t to)
       {
+        int lo = ring.At(from);
+        int hi = lo;
         for (auto idx = from; idx < to; ++idx)
         {
-          if (std::abs(int(ring.At(idx))) > SILENCE_LEVEL)
+          const int smp = ring.At(idx);
+          lo = std::min(lo, smp);
+          hi = std::max(hi, smp);
+          if (hi - lo > 2 * SILENCE_LEVEL)
           {
             return false;
           }
         }
         return true;
+      }
+
+      static void RemoveOffset(int16_t* data, uint_t count)
+      {
+        if (!count)
+        {
+          return;
+        }
+        const auto [lo, hi] = std::minmax_element(data, data + count);
+        const auto offset = (int(*lo) + *hi) / 2;
+        if (offset)
+        {
+          std::transform(data, data + count, data,
+                         [offset](int16_t smp) { return static_cast<int16_t>(smp - offset); });
+        }
       }
 
       // end is index of currently heard sample in voice's samples
@@ -735,10 +759,22 @@ namespace Sound
           out[0] = c.Min > c.Max ? c.Max : c.Min;
           out[1] = c.Max;
         };
-        auto toByte = [](int16_t smp) { return static_cast<uint8_t>((int(smp) + 32768) >> 8); };
         // fast wave gauge
         {
           const double fastSamples = double(Samplerate) * waveWindowMs / 1000 / GAUGE_COLUMNS;
+          // centered as oscilloscope traces are, see RemoveOffset
+          int lo = 32767;
+          int hi = -32768;
+          for (auto idx = end - int64_t(GAUGE_COLUMNS * fastSamples); idx < end; ++idx)
+          {
+            const int smp = voice.Samples.At(idx);
+            lo = std::min(lo, smp);
+            hi = std::max(hi, smp);
+          }
+          const auto offset = lo <= hi ? (lo + hi) / 2 : 0;
+          auto toByte = [offset](int16_t smp) {
+            return static_cast<uint8_t>(std::clamp(int(smp) - offset + 32768, 0, 65535) >> 8);
+          };
           uint8_t prev = 128;
           for (uint_t col = 0; col < GAUGE_COLUMNS; ++col)
           {

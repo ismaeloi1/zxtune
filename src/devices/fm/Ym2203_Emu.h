@@ -29,6 +29,11 @@ void YM2203ResetChip(void *chip);
 */
 void YM2203UpdateOne(void *chip, int32_t *buffer, int length);
 
+/*
+** update one of chip storing each channel output to 'voices' (with 'stride' between samples) if not null
+*/
+void YM2203UpdateOneVoices(void *chip, int32_t *buffer, int16_t *voices, int stride, int length);
+
 void YM2203WriteRegs(void *chip, int reg, unsigned char val);
 /*
 ** change clock and/or sampling rate keeping chip state
