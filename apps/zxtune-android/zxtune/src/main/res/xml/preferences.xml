@@ -289,4 +289,13 @@
                 android:title="@string/pref_zxtune_sid_combined_waveforms_title"
                 app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
+    <!-- android auto -->
+    <PreferenceCategory android:title="@string/pref_car_title">
+        <Preference
+                android:fragment="app.zxtune.PreferencesActivity$Fragment"
+                android:key="ui.car"
+                android:persistent="false"
+                android:summary="@string/pref_car_summary"
+                android:title="@string/pref_car_title" />
+    </PreferenceCategory>
 </PreferenceScreen>

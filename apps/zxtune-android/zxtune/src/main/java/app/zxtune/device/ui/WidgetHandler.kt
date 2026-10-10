@@ -20,10 +20,13 @@ import androidx.media.session.MediaButtonReceiver
 import app.zxtune.MainActivity
 import app.zxtune.R
 import app.zxtune.Releaseable
+import app.zxtune.device.media.isLiveArtFrame
 
 class WidgetHandler : AppWidgetProvider() {
     override fun onUpdate(
-        context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
     ) = update(context, createView(context))
 
     private class WidgetNotification(private val ctx: Context) : MediaControllerCompat.Callback() {
@@ -40,12 +43,19 @@ class WidgetHandler : AppWidgetProvider() {
             updateView()
         } ?: Unit
 
-        override fun onMetadataChanged(metadata: MediaMetadataCompat?) = metadata?.run {
+        private var lastMediaId: String? = null
+
+        override fun onMetadataChanged(metadata: MediaMetadataCompat?) = metadata?.takeIf {
+            // widget does not show artwork, so live artwork frames of the same item change nothing
+            !it.isLiveArtFrame() || it.description.mediaId != lastMediaId
+        }?.run {
+            lastMediaId = description.mediaId
             views.setTextViewText(R.id.widget_title, description.title)
             description.subtitle.let {
                 views.setTextViewText(R.id.widget_subtitle, it)
                 views.setViewVisibility(
-                    R.id.widget_subtitle, if (TextUtils.isEmpty(it)) View.GONE else View.VISIBLE
+                    R.id.widget_subtitle,
+                    if (TextUtils.isEmpty(it)) View.GONE else View.VISIBLE
                 )
             }
             updateView()
@@ -61,36 +71,44 @@ class WidgetHandler : AppWidgetProvider() {
             Releaseable { unregisterCallback(cb) }
         }
 
-        private fun update(ctx: Context, widgetView: RemoteViews) =
-            AppWidgetManager.getInstance(ctx).run {
-                getAppWidgetIds(
-                    ComponentName(
-                        ctx, WidgetHandler::class.java
-                    )
-                ).takeIf { it.isNotEmpty() }?.let {
-                    updateAppWidget(it, widgetView)
-                } ?: Unit
-            }
+        private fun update(ctx: Context, widgetView: RemoteViews) = AppWidgetManager.getInstance(ctx).run {
+            getAppWidgetIds(
+                ComponentName(
+                    ctx,
+                    WidgetHandler::class.java
+                )
+            ).takeIf { it.isNotEmpty() }?.let {
+                updateAppWidget(it, widgetView)
+            } ?: Unit
+        }
 
         private fun createView(ctx: Context) = RemoteViews(
-            ctx.packageName, R.layout.widget
+            ctx.packageName,
+            R.layout.widget
         ).apply {
             setOnClickPendingIntent(
-                android.R.id.background, MainActivity.createPendingIntent(ctx)
+                android.R.id.background,
+                MainActivity.createPendingIntent(ctx)
             )
             setOnClickPendingIntent(
-                R.id.widget_ctrl_prev, MediaButtonReceiver.buildMediaButtonPendingIntent(
-                    ctx, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                R.id.widget_ctrl_prev,
+                MediaButtonReceiver.buildMediaButtonPendingIntent(
+                    ctx,
+                    PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
                 )
             )
             setOnClickPendingIntent(
-                R.id.widget_ctrl_play_pause, MediaButtonReceiver.buildMediaButtonPendingIntent(
-                    ctx, PlaybackStateCompat.ACTION_PLAY_PAUSE
+                R.id.widget_ctrl_play_pause,
+                MediaButtonReceiver.buildMediaButtonPendingIntent(
+                    ctx,
+                    PlaybackStateCompat.ACTION_PLAY_PAUSE
                 )
             )
             setOnClickPendingIntent(
-                R.id.widget_ctrl_next, MediaButtonReceiver.buildMediaButtonPendingIntent(
-                    ctx, PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+                R.id.widget_ctrl_next,
+                MediaButtonReceiver.buildMediaButtonPendingIntent(
+                    ctx,
+                    PlaybackStateCompat.ACTION_SKIP_TO_NEXT
                 )
             )
         }

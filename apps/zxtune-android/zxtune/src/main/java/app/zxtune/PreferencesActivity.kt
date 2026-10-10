@@ -17,9 +17,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.SwitchPreferenceCompat
 import app.zxtune.analytics.Analytics
+import app.zxtune.device.car.CarVisualSettings
 import app.zxtune.preferences.Mt32Roms
 import app.zxtune.preferences.Preferences
+import app.zxtune.ui.CarDisclaimerDialog
 import app.zxtune.ui.utils.FragmentIntProperty
 import app.zxtune.ui.utils.ThemeUtils
 import app.zxtune.ui.utils.applyEdgeToEdge
@@ -33,6 +36,9 @@ class PreferencesActivity :
     companion object {
         @JvmStatic
         fun createIntent(ctx: Context) = Intent(ctx, PreferencesActivity::class.java)
+
+        private const val CAR_PREFERENCES_KEY = "ui.car"
+        private const val CAR_LEGAL_KEY = "ui.car.legal"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,15 +66,19 @@ class PreferencesActivity :
     override fun onPreferenceStartFragment(
         caller: PreferenceFragmentCompat,
         pref: Preference
-    ) = if ("zxtune.sound.mixer.3" == pref.key) {
+    ) = when (pref.key) {
+        "zxtune.sound.mixer.3" -> openNested(R.xml.preferences_mixer3)
+        CAR_PREFERENCES_KEY -> openNested(R.xml.preferences_car)
+        else -> false
+    }
+
+    private fun openNested(@XmlRes layout: Int): Boolean {
         supportFragmentManager
             .beginTransaction()
-            .replace(android.R.id.content, makeFragment(R.xml.preferences_mixer3))
+            .replace(android.R.id.content, makeFragment(layout))
             .addToBackStack(null)
             .commit()
-        true
-    } else {
-        false
+        return true
     }
 
     private fun makeFragment(@XmlRes layout: Int) = PrefFragment().apply {
@@ -91,6 +101,30 @@ class PreferencesActivity :
                     selectMt32Roms.launch(null)
                     true
                 }
+            }
+            setupCarPreferences()
+        }
+
+        // Enabling is intercepted to show legal notice first, disabling is immediate
+        private fun setupCarPreferences() {
+            val visualization = findPreference<SwitchPreferenceCompat>(CarVisualSettings.ENABLED_KEY) ?: return
+            visualization.setOnPreferenceChangeListener { _, value ->
+                if (value == true) {
+                    CarDisclaimerDialog.show(childFragmentManager)
+                    false
+                } else {
+                    true
+                }
+            }
+            childFragmentManager.setFragmentResultListener(CarDisclaimerDialog.REQUEST_KEY, this) { _, result ->
+                if (result.getBoolean(CarDisclaimerDialog.ACCEPTED_KEY)) {
+                    visualization.isChecked = true
+                    CarDisclaimerDialog.askRestart(requireContext())
+                }
+            }
+            findPreference<Preference>(CAR_LEGAL_KEY)?.setOnPreferenceClickListener {
+                CarDisclaimerDialog.showInformation(requireContext())
+                true
             }
         }
 

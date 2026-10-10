@@ -18,6 +18,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Car connection state provided by Android Auto, see device/car/CarConnection.kt -->
+    <queries>
+        <provider android:authorities="androidx.car.app.connection" />
+    </queries>
+
     <supports-screens
             android:largeScreens="true"
             android:xlargeScreens="true" />

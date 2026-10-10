@@ -1,12 +1,16 @@
 package app.zxtune.device.media
 
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import app.zxtune.playback.PlaybackControl
 
 @PlaybackStateCompat.State
 internal fun PlaybackControl.State.toState() = when (this) {
     PlaybackControl.State.PLAYING -> PlaybackStateCompat.STATE_PLAYING
-    PlaybackControl.State.SEEKING -> PlaybackStateCompat.STATE_BUFFERING //?
+
+    PlaybackControl.State.SEEKING -> PlaybackStateCompat.STATE_BUFFERING
+
+    // ?
     PlaybackControl.State.STOPPED -> PlaybackStateCompat.STATE_STOPPED
 }
 
@@ -35,3 +39,9 @@ internal fun fromRepeatMode(@PlaybackStateCompat.RepeatMode mode: Int) = when (m
     PlaybackStateCompat.REPEAT_MODE_ONE -> PlaybackControl.TrackMode.LOOPED
     else -> null
 }
+
+/**
+ * Live artwork frames (see [StatusCallback.setLiveArt]) only replace picture, so consumers not
+ * displaying it may skip them
+ */
+internal fun MediaMetadataCompat.isLiveArtFrame() = getLong(StatusCallback.LIVE_ART_FRAME_KEY) != 0L
