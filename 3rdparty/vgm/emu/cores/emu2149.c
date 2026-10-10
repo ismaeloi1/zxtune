@@ -30,6 +30,7 @@
 *****************************************************************************/
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "../../stdtype.h"
 #include "../snddef.h"
@@ -42,6 +43,9 @@
 #include "../panning.h"
 
 
+static void EPSG_set_voices_cb(EPSG *psg, DEVCB_VOICES cb, void* param);
+static UINT32 EPSG_get_voices_state(EPSG *psg, UINT32 count, DEV_VOICE_STATE* states);
+
 static DEVDEF_RWFUNC devFunc[] =
 {
 	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, EPSG_writeIO},
@@ -53,6 +57,8 @@ static DEVDEF_RWFUNC devFunc[] =
 	{RWF_SRATE | RWF_WRITE, DEVRW_VALUE, 0, EPSG_set_rate},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, EPSG_setMuteMask},
 	{RWF_CHN_PAN | RWF_WRITE, DEVRW_ALL, 0, ay8910_emu_pan},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, EPSG_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, EPSG_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 DEV_DEF devDef_YM2149_Emu =
@@ -489,6 +495,52 @@ mix_output_stereo(EPSG *psg, int32_t out[2])
   return;
 }
 
+/* real channels outputs (unipolar levels of DAC), scaled to 16 bits as Furnace does */
+static void
+output_voices (EPSG * psg)
+{
+  INT32 voices[3];
+  int i;
+
+  for (i = 0; i < 3; i++)
+    voices[i] = psg->ch_out[i] * 4;
+  psg->voicesCb(psg->voicesParam, 3, voices);
+}
+
+static void
+EPSG_set_voices_cb (EPSG * psg, DEVCB_VOICES cb, void* param)
+{
+  psg->voicesCb = cb;
+  psg->voicesParam = param;
+}
+
+static UINT32
+EPSG_get_voices_state (EPSG * psg, UINT32 count, DEV_VOICE_STATE* states)
+{
+  uint32_t clk = psg->clk;
+  int i;
+
+  if (psg->chp_flags & YM2149_PIN26_LOW)
+    clk /= 2;
+  for (i = 0; i < 3 && i < (int)count; i++)
+  {
+    DEV_VOICE_STATE* state = &states[i];
+    const uint8_t tone = !psg->tmask[i];
+    const uint8_t noise = !psg->nmask[i];
+    const uint8_t env = (psg->volume[i] & 32) != 0;
+    const uint32_t level = psg->voltbl[env ? psg->env_ptr : (psg->volume[i] & 31)];
+    const uint32_t period = psg->freq[i] ? psg->freq[i] : 1;
+
+    state->freq = tone ? (float)clk / (16 * period) : 0.0f;
+    state->level = level ? (float)(20.0 * log10((double)level / psg->voltbl[31])) : -96.0f;
+    state->flags = DEVVOICE_LEVEL | (tone ? DEVVOICE_FREQ : 0) | (noise ? DEVVOICE_NOISE : 0)
+                   | (level && (tone || noise || env) ? DEVVOICE_KEYON : 0);
+    state->kind = DEVVOICE_KIND_GENERIC;
+    memset(state->fields, 0, sizeof(state->fields));
+  }
+  return 3;
+}
+
 void
 EPSG_calc_stereo (EPSG * psg, UINT32 samples, DEV_SMPL **out)
 {
@@ -502,6 +554,8 @@ EPSG_calc_stereo (EPSG * psg, UINT32 samples, DEV_SMPL **out)
     for (i = 0; i < samples; i ++)
     {
       update_output(psg);
+      if (psg->voicesCb)
+        output_voices(psg);
       mix_output_stereo(psg, buffers);
       bufMO[i] = buffers[0];
       bufRO[i] = buffers[1];
@@ -517,6 +571,8 @@ EPSG_calc_stereo (EPSG * psg, UINT32 samples, DEV_SMPL **out)
         psg->sprev[0] = psg->snext[0];
         psg->sprev[1] = psg->snext[1];
         update_output(psg);
+        if (psg->voicesCb)
+          output_voices(psg);
         mix_output_stereo(psg, psg->snext);
       }
 

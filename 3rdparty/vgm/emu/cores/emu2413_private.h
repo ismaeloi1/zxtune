@@ -128,6 +128,10 @@ typedef struct __EOPLL {
   int32_t mix_out[2];
 
   EOPLL_RateConv *conv;
+
+  /* per-channel output tap (zxtune extension) */
+  DEVCB_VOICES voicesCb;
+  void *voicesParam;
 } EOPLL;
 
 EOPLL *EOPLL_new(uint32_t clk, uint32_t rate);

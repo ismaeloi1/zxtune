@@ -2338,6 +2338,36 @@ static void OPNSetSmplRateChgCallback(FM_OPN *OPN, DEVCB_SRATE_CHG cbFunc, void*
 }
 
 
+/* carriers mask per algorithm in SLOT1..SLOT4 order */
+static const UINT8 FM_CARRIERS[8] = {0x08, 0x08, 0x08, 0x08, 0x0a, 0x0e, 0x0e, 0x0f};
+static const UINT8 FM_SLOTS[4] = {SLOT1, SLOT2, SLOT3, SLOT4};
+
+/* attenuation of loudest carrier in dB, 0 if no carriers are sounding */
+static float fm_carriers_level(const FM_CH* CH, UINT8* keyOn)
+{
+	static const UINT8* CARRIERS = FM_CARRIERS;
+	static const UINT8* SLOTS = FM_SLOTS;
+	UINT32 minAtt = MAX_ATT_INDEX;
+	UINT8 op;
+
+	*keyOn = 0;
+	for (op = 0; op < 4; op ++)
+	{
+		const FM_SLOT* slot = &CH->SLOT[SLOTS[op]];
+		UINT32 att;
+		if (! (CARRIERS[CH->ALGO & 7] & (1 << op)))
+			continue;
+		if (slot->key)
+			*keyOn = 1;
+		att = slot->vol_out;
+		if (att < minAtt)
+			minAtt = att;
+	}
+	/* 10-bit attenuation, 0.09375dB per step (6dB per 64 steps, see tl_tab) */
+	return -(float)(minAtt * (96.0 / ENV_LEN));
+}
+
+
 #if BUILD_YM2203
 /*****************************************************************************/
 /*      YM2203 local section                                                 */
@@ -2351,6 +2381,9 @@ typedef struct
 	UINT8 REGS[256];        /* registers         */
 	FM_OPN OPN;             /* OPN state         */
 	FM_CH CH[3];            /* channel state     */
+
+	DEVCB_VOICES voicesCb;
+	void*       voicesParam;
 } YM2203;
 
 /* Generate samples for one of the YM2203s */
@@ -2443,6 +2476,16 @@ void ym2203_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 			/* buffering */
 			bufL[i] = lt;
 			bufR[i] = lt;
+		}
+
+		if (F2203->voicesCb)
+		{
+			/* channels outputs before mixing, single operator is in 14-bit range */
+			INT32 voices[3];
+			voices[0] = OPN->out_fm[0] << 1;
+			voices[1] = OPN->out_fm[1] << 1;
+			voices[2] = OPN->out_fm[2] << 1;
+			F2203->voicesCb(F2203->voicesParam, 3, voices);
 		}
 
 		/* CSM mode: if CSM Key ON has occured, CSM Key OFF need to be sent       */
@@ -2651,6 +2694,53 @@ UINT8 ym2203_timer_over(void *chip,UINT8 c)
 		}
 	}
 	return F2203->OPN.ST.irq;
+}
+
+void ym2203_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	YM2203* F2203 = (YM2203 *)chip;
+	F2203->voicesCb = cb;
+	F2203->voicesParam = param;
+}
+
+UINT32 ym2203_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	YM2203* F2203 = (YM2203 *)chip;
+	/* sample rate as prescaler gives it, fnote = fnum * rate * 2^(block-1) / 2^20 */
+	const double rate = F2203->OPN.ST.freqbase * F2203->OPN.ST.rate;
+	UINT32 ch;
+
+	for (ch = 0; ch < 3 && ch < count; ch ++)
+	{
+		const FM_CH* CH = &F2203->CH[ch];
+		const UINT32 fnum = CH->block_fnum & 0x7ff;
+		const UINT32 block = (CH->block_fnum >> 11) & 7;
+		const UINT8 algFb = F2203->REGS[0xb0 + ch];
+		DEV_VOICE_STATE* state = &states[ch];
+		UINT8 keyOn;
+		UINT8 op;
+
+		state->level = fm_carriers_level(CH, &keyOn);
+		state->freq = (float)(fnum * rate * (1 << block) / (double)(1 << 21));
+		state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
+		state->kind = DEVVOICE_KIND_OPN_FM;
+		memset(state->fields, 0, sizeof(state->fields));
+		state->fields[0] = algFb & 7;
+		state->fields[1] = (algFb >> 3) & 7;
+		state->fields[6] = FM_CARRIERS[algFb & 7];
+		/* mono chip */
+		state->fields[7] = 3;
+		for (op = 0; op < 4; op ++)
+		{
+			const FM_SLOT* slot = &CH->SLOT[FM_SLOTS[op]];
+			const UINT32 att = slot->vol_out < MAX_ATT_INDEX ? slot->vol_out : MAX_ATT_INDEX;
+			state->fields[2 + op] = (UINT8)(255 - att * 255 / MAX_ATT_INDEX);
+			if (slot->key)
+				state->fields[10] |= 1 << op;
+		}
+		state->fields[11] = (UINT8)block;
+	}
+	return 3;
 }
 
 void ym2203_set_mute_mask(void *chip, UINT32 MuteMask)
@@ -4804,34 +4894,6 @@ void ym2612_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
 	F2612->voicesParam = param;
 }
 
-/* carriers mask per algorithm in SLOT1..SLOT4 order */
-static const UINT8 FM_CARRIERS[8] = {0x08, 0x08, 0x08, 0x08, 0x0a, 0x0e, 0x0e, 0x0f};
-static const UINT8 FM_SLOTS[4] = {SLOT1, SLOT2, SLOT3, SLOT4};
-
-/* attenuation of loudest carrier in dB, 0 if no carriers are sounding */
-static float fm_carriers_level(const FM_CH* CH, UINT8* keyOn)
-{
-	static const UINT8* CARRIERS = FM_CARRIERS;
-	static const UINT8* SLOTS = FM_SLOTS;
-	UINT32 minAtt = MAX_ATT_INDEX;
-	UINT8 op;
-
-	*keyOn = 0;
-	for (op = 0; op < 4; op ++)
-	{
-		const FM_SLOT* slot = &CH->SLOT[SLOTS[op]];
-		UINT32 att;
-		if (! (CARRIERS[CH->ALGO & 7] & (1 << op)))
-			continue;
-		if (slot->key)
-			*keyOn = 1;
-		att = slot->vol_out;
-		if (att < minAtt)
-			minAtt = att;
-	}
-	/* 10-bit attenuation, 0.09375dB per step (6dB per 64 steps, see tl_tab) */
-	return -(float)(minAtt * (96.0 / ENV_LEN));
-}
 
 UINT32 ym2612_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
 {
