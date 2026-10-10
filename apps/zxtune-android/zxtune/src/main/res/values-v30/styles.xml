@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Cutout mode is set by theme to have final window geometry since the first layout.
+      Legacy fullscreen flag is not used: system bars are hidden by insets controller only, mixing both
+      makes window frame and content offsets disagree (black band at the top, dashboard covered by
+      oscilloscope surface). -->
+    <style name="FullscreenTheme" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">always</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+</resources>

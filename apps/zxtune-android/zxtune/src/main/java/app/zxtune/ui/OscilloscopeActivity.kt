@@ -30,7 +30,9 @@ import kotlinx.coroutines.launch
  * Fullscreen oscilloscope, follows device orientation:
  * - portrait: oscilloscope with SID state dashboard below, as in now playing view
  * - landscape: oscilloscope only
- * Black background covers the whole screen, while content avoids display cutouts (camera holes, notches).
+ * Black background covers the whole screen (cutout mode is set by theme). Content avoids only side cutouts
+ * (landscape notches): top/bottom ones (camera holes) overlap just a part of the first voice waveform, while
+ * avoiding them wastes a band of screen height.
  */
 class OscilloscopeActivity : AppCompatActivity() {
     private lateinit var oscilloscope: OscilloscopeView
@@ -38,6 +40,8 @@ class OscilloscopeActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // window geometry should be final before content is laid out
+        setupImmersiveMode()
         oscilloscope = OscilloscopeView(this).apply {
             setOnClickListener { finish() }
         }
@@ -53,13 +57,15 @@ class OscilloscopeActivity : AppCompatActivity() {
         }
         ViewCompat.setOnApplyWindowInsetsListener(panel) { view, insets ->
             val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
-            view.setPadding(cutout.left, cutout.top, cutout.right, cutout.bottom)
+            // avoid relayout (and oscilloscope surface repositioning) on repeated identical insets
+            if (view.paddingLeft != cutout.left || view.paddingRight != cutout.right) {
+                view.setPadding(cutout.left, 0, cutout.right, 0)
+            }
             insets
         }
         setContentView(panel)
         updateLayout(resources.configuration)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        setupImmersiveMode()
         requestHighestRefreshRate()
 
         MediaModel.of(this).run {
@@ -115,17 +121,8 @@ class OscilloscopeActivity : AppCompatActivity() {
         super.onStop()
     }
 
+    // Display cutout mode is set by FullscreenTheme, changing it at runtime causes window relayout
     private fun setupImmersiveMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            // draw black background under cutout area in both orientations, see insets listener
-            window.attributes = window.attributes.apply {
-                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-                } else {
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-                }
-            }
-        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         WindowInsetsControllerCompat(window, window.decorView).run {
             hide(WindowInsetsCompat.Type.systemBars())
