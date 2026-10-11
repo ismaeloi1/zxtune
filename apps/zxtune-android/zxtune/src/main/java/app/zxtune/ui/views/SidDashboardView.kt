@@ -11,6 +11,8 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.os.Build
+import android.os.SystemClock
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Choreographer
@@ -76,6 +78,7 @@ class SidDashboardView @JvmOverloads constructor(
         textSize = sp(TITLE_SIZE_SP)
         // keeps titles readable over traces
         setShadowLayer(density * 2, 0f, 0f, Color.BLACK)
+        tabularFigures()
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(230, 255, 255, 255)
@@ -103,19 +106,24 @@ class SidDashboardView @JvmOverloads constructor(
         typeface = Typeface.MONOSPACE
         textAlign = Paint.Align.RIGHT
     }
+    private val summaryAlpha = summaryPaint.alpha
 
     // human readable values of registers are greyed to separate them from raw values
     private val valuePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(160, 255, 255, 255)
         textSize = sp(TEXT_SIZE_SP)
         textAlign = Paint.Align.RIGHT
+        tabularFigures()
     }
+    private val valueAlpha = valuePaint.alpha
 
     // explanations are secondary information, so greyed and proportional to fit more words
     private val explainPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(150, 255, 255, 255)
         textSize = sp(EXPLAIN_SIZE_SP)
+        tabularFigures()
     }
+    private val explainAlpha = explainPaint.alpha
     private val dimTracePaint = Paint(tracePaint).apply {
         color = Color.argb(110, 255, 255, 255)
     }
@@ -126,6 +134,30 @@ class SidDashboardView @JvmOverloads constructor(
     private val lines = FloatArray(ChipGauges.COLUMNS * 4)
     private val widgets = ChipWidgets(density, sp(TEXT_SIZE_SP))
     private val smooth = Array(MAX_VOICES) { FloatArray(ChipWidgets.SMOOTH_SIZE) }
+
+    /**
+     * Time source for texts stabilization
+     */
+    @androidx.annotation.VisibleForTesting
+    internal var clock: () -> Long = { SystemClock.uptimeMillis() }
+    private val voiceTexts = Array(MAX_CHIPS) { Array(3) { SidVoiceText() } }
+    private val globalTexts = Array(MAX_CHIPS) { SidGlobalText() }
+    private val fitted = Array(MAX_CHIPS * 4) { Array(SidDescription.SLOTS) { FittedText() } }
+    private val slots = SlotsLayout()
+    private val voiceTemplates = TitleTemplates(VOICE_TEMPLATE)
+    private val globalTemplates = TitleTemplates(GLOBAL_TEMPLATE)
+
+    // geometry of the last drawn gauges rows
+    @androidx.annotation.VisibleForTesting
+    internal var gaugesRowHeight = 0f
+
+    @androidx.annotation.VisibleForTesting
+    internal var gaugesCellHeight = 0f
+    private val summaries = Array(MAX_VOICES) { ChipWidgets.StableSummary() }
+
+    // summary width is reserved by widest one to not shift title with each summary change
+    private val summaryWidths = FloatArray(MAX_VOICES)
+    private val summaryKinds = IntArray(MAX_VOICES) { -1 }
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
@@ -259,6 +291,7 @@ class SidDashboardView @JvmOverloads constructor(
         if (chips == 0 || areaHeight < density * 40) {
             return
         }
+        val now = clock()
         val chip = SidDescription.Chip.fromStatus(status)
         val groupW = width.toFloat() / chips
         val cellW = groupW / 3
@@ -269,82 +302,78 @@ class SidDashboardView @JvmOverloads constructor(
             rowH - explanationHeight(it) >= density * MIN_EXPLAINED_CELL_DP
         } ?: 0
         val cellH = rowH - explanationHeight(explainLines)
+        gaugesRowHeight = rowH
+        gaugesCellHeight = cellH
+        slots.update(groupW - explanationPadding() * 2, explainLines)
         for (idx in 0 until chips) {
             val gauges = ChipGauges(buffers[readyBuffer], idx * ChipGauges.SIZE)
             val last = gauges.state
             val left = groupW * idx
-            val chipPrefix = if (chips > 1) "S${idx + 1}" else ""
+            val chipLabel = if (chips > 1) idx + 1 else 0
             for (voice in 0 until 3) {
-                val trend = envelopeTrend(gauges, last, voice)
-                val cells = listOf(
-                    Cell(
-                        ChipGauges.wave(voice),
-                        "${chipPrefix}V${voice + 1} ${waveTitle(last, voice)}",
-                        SidDescription.waveSummary(last, voice)
-                    ),
-                    Cell(
-                        ChipGauges.envelope(voice),
-                        "Env ${last.envelopeRegs(voice)}",
-                        SidDescription.envelopeSummary(last, voice, trend)
-                    ),
-                    Cell(
-                        ChipGauges.frequency(voice),
-                        "Freq ${hex4(last.frequency(voice))}",
-                        SidDescription.frequencySummary(last, voice, chip)
-                    )
-                )
-                drawGaugesRow(canvas, gauges, cells, VOICE_TEMPLATE, left, rowH * voice, cellW, cellH)
-                val explanation = SidDescription.voiceExplanation(last, voice, trend, chip)
-                drawExplanation(canvas, explanation, left, rowH * voice + cellH, groupW, explainLines)
+                val texts = voiceTexts[idx][voice]
+                texts.update(last, voice, envelopeTrend(gauges, last, voice), chip, chipLabel, now)
+                drawGaugesRow(canvas, gauges, VOICE_GAUGES[voice], texts.texts, voiceTemplates, left, rowH * voice, cellW, cellH, now)
+                drawSlots(canvas, texts.texts, fitted[idx * 4 + voice], left, rowH * voice + cellH, now)
             }
-            val cells = listOf(
-                Cell(ChipGauges.VOLUME, "Vol ${last.volume}", SidDescription.volumeSummary(last)),
-                Cell(ChipGauges.RESONANCE, "Res ${last.resonance}", SidDescription.resonanceSummary(last)),
-                Cell(ChipGauges.CUTOFF, filterTitle(last), SidDescription.filterSummary(last, chip))
-            )
-            drawGaugesRow(canvas, gauges, cells, GLOBAL_TEMPLATE, left, rowH * 3, cellW, cellH)
-            val explanation = SidDescription.filterExplanation(last, chip)
-            drawExplanation(canvas, explanation, left, rowH * 3 + cellH, groupW, explainLines)
+            val texts = globalTexts[idx]
+            texts.update(last, chip, now)
+            drawGaugesRow(canvas, gauges, GLOBAL_GAUGES, texts.texts, globalTemplates, left, rowH * 3, cellW, cellH, now)
+            drawSlots(canvas, texts.texts, fitted[idx * 4 + 3], left, rowH * 3 + cellH, now)
             if (idx != 0) {
                 canvas.drawLine(left, 0f, left, areaHeight, separatorPaint)
             }
         }
     }
 
-    private class Cell(val gauge: Int, val title: String, val summary: String)
+    /**
+     * Widest title and value parts of gauges in a row (value is split to main part and tail slot, e.g. "60%" and
+     * "Sus"), measured once to keep layout stable regardless of current texts
+     */
+    private class TitleTemplate(
+        val title: String,
+        val main: String,
+        val tails: Array<String>,
+        val tailAlign: Paint.Align = Paint.Align.RIGHT
+    )
+
+    private inner class TitleTemplates(templates: Array<TitleTemplate>) {
+        val items = templates
+
+        // hex digits are not of the same width even with tabular figures
+        val titleWidth = FloatArray(templates.size) { idx ->
+            maxOf(titlePaint.measureText(templates[idx].title), titlePaint.measureText(templates[idx].title.replace('F', '0')))
+        }
+        val mainWidth = FloatArray(templates.size) { valuePaint.measureText(templates[it].main) }
+        val tailWidth = FloatArray(templates.size) { idx -> templates[idx].tails.maxOf { valuePaint.measureText(it) } }
+        val spaceWidth = valuePaint.measureText(" ")
+
+        fun valueWidth(idx: Int) = mainWidth[idx] + (if (mainWidth[idx] > 0f) spaceWidth else 0f) + tailWidth[idx]
+    }
 
     // Gauges in a row have the same title band height to keep plots aligned
     private fun drawGaugesRow(
         canvas: Canvas,
         gauges: GaugesData,
-        cells: List<Cell>,
-        template: List<Cell>,
+        ids: IntArray,
+        texts: StableTexts,
+        templates: TitleTemplates,
         left: Float,
         top: Float,
         cellW: Float,
-        cellH: Float
+        cellH: Float,
+        now: Long
     ) {
         // see drawGauge and drawTitleBand paddings
         val inner = cellW - density * 11
         // widest values are used instead of current ones to keep layout stable
-        val crowded = template.any {
-            titlePaint.measureText(it.title) * SHRINKED_TITLE + valuePaint.measureText(it.summary) > inner
+        val crowded = (0 until 3).any {
+            templates.titleWidth[it] * SHRINKED_TITLE + templates.valueWidth(it) > inner
         }
         // second line is used only if plot is still visible enough
         val twoLines = crowded && cellH > (titlePaint.fontSpacing + valuePaint.fontSpacing) * 1.8f
-        cells.forEachIndexed { idx, cell ->
-            drawGauge(
-                canvas,
-                gauges,
-                cell.gauge,
-                left + cellW * idx,
-                top,
-                cellW,
-                cellH,
-                cell.title,
-                cell.summary,
-                twoLines
-            )
+        for (idx in 0 until 3) {
+            drawGauge(canvas, gauges, ids[idx], left + cellW * idx, top, cellW, cellH, texts, templates, idx, twoLines, now)
         }
     }
 
@@ -367,36 +396,108 @@ class SidDashboardView @JvmOverloads constructor(
 
     private fun explanationPadding() = density * 4
 
-    // Wraps text by words to the given lines count, the last line is shrunk (down to 70%) and cut to fit width
-    private fun drawExplanation(canvas: Canvas, text: String, left: Float, top: Float, w: Float, lines: Int) {
-        val pad = explanationPadding()
-        val maxWidth = w - pad * 2
-        if (maxWidth <= 0 || lines == 0) {
+    /**
+     * Fixed positions of explanation slots (see [SidDescription.SLOTS]) for given width and lines count.
+     * Sizes are taken from templates, so neither positions nor text size depend on current texts: changing part
+     * of explanation doesn't move others (as columns in trackers).
+     */
+    private inner class SlotsLayout {
+        private val templates = FloatArray(SidDescription.SLOTS) { idx ->
+            SidDescription.SLOT_TEMPLATES[idx].maxOf { explainPaint.measureText(it) }
+        }
+        private var width = -1f
+        var lines = -1
+            private set
+        var textSize = 0f
+            private set
+        val x = FloatArray(SidDescription.SLOTS)
+        val maxWidth = FloatArray(SidDescription.SLOTS)
+        val row = IntArray(SidDescription.SLOTS)
+
+        fun update(w: Float, linesCount: Int) {
+            if (w == width && linesCount == lines) {
+                return
+            }
+            width = w
+            lines = linesCount
+            val base = explainPaint.textSize
+            val gap = base
+            val single = templates.sum() + gap * (SidDescription.SLOTS - 1)
+            // two rows of two columns aligned across all rows: wave and filter, pitch and envelope
+            val col0 = maxOf(templates[0], templates[2])
+            val col1 = maxOf(templates[1], templates[3])
+            val twoRows = linesCount >= 2 && single > w
+            val required = if (twoRows) col0 + gap + col1 else single
+            val scale = (w / required).coerceIn(MIN_EXPLANATION_SCALE, 1f)
+            // what still doesn't fit is distributed proportionally and cut
+            val squeeze = minOf(1f, w / (required * scale)) * scale
+            textSize = base * scale
+            if (twoRows) {
+                for (idx in 0 until SidDescription.SLOTS) {
+                    val second = idx % 2 == 1
+                    row[idx] = idx / 2
+                    x[idx] = if (second) (col0 + gap) * squeeze else 0f
+                    maxWidth[idx] = if (second) w - x[idx] else col0 * squeeze
+                }
+            } else {
+                var pos = 0f
+                for (idx in 0 until SidDescription.SLOTS) {
+                    row[idx] = 0
+                    x[idx] = pos
+                    maxWidth[idx] = if (idx == SidDescription.SLOTS - 1) w - pos else templates[idx] * squeeze
+                    pos += (templates[idx] + gap) * squeeze
+                }
+            }
+        }
+    }
+
+    /**
+     * Ellipsized text cache, to not cut the same text every frame
+     */
+    private inner class FittedText {
+        private var source = ""
+        private var width = 0f
+        private var size = 0f
+        private var result = ""
+
+        fun get(text: String, maxWidth: Float, paint: Paint): String {
+            if (text !== source || maxWidth != width || paint.textSize != size) {
+                source = text
+                width = maxWidth
+                size = paint.textSize
+                result = ellipsize(text, maxWidth, paint)
+            }
+            return result
+        }
+    }
+
+    private fun drawSlots(canvas: Canvas, texts: StableTexts, cache: Array<FittedText>, left: Float, top: Float, now: Long) {
+        if (slots.lines <= 0) {
             return
         }
         val baseSize = explainPaint.textSize
-        // whole text is scaled uniformly to look consistent, words wrapping wastes some space
-        val width = explainPaint.measureText(text)
-        if (width > maxWidth * lines) {
-            explainPaint.textSize = baseSize * maxOf(maxWidth * lines * 0.92f / width, 0.7f)
-        }
-        var rest = text
-        var y = top + density - explainPaint.ascent()
-        for (line in 1 until lines) {
-            if (explainPaint.measureText(rest) <= maxWidth) {
-                break
+        explainPaint.textSize = slots.textSize
+        val baseline = top + density - explainPaint.ascent()
+        for (idx in 0 until SidDescription.SLOTS) {
+            val text = texts[SidRowText.slot(idx)]
+            if (text.isEmpty()) {
+                continue
             }
-            val count = explainPaint.breakText(rest, true, maxWidth, null)
-            // break at words boundary if possible
-            val space = rest.lastIndexOf(' ', count)
-            val end = if (space > 0) space else count
-            canvas.drawText(rest, 0, end, left + pad, y, explainPaint)
-            rest = rest.substring(end).trimStart()
-            y += explainPaint.fontSpacing
+            explainPaint.alpha = fadedAlpha(explainAlpha, texts.fade(SidRowText.slot(idx), now))
+            val fit = cache[idx].get(text, slots.maxWidth[idx], explainPaint)
+            canvas.drawText(
+                fit,
+                left + explanationPadding() + slots.x[idx],
+                baseline + explainPaint.fontSpacing * slots.row[idx],
+                explainPaint
+            )
         }
-        canvas.drawText(ellipsize(rest, maxWidth, explainPaint), left + pad, y, explainPaint)
+        explainPaint.alpha = explainAlpha
         explainPaint.textSize = baseSize
     }
+
+    // changed text appears from dimmed state to mark the change without movement
+    private fun fadedAlpha(alpha: Int, progress: Float) = (alpha * (FADE_FROM + (1f - FADE_FROM) * progress)).toInt()
 
     // Chips are placed side by side as in oscilloscope above (long chips are split to several columns),
     // card per voice
@@ -410,6 +511,7 @@ class SidDashboardView @JvmOverloads constructor(
         if (data.size < voices * VoiceGauges.SIZE) {
             return
         }
+        val now = clock()
         var totalCols = 0
         for (group in current.groups) {
             totalCols += columnsOf(group.voices.size)
@@ -431,7 +533,7 @@ class SidDashboardView @JvmOverloads constructor(
                 val gauges = VoiceGauges(data, voice * VoiceGauges.SIZE)
                 val left = cellW * (col + idx / rows)
                 val top = cellH * (idx % rows)
-                drawVoiceCard(canvas, gauges, group.name, name, left, top, cellW, cellH, smooth[voice % MAX_VOICES])
+                drawVoiceCard(canvas, gauges, group.name, name, left, top, cellW, cellH, voice % MAX_VOICES, now)
                 ++voice
             }
             col += columnsOf(group.voices.size)
@@ -447,19 +549,31 @@ class SidDashboardView @JvmOverloads constructor(
         top: Float,
         w: Float,
         h: Float,
-        smoothValues: FloatArray
+        voice: Int,
+        now: Long
     ) {
+        val smoothValues = smooth[voice]
         val pad = density * 2
         rect.set(left + pad, top + pad, left + w - pad, top + h - pad)
         canvas.drawRect(rect, framePaint)
         // title band is separated from graphs to keep both readable
-        val summary = widgets.summary(gauges)
+        val stable = summaries[voice]
+        stable.update(gauges, now)
+        val summary = stable.text
+        if (summaryKinds[voice] != gauges.kind) {
+            summaryKinds[voice] = gauges.kind
+            summaryWidths[voice] = 0f
+        }
+        summaryWidths[voice] = maxOf(summaryWidths[voice], summaryPaint.measureText(summary))
+        val reserved = summaryWidths[voice]
         val key = if (gauges.isKeyOn) " \u25CF" else ""
         // group name is omitted if there's no space for it
         val full = "$group $name$key"
-        val available = rect.width() - density * 9 - summaryPaint.measureText(summary)
+        val available = rect.width() - density * 9 - reserved
         val title = if (titlePaint.measureText(full) <= available) full else "$name$key"
-        val band = drawTitleBand(canvas, rect, title, summary)
+        summaryPaint.alpha = fadedAlpha(summaryAlpha, StableValue.fadeProgress(stable.changedAt, now))
+        val band = drawTitleBand(canvas, rect, title, summary, reserved)
+        summaryPaint.alpha = summaryAlpha
         body.set(rect.left + pad * 2, band + pad, rect.right - pad * 2, rect.bottom - pad * 2)
         if (body.height() < density * 18) {
             // no space for details, only current level
@@ -487,71 +601,125 @@ class SidDashboardView @JvmOverloads constructor(
         }
     }
 
-    // Title has priority over summary: summary is placed at the second line (if requested) or shrunk and cut
-    // if both don't fit
+    // Title has priority over summary: summary is shrunk and cut if both don't fit
+    // @param reserved width of summary to keep title and summary size independent of the current summary
     // @return bottom of title band
-    private fun drawTitleBand(
-        canvas: Canvas,
-        card: RectF,
-        title: String,
-        summary: String,
-        valuePaint: Paint = summaryPaint,
-        secondLine: Boolean = false
-    ): Float {
+    private fun drawTitleBand(canvas: Canvas, card: RectF, title: String, summary: String, reserved: Float): Float {
         val pad = density * 3
         val baseline = card.top + pad - titlePaint.ascent()
         val baseSize = sp(TITLE_SIZE_SP)
         val minSize = sp(MIN_TITLE_SIZE_SP)
         val titleWidth = titlePaint.measureText(title)
         val inner = card.width() - pad * 3
-        val valueBaseSize = valuePaint.textSize
-        val bottom = if (!secondLine || summary.isEmpty()) {
-            val room = inner - minOf(titleWidth, titleWidth * minSize / baseSize)
-            val value = fitText(summary, room, valuePaint, 0.8f)
-            val available = inner - valuePaint.measureText(value)
-            drawTitle(canvas, title, card.left + pad, baseline, available)
-            if (value.isNotEmpty()) {
-                canvas.drawText(value, card.right - pad, baseline, valuePaint)
-            }
-            baseline + titlePaint.descent() + pad
-        } else {
-            drawTitle(canvas, title, card.left + pad, baseline, inner)
-            val valueBaseline = baseline + titlePaint.descent() - valuePaint.ascent()
-            val value = fitText(summary, card.width() - pad * 2, valuePaint, 0.8f)
-            canvas.drawText(value, card.right - pad, valueBaseline, valuePaint)
-            valueBaseline + valuePaint.descent() + pad
+        val valueBaseSize = summaryPaint.textSize
+        val room = inner - minOf(titleWidth, titleWidth * minSize / baseSize)
+        if (reserved > room) {
+            summaryPaint.textSize *= maxOf(room / reserved, 0.8f)
         }
-        valuePaint.textSize = valueBaseSize
+        val value = ellipsize(summary, room, summaryPaint)
+        val available = inner - minOf(reserved * summaryPaint.textSize / valueBaseSize, room)
+        drawTitle(canvas, title, card.left + pad, baseline, available, titleWidth)
+        if (value.length >= 4 || value == summary) {
+            canvas.drawText(value, card.right - pad, baseline, summaryPaint)
+        }
+        summaryPaint.textSize = valueBaseSize
+        val bottom = baseline + titlePaint.descent() + pad
         canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
         return bottom
     }
 
-    // shrinks title down to minimal size and then cuts it
-    private fun drawTitle(canvas: Canvas, fullTitle: String, x: Float, y: Float, available: Float) {
+    // Value is placed at the second line (if requested) or shrunk and cut if both don't fit. All sizes are taken
+    // from templates, so only changed parts of texts are redrawn differently.
+    // @return bottom of title band
+    private fun drawGaugeTitleBand(
+        canvas: Canvas,
+        card: RectF,
+        texts: StableTexts,
+        templates: TitleTemplates,
+        idx: Int,
+        secondLine: Boolean,
+        now: Long
+    ): Float {
+        val pad = density * 3
+        val baseline = card.top + pad - titlePaint.ascent()
         val baseSize = sp(TITLE_SIZE_SP)
-        // raw register values are more important than gauge name in narrow cells
-        val title = if (titlePaint.measureText(fullTitle) * sp(MIN_TITLE_SIZE_SP) / baseSize > available) {
-            fullTitle.replace(" Wave ", " ")
+        val minSize = sp(MIN_TITLE_SIZE_SP)
+        val titleWidth = templates.titleWidth[idx]
+        val inner = card.width() - pad * 3
+        val valueWidth = templates.valueWidth(idx)
+        val title = texts[SidRowText.title(idx)]
+        val bottom = if (!secondLine) {
+            val room = inner - minOf(titleWidth, titleWidth * minSize / baseSize)
+            val scale = if (valueWidth > room) maxOf(room / valueWidth, 0.8f) else 1f
+            drawTitle(canvas, title, card.left + pad, baseline, inner - minOf(valueWidth * scale, room), titleWidth)
+            drawGaugeValue(canvas, texts, templates, idx, card.right - pad, baseline, scale, room, now)
+            baseline + titlePaint.descent() + pad
         } else {
-            fullTitle
+            drawTitle(canvas, title, card.left + pad, baseline, inner, titleWidth)
+            val valueBaseline = baseline + titlePaint.descent() - valuePaint.ascent()
+            val room = card.width() - pad * 2
+            val scale = if (valueWidth > room) maxOf(room / valueWidth, 0.8f) else 1f
+            drawGaugeValue(canvas, texts, templates, idx, card.right - pad, valueBaseline, scale, room, now)
+            valueBaseline + valuePaint.descent() + pad
         }
-        val titleWidth = titlePaint.measureText(title)
-        titlePaint.textSize =
-            if (titleWidth > available) maxOf(baseSize * available / titleWidth, sp(MIN_TITLE_SIZE_SP)) else baseSize
-        canvas.drawText(ellipsize(title, available, titlePaint), x, y, titlePaint)
-        titlePaint.textSize = baseSize
+        canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
+        return bottom
     }
 
-    // Changes paint size (restoring is caller's responsibility), empty result if too little is left
-    private fun fitText(text: String, maxWidth: Float, paint: Paint, minScale: Float): String {
-        val width = paint.measureText(text)
-        if (width <= maxWidth) {
-            return text
+    // Tail is aligned in its own fixed slot at the right, main part is right-aligned before it
+    private fun drawGaugeValue(
+        canvas: Canvas,
+        texts: StableTexts,
+        templates: TitleTemplates,
+        idx: Int,
+        right: Float,
+        baseline: Float,
+        scale: Float,
+        room: Float,
+        now: Long
+    ) {
+        val baseSize = valuePaint.textSize
+        valuePaint.textSize = baseSize * scale
+        val tailWidth = templates.tailWidth[idx] * scale
+        val tail = texts[SidRowText.tail(idx)]
+        if (tail.isNotEmpty()) {
+            valuePaint.alpha = fadedAlpha(valueAlpha, texts.fade(SidRowText.tail(idx), now))
+            if (templates.items[idx].tailAlign == Paint.Align.LEFT) {
+                valuePaint.textAlign = Paint.Align.LEFT
+                canvas.drawText(tail, right - tailWidth, baseline, valuePaint)
+                valuePaint.textAlign = Paint.Align.RIGHT
+            } else {
+                canvas.drawText(tail, right, baseline, valuePaint)
+            }
         }
-        paint.textSize *= maxOf(maxWidth / width, minScale)
-        val result = ellipsize(text, maxWidth, paint)
-        // too short beginning is useless
-        return if (result.length < 4) "" else result
+        val main = texts[SidRowText.main(idx)]
+        if (main.isNotEmpty()) {
+            val mainRight = right - tailWidth - (if (tailWidth > 0f) templates.spaceWidth * scale else 0f)
+            val available = room - (right - mainRight)
+            if (available > 0f) {
+                valuePaint.alpha = fadedAlpha(valueAlpha, texts.fade(SidRowText.main(idx), now))
+                canvas.drawText(ellipsize(main, available, valuePaint), mainRight, baseline, valuePaint)
+            }
+        }
+        valuePaint.alpha = valueAlpha
+        valuePaint.textSize = baseSize
+    }
+
+    // Shrinks title down to minimal size and then cuts it. Size is selected by widest title to not
+    // change it with each value.
+    private fun drawTitle(canvas: Canvas, fullTitle: String, x: Float, y: Float, available: Float, templateWidth: Float) {
+        val baseSize = sp(TITLE_SIZE_SP)
+        // raw register values are more important than gauge name in narrow cells
+        val shorten = templateWidth * sp(MIN_TITLE_SIZE_SP) / baseSize > available
+        val title = if (shorten) fullTitle.replace(" Wave ", " ") else fullTitle
+        val actual = titlePaint.measureText(title)
+        val template = if (shorten) templateWidth * actual / titlePaint.measureText(fullTitle) else templateWidth
+        // template may be narrower for some values, cutting them is worse than rare size change
+        val width = maxOf(template, actual)
+        titlePaint.textSize =
+            if (width > available) maxOf(baseSize * available / width, sp(MIN_TITLE_SIZE_SP)) else baseSize
+        canvas.drawText(ellipsize(title, available, titlePaint), x, y, titlePaint)
+        titlePaint.textSize = baseSize
     }
 
     private fun ellipsize(text: String, maxWidth: Float, paint: Paint): String {
@@ -609,14 +777,16 @@ class SidDashboardView @JvmOverloads constructor(
         top: Float,
         w: Float,
         h: Float,
-        title: String,
-        summary: String,
-        twoLines: Boolean
+        texts: StableTexts,
+        templates: TitleTemplates,
+        idx: Int,
+        twoLines: Boolean,
+        now: Long
     ) {
         val pad = density
         rect.set(left + pad, top + pad, left + w - pad, top + h - pad)
         canvas.drawRect(rect, framePaint)
-        val plotTop = drawTitleBand(canvas, rect, title, summary, valuePaint, twoLines) + pad * 2
+        val plotTop = drawGaugeTitleBand(canvas, rect, texts, templates, idx, twoLines, now) + pad * 2
         val plotHeight = rect.bottom - pad * 2 - plotTop
         if (plotHeight <= 0) {
             return
@@ -656,21 +826,28 @@ class SidDashboardView @JvmOverloads constructor(
         private const val MAX_EXPLANATION_LINES = 2
 
         // widest titles and values of gauges
-        private val VOICE_TEMPLATE = listOf(
-            Cell(0, "S1V1 Wave F SRTF", "Pulse 50% Sync \u25CF"),
-            Cell(0, "Env FFFF", "100% Atk"),
-            Cell(0, "Freq FFFF", "C#5 1047Hz")
+        private val VOICE_TEMPLATE = arrayOf(
+            TitleTemplate("S1V1 Wave F SRTF", "Pulse 50% Sync", arrayOf(SidDescription.GATE_MARK)),
+            TitleTemplate("Env FFFF", "100%", SidDescription.Phase.values().map { it.short }.toTypedArray(), Paint.Align.LEFT),
+            TitleTemplate("Freq FFFF", "C#5", arrayOf("1047Hz", "3.8kHz"))
         )
-        private val GLOBAL_TEMPLATE = listOf(
-            Cell(0, "Vol 15", "100%"),
-            Cell(0, "Res 15", "100%"),
-            Cell(0, "Filter LBH 2047", "Notch ~18kHz")
+        private val GLOBAL_TEMPLATE = arrayOf(
+            TitleTemplate("Vol 15", "", arrayOf("100%")),
+            TitleTemplate("Res 15", "", arrayOf("100%")),
+            TitleTemplate("Filter LBH 2047", "Notch", arrayOf("~9.9kHz", "~18kHz", "~880Hz"))
         )
+        private val VOICE_GAUGES = Array(3) {
+            intArrayOf(ChipGauges.wave(it), ChipGauges.envelope(it), ChipGauges.frequency(it))
+        }
+        private val GLOBAL_GAUGES = intArrayOf(ChipGauges.VOLUME, ChipGauges.RESONANCE, ChipGauges.CUTOFF)
+        private const val MIN_EXPLANATION_SCALE = 0.7f
+
+        // dimmed enough to notice, but still readable
+        private const val FADE_FROM = 0.4f
         private const val SHRINKED_TITLE = 0.85f
         private const val ELLIPSIS = "\u2026"
         const val DEFAULT_WAVE_WINDOW_MS = 10
 
-        private fun hex4(value: Int) = String.format(java.util.Locale.US, "%04X", value)
         private const val MAX_CHIPS = 3
         private const val MAX_VOICES = 64
 
@@ -682,26 +859,32 @@ class SidDashboardView @JvmOverloads constructor(
         private const val STATUS_PERIOD_NS = 500_000_000L
 
         // Waveform bits and flags: Sync, Ring modulation, Test, Filtered
-        internal fun waveTitle(state: ChipState, voice: Int) = buildString {
-            val ctrl = state.control(voice)
+        internal fun waveTitle(control: Int, filtered: Boolean) = buildString {
             append("Wave ")
-            append(Integer.toHexString(ctrl shr 4))
+            append(Integer.toHexString(control shr 4))
             append(' ')
-            if (ctrl and 2 != 0) append('S')
-            if (ctrl and 4 != 0) append('R')
-            if (ctrl and 8 != 0) append('T')
-            if (state.routing and (1 shl voice) != 0) append('F')
+            if (control and 2 != 0) append('S')
+            if (control and 4 != 0) append('R')
+            if (control and 8 != 0) append('T')
+            if (filtered) append('F')
         }
 
         // Filter modes: Lowpass, Bandpass, Highpass
-        internal fun filterTitle(state: ChipState) = buildString {
+        internal fun filterTitle(mode: Int, cutoff: Int) = buildString {
             append("Filter ")
-            val mode = state.mode
             if (mode and 1 != 0) append('L')
             if (mode and 2 != 0) append('B')
             if (mode and 4 != 0) append('H')
             append(' ')
-            append(state.cutoff)
+            append(cutoff)
+        }
+
+        // Digits of the same width keep numbers in place while they change. Roboto has them by default,
+        // but not every font does.
+        private fun Paint.tabularFigures() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                fontFeatureSettings = "tnum"
+            }
         }
     }
 }

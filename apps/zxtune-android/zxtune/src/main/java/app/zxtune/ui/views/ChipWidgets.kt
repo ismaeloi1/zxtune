@@ -64,32 +64,7 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     /**
      * Short text describing current state, displayed in title band
      */
-    fun summary(g: VoiceGauges) = when (g.kind) {
-        VoiceGauges.Kind.MT32_PART -> g.text.ifEmpty { "-" }
-        VoiceGauges.Kind.MT32_PARTIAL -> partialSummary(g)
-        VoiceGauges.Kind.OPL_RHYTHM -> RHYTHM_NAMES.getOrElse(g.field(0)) { "" }
-        VoiceGauges.Kind.OPN_DAC -> if (g.field(0) != 0) "PCM" else "off"
-        else -> noteSummary(g)
-    }
-
-    private fun noteSummary(g: VoiceGauges) = when {
-        g.isNoise && !g.hasFrequency -> "noise"
-        (!g.hasFrequency || g.frequency <= 0f) && g.hasLevel -> if (g.level > -96f) "${g.level.roundToInt()}dB" else "off"
-        !g.hasFrequency || g.frequency <= 0f -> ""
-        g.isNoise -> "noise ${g.frequency.roundToInt()}Hz"
-        else -> "${noteName(g.frequency)} ${g.frequency.roundToInt()}Hz"
-    }
-
-    private fun partialSummary(g: VoiceGauges): String {
-        val state = PARTIAL_STATES.getOrElse(g.field(0)) { "" }
-        val owner = g.field(1)
-        return when {
-            g.field(0) == 0 -> state
-            owner == 9 -> "$state rhythm"
-            g.hasFrequency -> "$state P$owner ${noteName(g.frequency)}"
-            else -> "$state P$owner"
-        }
-    }
+    fun summary(g: VoiceGauges) = summaryOf(g)
 
     /**
      * @param smooth per voice storage of displayed values, at least SMOOTH_SIZE
@@ -655,8 +630,56 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
 
         fun noteName(hz: Float): String {
             if (hz <= 0f) return ""
-            val note = (12 * log2(hz / 440f) + 57).roundToInt()
-            return if (note in 0..131) "${NOTES[note % 12]}${note / 12}" else ""
+            return noteName(semitones(hz).roundToInt())
+        }
+
+        /**
+         * @param note semitones from C0
+         */
+        fun noteName(note: Int) = if (note in 0..131) "${NOTES[note % 12]}${note / 12}" else ""
+
+        fun semitones(hz: Float) = 12 * log2(hz / 440f) + 57
+
+        fun summaryOf(g: VoiceGauges) = when (g.kind) {
+            VoiceGauges.Kind.MT32_PART -> g.text.ifEmpty { "-" }
+            VoiceGauges.Kind.MT32_PARTIAL -> partialSummary(g)
+            VoiceGauges.Kind.OPL_RHYTHM -> RHYTHM_NAMES.getOrElse(g.field(0)) { "" }
+            VoiceGauges.Kind.OPN_DAC -> if (g.field(0) != 0) "PCM" else "off"
+            else -> noteSummary(g.summaryMode, g.frequency, noteName(g.frequency), g.level.roundToInt())
+        }
+
+        private val VoiceGauges.summaryMode
+            get() = when {
+                isNoise && !hasFrequency -> SUMMARY_NOISE
+                (!hasFrequency || frequency <= 0f) && hasLevel -> SUMMARY_LEVEL
+                !hasFrequency || frequency <= 0f -> SUMMARY_NONE
+                isNoise -> SUMMARY_NOISE_RATE
+                else -> SUMMARY_NOTE
+            }
+
+        private const val SUMMARY_NOISE = 0
+        private const val SUMMARY_LEVEL = 1
+        private const val SUMMARY_NONE = 2
+        private const val SUMMARY_NOISE_RATE = 3
+        private const val SUMMARY_NOTE = 4
+
+        private fun noteSummary(mode: Int, hz: Float, note: String, levelDb: Int) = when (mode) {
+            SUMMARY_NOISE -> "noise"
+            SUMMARY_LEVEL -> if (levelDb > -96) "${levelDb}dB" else "off"
+            SUMMARY_NONE -> ""
+            SUMMARY_NOISE_RATE -> "noise ${hz.roundToInt()}Hz"
+            else -> "$note ${hz.roundToInt()}Hz"
+        }
+
+        private fun partialSummary(g: VoiceGauges): String {
+            val state = PARTIAL_STATES.getOrElse(g.field(0)) { "" }
+            val owner = g.field(1)
+            return when {
+                g.field(0) == 0 -> state
+                owner == 9 -> "$state rhythm"
+                g.hasFrequency -> "$state P$owner ${noteName(g.frequency)}"
+                else -> "$state P$owner"
+            }
         }
 
         // phase 0..1 of one period
@@ -672,6 +695,66 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
                 6 -> if (phase < 0.5f) 1f else -1f
                 else -> if (phase < 0.5f) 1f - phase * 2 else -(phase - 0.5f) * 2
             }
+        }
+    }
+
+    /**
+     * Title band summary of voice card that changes calmly enough to be read, see [StableValue]
+     */
+    class StableSummary {
+        private val mode = StableValue()
+        private val note = StableValue()
+        private val pitch = StableValue(deadband = PITCH_DEADBAND_CENTS)
+        private val level = StableValue(deadband = LEVEL_DEADBAND_DB)
+        private val other = StableValue()
+        private var hz = 0f
+        var text = ""
+            private set
+
+        /** Time of the last text change for fading */
+        var changedAt = Long.MIN_VALUE / 2
+            private set
+
+        fun update(g: VoiceGauges, nowMs: Long) {
+            val kind = g.kind
+            val changed = if (kind.hasNoteSummary) {
+                // the text depends only on values below, so it is not built every frame
+                var changed = mode.update((kind shl 8) or g.summaryMode, nowMs)
+                if (g.hasFrequency && g.frequency > 0f) {
+                    changed = note.update(semitones(g.frequency), NOTE_MARGIN, nowMs) or changed
+                    if (pitch.update(SidRowText.cents(g.frequency), nowMs)) {
+                        hz = g.frequency
+                        changed = true
+                    }
+                }
+                if (g.hasLevel) {
+                    changed = level.update(g.level.roundToInt(), nowMs) or changed
+                }
+                if (changed || text.isEmpty()) {
+                    noteSummary(mode.value and 0xff, hz, noteName(note.value), level.value)
+                } else {
+                    null
+                }
+            } else {
+                val current = summaryOf(g)
+                if (other.update((kind shl 24) xor current.hashCode(), nowMs) || text.isEmpty()) current else null
+            }
+            if (changed != null && changed != text) {
+                if (text.isNotEmpty()) {
+                    changedAt = nowMs
+                }
+                text = changed
+            }
+        }
+
+        private val Int.hasNoteSummary
+            get() = this != VoiceGauges.Kind.MT32_PART && this != VoiceGauges.Kind.MT32_PARTIAL &&
+                this != VoiceGauges.Kind.OPL_RHYTHM && this != VoiceGauges.Kind.OPN_DAC
+
+        private companion object {
+            const val NOTE_MARGIN = SidRowText.NOTE_MARGIN
+            const val PITCH_DEADBAND_CENTS = SidRowText.PITCH_DEADBAND_CENTS
+            const val LEVEL_DEADBAND_DB = 2
         }
     }
 }

@@ -279,7 +279,7 @@ class ChipDashboardRenderTest {
             SidDescription.voiceExplanation(state, 0, 0, chip)
         )
         assertEquals(
-            "Pulse 37% duty at C4, hard-synced to V1, attack 56ms then decay 1.5s to sustain 100%",
+            "Pulse 37% duty at C4, hard-synced to V1, attack 56ms, decay 1.5s to sustain 100%",
             SidDescription.voiceExplanation(state, 1, 1, chip)
         )
         assertEquals(
@@ -287,11 +287,113 @@ class ChipDashboardRenderTest {
             SidDescription.voiceExplanation(state, 2, 0, chip)
         )
         assertEquals(
-            "Volume 100%, low-pass ~440Hz resonance 66% on V1+V3",
+            "Volume 100%, low-pass ~440Hz on V1+V3, resonance 66%",
             SidDescription.filterExplanation(state, chip)
         )
         assertEquals(SidDescription.NTSC_CLOCK, SidDescription.Chip.fromStatus("NTSC, MOS8580").clock)
         assertEquals("2ms", SidDescription.formatMs(SidDescription.attackMs(0)))
         assertEquals("24s", SidDescription.formatMs(SidDescription.decayMs(15)))
+    }
+
+    /**
+     * Renders 60fps frames of jittering registers (vibrato, pulse width and cutoff sweeps, decaying envelope,
+     * hard restart) and stacks title bands and explanations of sampled frames: texts should stay in place and
+     * change rarely.
+     */
+    private fun renderSidSequence(name: String) {
+        val width = 1080
+        val height = 1700
+        val view = SidDashboardView(ApplicationProvider.getApplicationContext())
+        var now = 0L
+        view.clock = { now }
+        view.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
+        )
+        view.layout(0, 0, width, height)
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val regs = sidRegs.copyOf()
+        val frames = ArrayList<Bitmap>()
+        val explanations = ArrayList<IntArray>()
+        for (frame in 0 until 150) {
+            val t = frame * 1000L / 60
+            now = t
+            jitter(regs, t)
+            view.setGaugesData(makeSidData(1, regs), 1, "PAL, MOS6581")
+            bitmap.eraseColor(0)
+            view.draw(Canvas(bitmap))
+            if (frame % 15 == 14) {
+                val rowH = view.gaugesRowHeight.toInt()
+                val cellH = view.gaugesCellHeight.toInt()
+                // title band and explanation of each row
+                val strip = Bitmap.createBitmap(width, 4 * (TITLE_BAND + rowH - cellH), Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(strip)
+                var y = 0
+                for (row in 0 until 4) {
+                    val top = rowH * row
+                    canvas.drawBitmap(
+                        bitmap,
+                        android.graphics.Rect(0, top, width, top + TITLE_BAND),
+                        android.graphics.Rect(0, y, width, y + TITLE_BAND),
+                        null
+                    )
+                    y += TITLE_BAND
+                    canvas.drawBitmap(
+                        bitmap,
+                        android.graphics.Rect(0, top + cellH, width, top + rowH),
+                        android.graphics.Rect(0, y, width, y + rowH - cellH),
+                        null
+                    )
+                    y += rowH - cellH
+                }
+                frames.add(strip)
+                // the first line of explanation: waveform and pitch
+                val lineH = (rowH - cellH) / 2
+                val pixels = IntArray(width * lineH)
+                bitmap.getPixels(pixels, 0, width, 0, cellH, width, lineH)
+                explanations.add(pixels)
+            }
+        }
+        System.getenv("ZXTUNE_SCREENSHOTS")?.let { dir ->
+            val gap = 6
+            val strip = Bitmap.createBitmap(width, frames.sumOf { it.height + gap }, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(strip)
+            canvas.drawColor(android.graphics.Color.rgb(40, 0, 60))
+            var y = 0
+            for (frame in frames) {
+                canvas.drawBitmap(frame, 0f, y.toFloat(), null)
+                y += frame.height + gap
+            }
+            File(dir).mkdirs()
+            File(dir, "$name.png").outputStream().use { strip.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        }
+        // waveform and pitch of the first voice (triangle with vibrato) are not changed
+        val changed = explanations.zipWithNext().count { (a, b) -> !a.contentEquals(b) }
+        assertEquals(0, changed)
+    }
+
+    // triangle with vibrato on V1 (+-70 cents), pulse width sweep and hard restarts on V2, release on V3, cutoff sweep
+    private fun jitter(regs: IntArray, t: Long) {
+        val sec = t / 1000.0
+        val freq = (0x22D0 * Math.pow(2.0, 0.7 * sin(2 * Math.PI * 6 * sec) / 12)).toInt()
+        regs[0] = freq and 0xff
+        regs[1] = freq shr 8
+        regs[4] = 0x11
+        val pulse = (0x5e8 + 0x400 * sin(2 * Math.PI * 0.7 * sec)).toInt()
+        regs[9] = pulse and 0xff
+        regs[10] = pulse shr 8
+        regs[11] = if (t % 500 < 20) 0x42 else 0x43
+        regs[0x1d] = (0xd0 + 40 * sin(2 * Math.PI * 1.5 * sec)).toInt()
+        regs[0x1e] = (0x40 - (sec * 20).toInt()).coerceAtLeast(0)
+        val cutoff = (519 + 300 * sin(2 * Math.PI * 0.4 * sec)).toInt()
+        regs[0x15] = cutoff and 7
+        regs[0x16] = cutoff shr 3
+    }
+
+    @Test
+    fun sidSequence() = renderSidSequence("sidtext-sequence")
+
+    private companion object {
+        const val TITLE_BAND = 150
     }
 }

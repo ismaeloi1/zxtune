@@ -97,16 +97,16 @@ internal object SidDescription {
      * @param control voice control register, waveform bits are in high nibble
      * @return short name for title band, e.g. "Saw", "Pulse 37%", "Saw+Tri"
      */
-    fun waveShort(control: Int, pulseWidth: Int) = waveName(control, pulseWidth, false)
+    fun waveShort(control: Int, pulseWidth: Int) = waveName(control, pulsePercent(pulseWidth), false)
 
-    fun waveLong(control: Int, pulseWidth: Int) = waveName(control, pulseWidth, true)
+    fun waveLong(control: Int, pulseWidth: Int) = waveName(control, pulsePercent(pulseWidth), true)
 
-    private fun waveName(control: Int, pulseWidth: Int, long: Boolean): String {
+    fun waveName(control: Int, pulsePercent: Int, long: Boolean): String {
         val parts = buildList {
             // order matches common naming of combined waveforms (e.g. "Pulse+Saw")
             if (control and NOISE != 0) add("Noise")
             if (control and PULSE != 0) {
-                add(if (long) "pulse ${pulsePercent(pulseWidth)}% duty" else "Pulse ${pulsePercent(pulseWidth)}%")
+                add(if (long) "pulse $pulsePercent% duty" else "Pulse $pulsePercent%")
             }
             if (control and SAWTOOTH != 0) add(if (long) "sawtooth" else "Saw")
             if (control and TRIANGLE != 0) add(if (long) "triangle" else "Tri")
@@ -124,17 +124,25 @@ internal object SidDescription {
     }
 
     /**
+     * @return Sync, Ring and Test flags as words with leading spaces
+     */
+    fun waveFlags(control: Int) = buildString {
+        if (control and SYNC != 0) append(" Sync")
+        if (control and RING != 0) append(" Ring")
+        if (control and TEST != 0) append(" Test")
+    }
+
+    const val GATE_MARK = "\u25CF"
+
+    fun isGate(control: Int) = control and GATE != 0
+
+    /**
      * @return short title band value for waveform gauge: name and flags (Gate as dot, Sync, Ring, Test)
      */
     fun waveSummary(state: ChipState, voice: Int): String {
         val ctrl = state.control(voice)
-        return buildString {
-            append(waveShort(ctrl, state.pulseWidth(voice)))
-            if (ctrl and SYNC != 0) append(" Sync")
-            if (ctrl and RING != 0) append(" Ring")
-            if (ctrl and TEST != 0) append(" Test")
-            if (ctrl and GATE != 0) append(" ●")
-        }
+        val gate = if (isGate(ctrl)) " $GATE_MARK" else ""
+        return waveShort(ctrl, state.pulseWidth(voice)) + waveFlags(ctrl) + gate
     }
 
     /**
@@ -142,7 +150,7 @@ internal object SidDescription {
      */
     fun phase(state: ChipState, voice: Int, trend: Int): Phase {
         val env = state.envelope(voice)
-        val gate = state.control(voice) and GATE != 0
+        val gate = isGate(state.control(voice))
         val sustain = (sustainNibble(state, voice)) * 0x11
         return when {
             !gate -> if (env == 0) Phase.IDLE else Phase.RELEASE
@@ -167,17 +175,17 @@ internal object SidDescription {
         return if (note.isEmpty()) formatHz(hz) else "$note ${formatHz(hz)}"
     }
 
-    fun volumeSummary(state: ChipState) = "${state.volume * 100 / 15}%"
+    fun volumeSummary(state: ChipState) = percentOf15(state.volume)
 
-    fun resonanceSummary(state: ChipState) = "${state.resonance * 100 / 15}%"
+    fun resonanceSummary(state: ChipState) = percentOf15(state.resonance)
 
-    fun filterSummary(state: ChipState, chip: Chip) = buildString {
-        append(modeShort(state.mode))
-        append(" ~")
-        append(formatHz(cutoffHz(state.cutoff, chip)))
-    }
+    fun percentOf15(value: Int) = "${value * 100 / 15}%"
 
-    private fun modeShort(mode: Int) = when (mode and 7) {
+    fun filterSummary(state: ChipState, chip: Chip) = "${modeShort(state.mode)} ${cutoffText(cutoffHz(state.cutoff, chip))}"
+
+    fun cutoffText(hz: Float) = "~${formatHz(hz)}"
+
+    fun modeShort(mode: Int) = when (mode and 7) {
         0 -> "Off"
         MODE_LOWPASS -> "LP"
         MODE_BANDPASS -> "BP"
@@ -199,72 +207,138 @@ internal object SidDescription {
         else -> "all-pass"
     }
 
-    /**
-     * Plain language description of what is heard from the voice, e.g.
-     * "Noise at C5, filtered low-pass ~1.2kHz, sustain 60%, release 750ms"
+    /*
+     * Plain language explanation is split to fixed slots (see [SLOTS]), so each part is drawn at the same place
+     * and changes of one part don't move others.
      */
-    fun voiceExplanation(state: ChipState, voice: Int, trend: Int, chip: Chip): String {
-        val ctrl = state.control(voice)
-        val parts = ArrayList<String>(6)
-        val filtered = state.routing and (1 shl voice) != 0
-        if (voice == 2 && state.mode and MODE_VOICE3_OFF != 0 && !filtered) {
-            // typical trick to use voice 3 as modulation source only
-            parts.add("Muted (3OFF)")
+    const val SLOT_WAVE = 0
+    const val SLOT_PITCH = 1
+    const val SLOT_FILTER = 2
+    const val SLOT_ENVELOPE = 3
+
+    // global row uses the same slots
+    const val SLOT_VOLUME = 0
+    const val SLOT_ROUTING = 1
+    const val SLOT_RESONANCE = 2
+    const val SLOT_VOICE3 = 3
+    const val SLOTS = 4
+
+    /**
+     * Widest typical texts of slots (both voice and global rows) to reserve space, rarer longer ones are cut
+     */
+    val SLOT_TEMPLATES = arrayOf(
+        arrayOf("Sawtooth+triangle mix", "Pulse 100% duty", "Volume 100%"),
+        arrayOf("at C#5, hard-synced to V1", "at C#5, ring-modulated by V3", "low+band-pass ~12.5kHz on V1+V3"),
+        arrayOf("filtered low-pass ~12.5kHz", "filtered band-pass ~12.5kHz", "resonance 100%"),
+        arrayOf("attack 250ms, decay 2.4s to sustain 100%", "releasing 100% over 750ms", "V3 disconnected"),
+    )
+
+    fun waveSlot(control: Int, pulsePercent: Int) = if (control and TEST != 0) "Oscillator reset (test bit)" else waveName(control, pulsePercent, true)
+
+    /**
+     * @param note name of note or empty if out of range
+     */
+    fun pitchSlot(control: Int, hz: Float, note: String, voice: Int): String {
+        if (control and TEST != 0) {
+            return ""
         }
         val modulator = "V${modulatorOf(voice) + 1}"
-        if (ctrl and TEST != 0) {
-            parts.add("Oscillator held in reset (test bit)")
-        } else {
-            val hz = frequencyHz(state.frequency(voice), chip)
-            val note = ChipWidgets.noteName(hz)
-            val pitch = when {
-                hz < 1f -> ""
-                ctrl and NOISE != 0 -> " ${formatHz(hz)} rate"
-                note.isNotEmpty() -> " at $note"
-                else -> " at ${formatHz(hz)}"
-            }
-            parts.add(waveLong(ctrl, state.pulseWidth(voice)) + pitch)
-            if (ctrl and SYNC != 0) parts.add("hard-synced to $modulator")
-            // ring modulation affects only triangle waveform
-            if (ctrl and RING != 0 && ctrl and TRIANGLE != 0) parts.add("ring-modulated by $modulator")
+        val parts = ArrayList<String>(3)
+        when {
+            hz < 1f -> Unit
+            control and NOISE != 0 -> parts.add("${formatHz(hz)} rate")
+            note.isNotEmpty() -> parts.add("at $note")
+            else -> parts.add("at ${formatHz(hz)}")
         }
-        if (filtered) {
-            parts.add("filtered ${modeLong(state.mode)} ~${formatHz(cutoffHz(state.cutoff, chip))}")
-        }
-        parts.add(envelopeExplanation(state, voice, trend))
+        if (control and SYNC != 0) parts.add("hard-synced to $modulator")
+        // ring modulation affects only triangle waveform
+        if (control and RING != 0 && control and TRIANGLE != 0) parts.add("ring-modulated by $modulator")
         return parts.joinToString(", ")
     }
 
-    private fun envelopeExplanation(state: ChipState, voice: Int, trend: Int): String {
-        val ad = adReg(state, voice)
-        val release = formatMs(decayMs(srReg(state, voice)))
-        val sustain = "sustain ${sustainPercent(sustainNibble(state, voice))}%"
-        return when (phase(state, voice, trend)) {
-            Phase.ATTACK -> "attack ${formatMs(attackMs(ad shr 4))} then decay ${formatMs(decayMs(ad))} to $sustain"
-            Phase.DECAY -> "decay ${formatMs(decayMs(ad))} to $sustain"
+    fun filterSlot(filtered: Boolean, mode: Int, cutoffHz: Float, muted: Boolean) = when {
+        filtered -> "filtered ${modeLong(mode)} ${cutoffText(cutoffHz)}"
+
+        // typical trick to use voice 3 as modulation source only
+        muted -> "muted (3OFF)"
+
+        else -> ""
+    }
+
+    fun isMuted(voice: Int, mode: Int, routing: Int) = voice == 2 && mode and MODE_VOICE3_OFF != 0 && routing and (1 shl voice) == 0
+
+    fun envelopeSlot(phase: Phase, attackDecay: Int, sustainRelease: Int, envelopePercent: Int): String {
+        val release = formatMs(decayMs(sustainRelease))
+        val sustain = "sustain ${sustainPercent(sustainRelease shr 4)}%"
+        return when (phase) {
+            Phase.ATTACK -> "attack ${formatMs(attackMs(attackDecay shr 4))}, decay ${formatMs(decayMs(attackDecay))} to $sustain"
+            Phase.DECAY -> "decay ${formatMs(decayMs(attackDecay))} to $sustain"
             Phase.SUSTAIN -> "$sustain, release $release"
-            Phase.RELEASE -> "releasing ${envelopePercent(state, voice)}% over $release"
+            Phase.RELEASE -> "releasing $envelopePercent% over $release"
             Phase.IDLE -> "silent"
         }
     }
 
     /**
-     * Global filter and volume description, e.g. "Volume 100%, low-pass ~1.2kHz resonance 47% on V1+V3"
+     * Plain language description of what is heard from the voice, e.g.
+     * "Noise 523Hz rate, filtered low-pass ~1.2kHz, sustain 60%, release 750ms"
      */
-    fun filterExplanation(state: ChipState, chip: Chip) = buildString {
-        append("Volume ${state.volume * 100 / 15}%")
-        val voices = (0 until 4).filter { state.routing and (1 shl it) != 0 }
-            .joinToString("+") { if (it == 3) "Ext" else "V${it + 1}" }
-        if (voices.isEmpty()) {
-            append(", filter unused")
-        } else {
-            append(", ${modeLong(state.mode)} ~${formatHz(cutoffHz(state.cutoff, chip))}")
-            append(" resonance ${state.resonance * 100 / 15}% on $voices")
-        }
-        if (state.mode and MODE_VOICE3_OFF != 0) {
-            append(", V3 disconnected")
+    fun voiceExplanation(state: ChipState, voice: Int, trend: Int, chip: Chip): String {
+        val ctrl = state.control(voice)
+        val hz = frequencyHz(state.frequency(voice), chip)
+        val slots = arrayOf(
+            waveSlot(ctrl, pulsePercent(state.pulseWidth(voice))),
+            pitchSlot(ctrl, hz, ChipWidgets.noteName(hz), voice),
+            filterSlot(
+                state.routing and (1 shl voice) != 0,
+                state.mode,
+                cutoffHz(state.cutoff, chip),
+                isMuted(voice, state.mode, state.routing)
+            ),
+            envelopeSlot(phase(state, voice, trend), adReg(state, voice), srReg(state, voice), envelopePercent(state, voice))
+        )
+        return joinSlots(slots, true)
+    }
+
+    // pitch continues waveform name (e.g. "Saw at C4"), other slots are separate clauses
+    private fun joinSlots(slots: Array<String>, continuePitch: Boolean) = buildString {
+        slots.forEachIndexed { idx, slot ->
+            if (slot.isNotEmpty()) {
+                val continues = continuePitch && idx == SLOT_PITCH && !slot.startsWith("hard-") &&
+                    !slot.startsWith("ring-")
+                if (isNotEmpty()) append(if (continues) " " else ", ")
+                append(slot)
+            }
         }
     }
+
+    fun volumeSlot(volume: Int) = "Volume ${percentOf15(volume)}"
+
+    fun routingSlot(routing: Int, mode: Int, cutoffHz: Float): String {
+        if (routing == 0) {
+            return "filter unused"
+        }
+        val voices = (0 until 4).filter { routing and (1 shl it) != 0 }
+            .joinToString("+") { if (it == 3) "Ext" else "V${it + 1}" }
+        return "${modeLong(mode)} ${cutoffText(cutoffHz)} on $voices"
+    }
+
+    fun resonanceSlot(routing: Int, resonance: Int) = if (routing == 0) "" else "resonance ${percentOf15(resonance)}"
+
+    fun voice3Slot(mode: Int) = if (mode and MODE_VOICE3_OFF != 0) "V3 disconnected" else ""
+
+    /**
+     * Global filter and volume description, e.g. "Volume 100%, low-pass ~1.2kHz on V1+V3, resonance 47%"
+     */
+    fun filterExplanation(state: ChipState, chip: Chip) = joinSlots(
+        arrayOf(
+            volumeSlot(state.volume),
+            routingSlot(state.routing, state.mode, cutoffHz(state.cutoff, chip)),
+            resonanceSlot(state.routing, state.resonance),
+            voice3Slot(state.mode)
+        ),
+        false
+    )
 
     private fun adReg(state: ChipState, voice: Int) = state.attackDecay(voice)
 
