@@ -10,7 +10,6 @@ import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
 import app.zxtune.analytics.Analytics
 import app.zxtune.core.jni.Api
-import app.zxtune.device.car.CarVisualization
 import app.zxtune.device.media.AudioFocusConnection
 import app.zxtune.device.media.BrowseTree
 import app.zxtune.device.media.MediaSessionControl
@@ -226,7 +225,8 @@ class MainService : MediaBrowserServiceCompat() {
             val ctrl = MediaSessionControl.subscribe(ctx, service).also {
                 addResource(it)
             }
-            addResource(CarVisualization.create(ctx, service, ctrl::setLiveArt))
+            // live artwork is not attached: Android Auto crossfades each artwork change through white,
+            // so animated frames flash instead of animating
             syncQueue(ctx, ctrl.session)
             return ctrl.session
         }
