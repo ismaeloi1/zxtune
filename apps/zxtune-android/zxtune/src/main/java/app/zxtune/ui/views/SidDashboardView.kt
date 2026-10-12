@@ -68,6 +68,10 @@ class SidDashboardView @JvmOverloads constructor(
     @Volatile
     private var layout = VoicesLayout.MASTER
 
+    // not created at each frame
+    private var columns = ChipColumns(layout.groups)
+    private var columnsLayout = layout
+
     @Volatile
     private var status = ""
     private var lastStatusTime = 0L
@@ -499,8 +503,7 @@ class SidDashboardView @JvmOverloads constructor(
     // changed text appears from dimmed state to mark the change without movement
     private fun fadedAlpha(alpha: Int, progress: Float) = (alpha * (FADE_FROM + (1f - FADE_FROM) * progress)).toInt()
 
-    // Chips are placed side by side as in oscilloscope above (long chips are split to several columns),
-    // card per voice
+    // Chips are placed side by side as in oscilloscope above, see [ChipColumns], card per voice
     private fun drawVoices(canvas: Canvas, areaHeight: Float) {
         val voices = readyVoices
         val current = layout
@@ -512,31 +515,33 @@ class SidDashboardView @JvmOverloads constructor(
             return
         }
         val now = clock()
-        var totalCols = 0
-        for (group in current.groups) {
-            totalCols += columnsOf(group.voices.size)
+        if (columnsLayout !== current) {
+            columns = ChipColumns(current.groups)
+            columnsLayout = current
         }
-        val cellW = width.toFloat() / maxOf(totalCols, 1)
+        val columns = columns
+        val fullW = width.toFloat()
         var voice = 0
-        var col = 0
-        for (group in current.groups) {
-            val rows = rowsOf(group.voices.size)
+        current.groups.forEachIndexed { groupIdx, group ->
+            val rows = columns.rows(groupIdx)
             // chips with less voices get taller cards
             val cellH = areaHeight / rows
-            if (col != 0) {
-                canvas.drawLine(cellW * col, 0f, cellW * col, areaHeight, separatorPaint)
+            val first = columns.column(groupIdx, 0)
+            if (first != 0) {
+                val x = fullW * columns.left(first)
+                canvas.drawLine(x, 0f, x, areaHeight, separatorPaint)
             }
             group.voices.forEachIndexed { idx, name ->
                 if (voice >= voices) {
                     return
                 }
                 val gauges = VoiceGauges(data, voice * VoiceGauges.SIZE)
-                val left = cellW * (col + idx / rows)
-                val top = cellH * (idx % rows)
-                drawVoiceCard(canvas, gauges, group.name, name, left, top, cellW, cellH, voice % MAX_VOICES, now)
+                val col = columns.column(groupIdx, idx)
+                val left = fullW * columns.left(col)
+                val top = cellH * columns.row(groupIdx, idx)
+                drawVoiceCard(canvas, gauges, group.name, name, left, top, fullW * columns.width(col), cellH, voice % MAX_VOICES, now)
                 ++voice
             }
-            col += columnsOf(group.voices.size)
         }
     }
 
@@ -850,11 +855,6 @@ class SidDashboardView @JvmOverloads constructor(
 
         private const val MAX_CHIPS = 3
         private const val MAX_VOICES = 64
-
-        // same as in OscilloscopeView
-        private const val MAX_ROWS = 8
-        private fun columnsOf(voices: Int) = (voices + MAX_ROWS - 1) / MAX_ROWS
-        private fun rowsOf(voices: Int) = (voices + columnsOf(voices) - 1) / maxOf(columnsOf(voices), 1)
 
         private const val STATUS_PERIOD_NS = 500_000_000L
 
