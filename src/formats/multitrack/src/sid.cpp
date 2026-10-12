@@ -33,7 +33,8 @@ namespace Formats::Multitrack
     const SignatureType SIGNATURE_PSID = {{'P', 'S', 'I', 'D'}};
 
     const uint_t VERSION_MIN = 1;
-    const uint_t VERSION_MAX = 3;
+    // v3 adds second chip, v4 adds third one
+    const uint_t VERSION_MAX = 4;
 
     struct RawHeader
     {
@@ -52,7 +53,7 @@ namespace Formats::Multitrack
 
     const auto FORMAT =
         "'R|'P 'S'I'D"  // signature
-        "00 01-03"      // BE version
+        "00 01-04"      // BE version
         "00 76|7c"      // BE data offset
         "??"            // BE load address
         "??"            // BE init address
