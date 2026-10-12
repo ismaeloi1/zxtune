@@ -49,7 +49,6 @@ class OscilloscopeView @JvmOverloads constructor(
         LABEL_TEXT_SIZE_SP,
         resources.displayMetrics
     )
-    private val labelPadding = labelTextSize / 2
 
     init {
         setEGLContextClientVersion(2)
@@ -107,9 +106,9 @@ class OscilloscopeView @JvmOverloads constructor(
         }
     }
 
-    // Grid of cells: column per chip, row per voice
+    // Grid of cells: column per chip, row per voice. Columns are shared with dashboard, see [ChipColumns]
     private class Grid(
-        val cols: Int,
+        val columns: ChipColumns,
         val rows: Int,
         private val cellColumns: IntArray,
         private val cellRows: IntArray,
@@ -118,37 +117,33 @@ class OscilloscopeView @JvmOverloads constructor(
         val channels
             get() = cellColumns.size
 
-        fun column(chan: Int) = cellColumns[chan]
         fun row(chan: Int) = cellRows[chan]
+
+        // relative (0..1) horizontal placement of channel's cell
+        fun left(chan: Int) = columns.left(cellColumns[chan])
+        fun width(chan: Int) = columns.width(cellColumns[chan])
 
         companion object {
             fun of(layout: VoicesLayout, channels: Int): Grid {
+                val columns = ChipColumns(layout.groups)
                 if (layout.groups.isEmpty()) {
-                    return Grid(1, channels, IntArray(channels), IntArray(channels) { it }, emptyList())
+                    return Grid(columns, channels, IntArray(channels), IntArray(channels) { it }, emptyList())
                 }
-                val columns = ArrayList<Int>()
+                val cellColumns = ArrayList<Int>()
                 val rows = ArrayList<Int>()
                 val labels = ArrayList<String>()
-                var cols = 0
-                var maxRows = 1
-                for (group in layout.groups) {
-                    val voices = group.voices.size
-                    // split long chips (e.g. OPL3 with 23 voices) to equal columns
-                    val groupCols = (voices + MAX_ROWS - 1) / MAX_ROWS
-                    val groupRows = (voices + groupCols - 1) / groupCols
-                    group.voices.forEachIndexed { idx, voice ->
-                        columns.add(cols + idx / groupRows)
-                        rows.add(idx % groupRows)
-                        labels.add("${group.name} - $voice")
+                layout.groups.forEachIndexed { group, desc ->
+                    desc.voices.forEachIndexed { idx, voice ->
+                        cellColumns.add(columns.column(group, idx))
+                        rows.add(columns.row(group, idx))
+                        labels.add("${desc.name} - $voice")
                     }
-                    cols += groupCols
-                    maxRows = maxOf(maxRows, groupRows)
                 }
-                val count = minOf(channels, columns.size)
+                val count = minOf(channels, cellColumns.size)
                 return Grid(
-                    cols,
-                    maxRows,
-                    columns.take(count).toIntArray(),
+                    columns,
+                    columns.maxRows,
+                    cellColumns.take(count).toIntArray(),
                     rows.take(count).toIntArray(),
                     labels.take(count)
                 )
@@ -228,7 +223,7 @@ class OscilloscopeView @JvmOverloads constructor(
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val src = source ?: return
             // narrow cells don't need many points, less data to transfer and draw for many voices
-            val points = (width / maxOf(grid?.cols ?: 1, 1)).coerceIn(MIN_POINTS, POINTS)
+            val points = (width * (grid?.columns?.narrowest ?: 1f)).toInt().coerceIn(MIN_POINTS, POINTS)
             this.points = points
             val layout = runCatching {
                 ScopeLayout(src.getScope(samples, points, windowMs))
@@ -270,13 +265,11 @@ class OscilloscopeView @JvmOverloads constructor(
             }
         }
 
-        // Height of labels band in pixels, labels are drawn over traces only if cells are too small
-        private fun labelBand(grid: Grid): Float {
-            if (grid.labels.isEmpty()) {
-                return 0f
-            }
-            val band = labelTextSize + labelPadding
-            return if (height.toFloat() / grid.rows >= band * MIN_TRACE_TO_BAND) band else 0f
+        // Height of labels band in pixels, see [labelSize]
+        private fun labelBand(grid: Grid) = if (grid.labels.isEmpty()) {
+            0f
+        } else {
+            labelSize(height.toFloat() / grid.rows, labelTextSize) * LABEL_BAND_TO_TEXT
         }
 
         // Center line of trace area and bottom border of each cell
@@ -285,8 +278,8 @@ class OscilloscopeView @JvmOverloads constructor(
             val band = 2f * labelBand(grid) / height
             val cellH = 2f / grid.rows
             for (chan in 0 until grid.channels) {
-                val left = -1f + 2f * grid.column(chan) / grid.cols
-                val right = left + 2f / grid.cols
+                val left = -1f + 2f * grid.left(chan)
+                val right = left + 2f * grid.width(chan)
                 val top = 1f - cellH * grid.row(chan)
                 val centerY = (top - band + top - cellH) / 2
                 gridVertices.put(left).put(centerY).put(right).put(centerY)
@@ -303,9 +296,9 @@ class OscilloscopeView @JvmOverloads constructor(
 
         // Builds thick line as triangle strip, thickness is computed in pixels
         private fun drawChannel(grid: Grid, chan: Int) {
-            val cellW = 2f / grid.cols
+            val cellW = 2f * grid.width(chan)
             val cellH = 2f / grid.rows
-            val left = -1f + cellW * grid.column(chan) + cellW * CELL_MARGIN
+            val left = -1f + 2f * grid.left(chan) + cellW * CELL_MARGIN
             val width = cellW * (1 - 2 * CELL_MARGIN)
             // trace area is below the label band
             val band = 2f * labelBand(grid) / height
@@ -386,17 +379,18 @@ class OscilloscopeView @JvmOverloads constructor(
         private fun updateLabels(grid: Grid) {
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
+            val cellH = height.toFloat() / grid.rows
+            val size = labelSize(cellH, labelTextSize)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color.argb(LABEL_ALPHA, 255, 255, 255)
-                textSize = labelTextSize
+                textSize = size
             }
-            val cellW = width.toFloat() / grid.cols
-            val cellH = height.toFloat() / grid.rows
-            for (chan in 0 until grid.channels) {
+            val padding = size * (LABEL_BAND_TO_TEXT - 1)
+            for (chan in 0 until if (size > 0f) grid.channels else 0) {
                 val label = grid.labels[chan]
-                val x = cellW * grid.column(chan) + labelPadding
+                val x = width * grid.left(chan) + padding
                 // centered in the band
-                val y = cellH * grid.row(chan) + labelPadding / 2 - paint.ascent()
+                val y = cellH * grid.row(chan) + padding / 2 - paint.ascent()
                 canvas.drawText(label, x, y, paint)
             }
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, labelsTexture)
@@ -443,8 +437,18 @@ class OscilloscopeView @JvmOverloads constructor(
         const val POINTS = 512
         private const val MIN_POINTS = 128
 
-        // separate labels band is used if trace area is at least this times higher
-        private const val MIN_TRACE_TO_BAND = 3f
+        // labels are never drawn over traces, so they are shrunk for short cells to keep traces high enough
+        private const val MAX_BAND_PART = 0.4f
+        private const val LABEL_BAND_TO_TEXT = 1.4f
+        private const val MIN_LABEL_SCALE = 0.6f
+
+        /**
+         * @return text size of labels in cell of specified height, 0 if there's no space for labels
+         */
+        internal fun labelSize(cellHeight: Float, textSize: Float): Float {
+            val size = minOf(textSize, cellHeight * MAX_BAND_PART / LABEL_BAND_TO_TEXT)
+            return if (size >= textSize * MIN_LABEL_SCALE) size else 0f
+        }
         const val DEFAULT_WINDOW_MS = 40
         const val AUTO_GAIN = 0
         private const val AUTO_GAIN_TARGET = 0.9f
@@ -453,7 +457,6 @@ class OscilloscopeView @JvmOverloads constructor(
         // per frame, ~0.5s to rise at 120Hz
         private const val AUTO_GAIN_RELEASE = 0.04f
         const val MAX_CHANNELS = 32
-        private const val MAX_ROWS = 8
         private const val AMPLIFICATION = 0.95f
         private const val LINE_WIDTH_PX = 3f
         private const val CELL_MARGIN = 0.01f

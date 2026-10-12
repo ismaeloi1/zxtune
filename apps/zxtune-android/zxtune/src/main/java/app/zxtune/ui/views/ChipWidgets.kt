@@ -96,14 +96,14 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         return true
     }
 
-    // FM operators schema of YM2612 algorithms, S1..S4 order as in datasheet
+    // FM operators schema of OPN/OPM algorithms, see OP_NAMES for operators order
     private fun drawOpnFm(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
         val alg = g.field(0) and 7
         val levels = FloatArray(4) { ease(smooth, it, g.field(2 + it) / 255f) }
         val keys = g.field(10)
         val info = "ALG$alg FB${g.field(1)}${panText(g.field(7))}"
         val schema = OPN_ALGORITHMS[alg]
-        drawSchema(canvas, rect, schema, g.field(6), levels, keys, g.field(1), info, OPN_NAMES, null)
+        drawSchema(canvas, rect, schema, g.field(6), levels, keys, g.field(1), info, OP_NAMES, null)
     }
 
     // OPL2/OPL3 2 and 4 operators channels, FM or AM (additive) connections
@@ -116,7 +116,7 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
             val info = "${OPL4_NAMES[alg]} FB${g.field(1)}${panText(g.field(11))}"
             val schema = OPL4_ALGORITHMS[alg]
             drawSchema(canvas, rect, schema, schema.carriers, levels, if (g.field(10) != 0) 0xf else 0, g.field(1), info,
-                OPL4_OPS, waves)
+                OP_NAMES, waves)
         } else {
             val additive = g.field(0) and 1
             val levels = FloatArray(2) { ease(smooth, it, g.field(2 + it) / 255f) }
@@ -124,7 +124,7 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
             val info = "${if (additive != 0) "AM" else "FM"} FB${g.field(1)}${panText(g.field(7))}"
             val schema = OPL2_ALGORITHMS[additive]
             drawSchema(canvas, rect, schema, schema.carriers, levels, if (g.field(6) != 0) 3 else 0, g.field(1), info,
-                OPL2_OPS, waves)
+                OP_NAMES, waves)
         }
     }
 
@@ -151,41 +151,74 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         names: Array<String>,
         waves: IntArray?
     ) {
-        val textHeight = text.fontSpacing
-        drawFit(canvas, info, rect.left, rect.top - text.ascent(), rect.right - (rect.left))
         val ops = levels.size
-        // carrier followed by another operator in the same row cannot reach the bus horizontally,
-        // so it goes down to a horizontal bus under the boxes
-        var downCarriers = 0
-        for (op in 0 until ops) {
-            if (carriers and (1 shl op) != 0 &&
-                (0 until ops).any { schema.row[it] == schema.row[op] && schema.col[it] > schema.col[op] }) {
-                downCarriers = downCarriers or (1 shl op)
-            }
-        }
-        val busGap = if (downCarriers != 0) density * 6 else 0f
-        val area = RectF(rect.left, rect.top + textHeight, rect.right - density * 14, rect.bottom - busGap)
+        // space for buses and feedback loop is reserved always to keep boxes of all algorithms the same
+        val busGap = density * 5
+        val topGap = density * 5
+        val loopGap = density * 6
+        val area = drawSchemaInfo(canvas, rect, info)
+        area.left += loopGap
+        area.top += topGap
+        area.right -= density * 14
+        area.bottom -= busGap
         if (area.height() < density * 12 || area.width() < density * 24) {
             return
         }
-        val cellW = area.width() / schema.cols
-        val cellH = area.height() / schema.rows
-        // stacked layouts are short, so allow wider boxes to keep labels readable
-        val boxH = min(cellW * 0.7f, cellH * 0.85f)
-        val boxW = min(cellW * 0.7f, boxH * 1.6f)
-        val size = min(boxW, boxH)
+        // Boxes are the same for all algorithms of chip (as if all operators are in a row), so live algorithm
+        // changes do not resize them. Short cards cannot fit two rows of readable boxes with connections
+        // between them, so all operators are drawn in a row in numbers order then.
+        val boxW = area.width() / ops * 0.7f
+        val compact = area.height() / MAX_SCHEMA_ROWS * 0.68f < density * MIN_BOX_DP
+        val boxH = min(boxW, if (compact) area.height() * 0.85f else area.height() / MAX_SCHEMA_ROWS * 0.68f)
+        val cols = if (compact) ops else schema.cols
+        val rows = if (compact) 1 else schema.rows
+        val cellW = area.width() / cols
+        val cellH = area.height() / rows
+        // short boxes are wider to fit labels
+        val width = min(boxW, boxH * 2.2f)
         for (op in 0 until ops) {
-            val cx = area.left + cellW * (schema.col[op] + 0.5f)
-            val cy = area.top + cellH * (schema.row[op] + 0.5f)
-            boxes[op].set(cx - boxW / 2, cy - boxH / 2, cx + boxW / 2, cy + boxH / 2)
+            val cx = area.left + cellW * ((if (compact) op.toFloat() else schema.col[op]) + 0.5f)
+            val cy = area.top + cellH * ((if (compact) 0f else schema.row[op]) + 0.5f)
+            boxes[op].set(cx - width / 2, cy - boxH / 2, cx + width / 2, cy + boxH / 2)
+        }
+        // Several carriers side by side (e.g. ALG 5..7 drawn as transposed datasheet figures) cannot reach
+        // the bus at right horizontally, so all carriers of such row go down to a bus under the boxes.
+        // Layouts keep these rows at the bottom, so drops never cross other operators.
+        var downRows = 0
+        for (op in 0 until ops) {
+            if (carriers and (1 shl op) != 0 &&
+                (0 until ops).any { boxes[it].centerY() == boxes[op].centerY() && boxes[it].left > boxes[op].left }) {
+                downRows = downRows or (1 shl op)
+            }
+        }
+        if (downRows != 0) {
+            for (op in 0 until ops) {
+                if (carriers and (1 shl op) != 0 &&
+                    (0 until ops).any { downRows and (1 shl it) != 0 && boxes[it].centerY() == boxes[op].centerY() }) {
+                    downRows = downRows or (1 shl op)
+                }
+            }
         }
         // modulation connections
+        val arcY = area.top - topGap * 0.7f
         for (edge in schema.edges) {
             val src = boxes[edge shr 4]
             val dst = boxes[edge and 15]
             path.reset()
-            if (abs(src.centerX() - dst.centerX()) < 1f) {
+            if (dst.top >= src.bottom) {
+                // modulator above modulated operators, as in transposed datasheet figures
+                val mid = (src.bottom + dst.top) / 2
                 path.moveTo(src.centerX(), src.bottom)
+                path.lineTo(src.centerX(), mid)
+                path.lineTo(dst.centerX(), mid)
+                path.lineTo(dst.centerX(), dst.top)
+            } else if (src.centerY() == dst.centerY() && dst.left - src.right > cellW) {
+                // over the operators between
+                val x = src.right + (cellW - width) / 2
+                path.moveTo(src.right, src.centerY() - src.height() / 4)
+                path.lineTo(x, src.centerY() - src.height() / 4)
+                path.lineTo(x, arcY)
+                path.lineTo(dst.centerX(), arcY)
                 path.lineTo(dst.centerX(), dst.top)
             } else {
                 val mid = (src.right + dst.left) / 2
@@ -203,12 +236,15 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         val lowBusY = area.bottom + busGap * 0.6f
         for (op in 0 until ops) {
             val b = boxes[op]
-            if (downCarriers and (1 shl op) != 0) {
+            if (carriers and (1 shl op) == 0) {
+                continue
+            }
+            if (downRows and (1 shl op) != 0) {
                 canvas.drawLine(b.centerX(), b.bottom, b.centerX(), lowBusY, stroke)
                 canvas.drawLine(b.centerX(), lowBusY, busX, lowBusY, stroke)
                 busTop = min(busTop, lowBusY)
                 busBottom = max(busBottom, lowBusY)
-            } else if (carriers and (1 shl op) != 0) {
+            } else {
                 canvas.drawLine(b.right, b.centerY(), busX, b.centerY(), stroke)
                 busTop = min(busTop, b.centerY())
                 busBottom = max(busBottom, b.centerY())
@@ -218,18 +254,26 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
             canvas.drawLine(busX, busTop, busX, busBottom, stroke)
             val outY = (busTop + busBottom) / 2
             canvas.drawLine(busX, outY, rect.right, outY, stroke)
+            // arrow marks output of the channel
+            val arrow = density * 3
+            path.reset()
+            path.moveTo(rect.right - arrow, outY - arrow)
+            path.lineTo(rect.right, outY)
+            path.lineTo(rect.right - arrow, outY + arrow)
+            canvas.drawPath(path, stroke)
         }
-        // feedback loop of the first operator
+        // Feedback loop from output (top) back to input (left) of the first operator.
+        // Connections from it start at right or bottom sides, so they never cross the loop.
         if (feedback != 0) {
             val b = boxes[0]
-            val loop = size * 0.25f
+            val top = b.top - topGap * 0.45f
+            val left = b.left - loopGap * 0.7f
             path.reset()
-            path.moveTo(b.right, b.centerY() - size * 0.2f)
-            path.lineTo(b.right + loop, b.centerY() - size * 0.2f)
-            path.lineTo(b.right + loop, b.top - loop * 0.6f)
-            path.lineTo(b.left - loop, b.top - loop * 0.6f)
-            path.lineTo(b.left - loop, b.centerY() - size * 0.2f)
-            path.lineTo(b.left, b.centerY() - size * 0.2f)
+            path.moveTo(b.centerX(), b.top)
+            path.lineTo(b.centerX(), top)
+            path.lineTo(left, top)
+            path.lineTo(left, b.centerY())
+            path.lineTo(b.left, b.centerY())
             canvas.drawPath(path, dimStroke)
         }
         for (op in 0 until ops) {
@@ -243,6 +287,28 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
                 waves?.getOrNull(op)
             )
         }
+    }
+
+    /**
+     * Algorithm and feedback are placed at top or (if there's no vertical space to spare) at left in two lines
+     * @return area left for schema
+     */
+    private fun drawSchemaInfo(canvas: Canvas, rect: RectF, info: String): RectF {
+        val textHeight = text.fontSpacing
+        if (rect.width() < rect.height() * 3) {
+            drawFit(canvas, info, rect.left, rect.top - text.ascent(), rect.width())
+            return RectF(rect.left, rect.top + textHeight, rect.right, rect.bottom)
+        }
+        val scale = min(1f, rect.height() / 2 / textHeight)
+        text.textSize = baseTextSize * scale
+        val infoWidth = text.measureText(INFO_TEMPLATE) + density * 4
+        val split = info.indexOf(' ')
+        val lineHeight = textHeight * scale
+        val y = rect.centerY() - lineHeight - text.ascent()
+        canvas.drawText(info, 0, split, rect.left, y, text)
+        canvas.drawText(info, split + 1, info.length, rect.left, y + lineHeight, text)
+        text.textSize = baseTextSize
+        return RectF(rect.left + infoWidth, rect.top, rect.right, rect.bottom)
     }
 
     private fun drawOperator(
@@ -266,12 +332,15 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         }
         canvas.drawRect(b, outline)
         outline.strokeWidth = width
-        label.textSize = min(baseLabelSize, b.height() * 0.42f)
-        if (wave != null && b.height() > baseLabelSize * 2.2f) {
+        val withWave = wave != null && b.height() > baseLabelSize * 2.2f
+        label.textSize = min(baseLabelSize, b.height() * (if (withWave) 0.42f else 0.6f))
+        // number only (as in Furnace algorithm figures) for narrow boxes
+        val shown = if (label.measureText(name) <= b.width() - density * 4) name else name.substring(OP_PREFIX.length)
+        if (wave != null && withWave) {
             drawOplWave(canvas, b, wave)
-            canvas.drawText(name, b.centerX(), b.bottom - density * 3, label)
+            canvas.drawText(shown, b.centerX(), b.bottom - density * 3, label)
         } else {
-            canvas.drawText(name, b.centerX(), b.centerY() - (label.ascent() + label.descent()) / 2, label)
+            canvas.drawText(shown, b.centerX(), b.centerY() - (label.ascent() + label.descent()) / 2, label)
         }
         label.textSize = baseLabelSize
     }
@@ -582,35 +651,65 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         const val SMOOTH_SIZE = 8
         private const val EASING = 0.35f
 
-        private val OPN_NAMES = arrayOf("S1", "S2", "S3", "S4")
-        private val OPL2_OPS = arrayOf("M", "C")
-        private val OPL4_OPS = arrayOf("1", "2", "3", "4")
+        /*
+         * Operators are numbered as in Furnace tracker (OP1..OP4, src/gui/guiConst.cpp opOrder), Nuked-OPN2 and
+         * YM2151 datasheet (M1 C1 M2 C2): by connection order (OP1 > OP2 > OP3 > OP4 in ALG 0), not registers order.
+         * Registers order is OP1 OP3 OP2 OP4 (OPN, +0/+4/+8/+C) and M1 M2 C1 C2 (OPM), so emulation cores report
+         * levels and keys already reordered (FM_SLOTS in fmopn.c, OPS in ym2151.c). Yamaha's S1..S4 names are
+         * avoided, as documents disagree on S2/S3 order. OPL operators follow registers order (OPL3 datasheet).
+         */
+        private const val OP_PREFIX = "OP"
+        private val OP_NAMES = Array(4) { "$OP_PREFIX${it + 1}" }
         private val OPL4_NAMES = arrayOf("FM-FM", "AM-FM", "FM-AM", "AM-AM")
 
-        // see YM2612 datasheet, figure "Algorithm"
+        private const val MAX_SCHEMA_ROWS = 2
+
+        // minimal height of operator box with readable label
+        private const val MIN_BOX_DP = 16
+
+        // the widest line of algorithm and feedback info
+        private const val INFO_TEMPLATE = "FB7 -"
+
+        /*
+         * Furnace drawAlgorithm (src/gui/insEdit/insTabFM.cpp), MAME fmopn.c setup_connection, Nuked-OPN2
+         * fm_algorithm. Cards are wide and short, so at most two rows are used: algorithms with operators
+         * in parallel (5..7) are drawn transposed - modulator above, carriers side by side with output bus below.
+         */
         private val OPN_ALGORITHMS = arrayOf(
+            // 1 > 2 > 3 > 4
             Schema(floatArrayOf(0f, 1f, 2f, 3f), floatArrayOf(0f, 0f, 0f, 0f), intArrayOf(0x01, 0x12, 0x23)),
+            // (1 + 2) > 3 > 4
             Schema(floatArrayOf(0f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 0.5f, 0.5f), intArrayOf(0x02, 0x12, 0x23)),
+            // 1 + (2 > 3) > 4
             Schema(floatArrayOf(1f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 0.5f), intArrayOf(0x03, 0x12, 0x23)),
+            // (1 > 2) + 3 > 4
             Schema(floatArrayOf(0f, 1f, 1f, 2f), floatArrayOf(0f, 0f, 1f, 0.5f), intArrayOf(0x01, 0x13, 0x23)),
+            // (1 > 2) + (3 > 4)
             Schema(floatArrayOf(0f, 1f, 0f, 1f), floatArrayOf(0f, 0f, 1f, 1f), intArrayOf(0x01, 0x23)),
-            Schema(floatArrayOf(0f, 1f, 1f, 1f), floatArrayOf(1f, 0f, 1f, 2f), intArrayOf(0x01, 0x02, 0x03)),
-            Schema(floatArrayOf(0f, 1f, 2f, 3f), floatArrayOf(0f, 0f, 0f, 0f), intArrayOf(0x01)),
+            // 1 > (2 + 3 + 4)
+            Schema(floatArrayOf(1f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x01, 0x02, 0x03)),
+            // (1 > 2) + 3 + 4
+            Schema(floatArrayOf(0f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x01)),
+            // 1 + 2 + 3 + 4
             Schema(floatArrayOf(0f, 1f, 2f, 3f), floatArrayOf(0f, 0f, 0f, 0f), intArrayOf()),
         )
 
         // OPL 2 operators: FM (modulator -> carrier) or AM (both heard)
         private val OPL2_ALGORITHMS = arrayOf(
             Schema(floatArrayOf(0f, 1f), floatArrayOf(0f, 0f), intArrayOf(0x01), 2),
-            Schema(floatArrayOf(0f, 1f), floatArrayOf(0f, 0f), intArrayOf(), 3),
+            Schema(floatArrayOf(0f, 0f), floatArrayOf(0f, 1f), intArrayOf(), 3),
         )
 
-        // OPL3 4 operators: FM-FM 1*2*3*4, AM-FM 1+2*3*4, FM-AM 1*2+3*4, AM-AM 1+2*3+4
+        // OPL3 4 operators (CNT of the first and second pairs), see OPL3 datasheet and Furnace FM_ALGS_4OP_OPL
         private val OPL4_ALGORITHMS = arrayOf(
+            // FM-FM: 1 > 2 > 3 > 4
             Schema(floatArrayOf(0f, 1f, 2f, 3f), floatArrayOf(0f, 0f, 0f, 0f), intArrayOf(0x01, 0x12, 0x23), 8),
+            // AM-FM: 1 + (2 > 3 > 4)
             Schema(floatArrayOf(0f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x12, 0x23), 9),
+            // FM-AM: (1 > 2) + (3 > 4)
             Schema(floatArrayOf(0f, 1f, 0f, 1f), floatArrayOf(0f, 0f, 1f, 1f), intArrayOf(0x01, 0x23), 10),
-            Schema(floatArrayOf(0f, 0f, 1f, 0f), floatArrayOf(0f, 1f, 1f, 2f), intArrayOf(0x12), 13),
+            // AM-AM: 1 + (2 > 3) + 4
+            Schema(floatArrayOf(0f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x12), 13),
         )
 
         private val RHYTHM_NAMES = arrayOf("Bass drum", "Snare", "Tom", "Cymbal", "Hi-hat")
