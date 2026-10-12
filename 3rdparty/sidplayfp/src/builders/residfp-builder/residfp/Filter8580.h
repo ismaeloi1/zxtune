@@ -294,6 +294,13 @@ public:
 
     ~Filter8580();
 
+    void stateRegions(StateRegions &regions) override
+    {
+        addStateRegion(regions, this);
+        hpIntegrator->stateRegions(regions);
+        bpIntegrator->stateRegions(regions);
+    }
+
     /**
      * Set filter curve type based on single parameter.
      *

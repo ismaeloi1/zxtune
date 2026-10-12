@@ -183,6 +183,18 @@ bool Player::load(SidTune *tune)
     return true;
 }
 
+bool Player::stateRegions(StateRegions &regions)
+{
+    addStateRegion(regions, this);
+    m_c64.stateRegions(regions);
+    for (unsigned int i = 0; sidemu *s = m_mixer.getSid(i); i++)
+    {
+        if (!s->stateRegions(regions))
+            return false;
+    }
+    return true;
+}
+
 void Player::mute(unsigned int sidNum, unsigned int voice, bool enable)
 {
     sidemu *s = m_mixer.getSid(sidNum);

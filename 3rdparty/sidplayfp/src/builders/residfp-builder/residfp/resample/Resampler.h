@@ -28,6 +28,7 @@
 #include "sidcxx11.h"
 
 #include "../siddefs-fp.h"
+#include "../StateRegions.h"
 
 namespace reSIDfp
 {
@@ -87,6 +88,15 @@ public:
     virtual bool input(int sample) = 0;
 
     /**
+     * Advance output timing by one input sample without its value,
+     * used to skip audio quickly. Ring buffers keep stale data till
+     * enough samples are input again.
+     *
+     * @return true when a sample would be ready
+     */
+    virtual bool advance() = 0;
+
+    /**
      * Output a sample from resampler.
      *
      * @return resampled sample
@@ -98,6 +108,11 @@ public:
     }
 
     virtual void reset() = 0;
+
+    /**
+     * zxtune: add resampler memory.
+     */
+    virtual void stateRegions(StateRegions &regions) = 0;
 };
 
 } // namespace reSIDfp

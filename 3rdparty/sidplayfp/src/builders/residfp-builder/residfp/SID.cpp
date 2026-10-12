@@ -356,6 +356,27 @@ void SID::setCombinedWaveforms(CombinedWaveforms cws)
     }
 }
 
+void SID::stateRegions(StateRegions &regions)
+{
+    addStateRegion(regions, this);
+    filter6581->stateRegions(regions);
+    filter8580->stateRegions(regions);
+    addStateRegion(regions, externalFilter);
+    if (resampler.get())
+    {
+        resampler->stateRegions(regions);
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        addStateRegion(regions, voice[i].get());
+        addStateRegion(regions, voice[i]->wave());
+        addStateRegion(regions, voice[i]->envelope());
+        voiceFilter6581[i]->stateRegions(regions);
+        voiceFilter8580[i]->stateRegions(regions);
+        addStateRegion(regions, voiceExternalFilter[i]);
+    }
+}
+
 void SID::reset()
 {
     for (int i = 0; i < 3; i++)

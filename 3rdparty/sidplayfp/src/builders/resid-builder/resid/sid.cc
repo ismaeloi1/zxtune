@@ -895,6 +895,14 @@ void SID::clock(cycle_count delta_t)
 // }
 //
 // ----------------------------------------------------------------------------
+void SID::state_regions(std::vector<std::pair<void*, std::size_t> >& regions)
+{
+  regions.push_back(std::make_pair(static_cast<void*>(this), sizeof(*this)));
+  if (sample) {
+    regions.push_back(std::make_pair(static_cast<void*>(sample), sizeof(*sample)*RINGSIZE*2));
+  }
+}
+
 int SID::clock(cycle_count& delta_t, short* buf, int n, int interleave)
 {
   if (!buf) {

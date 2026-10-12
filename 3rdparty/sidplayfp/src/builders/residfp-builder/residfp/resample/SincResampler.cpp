@@ -399,6 +399,23 @@ bool SincResampler::input(int input)
     return ready;
 }
 
+bool SincResampler::advance()
+{
+    bool ready = false;
+
+    sampleIndex = (sampleIndex + 1) & (RINGSIZE - 1);
+
+    if (sampleOffset < 1024)
+    {
+        ready = true;
+        sampleOffset += cyclesPerSample;
+    }
+
+    sampleOffset -= 1024;
+
+    return ready;
+}
+
 void SincResampler::reset()
 {
     memset(sample, 0, sizeof(sample));

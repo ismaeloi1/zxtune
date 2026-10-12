@@ -31,6 +31,7 @@
 #include "EventScheduler.h"
 
 #include "c64/c64sid.h"
+#include "stateregions.h"
 
 #include "sidcxx11.h"
 
@@ -114,6 +115,13 @@ public:
     virtual void voice(unsigned int num, bool mute) = 0;
 
     virtual void mute(bool muted) { m_muted = muted; }
+
+    /**
+     * zxtune: add memory of the whole emulation.
+     *
+     * @return false if not supported
+     */
+    virtual bool stateRegions(StateRegions &regions SID_UNUSED) { return false; }
 
     /**
      * Set SID model.

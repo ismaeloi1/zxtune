@@ -207,6 +207,15 @@ public:
     void resetCpu() { cpu.reset(); }
 
     /**
+     * zxtune: add memory of owned objects, c64 itself is a member of player.
+     */
+    void stateRegions(StateRegions &regions)
+    {
+        cia1.stateRegions(regions);
+        cia2.stateRegions(regions);
+    }
+
+    /**
      * Set the c64 model.
      */
     void setModel(model_t model);

@@ -54,7 +54,8 @@ ReSIDfp::ReSIDfp(sidbuilder *builder) :
     sidemu(builder),
     m_sid(*(new reSIDfp::SID)),
     m_residBuilder(static_cast<ReSIDfpBuilder*>(builder)),
-    m_voicesBuffer(nullptr),
+    // zxtune: allocated beforehand to keep the same pointer in state snapshots
+    m_voicesBuffer(new short[OUTPUTBUFFERSIZE * SidVoicesSink::STRIDE]),
     m_chipIndex(0),
     m_regs(),
     m_stateSamples(0)
@@ -104,6 +105,9 @@ void ReSIDfp::filter8580Curve(double filterCurve)
 void ReSIDfp::reset(uint8_t volume)
 {
     m_accessClk = 0;
+    // samples left from the previous playback should not be mixed after reset
+    m_bufferpos = 0;
+    m_stateSamples = 0;
     m_sid.reset();
     m_sid.write(0x18, volume);
     std::fill(m_regs, m_regs + sizeof(m_regs), 0);
@@ -128,9 +132,13 @@ void ReSIDfp::clock()
 {
     const event_clock_t cycles = eventScheduler->getTime(EVENT_CLOCK_PHI1) - m_accessClk;
     m_accessClk += cycles;
-    SidVoicesSink* const sink = m_muted ? nullptr : m_residBuilder->getVoicesSink();
-    if (sink && !m_voicesBuffer)
-        m_voicesBuffer = new short[OUTPUTBUFFERSIZE * SidVoicesSink::STRIDE];
+    if (m_muted)
+    {
+        // output is discarded, so do not waste time on analog part emulation
+        m_bufferpos += m_sid.clockSkip(cycles);
+        return;
+    }
+    SidVoicesSink* const sink = m_residBuilder->getVoicesSink();
     m_sid.setVoiceOutput(sink ? m_voicesBuffer : nullptr);
     const int samples = m_sid.clock(cycles, m_buffer+m_bufferpos);
     m_bufferpos += samples;
@@ -145,6 +153,15 @@ void ReSIDfp::clock()
             sink->state(m_chipIndex, m_regs, osc, env);
         }
     }
+}
+
+bool ReSIDfp::stateRegions(StateRegions &regions)
+{
+    addStateRegion(regions, this);
+    // samples not mixed yet
+    regions.emplace_back(m_buffer, OUTPUTBUFFERSIZE * sizeof(*m_buffer));
+    m_sid.stateRegions(regions);
+    return true;
 }
 
 void ReSIDfp::filter(bool enable)

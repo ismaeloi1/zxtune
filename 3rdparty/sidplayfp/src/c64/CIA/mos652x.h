@@ -125,6 +125,8 @@ public:
     {}
 
     void trigger(uint8_t interruptMask) override;
+
+    void stateRegions(StateRegions &regions) override { addStateRegion(regions, this); }
 };
 
 /**
@@ -141,6 +143,8 @@ public:
     {}
 
     void trigger(uint8_t interruptMask) override;
+
+    void stateRegions(StateRegions &regions) override { addStateRegion(regions, this); }
 
     uint8_t clear() override;
 };
@@ -307,6 +311,11 @@ public:
      * @param clock
      */
     void setDayOfTimeRate(unsigned int clock) { tod.setPeriod(clock); }
+
+    /**
+     * zxtune: add memory of owned objects, the chip itself is a member of owner.
+     */
+    void stateRegions(StateRegions &regions) { interruptSource->stateRegions(regions); }
 };
 
 }
