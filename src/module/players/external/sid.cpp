@@ -15,6 +15,7 @@
 #include "module/players/external/sid/songlengths.h"
 #include "module/players/platforms.h"
 #include "module/players/properties_helper.h"
+#include "module/players/seek_snapshots.h"
 #include "module/players/streaming.h"
 
 #include "core/core_parameters.h"
@@ -22,6 +23,7 @@
 #include "debug/log.h"
 #include "formats/multitrack/container.h"
 #include "module/attributes.h"
+#include "module/seek_interruption.h"
 #include "module/voices_scope.h"
 #include "parameters/tracking_helper.h"
 #include "strings/sanitize.h"
@@ -40,6 +42,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -256,6 +259,15 @@ namespace Module::Sid
   // Snapshots of chip state are taken with ~1ms period
   const uint_t STATE_RATE = 1000;
 
+  // Fast skipping leaves analog part of chips (filters, resampler) stale. Regular emulation settles it quickly,
+  // except of slow drift of DC level due to output high-pass filter (RC=0.1s), which is not audible
+  const auto SKIP_SETTLE_DURATION = Time::Milliseconds(250);
+  // Skipping is split to check for interruption, few tens of milliseconds of work on slow devices
+  const auto SKIP_CHUNK_DURATION = Time::Milliseconds(250);
+  // Snapshot takes 150..220kB (mostly C64 memory), each one costs settling, so do not take them too often on
+  // short tunes
+  const auto SNAPSHOTS_PERIOD = Time::Seconds(1);
+
   class VoicesSinkAdapter : public SidVoicesSink
   {
   public:
@@ -315,7 +327,24 @@ namespace Module::Sid
       Config.powerOnDelay = SidConfig::MAX_POWER_ON_DELAY - 1;
       Config.playback = Sound::Sample::CHANNELS == 1 ? SidConfig::MONO : SidConfig::STEREO;
       Sink.StatePeriod = std::max<uint_t>(samplerate / STATE_RATE, 1);
+      // libsidplayfp rejects (and stops tune!) buffers shorter than 10ms of mono samples
+      MinSkipSamples = (samplerate + 99) / 100;
+      MinRenderSamples = (samplerate + 199) / 200;
+      SettleSamples = std::max<uint_t>(GetSamples(SKIP_SETTLE_DURATION), MinRenderSamples);
+      SkipChunkSamples = std::max<uint_t>(GetSamples(SKIP_CHUNK_DURATION), MinSkipSamples);
     }
+
+    // Byte image of emulation objects, see sidplayfp::saveState
+    using Snapshot = std::vector<uint8_t>;
+
+    enum class Change
+    {
+      NONE,
+      // emulation is changed in place, so snapshots are not valid anymore
+      STATE,
+      // tune should be reloaded to apply new configuration
+      RELOAD,
+    };
 
     void Load(SidTune& tune)
     {
@@ -326,27 +355,67 @@ namespace Module::Sid
       UpdateDescription();
     }
 
-    //! @return true if tune should be reloaded to apply new configuration
-    bool ApplyParameters(const SidParameters& sidParams)
+    //! @return 0 if snapshots are not supported by current emulation
+    std::size_t GetStateSize() const
     {
-      bool reloadRequired = false;
+      return Player.stateSize();
+    }
+
+    std::unique_ptr<Snapshot> SaveState() const
+    {
+      auto result = std::make_unique<Snapshot>(Player.stateSize());
+      Player.saveState(result->data());
+      return result;
+    }
+
+    void LoadState(const Snapshot& state)
+    {
+      Player.loadState(state.data());
+      // voices muting is a part of state
+      for (uint_t chan = 0; chan < ChipsCount * VOICES; ++chan)
+      {
+        Player.mute(chan / VOICES, chan % VOICES, MuteMask & (1 << chan));
+      }
+    }
+
+    Change ApplyParameters(const SidParameters& sidParams)
+    {
+      auto change = Change::NONE;
       const bool useResidFp = sidParams.GetUseResidFp();
       sidbuilder* const builder = useResidFp ? static_cast<sidbuilder*>(&GetResidFp()) : &GetResid();
       const bool useFilter = sidParams.GetUseFilter();
+      FilterSettings newFilter{.UseResidFp = useResidFp, .UseFilter = useFilter};
       if (useResidFp)
       {
-        auto& fp = GetResidFp();
-        fp.filter(useFilter);
-        fp.filter6581Curve(sidParams.GetFilter6581Curve());
-        fp.filter6581Range(sidParams.GetFilter6581Range());
-        fp.filter8580Curve(sidParams.GetFilter8580Curve());
-        fp.combinedWaveformsStrength(sidParams.GetCombinedWaveforms());
+        newFilter.Curve6581 = sidParams.GetFilter6581Curve();
+        newFilter.Range6581 = sidParams.GetFilter6581Range();
+        newFilter.Curve8580 = sidParams.GetFilter8580Curve();
+        newFilter.CombinedWaveforms = sidParams.GetCombinedWaveforms();
       }
       else
       {
-        auto& resid = GetResid();
-        resid.filter(useFilter);
-        resid.bias(sidParams.GetFilterBias());
+        newFilter.Bias = sidParams.GetFilterBias();
+      }
+      // filters tuning reallocates emulation tables, so apply only real changes
+      if (!Filter || !(*Filter == newFilter))
+      {
+        if (useResidFp)
+        {
+          auto& fp = GetResidFp();
+          fp.filter(useFilter);
+          fp.filter6581Curve(newFilter.Curve6581);
+          fp.filter6581Range(newFilter.Range6581);
+          fp.filter8580Curve(newFilter.Curve8580);
+          fp.combinedWaveformsStrength(newFilter.CombinedWaveforms);
+        }
+        else
+        {
+          auto& resid = GetResid();
+          resid.filter(useFilter);
+          resid.bias(newFilter.Bias);
+        }
+        Filter = newFilter;
+        change = Change::STATE;
       }
 
       auto newConfig = Config;
@@ -366,7 +435,10 @@ namespace Module::Sid
         }
         Config = newConfig;
         // models and engine are applied by sidplayfp only on tune loading
-        reloadRequired = IsConfigured && Tune != nullptr;
+        if (IsConfigured && Tune != nullptr)
+        {
+          change = Change::RELOAD;
+        }
         CheckSidplayError(Player.config(Config));
         IsConfigured = true;
       }
@@ -383,7 +455,7 @@ namespace Module::Sid
       MuteMask = newMuteMask;
       UseFilter = useFilter;
       UpdateDescription();
-      return reloadRequired;
+      return change;
     }
 
     uint_t GetSoundFreq() const
@@ -396,14 +468,33 @@ namespace Module::Sid
       static_assert(Sound::Sample::BITS == 16, "Incompatible sound bits count");
       // separate voices rendering is expensive, so do it only if required
       SetSink(Config.sidEmulation, Sink.Scope && Sink.Scope->IsActive() ? &Sink : nullptr);
-      Sound::Chunk result(samples);
-      Player.play(safe_ptr_cast<short*>(result.data()), samples * Sound::Sample::CHANNELS);
+      // too short buffer (e.g. at the end of track) stops the tune, so render a bit more
+      Sound::Chunk result(std::max(samples, MinRenderSamples));
+      Player.play(safe_ptr_cast<short*>(result.data()), result.size() * Sound::Sample::CHANNELS);
       return result;
     }
 
-    void Skip(uint_t samples)
+    //! @return samples skipped, less than requested if interrupted, may be slightly more due to engine limitations
+    uint_t Skip(uint_t samples, const InterruptibleSeek::Predicate& interrupted)
     {
-      Player.play(nullptr, samples * Sound::Sample::CHANNELS);
+      const auto fastEnd = samples - std::min(samples, SettleSamples);
+      uint_t done = 0;
+      bool stopped = false;
+      while (done + MinSkipSamples <= fastEnd)
+      {
+        if (interrupted && interrupted())
+        {
+          stopped = true;
+          break;
+        }
+        // stereo mixer requires even count, which is mono samples (not frames!) count without output buffer
+        const auto part = std::max(std::min(fastEnd - done, SkipChunkSamples) & ~1u, MinSkipSamples + 1) & ~1u;
+        Player.play(nullptr, part);
+        done += part;
+      }
+      const auto settleEnd = stopped ? std::min(samples, done + SettleSamples) : samples;
+      done += Settle(settleEnd - done);
+      return done;
     }
 
     void SetVoicesScope(VoicesScope::Ptr scope, uint_t chips)
@@ -427,6 +518,25 @@ namespace Module::Sid
     }
 
   private:
+    uint_t GetSamples(Time::Milliseconds period) const
+    {
+      return static_cast<uint_t>(uint64_t(period.Get()) * Config.frequency / period.PER_SECOND);
+    }
+
+    // Regular emulation with output discarded to make state after skipping the same as after continuous playback
+    uint_t Settle(uint_t samples)
+    {
+      if (!samples)
+      {
+        return 0;
+      }
+      samples = std::max(samples, MinRenderSamples);
+      SetSink(Config.sidEmulation, nullptr);
+      SettleBuffer.resize(samples * Sound::Sample::CHANNELS);
+      Player.play(SettleBuffer.data(), SettleBuffer.size());
+      return samples;
+    }
+
     ReSIDBuilder& GetResid()
     {
       if (!Resid)
@@ -537,6 +647,26 @@ namespace Module::Sid
     // cache filter flag
     bool UseFilter = false;
     uint_t MuteMask = 0;
+
+    uint_t MinSkipSamples = 1;
+    uint_t MinRenderSamples = 1;
+    uint_t SettleSamples = 0;
+    uint_t SkipChunkSamples = 1;
+    std::vector<short> SettleBuffer;
+
+    struct FilterSettings
+    {
+      bool UseResidFp = false;
+      bool UseFilter = false;
+      double Curve6581 = 0;
+      double Range6581 = 0;
+      double Curve8580 = 0;
+      SidConfig::sid_cw_t CombinedWaveforms = SidConfig::AVERAGE;
+      double Bias = 0;
+
+      bool operator==(const FilterSettings&) const = default;
+    };
+    std::optional<FilterSettings> Filter;
   };
 
   const auto FRAME_DURATION = Time::Milliseconds(100);
@@ -544,6 +674,7 @@ namespace Module::Sid
   class Renderer
     : public Module::Renderer
     , public VoicesScopeSource
+    , public InterruptibleSeek
   {
   public:
     Renderer(Model::Ptr tune, uint_t samplerate, const Parameters::Accessor::Ptr& params)
@@ -551,6 +682,7 @@ namespace Module::Sid
       , State(Tune->GetDuration())
       , Engine(MakePtr<SidEngine>())
       , SidParams(MakePtr<SidParameters>(params))
+      , SnapshotsMemory(GetSeekSnapshotsMemoryLimit(*params))
     {
       Engine->Init(samplerate, *params);
       ApplyParameters();
@@ -565,8 +697,14 @@ namespace Module::Sid
     Sound::Chunk Render() override
     {
       ApplyParameters();
+      const auto loops = State.LoopCount();
       const auto avail = State.ConsumeUpTo(FRAME_DURATION);
-      return Engine->Render(GetSamples(avail));
+      auto result = Engine->Render(GetSamples(avail));
+      Samples += result.size();
+      // emulation is not restarted on looping, so position does not correspond to emulated samples anymore
+      InSync = InSync && loops == State.LoopCount();
+      TakeSnapshot();
+      return result;
     }
 
     void Reset() override
@@ -577,14 +715,19 @@ namespace Module::Sid
 
     void SetPosition(Time::AtMillisecond request) override
     {
-      if (request < State.At())
+      // position is wrapped by state, so detect backward seeking by already wrapped one
+      const auto duration = Tune->GetDuration().Get();
+      if (duration && request.Get() >= duration)
       {
-        ResetEngine();
+        request = Time::AtMillisecond(request.Get() % duration);
       }
-      if (const auto toSkip = State.Seek(request))
-      {
-        Engine->Skip(GetSamples(toSkip));
-      }
+      SeekTo(request, SeekInterrupted);
+    }
+
+    bool SetSeekInterruption(Predicate interrupted) override
+    {
+      SeekInterrupted = std::move(interrupted);
+      return true;
     }
 
     bool SetVoicesScope(VoicesScope::Ptr scope) override
@@ -595,10 +738,61 @@ namespace Module::Sid
     }
 
   private:
+    // Emulation from the very beginning is replaced by initial state restoring, so tune is loaded only once
+    // per emulation configuration
     void ResetEngine()
     {
-      Engine->Load(*Tune);
-      SidParams.Reset();
+      if (Initial)
+      {
+        Engine->LoadState(*Initial);
+      }
+      else
+      {
+        Engine->Load(*Tune);
+        SidParams.Reset();
+        Snapshots.reset();
+        const auto stateSize = Engine->GetStateSize();
+        Dbg("State size {} bytes", stateSize);
+        if (stateSize)
+        {
+          Initial = Engine->SaveState();
+          Snapshots.emplace(GetSamples(SNAPSHOTS_PERIOD), GetSamples(Tune->GetDuration()), stateSize, SnapshotsMemory);
+          Snapshots->Restart();
+        }
+      }
+      Samples = 0;
+      InSync = true;
+    }
+
+    // Snapshots are byte images of objects allocated on configuration, see sidplayfp::saveState
+    void InvalidateSnapshots()
+    {
+      Initial.reset();
+      if (Snapshots)
+      {
+        Snapshots->Invalidate();
+      }
+    }
+
+    void TakeSnapshot()
+    {
+      if (InSync && Snapshots && Snapshots->IsDue(Samples))
+      {
+        Snapshots->Add(Samples, Engine->SaveState());
+      }
+    }
+
+    //! @return true if restored
+    bool RestoreSnapshot(uint64_t after, uint64_t upTo)
+    {
+      if (const auto* snapshot = Snapshots ? Snapshots->Find(after, upTo) : nullptr)
+      {
+        Engine->LoadState(*snapshot->State);
+        Samples = snapshot->Position;
+        InSync = true;
+        return true;
+      }
+      return false;
     }
 
     uint_t GetSamples(Time::Microseconds period) const
@@ -606,11 +800,71 @@ namespace Module::Sid
       return period.Get() * Engine->GetSoundFreq() / period.PER_SECOND;
     }
 
+    Time::AtMicrosecond GetPosition(uint64_t samples) const
+    {
+      return Time::AtMicrosecond() + Time::Microseconds::FromRatio(samples, Engine->GetSoundFreq());
+    }
+
+    void SeekTo(Time::AtMillisecond request, const Predicate& interrupted)
+    {
+      if (request < State.At())
+      {
+        if (!RestoreSnapshot(0, GetSamples(request - Time::AtMillisecond())))
+        {
+          ResetEngine();
+        }
+        // state backward seeking just sets position
+        State.Seek(GetPosition(Samples));
+      }
+      else if (InSync && RestoreSnapshot(Samples, GetSamples(request - Time::AtMillisecond())))
+      {
+        State.Seek(GetPosition(Samples));
+      }
+      const auto from = State.PreciseAt();
+      const auto toSkip = GetSamples(State.Seek(request));
+      const auto done = Skip(toSkip, interrupted);
+      if (done < toSkip)
+      {
+        State.Seek(from + Time::Microseconds::FromRatio(done, Engine->GetSoundFreq()));
+      }
+    }
+
+    //! @return skipped samples count
+    uint64_t Skip(uint64_t samples, const Predicate& interrupted)
+    {
+      const auto start = Samples;
+      for (const auto end = Samples + samples; Samples < end;)
+      {
+        // split to take snapshots on the way
+        const auto next = InSync && Snapshots ? std::min(end, Snapshots->NextAt(Samples)) : end;
+        const auto part = static_cast<uint_t>(next - Samples);
+        const auto done = Engine->Skip(part, interrupted);
+        Samples += done;
+        if (done < part)
+        {
+          break;
+        }
+        TakeSnapshot();
+      }
+      return Samples - start;
+    }
+
     void ApplyParameters()
     {
-      if (SidParams.IsChanged() && Engine->ApplyParameters(*SidParams))
+      if (!SidParams.IsChanged())
       {
+        return;
+      }
+      switch (Engine->ApplyParameters(*SidParams))
+      {
+      case SidEngine::Change::RELOAD:
         Reload();
+        break;
+      case SidEngine::Change::STATE:
+        InvalidateSnapshots();
+        break;
+      default:
+        break;
       }
     }
 
@@ -618,22 +872,26 @@ namespace Module::Sid
     void Reload()
     {
       const auto pos = State.At();
+      InvalidateSnapshots();
       State.Reset();
-      Engine->Load(*Tune);
+      ResetEngine();
       // restore muted voices
       Engine->ApplyParameters(*SidParams);
-      if (const auto toSkip = State.Seek(pos))
-      {
-        Engine->Skip(GetSamples(toSkip));
-      }
+      SeekTo(pos, {});
     }
 
   private:
     const Model::Ptr Tune;
     TimedState State;
     const SidEngine::Ptr Engine;
-    const StateIterator::Ptr Iterator;
     Parameters::TrackingHelper<SidParameters> SidParams;
+    const uint64_t SnapshotsMemory;
+    Predicate SeekInterrupted;
+    // emulated since reset (or initial state restoring)
+    uint64_t Samples = 0;
+    bool InSync = true;
+    std::unique_ptr<SidEngine::Snapshot> Initial;
+    std::optional<SeekSnapshots<SidEngine::Snapshot>> Snapshots;
   };
 
   class Holder : public Module::Holder
@@ -708,14 +966,12 @@ namespace Module::Sid
     }
   };
 
-  // reSIDfp filter models tables are built on first use (thread-safe) and take noticeable time,
-  // so prepare them in background to make the first tune start faster
+  // reSIDfp filter models tables are built on first use (thread-safe) and take noticeable time. Every chip
+  // emulation requires tables of both models, so prepare them in parallel to make the first tune start faster
   void WarmUpEngines()
   {
-    std::thread([]() {
-      ReSIDfpBuilder builder("warmup");
-      builder.create(1);
-    }).detach();
+    std::thread([]() { ReSIDfpBuilder::prepareModel(SidConfig::MOS6581); }).detach();
+    std::thread([]() { ReSIDfpBuilder::prepareModel(SidConfig::MOS8580); }).detach();
   }
 
   MultitrackFactory::Ptr CreateFactory()

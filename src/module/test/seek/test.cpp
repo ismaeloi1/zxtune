@@ -1,9 +1,12 @@
-// Usage: module_test_seek <file> [subpath, e.g. "#2" for multitrack] [max seconds]
-// Host check: seeking speed and output after seeking compared to seeking without emulation state snapshots
+// Usage: module_test_seek <file> [subpath, e.g. "#2" for multitrack] [max seconds] [max delta] [param=value...]
+// Host check: seeking speed and output after seeking compared to seeking without emulation state snapshots.
+// Max delta allows approximate seeking (e.g. SID fast skip without analog part emulation), integer params are
+// applied to all renderers (e.g. zxtune.core.sid.engine=0)
 #include "binary/container_factories.h"
 #include "core/core_parameters.h"
 #include "core/service.h"
 #include "module/holder.h"
+#include "module/seek_interruption.h"
 #include "parameters/container.h"
 #include "parameters/merged_accessor.h"
 #include "sound/sound_parameters.h"
@@ -14,6 +17,8 @@
 #include <cstdlib>
 #include <fstream>
 #include <iterator>
+#include <limits>
+#include <string>
 #include <vector>
 
 namespace
@@ -27,6 +32,8 @@ namespace
     return std::chrono::duration<double, std::milli>(Clock::now() - start).count();
   }
 
+  const auto Extra = Parameters::Container::Create();
+
   class Player
   {
   public:
@@ -34,7 +41,14 @@ namespace
     {
       auto params = Parameters::Container::Create();
       params->SetValue(Parameters::ZXTune::Core::SEEK_SNAPSHOTS_MEMORY, snapshotsMemory);
-      Delegate = holder.CreateRenderer(FREQ, Parameters::CreateMergedAccessor(params, holder.GetModuleProperties()));
+      Delegate =
+          holder.CreateRenderer(FREQ, Parameters::CreateMergedAccessor(params, Extra, holder.GetModuleProperties()));
+    }
+
+    bool SetSeekInterruption(Module::InterruptibleSeek::Predicate interrupted)
+    {
+      auto* const target = dynamic_cast<Module::InterruptibleSeek*>(Delegate.get());
+      return target && target->SetSeekInterruption(std::move(interrupted));
     }
 
     std::vector<Sound::Sample> Render(uint_t ms)
@@ -79,7 +93,9 @@ namespace
   {
     std::size_t Count = 0;
     std::size_t First = 0;
+    std::size_t Last = 0;
     std::size_t Size = 0;
+    int MaxDelta = 0;
   };
 
   Diff Compare(const std::vector<Sound::Sample>& lh, const std::vector<Sound::Sample>& rh)
@@ -88,14 +104,21 @@ namespace
     res.Size = std::min(lh.size(), rh.size());
     for (std::size_t i = 0; i < res.Size; ++i)
     {
-      if (!(lh[i] == rh[i]) && !res.Count++)
+      if (!(lh[i] == rh[i]))
       {
-        res.First = i;
+        if (!res.Count++)
+        {
+          res.First = i;
+        }
+        res.Last = i;
+        res.MaxDelta =
+            std::max({res.MaxDelta, std::abs(lh[i].Left() - rh[i].Left()), std::abs(lh[i].Right() - rh[i].Right())});
       }
     }
     if (lh.size() != rh.size())
     {
       res.Count += std::max(lh.size(), rh.size()) - res.Size;
+      res.MaxDelta = std::numeric_limits<int>::max();
     }
     return res;
   }
@@ -104,7 +127,8 @@ namespace
   {
     if (d.Count)
     {
-      std::printf("  %s: DIFFERS (%zu of %zu samples, first at %zu)\n", name, d.Count, d.Size, d.First);
+      std::printf("  %s: DIFFERS (%zu of %zu samples, first at %zu, last at %zu, max delta %d)\n", name, d.Count,
+                  d.Size, d.First, d.Last, d.MaxDelta);
     }
     else
     {
@@ -117,7 +141,7 @@ int main(int argc, char** argv)
 {
   if (argc < 2)
   {
-    std::printf("Usage: %s <file> [subpath] [max seconds]\n", argv[0]);
+    std::printf("Usage: %s <file> [subpath] [max seconds] [max delta] [param=value...]\n", argv[0]);
     return 2;
   }
   std::ifstream f(argv[1], std::ios::binary);
@@ -127,16 +151,70 @@ int main(int argc, char** argv)
     std::printf("Failed to read %s\n", argv[1]);
     return 2;
   }
+  for (int arg = 5; arg < argc; ++arg)
+  {
+    const std::string param(argv[arg]);
+    const auto eq = param.find('=');
+    if (eq == std::string::npos)
+    {
+      std::printf("Invalid parameter %s\n", argv[arg]);
+      return 2;
+    }
+    Extra->SetValue(param.substr(0, eq), std::atoll(param.c_str() + eq + 1));
+  }
+  const int maxDelta = argc > 4 ? std::atoi(argv[4]) : 0;
   const auto global = Parameters::Container::Create();
   global->SetValue(Parameters::ZXTune::Sound::FREQUENCY, FREQ);
   const auto service = ZXTune::Service::Create(global);
+  auto start = Clock::now();
   const auto holder = service->OpenModule(Binary::CreateContainer(Binary::View(data.data(), data.size())),
                                           argc > 2 ? argv[2] : "", Parameters::Container::Create());
+  const auto openMs = Since(start);
+  // the first renderer may wait for lazily initialized engine tables, the next ones show regular track switch cost
+  for (uint_t attempt = 0; attempt < 3; ++attempt)
+  {
+    start = Clock::now();
+    Player player(*holder, 0);
+    const auto createMs = Since(start);
+    start = Clock::now();
+    player.Render(100);
+    std::printf("open %.2fms, create renderer %.2fms, first frame %.2fms\n", openMs, createMs, Since(start));
+  }
   const uint_t maxSeconds = argc > 3 ? std::atoi(argv[3]) : 180;
   const uint_t duration = holder->GetModuleInformation().Duration.Get();
   const uint_t len = std::min<uint_t>(duration, maxSeconds * 1000);
   std::printf("%s: duration %ums, testing %ums\n", argv[1], duration, len);
   const uint_t probe = std::min<uint_t>(1000, len / 20);
+  // seeking from the very beginning (without engine reset) vs continuous playback shows skipping accuracy
+  {
+    const uint_t pos = len / 2 - len / 2 % 100;
+    Player cont(*holder, 0);
+    cont.PlayTill(pos);
+    Player seek(*holder, 0);
+    seek.Seek(pos);
+    Report("seek from start vs continuous playback", Compare(cont.Render(probe), seek.Render(probe)));
+  }
+
+  // long seeking should stop promptly once interrupted and keep consistent position
+  {
+    Player player(*holder, 0);
+    auto deadline = Clock::now() + std::chrono::milliseconds(20);
+    if (player.SetSeekInterruption([&deadline]() { return Clock::now() >= deadline; }))
+    {
+      const uint_t pos = len * 9 / 10;
+      const auto ms = player.Seek(pos);
+      const auto reached = player.At();
+      std::printf("interrupted seek to %ums: stopped at %ums in %.2fms\n", pos, reached, ms);
+      deadline = Clock::time_point::max();
+      const auto restMs = player.Seek(pos);
+      std::printf("  continued to %ums in %.2fms\n", player.At(), restMs);
+      if (ms > 200 || reached >= pos || player.At() != pos)
+      {
+        std::printf("RESULT: FAIL\n");
+        return 1;
+      }
+    }
+  }
 
   // forward seek from current position vs from the beginning
   {
@@ -177,7 +255,7 @@ int main(int argc, char** argv)
     const auto testOut = test.Render(probe);
     const auto d = Compare(refOut, testOut);
     Report("after seek", d);
-    ok = ok && d.Count == 0;
+    ok = ok && d.MaxDelta <= maxDelta;
     if (pos < cont.At())
     {
       cont = Player(*holder, 0);
