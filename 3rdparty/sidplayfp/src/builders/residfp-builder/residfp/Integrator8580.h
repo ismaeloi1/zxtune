@@ -94,6 +94,8 @@ public:
     }
 
     int solve(int vi) const override;
+
+    void stateRegions(StateRegions &regions) override { addStateRegion(regions, this); }
 };
 
 } // namespace reSIDfp

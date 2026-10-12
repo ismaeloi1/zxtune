@@ -74,7 +74,24 @@ public:
         return ready;
     }
 
+    bool advance() override
+    {
+        bool ready = false;
+
+        if (sampleOffset < 1024)
+        {
+            ready = true;
+            sampleOffset += cyclesPerSample;
+        }
+
+        sampleOffset -= 1024;
+
+        return ready;
+    }
+
     int output() const override { return outputValue; }
+
+    void stateRegions(StateRegions &regions) override { addStateRegion(regions, this); }
 
     void reset() override
     {

@@ -111,6 +111,32 @@ public:
     uint_least32_t play(short *buffer, uint_least32_t count);
 
     /**
+     * zxtune: size of emulation state snapshot.
+     *
+     * Snapshot is a byte image of emulation objects, so it can be loaded
+     * to the same instance only, until the next #load() or #config() call
+     * or change of emulation parameters (e.g. via builder).
+     * Snapshots should be saved and loaded between #play() calls.
+     *
+     * @return 0 if not supported by SID emulation
+     */
+    unsigned int stateSize() const;
+
+    /**
+     * zxtune: save emulation state snapshot.
+     *
+     * @param state buffer of #stateSize() bytes
+     */
+    void saveState(unsigned char *state) const;
+
+    /**
+     * zxtune: load emulation state snapshot.
+     *
+     * @param state buffer filled by #saveState()
+     */
+    void loadState(const unsigned char *state);
+
+    /**
      * Check if the engine is playing or stopped.
      *
      * @return true if playing, false otherwise.

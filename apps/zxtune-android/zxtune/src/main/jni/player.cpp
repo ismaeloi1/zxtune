@@ -21,6 +21,7 @@
 #include "module/players/pipeline.h"
 #include "sound/impl/fft_analyzer.h"
 
+#include "module/seek_interruption.h"
 #include "module/voices_scope.h"
 #include "parameters/merged_accessor.h"
 #include "sound/mixer_factory.h"
@@ -250,6 +251,12 @@ namespace
       {
         voices->SetVoicesScope(ScopeData);
       }
+      // Seek is called from playback thread and may take seconds for some engines (e.g. SID), so stale seeking
+      // should not delay track change or playback stop
+      if (auto* const seek = dynamic_cast<Module::InterruptibleSeek*>(Renderer.get()))
+      {
+        seek->SetSeekInterruption([this]() { return Released.load() || SeekInterrupts.load() != SeekGeneration; });
+      }
     }
 
     Parameters::Container& GetParameters() const override
@@ -325,10 +332,21 @@ namespace
 
     void Seek(uint_t pos) override
     {
+      // only interruptions requested after this point are applied
+      SeekGeneration = SeekInterrupts.load();
       Renderer->SetPosition(Time::Instant<Player::TimeBase>(pos));
       // rest of the frame rendered before seeking should not be heard after it
       Buffer.Clear();
       ScopeData->Reset();
+    }
+
+    void InterruptSeek(bool released) override
+    {
+      if (released)
+      {
+        Released = true;
+      }
+      ++SeekInterrupts;
     }
 
     uint_t GetPlaybackPerformance() const override
@@ -363,6 +381,10 @@ namespace
     AnalyzerControl Analyzer;
     const Sound::Scope::Ptr ScopeData;
     uint64_t PlayedSamples = 0;
+    std::atomic<uint_t> SeekInterrupts = 0;
+    // accessed from Seek's thread only
+    uint_t SeekGeneration = 0;
+    std::atomic<bool> Released = false;
   };
 
   Player::Control::Ptr CreateControl(const Module::Holder& module, uint_t samplerate)
@@ -394,9 +416,11 @@ namespace Player
 
 EXPORTED void JNICALL Java_app_zxtune_core_jni_JniPlayer_close(JNIEnv* /*env*/, jclass /*self*/, jint handle)
 {
-  if (Player::Storage::Instance().Fetch(handle))
+  // playback thread may still use the player (e.g. long seeking), it is destroyed there by the last reference
+  if (const auto player = Player::Storage::Instance().Fetch(handle))
   {
     Dbg("Player::Close(handle={})", handle);
+    player->InterruptSeek(true);
   }
 }
 
@@ -531,6 +555,17 @@ EXPORTED void JNICALL Java_app_zxtune_core_jni_JniPlayer_setPositionMs(JNIEnv* e
     if (const auto player = Player::Storage::Instance().Find(playerHandle))
     {
       player->Seek(position);
+    }
+  });
+}
+
+EXPORTED void JNICALL Java_app_zxtune_core_jni_JniPlayer_interruptSeek(JNIEnv* env, jobject self)
+{
+  return Jni::Call(env, [=]() {
+    const auto playerHandle = NativePlayerJni::GetHandle(env, self);
+    if (const auto player = Player::Storage::Instance().Find(playerHandle))
+    {
+      player->InterruptSeek(false);
     }
   });
 }

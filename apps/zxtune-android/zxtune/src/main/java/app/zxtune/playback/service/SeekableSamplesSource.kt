@@ -18,4 +18,6 @@ internal class SeekableSamplesSource(private val player: Player) : SamplesSource
     }
 
     override var position: TimeStamp by player::position
+
+    override fun interruptSeek() = player.interruptSeek()
 }

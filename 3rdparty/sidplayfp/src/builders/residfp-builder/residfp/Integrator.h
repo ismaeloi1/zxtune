@@ -23,6 +23,8 @@
 #ifndef INTEGRATOR_H
 #define INTEGRATOR_H
 
+#include "StateRegions.h"
+
 namespace reSIDfp
 {
 
@@ -38,6 +40,8 @@ protected:
 
 public:
     virtual int solve(int vi) const = 0;
+
+    virtual void stateRegions(StateRegions &regions) = 0;
 
     virtual ~Integrator() {}
 };

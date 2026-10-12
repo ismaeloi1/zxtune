@@ -26,10 +26,20 @@
 #include <new>
 
 #include "residfp-emu.h"
+#include "residfp/FilterModelConfig6581.h"
+#include "residfp/FilterModelConfig8580.h"
 
 ReSIDfpBuilder::~ReSIDfpBuilder()
 {   // Remove all SID emulations
     remove();
+}
+
+void ReSIDfpBuilder::prepareModel(SidConfig::sid_model_t model)
+{
+    if (model == SidConfig::MOS8580)
+        reSIDfp::FilterModelConfig8580::getInstance();
+    else
+        reSIDfp::FilterModelConfig6581::getInstance();
 }
 
 // Create a new sid emulation.

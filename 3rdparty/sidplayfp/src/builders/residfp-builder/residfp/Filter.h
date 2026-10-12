@@ -24,6 +24,7 @@
 #define FILTER_H
 
 #include "FilterModelConfig.h"
+#include "StateRegions.h"
 
 #include "siddefs-fp.h"
 
@@ -125,6 +126,11 @@ public:
     Filter(FilterModelConfig* fmc);
 
     virtual ~Filter();
+
+    /**
+     * zxtune: add filter and integrators memory.
+     */
+    virtual void stateRegions(StateRegions &regions) = 0;
 
     /**
      * SID clocking - 1 cycle

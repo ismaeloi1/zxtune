@@ -58,7 +58,8 @@ ReSID::ReSID(sidbuilder *builder) :
     m_sid(*(new reSID::SID)),
     m_voiceMask(0x07),
     m_residBuilder(static_cast<ReSIDBuilder*>(builder)),
-    m_voicesBuffer(nullptr),
+    // zxtune: allocated beforehand to keep the same pointer in state snapshots
+    m_voicesBuffer(new short[OUTPUTBUFFERSIZE * SidVoicesSink::STRIDE]),
     m_chipIndex(0),
     m_regs(),
     m_stateSamples(0)
@@ -98,6 +99,9 @@ void ReSID::bias(double dac_bias)
 void ReSID::reset(uint8_t volume)
 {
     m_accessClk = 0;
+    // samples left from the previous playback should not be mixed after reset
+    m_bufferpos = 0;
+    m_stateSamples = 0;
     m_sid.reset();
     m_sid.write(0x18, volume);
     std::fill(m_regs, m_regs + sizeof(m_regs), 0);
@@ -123,8 +127,6 @@ void ReSID::clock()
     reSID::cycle_count cycles = eventScheduler->getTime(EVENT_CLOCK_PHI1) - m_accessClk;
     m_accessClk += cycles;
     ReSIDBuilder::VoicesSink* const sink = m_muted ? nullptr : m_residBuilder->getVoicesSink();
-    if (sink && !m_voicesBuffer)
-        m_voicesBuffer = new short[OUTPUTBUFFERSIZE * SidVoicesSink::STRIDE];
     m_sid.set_voice_output(sink ? m_voicesBuffer : nullptr);
     const int samples = m_sid.clock(cycles, m_muted ? nullptr : (short *) m_buffer + m_bufferpos, OUTPUTBUFFERSIZE - m_bufferpos, 1);
     m_bufferpos += samples;
@@ -174,6 +176,15 @@ void ReSID::sampling(float systemclock, float freq,
     }
 
     m_status = true;
+}
+
+bool ReSID::stateRegions(StateRegions &regions)
+{
+    addStateRegion(regions, this);
+    // samples not mixed yet
+    regions.emplace_back(m_buffer, OUTPUTBUFFERSIZE * sizeof(*m_buffer));
+    m_sid.state_regions(regions);
+    return true;
 }
 
 void ReSID::voice(unsigned int num, bool mute)

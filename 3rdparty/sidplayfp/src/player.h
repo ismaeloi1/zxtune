@@ -35,6 +35,7 @@
 #include "sidrandom.h"
 #include "mixer.h"
 #include "c64/c64.h"
+#include "stateregions.h"
 
 #ifdef HAVE_CONFIG_H
 #  include "config.h"
@@ -160,6 +161,13 @@ public:
     void debug(const bool enable, FILE *out) { m_c64.debug(enable, out); }
 
     void mute(unsigned int sidNum, unsigned int voice, bool enable);
+
+    /**
+     * zxtune: add memory of the whole emulation.
+     *
+     * @return false if not supported by SID emulation
+     */
+    bool stateRegions(StateRegions &regions);
 
     const char *error() const { return m_errorString; }
 

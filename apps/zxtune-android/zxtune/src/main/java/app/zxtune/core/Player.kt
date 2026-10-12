@@ -18,6 +18,12 @@ interface Player :
     var position: TimeStamp
 
     /**
+     * Stop seeking performed in another thread as soon as possible at some intermediate position.
+     * Seeking may take seconds for some formats (e.g. SID), so stale one should not delay track change or stop.
+     */
+    fun interruptSeek()
+
+    /**
      * @param levels Array of levels to store
      * @return Count of actually stored entries
      */

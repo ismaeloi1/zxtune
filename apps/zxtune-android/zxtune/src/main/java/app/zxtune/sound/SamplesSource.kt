@@ -30,4 +30,9 @@ interface SamplesSource {
      * Current playback position
      */
     var position: TimeStamp
+
+    /**
+     * Stop position assignment performed in another thread as soon as possible
+     */
+    fun interruptSeek() {}
 }

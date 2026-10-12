@@ -104,7 +104,11 @@ public:
 
     bool input(int input) override;
 
+    bool advance() override;
+
     int output() const override { return outputValue; }
+
+    void stateRegions(StateRegions &regions) override { addStateRegion(regions, this); }
 
     void reset() override;
 };

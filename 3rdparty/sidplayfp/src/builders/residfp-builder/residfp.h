@@ -62,6 +62,12 @@ public:
     void filter(bool enable);
 
     /**
+     * zxtune: build emulation tables of chip model beforehand.
+     * Thread safe, tables are shared by all the emulations.
+     */
+    static void prepareModel(SidConfig::sid_model_t model);
+
+    /**
      * Set 6581 filter curve.
      *
      * @param filterCurve from 0.0 (light) to 1.0 (dark) (default 0.5)

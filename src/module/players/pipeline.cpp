@@ -13,6 +13,7 @@
 #include "debug/log.h"
 #include "module/holder.h"
 #include "module/loop.h"
+#include "module/seek_interruption.h"
 #include "module/voices_scope.h"
 #include "parameters/merged_accessor.h"
 #include "parameters/tracking_helper.h"
@@ -124,6 +125,7 @@ namespace Module
   class PipelinedRenderer
     : public Renderer
     , public VoicesScopeSource
+    , public InterruptibleSeek
   {
   public:
     PipelinedRenderer(const Holder& holder, uint_t samplerate, Parameters::Accessor::Ptr params)
@@ -177,6 +179,12 @@ namespace Module
     {
       auto* const source = dynamic_cast<VoicesScopeSource*>(Delegate.get());
       return source && source->SetVoicesScope(std::move(scope));
+    }
+
+    bool SetSeekInterruption(Predicate interrupted) override
+    {
+      auto* const target = dynamic_cast<InterruptibleSeek*>(Delegate.get());
+      return target && target->SetSeekInterruption(std::move(interrupted));
     }
 
   private:

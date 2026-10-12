@@ -32,6 +32,10 @@
 #include "extfilt.h"
 #include "pot.h"
 
+#include <cstddef>
+#include <utility>
+#include <vector>
+
 namespace reSID
 {
 
@@ -59,6 +63,9 @@ public:
   // Oscillator and envelope outputs of any voice, as OSC3/ENV3 registers
   reg8 read_osc(int i) { return voice[i].wave.readOSC(); }
   reg8 read_env(int i) { return voice[i].envelope.readENV(); }
+
+  // zxtune: memory of the whole emulation to save and restore its state, see libsidplayfp::StateRegions
+  void state_regions(std::vector<std::pair<void*, std::size_t> >& regions);
 
   void clock();
   void clock(cycle_count delta_t);

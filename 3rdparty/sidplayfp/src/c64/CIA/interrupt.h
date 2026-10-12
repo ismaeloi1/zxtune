@@ -26,6 +26,7 @@
 #include "Event.h"
 #include "EventScheduler.h"
 #include "EventCallback.h"
+#include "stateregions.h"
 
 #include <stdint.h>
 
@@ -166,6 +167,11 @@ public:
      * @param interruptMask Interrupt flag number
      */
     virtual void trigger(uint8_t interruptMask) =0;
+
+    /**
+     * zxtune: add memory of the object.
+     */
+    virtual void stateRegions(StateRegions &regions) =0;
 
     /**
      * Clear interrupt state.

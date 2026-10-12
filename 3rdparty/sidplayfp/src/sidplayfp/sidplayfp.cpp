@@ -33,6 +33,8 @@
 
 #include "player.h"
 
+#include <cstring>
+
 sidplayfp::sidplayfp() :
     sidplayer(*(new libsidplayfp::Player)) {}
 
@@ -99,6 +101,40 @@ void sidplayfp::mute(unsigned int sidNum, unsigned int voice, bool enable)
 void sidplayfp::debug(bool enable, FILE *out)
 {
     sidplayer.debug(enable, out);
+}
+
+static libsidplayfp::StateRegions getStateRegions(libsidplayfp::Player &player)
+{
+    libsidplayfp::StateRegions regions;
+    if (!player.stateRegions(regions))
+        regions.clear();
+    return regions;
+}
+
+unsigned int sidplayfp::stateSize() const
+{
+    unsigned int size = 0;
+    for (const auto &region : getStateRegions(sidplayer))
+        size += region.second;
+    return size;
+}
+
+void sidplayfp::saveState(unsigned char *state) const
+{
+    for (const auto &region : getStateRegions(sidplayer))
+    {
+        std::memcpy(state, region.first, region.second);
+        state += region.second;
+    }
+}
+
+void sidplayfp::loadState(const unsigned char *state)
+{
+    for (const auto &region : getStateRegions(sidplayer))
+    {
+        std::memcpy(region.first, state, region.second);
+        state += region.second;
+    }
 }
 
 bool sidplayfp::isPlaying() const

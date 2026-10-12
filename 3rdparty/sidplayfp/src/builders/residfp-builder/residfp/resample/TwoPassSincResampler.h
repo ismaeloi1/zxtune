@@ -66,6 +66,18 @@ public:
         return s1->input(sample) && s2->input(s1->output());
     }
 
+    bool advance() override
+    {
+        return s1->advance() && s2->advance();
+    }
+
+    void stateRegions(StateRegions &regions) override
+    {
+        addStateRegion(regions, this);
+        s1->stateRegions(regions);
+        s2->stateRegions(regions);
+    }
+
     int output() const override
     {
         return s2->output();

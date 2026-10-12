@@ -76,6 +76,8 @@ public:
 
     void voice(unsigned int num, bool mute) override { m_sid.mute(num, mute); }
 
+    bool stateRegions(StateRegions &regions) override;
+
     void model(SidConfig::sid_model_t model, bool digiboost) override;
 
     // Specific to residfp

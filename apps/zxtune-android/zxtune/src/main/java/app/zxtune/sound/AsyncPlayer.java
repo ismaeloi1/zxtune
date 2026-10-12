@@ -26,6 +26,9 @@ public final class AsyncPlayer implements Player {
   private static final int FINISHING = 4;
   private static final int RELEASED = 5;
 
+  // Interruption may be requested right before seeking is started, so repeat it while waiting
+  private static final int STOP_POLL_MS = 100;
+
   private final PlayerEventsListener events;
   private final AtomicInteger state;
   private final AtomicReference<SamplesSource> source;
@@ -65,11 +68,20 @@ public final class AsyncPlayer implements Player {
 
   @Override
   public void setSource(SamplesSource src) {
+    final SamplesSource prev;
     synchronized(state) {
-      source.set(src);
+      prev = source.getAndSet(src);
       seekRequest.set(null);
       state.compareAndSet(UNINITIALIZED, STOPPED);
       state.notify();
+    }
+    // new source should not wait for seeking of the previous one
+    interruptSeek(prev);
+  }
+
+  private static void interruptSeek(@Nullable SamplesSource src) {
+    if (src != null) {
+      src.interruptSeek();
     }
   }
 
@@ -113,13 +125,16 @@ public final class AsyncPlayer implements Player {
   public void stopPlayback() {
     if (stopping()) {
       while (thread != null) {
+        interruptSeek(source.get());
         try {
-          thread.join();
-          break;
+          thread.join(STOP_POLL_MS);
+          if (!thread.isAlive()) {
+            break;
+          }
         } catch (InterruptedException e) {
           Log.w(TAG, e, "Interrupted while stopping");
+          thread.interrupt();
         }
-        thread.interrupt();
       }
       thread = null;
     }
@@ -144,6 +159,8 @@ public final class AsyncPlayer implements Player {
 
   public void setPosition(TimeStamp pos) {
     seekRequest.set(pos);
+    // the latest request matters only, partially done seeking is continued from reached position
+    interruptSeek(source.get());
   }
 
   public TimeStamp getPosition() {
@@ -168,9 +185,22 @@ public final class AsyncPlayer implements Player {
       while (isStarted()) {
         final SamplesSource src = source.get();
         maybeSeek(src);
+        if (source.get() != src) {
+          // changed while seeking, previous one may be already released
+          continue;
+        }
         final short[] buf = target.getBuffer();
         final TimeStamp pos = src.getPosition();
-        final boolean hasSamples = src.getSamples(buf);
+        final boolean hasSamples;
+        try {
+          hasSamples = src.getSamples(buf);
+        } catch (Exception e) {
+          if (source.get() != src) {
+            // released while rendering, new one should be played instead of stopping with error
+            continue;
+          }
+          throw e;
+        }
         timeline.onRendered(src, buf.length / SamplesSource.Channels.COUNT, hasSamples);
         if (hasSamples) {
           if (!commitSamples()) {
@@ -202,9 +232,20 @@ public final class AsyncPlayer implements Player {
     TimeStamp req = seekRequest.getAndSet(null);
     if (req != null) {
       events.onSeeking();
-      while (req != null && isStarted()) {
+      TimeStamp last = null;
+      while (req != null && isStarted() && source.get() == src) {
         src.setPosition(req);
+        last = req;
         req = seekRequest.getAndSet(null);
+      }
+      // seeking may be interrupted by stop, so complete it on resume
+      final TimeStamp pending = req != null ? req : (isStarted() ? null : last);
+      if (pending != null) {
+        synchronized(state) {
+          if (source.get() == src) {
+            seekRequest.compareAndSet(null, pending);
+          }
+        }
       }
       events.onStart();
     }

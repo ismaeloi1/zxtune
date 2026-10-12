@@ -26,6 +26,7 @@
 #include <memory>
 
 #include "siddefs-fp.h"
+#include "StateRegions.h"
 
 #include "sidcxx11.h"
 
@@ -292,6 +293,19 @@ public:
     int clock(unsigned int cycles, short* buf);
 
     /**
+     * Clock SID forward to skip audio quickly.
+     *
+     * Unlike clockSilent(), the whole digital state is emulated,
+     * so audio producing clock() may follow. Analog part (filters,
+     * resampler) is not clocked and stays stale, so few milliseconds
+     * of audio should be clocked to settle it before output.
+     *
+     * @param cycles c64 clocks to clock
+     * @return number of samples which would be produced
+     */
+    int clockSkip(unsigned int cycles);
+
+    /**
      * Clock SID forward with no audio production.
      *
      * _Warning_:
@@ -302,6 +316,13 @@ public:
      * @param cycles c64 clocks to clock.
      */
     void clockSilent(unsigned int cycles);
+
+    /**
+     * zxtune: add memory of the whole chip emulation.
+     *
+     * @see StateRegions
+     */
+    void stateRegions(StateRegions &regions);
 
     /**
      * Set filter curve parameter for 6581 model.
@@ -436,6 +457,54 @@ int SID::clock(unsigned int cycles, short* buf)
                 else if (unlikely(resampler->input(output())))
                 {
                     buf[s++] = resampler->getOutput(scaleFactor);
+                }
+            }
+
+            cycles -= delta_t;
+            nextVoiceSync -= delta_t;
+        }
+
+        if (unlikely(nextVoiceSync == 0))
+        {
+            voiceSync(true);
+        }
+    }
+
+    return s;
+}
+
+RESID_INLINE
+int SID::clockSkip(unsigned int cycles)
+{
+    ageBusValue(cycles);
+    int s = 0;
+
+    while (cycles != 0)
+    {
+        unsigned int delta_t = std::min(nextVoiceSync, cycles);
+
+        if (likely(delta_t > 0))
+        {
+            for (unsigned int i = 0; i < delta_t; i++)
+            {
+                // clock waveform generators
+                voice[0]->wave()->clock();
+                voice[1]->wave()->clock();
+                voice[2]->wave()->clock();
+
+                // clock envelope generators
+                voice[0]->envelope()->clock();
+                voice[1]->envelope()->clock();
+                voice[2]->envelope()->clock();
+
+                // waveform output affects noise shift register and OSC3
+                voice[0]->wave()->output(voice[2]->wave());
+                voice[1]->wave()->output(voice[0]->wave());
+                voice[2]->wave()->output(voice[1]->wave());
+
+                if (unlikely(resampler->advance()))
+                {
+                    ++s;
                 }
             }
 

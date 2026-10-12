@@ -197,6 +197,8 @@ public:
     void setVw(unsigned short Vw) { nVddt_Vw_2 = ((nVddt - Vw) * (nVddt - Vw)) >> 1; }
 
     int solve(int vi) const override;
+
+    void stateRegions(StateRegions &regions) override { addStateRegion(regions, this); }
 };
 
 } // namespace reSIDfp
