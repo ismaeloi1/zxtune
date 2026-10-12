@@ -41,6 +41,9 @@ namespace Player
 
     virtual bool Render(uint_t samples, int16_t* buffer) = 0;
     virtual void Seek(uint_t frame) = 0;
+    //! @brief Stops current (if any) Seek call at some intermediate position, callable from any thread
+    //! @param released makes all the further seeks interrupted too
+    virtual void InterruptSeek(bool released) = 0;
 
     virtual uint_t GetPlaybackPerformance() const = 0;
     virtual uint_t GetPlaybackProgress() const = 0;

@@ -42,6 +42,8 @@ internal class JniPlayer(handleVal: Int) : Player {
             positionMs = pos.toMilliseconds().toInt()
         }
 
+    external override fun interruptSeek()
+
     // Should be public!!! Or backing field is accessed instead of member
     // On the JVM: Access to private properties with default getters and setters is optimized to
     // avoid function call overhead.
