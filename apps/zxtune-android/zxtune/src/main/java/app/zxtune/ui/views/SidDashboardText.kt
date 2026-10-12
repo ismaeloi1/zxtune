@@ -1,196 +1,257 @@
 /**
  * @file
- * @brief Stabilized texts of SID dashboard rows
+ * @brief Live texts of SID dashboard rows
  * @author vitamin.caig@gmail.com
  */
 package app.zxtune.ui.views
 
 import app.zxtune.playback.ChipState
+import app.zxtune.ui.views.SidDescription.Words
+import kotlin.math.abs
 import kotlin.math.log2
 import kotlin.math.roundToInt
 
 /**
- * Texts of gauges row (3 gauges with title bands and explanation below), see [SidDashboardView].
- * Registers are changed by players up to several hundred times per second (vibrato, pulse width and filter sweeps,
- * arpeggios, digis), so texts are produced from [StableValue]s and rebuilt only when those are changed.
+ * Fixed set of texts, each one is rebuilt only when the quantized value it's made from is changed. Texts are drawn
+ * every frame (60..120fps) while registers mostly stay the same, so this avoids allocations per frame without
+ * delaying any change.
  */
-internal abstract class SidRowText {
-    val texts = StableTexts(SIZE)
+internal class LiveTexts(size: Int) {
+    private val keys = LongArray(size) { UNSET }
+    private val texts = Array(size) { "" }
 
-    companion object {
-        // raw registers in titles are data, so they are just rate limited
-        const val RAW_HOLD_MS = 200L
+    operator fun get(idx: Int) = texts[idx]
 
-        // vibrato often exceeds half of semitone, so the note is kept a bit more than its bounds
-        const val NOTE_MARGIN = 0.3f
+    /**
+     * @return true if text should be rebuilt for the new [key] (see [set])
+     */
+    fun changed(idx: Int, key: Long): Boolean {
+        if (keys[idx] == key) {
+            return false
+        }
+        keys[idx] = key
+        return true
+    }
 
-        // ~1.5%, less than vibrato depth, but noticeable for slides
-        const val PITCH_DEADBAND_CENTS = 25
+    fun changed(idx: Int, key: Int) = changed(idx, key.toLong())
 
-        // filter sweeps are slow and wide, so cutoff is coarser
-        const val CUTOFF_DEADBAND_CENTS = 50
-        const val PERCENT_DEADBAND = 2
+    operator fun set(idx: Int, text: String) {
+        texts[idx] = text
+    }
 
-        // modulations (vibrato, pulse width and filter sweeps) are periodic, so their exact current values are
-        // less important than envelope level and are updated more calmly
-        const val SLOW_HOLD_MS = 500L
-        const val NONE = Int.MIN_VALUE
-
-        const val SIZE = 3 + 3 * 2 + SidDescription.SLOTS
-        fun title(gauge: Int) = gauge
-        fun main(gauge: Int) = 3 + gauge * 2
-        fun tail(gauge: Int) = 4 + gauge * 2
-        fun slot(idx: Int) = 9 + idx
-
-        fun cents(hz: Float) = if (hz < 1f) NONE else (1200 * log2(hz / 440f)).roundToInt()
-
-        fun semitones(hz: Float) = 12 * log2(hz / 440f) + 57
+    private companion object {
+        const val UNSET = Long.MIN_VALUE
     }
 }
 
-internal class SidVoiceText : SidRowText() {
-    private val rawControl = StableValue(0, RAW_HOLD_MS)
-    private val rawEnvelope = StableValue(0, RAW_HOLD_MS)
-    private val rawFrequency = StableValue(0, RAW_HOLD_MS)
-    private val wave = StableValue()
-    private val gate = StableValue()
-    private val pulse = StableValue(holdMs = SLOW_HOLD_MS, deadband = PERCENT_DEADBAND)
-    private val level = StableValue(deadband = PERCENT_DEADBAND)
-    private val phase = StableValue()
-    private val note = StableValue()
-    private val pitch = StableValue(holdMs = SLOW_HOLD_MS, deadband = PITCH_DEADBAND_CENTS)
-    private val filter = StableValue()
-    private val cutoff = StableValue(holdMs = SLOW_HOLD_MS, deadband = CUTOFF_DEADBAND_CENTS)
-    private var hz = 0f
-    private var cutoffHz = 0f
-    private var label = -1
+/**
+ * Description of a single cell of values grid under gauges row
+ * @param caption small label above the value
+ * @param templates widest typical values, to reserve space regardless of the current one; rarer longer values are cut
+ * @param numeric numbers are right-aligned to keep digits in place (as in trackers), words are left-aligned
+ * @param priority cells with greater values are dropped first if there's not enough space
+ */
+internal class CellSpec(val caption: String, val templates: Array<String>, val numeric: Boolean, val priority: Int)
+
+internal object SidCells {
+    const val WAVE = 0
+    const val DUTY = 1
+    const val NOTE = 2
+    const val PITCH = 3
+    const val MOD = 4
+    const val FILTER = 5
+    const val LEVEL = 6
+    const val STAGE = 7
+    const val ATTACK = 8
+    const val DECAY = 9
+    const val SUSTAIN = 10
+    const val RELEASE = 11
+
+    // order of cells is order of display; what is heard (waveform, note, loudness) is kept the longest,
+    // envelope timings are static settings and dropped first
+    val VOICE = arrayOf(
+        CellSpec(Words.WAVE, arrayOf("Pulse+Saw", Words.TRIANGLE, Words.RESET), false, 0),
+        CellSpec(Words.DUTY, arrayOf("100%"), true, 6),
+        CellSpec(Words.NOTE, arrayOf("C#5"), false, 1),
+        CellSpec(Words.PITCH, arrayOf("8888 Hz"), true, 5),
+        CellSpec(Words.MOD, arrayOf("Sync V3", "Ring V3", Words.SYNC_RING), false, 7),
+        CellSpec(Words.FILTER, arrayOf("Low+Band", "Band+High", Words.MUTED), false, 4),
+        CellSpec(Words.LEVEL, arrayOf("100%"), true, 2),
+        CellSpec(Words.STAGE, SidDescription.Phase.values().map { it.word }.toTypedArray(), false, 3),
+        CellSpec(Words.ATTACK, arrayOf("250 ms", "8 s"), true, 10),
+        CellSpec(Words.DECAY, arrayOf("750 ms", "24 s"), true, 11),
+        CellSpec(Words.SUSTAIN, arrayOf("100%"), true, 8),
+        CellSpec(Words.RELEASE, arrayOf("750 ms", "24 s"), true, 9),
+    )
+
+    const val VOLUME = 0
+    const val MODE = 1
+    const val CUTOFF = 2
+    const val RESONANCE = 3
+    const val ROUTED = 4
+
+    val GLOBAL = arrayOf(
+        CellSpec(Words.VOLUME, arrayOf("100%"), true, 0),
+        CellSpec(Words.FILTER, arrayOf("Low+Band", "Band+High"), false, 1),
+        CellSpec(Words.CUTOFF, arrayOf("~8.8 kHz", "~18 kHz"), true, 2),
+        CellSpec(Words.RESONANCE, arrayOf("100%"), true, 3),
+        CellSpec(Words.ROUTED, arrayOf("V1+V2+V3"), false, 4),
+    )
+}
+
+/**
+ * Texts of gauges row: title bands of 3 gauges (raw registers with greyed human readable value split to main part
+ * and tail, e.g. "60%" and "Sus") and cells grid below, see [SidDashboardView].
+ * Values are displayed as is, without any delay; only quantization with hysteresis is applied where the last digit
+ * would flicker without any meaning.
+ */
+internal abstract class SidRowText(cells: Int) {
+    val titles = LiveTexts(TITLES)
+    val cells = LiveTexts(cells)
+
+    companion object {
+        // vibrato often exceeds half of semitone, so the note is kept a bit more than its bounds
+        const val NOTE_MARGIN = 0.3f
+        const val NONE = Int.MIN_VALUE
+
+        const val TITLES = 9
+        fun title(gauge: Int) = gauge
+        fun main(gauge: Int) = 3 + gauge * 2
+        fun tail(gauge: Int) = 4 + gauge * 2
+
+        fun semitones(hz: Float) = 12 * log2(hz / 440f) + 57
+
+        /**
+         * Quantizes [semitones] to note with hysteresis: [shown] note is kept while input is within [NOTE_MARGIN]
+         * beyond its half-step bounds. Doesn't delay real note changes.
+         */
+        fun note(semitones: Float, shown: Int) = if (shown != NONE && abs(semitones - shown) <= 0.5f + NOTE_MARGIN) shown else semitones.roundToInt()
+    }
+}
+
+internal class SidVoiceText : SidRowText(SidCells.VOICE.size) {
+    private var note = NONE
 
     /**
      * @param chipLabel 1-based index of chip in multichip setup or 0
      */
-    fun update(
-        state: ChipState,
-        voice: Int,
-        trend: Int,
-        chip: SidDescription.Chip,
-        chipLabel: Int,
-        nowMs: Long
-    ) {
+    fun update(state: ChipState, voice: Int, trend: Int, chip: SidDescription.Chip, chipLabel: Int) {
         val ctrl = state.control(voice)
         val routing = state.routing
         val mode = state.mode
         val filtered = routing and (1 shl voice) != 0
-        val currentHz = SidDescription.frequencyHz(state.frequency(voice), chip)
-        var titles = rawControl.update((ctrl and 0xfe) or (if (filtered) 1 else 0), nowMs)
-        titles = rawEnvelope.update((state.attackDecay(voice) shl 8) or state.sustainRelease(voice), nowMs) or titles
-        titles = rawFrequency.update(state.frequency(voice), nowMs) or titles
-        if (label != chipLabel) {
-            label = chipLabel
-            titles = true
+        val ad = state.attackDecay(voice)
+        val sr = state.sustainRelease(voice)
+        val hz = SidDescription.frequencyHz(state.frequency(voice), chip)
+        note = if (hz < 1f) NONE else note(semitones(hz), note)
+        val pulse = SidDescription.pulsePercent(state.pulseWidth(voice))
+        val level = SidDescription.envelopePercent(state, voice)
+        val phase = SidDescription.phase(state, voice, trend)
+        val roundedHz = hz.roundToInt()
+        val noteName = if (note == NONE) "" else ChipWidgets.noteName(note)
+
+        // titles: raw registers
+        val wave = (ctrl and 0xfe) or (if (filtered) 1 else 0)
+        if (titles.changed(title(0), (chipLabel shl 8) or wave)) {
+            val prefix = if (chipLabel != 0) "S$chipLabel" else ""
+            titles[title(0)] = "${prefix}V${voice + 1} ${SidDashboardView.waveTitle(wave, filtered)}"
         }
-        // gate is excluded from waveform to not confirm waveform again after hard restart
-        var values = wave.update(ctrl and 0xfe, nowMs)
-        values = gate.update(ctrl and 1, nowMs) or values
-        values = pulse.update(SidDescription.pulsePercent(state.pulseWidth(voice)), nowMs) or values
-        values = level.update(SidDescription.envelopePercent(state, voice), nowMs) or values
-        values = phase.update(SidDescription.phase(state, voice, trend).ordinal, nowMs) or values
-        values = if (currentHz < 1f) {
-            note.update(NONE, nowMs)
-        } else {
-            note.update(semitones(currentHz), NOTE_MARGIN, nowMs)
-        } or values
-        if (pitch.update(cents(currentHz), nowMs)) {
-            hz = currentHz
-            values = true
+        if (titles.changed(title(1), (ad shl 8) or sr)) {
+            titles[title(1)] = "Env ${hex4((ad shl 8) or sr)}"
+        }
+        if (titles.changed(title(2), state.frequency(voice))) {
+            titles[title(2)] = "Freq ${hex4(state.frequency(voice))}"
+        }
+        // titles: values
+        if (titles.changed(main(0), (ctrl and 0xfe) or (pulse shl 8))) {
+            titles[main(0)] = SidDescription.waveName(ctrl, pulse) + SidDescription.waveFlags(ctrl)
+        }
+        if (titles.changed(tail(0), ctrl and 1)) {
+            titles[tail(0)] = if (SidDescription.isGate(ctrl)) SidDescription.GATE_MARK else ""
+        }
+        if (titles.changed(main(1), level)) {
+            titles[main(1)] = SidDescription.percent(level)
+        }
+        if (titles.changed(tail(1), phase.ordinal)) {
+            titles[tail(1)] = phase.short
+        }
+        if (titles.changed(main(2), note)) {
+            titles[main(2)] = noteName
+        }
+        if (titles.changed(tail(2), roundedHz)) {
+            titles[tail(2)] = "${roundedHz}Hz"
+        }
+
+        // cells
+        if (cells.changed(SidCells.WAVE, ctrl and 0xf8)) {
+            cells[SidCells.WAVE] = SidDescription.waveWord(ctrl)
+        }
+        val duty = if (SidDescription.hasPulse(ctrl)) pulse else NONE
+        if (cells.changed(SidCells.DUTY, duty)) {
+            cells[SidCells.DUTY] = if (duty == NONE) "" else SidDescription.percent(duty)
+        }
+        if (cells.changed(SidCells.NOTE, note)) {
+            cells[SidCells.NOTE] = noteName.ifEmpty { Words.DASH }
+        }
+        if (cells.changed(SidCells.PITCH, roundedHz)) {
+            cells[SidCells.PITCH] = if (roundedHz == 0) Words.DASH else SidDescription.hzWord(roundedHz)
+        }
+        if (cells.changed(SidCells.MOD, ctrl and 0x16)) {
+            cells[SidCells.MOD] = SidDescription.modulationWord(ctrl, voice)
         }
         val muted = SidDescription.isMuted(voice, mode, routing)
-        values = filter.update((if (filtered) 1 else 0) or (if (muted) 2 else 0) or ((mode and 7) shl 2), nowMs) or values
-        val currentCutoff = SidDescription.cutoffHz(state.cutoff, chip)
-        if (cutoff.update(cents(currentCutoff), nowMs)) {
-            cutoffHz = currentCutoff
-            values = true
+        if (cells.changed(SidCells.FILTER, (if (filtered) 1 else 0) or (if (muted) 2 else 0) or ((mode and 7) shl 2))) {
+            cells[SidCells.FILTER] = SidDescription.filterWord(filtered, mode, muted)
         }
-        if (titles) {
-            updateTitles(voice, nowMs)
+        if (cells.changed(SidCells.LEVEL, level)) {
+            cells[SidCells.LEVEL] = SidDescription.percent(level)
         }
-        if (values || titles) {
-            updateValues(voice, nowMs)
+        if (cells.changed(SidCells.STAGE, phase.ordinal)) {
+            cells[SidCells.STAGE] = phase.word
         }
-    }
-
-    private fun updateTitles(voice: Int, nowMs: Long) {
-        val ctrl = rawControl.value
-        val prefix = if (label != 0) "S$label" else ""
-        texts.set(title(0), "${prefix}V${voice + 1} ${SidDashboardView.waveTitle(ctrl, ctrl and 1 != 0)}", nowMs)
-        texts.set(title(1), "Env ${hex4(rawEnvelope.value)}", nowMs)
-        texts.set(title(2), "Freq ${hex4(rawFrequency.value)}", nowMs)
-    }
-
-    private fun updateValues(voice: Int, nowMs: Long) {
-        val ctrl = wave.value
-        val noteName = if (note.value == NONE) "" else ChipWidgets.noteName(note.value)
-        val currentPhase = SidDescription.Phase.values()[phase.value]
-        texts.set(main(0), SidDescription.waveName(ctrl, pulse.value, false) + SidDescription.waveFlags(ctrl), nowMs)
-        texts.set(tail(0), if (gate.value != 0) SidDescription.GATE_MARK else "", nowMs)
-        texts.set(main(1), "${level.value}%", nowMs)
-        texts.set(tail(1), currentPhase.short, nowMs)
-        texts.set(main(2), noteName, nowMs)
-        texts.set(tail(2), if (pitch.value == NONE) "0Hz" else SidDescription.formatHz(hz), nowMs)
-        val filterState = filter.value
-        val regs = rawEnvelope.value
-        texts.set(slot(SidDescription.SLOT_WAVE), SidDescription.waveSlot(ctrl, pulse.value), nowMs)
-        texts.set(
-            slot(SidDescription.SLOT_PITCH),
-            SidDescription.pitchSlot(ctrl, if (pitch.value == NONE) 0f else hz, noteName, voice),
-            nowMs
-        )
-        texts.set(
-            slot(SidDescription.SLOT_FILTER),
-            SidDescription.filterSlot(filterState and 1 != 0, filterState shr 2, cutoffHz, filterState and 2 != 0),
-            nowMs
-        )
-        texts.set(
-            slot(SidDescription.SLOT_ENVELOPE),
-            SidDescription.envelopeSlot(currentPhase, regs shr 8, regs and 0xff, level.value),
-            nowMs
-        )
+        if (cells.changed(SidCells.ATTACK, ad shr 4)) {
+            cells[SidCells.ATTACK] = SidDescription.durationWord(SidDescription.attackMs(ad shr 4))
+        }
+        if (cells.changed(SidCells.DECAY, ad and 15)) {
+            cells[SidCells.DECAY] = SidDescription.durationWord(SidDescription.decayMs(ad))
+        }
+        if (cells.changed(SidCells.SUSTAIN, sr shr 4)) {
+            cells[SidCells.SUSTAIN] = SidDescription.percent(SidDescription.sustainPercent(sr shr 4))
+        }
+        // release uses the same table as decay
+        if (cells.changed(SidCells.RELEASE, sr and 15)) {
+            cells[SidCells.RELEASE] = SidDescription.durationWord(SidDescription.decayMs(sr))
+        }
     }
 }
 
-internal class SidGlobalText : SidRowText() {
-    private val rawFilter = StableValue(0, RAW_HOLD_MS)
-    private val volume = StableValue()
-    private val resonance = StableValue()
-    private val routing = StableValue()
-    private val cutoff = StableValue(holdMs = SLOW_HOLD_MS, deadband = CUTOFF_DEADBAND_CENTS)
-    private var cutoffHz = 0f
-
-    fun update(state: ChipState, chip: SidDescription.Chip, nowMs: Long) {
-        val titles = rawFilter.update(((state.mode and 7) shl 11) or state.cutoff, nowMs)
-        // volume and resonance values are shown in titles too, so not rate limited separately
-        var values = volume.update(state.volume, nowMs)
-        values = resonance.update(state.resonance, nowMs) or values
-        values = routing.update(state.routing or (state.mode shl 4), nowMs) or values
-        val currentCutoff = SidDescription.cutoffHz(state.cutoff, chip)
-        if (cutoff.update(cents(currentCutoff), nowMs)) {
-            cutoffHz = currentCutoff
-            values = true
+internal class SidGlobalText : SidRowText(SidCells.GLOBAL.size) {
+    fun update(state: ChipState, chip: SidDescription.Chip) {
+        val mode = state.mode
+        val cutoff = SidDescription.roundCutoff(SidDescription.cutoffHz(state.cutoff, chip))
+        if (titles.changed(title(0), state.volume)) {
+            titles[title(0)] = "Vol ${state.volume}"
+            titles[tail(0)] = SidDescription.percentOf15(state.volume)
+            cells[SidCells.VOLUME] = titles[tail(0)]
         }
-        if (titles || values) {
-            val raw = rawFilter.value
-            texts.set(title(0), "Vol ${volume.value}", nowMs)
-            texts.set(title(1), "Res ${resonance.value}", nowMs)
-            texts.set(title(2), SidDashboardView.filterTitle(raw shr 11, raw and 0x7ff), nowMs)
-            val route = routing.value and 15
-            val mode = routing.value shr 4
-            texts.set(tail(0), SidDescription.percentOf15(volume.value), nowMs)
-            texts.set(tail(1), SidDescription.percentOf15(resonance.value), nowMs)
-            texts.set(main(2), SidDescription.modeShort(mode), nowMs)
-            texts.set(tail(2), SidDescription.cutoffText(cutoffHz), nowMs)
-            texts.set(slot(SidDescription.SLOT_VOLUME), SidDescription.volumeSlot(volume.value), nowMs)
-            texts.set(slot(SidDescription.SLOT_ROUTING), SidDescription.routingSlot(route, mode, cutoffHz), nowMs)
-            texts.set(slot(SidDescription.SLOT_RESONANCE), SidDescription.resonanceSlot(route, resonance.value), nowMs)
-            texts.set(slot(SidDescription.SLOT_VOICE3), SidDescription.voice3Slot(mode), nowMs)
+        if (titles.changed(title(1), state.resonance)) {
+            titles[title(1)] = "Res ${state.resonance}"
+            titles[tail(1)] = SidDescription.percentOf15(state.resonance)
+            cells[SidCells.RESONANCE] = titles[tail(1)]
+        }
+        if (titles.changed(title(2), ((mode and 7) shl 11) or state.cutoff)) {
+            titles[title(2)] = SidDashboardView.filterTitle(mode, state.cutoff)
+        }
+        if (titles.changed(main(2), mode and 7)) {
+            titles[main(2)] = SidDescription.modeShort(mode)
+            cells[SidCells.MODE] = SidDescription.modeWord(mode)
+        }
+        if (titles.changed(tail(2), cutoff)) {
+            titles[tail(2)] = SidDescription.cutoffWord(cutoff).replace(" ", "")
+            cells[SidCells.CUTOFF] = SidDescription.cutoffWord(cutoff)
+        }
+        if (cells.changed(SidCells.ROUTED, state.routing and 15)) {
+            cells[SidCells.ROUTED] = SidDescription.routingWord(state.routing)
         }
     }
 }

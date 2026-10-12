@@ -645,7 +645,7 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
             VoiceGauges.Kind.MT32_PARTIAL -> partialSummary(g)
             VoiceGauges.Kind.OPL_RHYTHM -> RHYTHM_NAMES.getOrElse(g.field(0)) { "" }
             VoiceGauges.Kind.OPN_DAC -> if (g.field(0) != 0) "PCM" else "off"
-            else -> noteSummary(g.summaryMode, g.frequency, noteName(g.frequency), g.level.roundToInt())
+            else -> noteSummary(g.summaryMode, g.frequency.roundToInt(), noteName(g.frequency), g.level.roundToInt())
         }
 
         private val VoiceGauges.summaryMode
@@ -663,12 +663,12 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         private const val SUMMARY_NOISE_RATE = 3
         private const val SUMMARY_NOTE = 4
 
-        private fun noteSummary(mode: Int, hz: Float, note: String, levelDb: Int) = when (mode) {
+        private fun noteSummary(mode: Int, hz: Int, note: String, levelDb: Int) = when (mode) {
             SUMMARY_NOISE -> "noise"
             SUMMARY_LEVEL -> if (levelDb > -96) "${levelDb}dB" else "off"
             SUMMARY_NONE -> ""
-            SUMMARY_NOISE_RATE -> "noise ${hz.roundToInt()}Hz"
-            else -> "$note ${hz.roundToInt()}Hz"
+            SUMMARY_NOISE_RATE -> "noise ${hz}Hz"
+            else -> "$note ${hz}Hz"
         }
 
         private fun partialSummary(g: VoiceGauges): String {
@@ -699,62 +699,40 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     }
 
     /**
-     * Title band summary of voice card that changes calmly enough to be read, see [StableValue]
+     * Title band summary of voice card, rebuilt only when its displayed values are changed to avoid allocations per
+     * frame. Values are shown without delay, only the note is kept through vibrato (see [SidRowText.note]).
      */
-    class StableSummary {
-        private val mode = StableValue()
-        private val note = StableValue()
-        private val pitch = StableValue(deadband = PITCH_DEADBAND_CENTS)
-        private val level = StableValue(deadband = LEVEL_DEADBAND_DB)
-        private val other = StableValue()
-        private var hz = 0f
+    class LiveSummary {
+        private var key = Long.MIN_VALUE
+        private var note = SidRowText.NONE
         var text = ""
             private set
 
-        /** Time of the last text change for fading */
-        var changedAt = Long.MIN_VALUE / 2
-            private set
-
-        fun update(g: VoiceGauges, nowMs: Long) {
+        fun update(g: VoiceGauges) {
             val kind = g.kind
-            val changed = if (kind.hasNoteSummary) {
-                // the text depends only on values below, so it is not built every frame
-                var changed = mode.update((kind shl 8) or g.summaryMode, nowMs)
-                if (g.hasFrequency && g.frequency > 0f) {
-                    changed = note.update(semitones(g.frequency), NOTE_MARGIN, nowMs) or changed
-                    if (pitch.update(SidRowText.cents(g.frequency), nowMs)) {
-                        hz = g.frequency
-                        changed = true
-                    }
-                }
-                if (g.hasLevel) {
-                    changed = level.update(g.level.roundToInt(), nowMs) or changed
-                }
-                if (changed || text.isEmpty()) {
-                    noteSummary(mode.value and 0xff, hz, noteName(note.value), level.value)
-                } else {
-                    null
-                }
-            } else {
+            if (!kind.hasNoteSummary) {
                 val current = summaryOf(g)
-                if (other.update((kind shl 24) xor current.hashCode(), nowMs) || text.isEmpty()) current else null
-            }
-            if (changed != null && changed != text) {
-                if (text.isNotEmpty()) {
-                    changedAt = nowMs
+                if (current != text) {
+                    text = current
                 }
-                text = changed
+                key = Long.MIN_VALUE
+                return
+            }
+            val mode = g.summaryMode
+            val hasPitch = g.hasFrequency && g.frequency > 0f
+            note = if (hasPitch) SidRowText.note(semitones(g.frequency), note) else SidRowText.NONE
+            val hz = if (hasPitch) g.frequency.roundToInt() else 0
+            val level = if (g.hasLevel) g.level.roundToInt() else 0
+            val current = (kind.toLong() shl 56) or (mode.toLong() shl 48) or ((note.toLong() and 0xff) shl 40) or
+                ((hz.toLong() and 0xffffff) shl 16) or (level.toLong() and 0xffff)
+            if (current != key) {
+                key = current
+                text = noteSummary(mode, hz, if (note == SidRowText.NONE) "" else noteName(note), level)
             }
         }
 
         private val Int.hasNoteSummary
             get() = this != VoiceGauges.Kind.MT32_PART && this != VoiceGauges.Kind.MT32_PARTIAL &&
                 this != VoiceGauges.Kind.OPL_RHYTHM && this != VoiceGauges.Kind.OPN_DAC
-
-        private companion object {
-            const val NOTE_MARGIN = SidRowText.NOTE_MARGIN
-            const val PITCH_DEADBAND_CENTS = SidRowText.PITCH_DEADBAND_CENTS
-            const val LEVEL_DEADBAND_DB = 2
-        }
     }
 }

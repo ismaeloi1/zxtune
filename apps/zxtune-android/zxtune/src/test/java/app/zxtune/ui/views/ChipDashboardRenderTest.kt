@@ -242,24 +242,79 @@ class ChipDashboardRenderTest {
         0x99, 0xd0, 0x40
     )
 
-    private fun renderSid(name: String, chips: Int, width: Int = 1080, height: Int = 1700) {
+    private fun sidStatus(chips: Int) = "PAL, MOS6581, reSIDfp, resample\n" +
+        "PlaySID one-file format (PSID), 50 Hz VBI (PAL), $chips SID, song 1/1\n" +
+        "scope: 3/3 ch, trigger 1024us, sync device\noutput: 48000Hz buffer=160ms sync=timestamp\n" +
+        "render: 213% realtime\ngpu: 89.8 fps, frame 11.14 ms (max 18.0), draw 10.59 ms (max 17.6)"
+
+    private fun renderSid(name: String, chips: Int, width: Int = 1080, height: Int = 1700): SidDashboardView {
         val view = SidDashboardView(ApplicationProvider.getApplicationContext())
-        view.setGaugesData(
-            makeSidData(chips, sidRegs),
-            chips,
-            "PAL, MOS6581, reSIDfp, resample\nPlaySID one-file format (PSID), 50 Hz VBI (PAL), $chips SID, song 1/1"
-        )
+        view.setGaugesData(makeSidData(chips, sidRegs), chips, sidStatus(chips))
         render(name, view, width, height)
+        checkGrid(view.voiceGrid, width.toFloat() / chips)
+        checkGrid(view.globalGrid, width.toFloat() / chips)
+        return view
+    }
+
+    // cells never overlap and are inside of chip's column
+    private fun checkGrid(grid: SidDashboardView.CellGrid, width: Float) {
+        for (a in grid.specs.indices) {
+            if (!grid.visible[a]) continue
+            assertTrue(grid.left[a] >= 0f && grid.right[a] <= width && grid.left[a] < grid.right[a])
+            for (b in a + 1 until grid.specs.size) {
+                if (grid.visible[b] && grid.line[a] == grid.line[b]) {
+                    assertTrue("$a $b", grid.right[a] <= grid.left[b])
+                }
+            }
+        }
+    }
+
+    private fun visibleCaptions(grid: SidDashboardView.CellGrid) = grid.specs.indices.filter { grid.visible[it] }.map { grid.specs[it].caption }
+
+    @Test
+    fun sid() {
+        val view = renderSid("sidcells-single", 1)
+        assertTrue(visibleCaptions(view.voiceGrid).toString(), visibleCaptions(view.voiceGrid).size >= 7)
     }
 
     @Test
-    fun sid() = renderSid("sid", 1)
+    fun sidSmall() {
+        val view = renderSid("sidcells-small", 1, 720, 1500)
+        assertTrue(view.voiceGrid.lines > 0)
+    }
 
     @Test
-    fun sidSmall() = renderSid("sid-small", 1, 720, 800)
+    fun sidTiny() {
+        // no space for cells, gauges are still drawn
+        val view = renderSid("sidcells-tiny", 1, 480, 500)
+        assertEquals(0, view.voiceGrid.lines)
+    }
 
     @Test
-    fun sid2() = renderSid("sid2", 2)
+    fun sid2() {
+        val view = renderSid("sidcells-dual", 2)
+        // the most important cells are kept
+        val captions = visibleCaptions(view.voiceGrid)
+        assertTrue(captions.toString(), captions.containsAll(listOf("Wave", "Note", "Level", "Stage")))
+    }
+
+    // the same geometry as user's phone: 1080px wide, ~1.6 scaled pixels per sp, dashboard below oscilloscope
+    @Test
+    @Config(qualifiers = "w675dp-h1507dp-256dpi")
+    fun sid2Device() {
+        val view = renderSid("sidcells-dual-device", 2, 1080, 1330)
+        assertTrue(view.voiceGrid.scale >= 0.85f)
+        assertEquals(2, view.voiceGrid.lines)
+        val captions = visibleCaptions(view.voiceGrid)
+        assertTrue(captions.toString(), captions.containsAll(listOf("Wave", "Note", "Level", "Stage", "Filter")))
+    }
+
+    @Test
+    @Config(qualifiers = "w675dp-h1507dp-256dpi")
+    fun sidDevice() {
+        val view = renderSid("sidcells-single-device", 1, 1080, 1330)
+        assertEquals(SidCells.VOICE.size, visibleCaptions(view.voiceGrid).size)
+    }
 
     @Test
     fun sidDescription() {
@@ -274,38 +329,45 @@ class ChipDashboardRenderTest {
         assertEquals("C5 523Hz", SidDescription.frequencySummary(state, 0, chip))
         assertEquals("100%", SidDescription.volumeSummary(state))
         assertEquals("66%", SidDescription.resonanceSummary(state))
-        assertEquals(
-            "Noise 523Hz rate, filtered low-pass ~440Hz, sustain 60%, release 1.5s",
-            SidDescription.voiceExplanation(state, 0, 0, chip)
-        )
-        assertEquals(
-            "Pulse 37% duty at C4, hard-synced to V1, attack 56ms, decay 1.5s to sustain 100%",
-            SidDescription.voiceExplanation(state, 1, 1, chip)
-        )
-        assertEquals(
-            "Sawtooth+triangle mix at F1, filtered low-pass ~440Hz, releasing 25% over 750ms",
-            SidDescription.voiceExplanation(state, 2, 0, chip)
-        )
-        assertEquals(
-            "Volume 100%, low-pass ~440Hz on V1+V3, resonance 66%",
-            SidDescription.filterExplanation(state, chip)
-        )
         assertEquals(SidDescription.NTSC_CLOCK, SidDescription.Chip.fromStatus("NTSC, MOS8580").clock)
         assertEquals("2ms", SidDescription.formatMs(SidDescription.attackMs(0)))
         assertEquals("24s", SidDescription.formatMs(SidDescription.decayMs(15)))
     }
 
+    @Test
+    fun sidCells() {
+        val state = ChipState(sidRegs.map { it.toByte() }.toByteArray(), 0)
+        val chip = SidDescription.Chip.fromStatus("PAL, MOS6581")
+        fun voice(idx: Int, trend: Int) = SidVoiceText().apply { update(state, idx, trend, chip, 0) }.cells.let { cells ->
+            SidCells.VOICE.indices.map { cells[it] }
+        }
+        assertEquals(
+            listOf("Noise", "", "C5", "523 Hz", "\u2014", "Low", "60%", "Sustain", "2 ms", "750 ms", "60%", "1.5 s"),
+            voice(0, 0)
+        )
+        assertEquals(
+            listOf("Pulse", "37%", "C4", "262 Hz", "Sync V1", "\u2014", "81%", "Attack", "56 ms", "1.5 s", "100%", "114 ms"),
+            voice(1, 1)
+        )
+        assertEquals(
+            listOf("Saw+Tri", "", "F1", "44 Hz", "\u2014", "Low", "25%", "Release", "2 ms", "6 ms", "0%", "750 ms"),
+            voice(2, 0)
+        )
+        val global = SidGlobalText().apply { update(state, chip) }.cells
+        assertEquals(listOf("100%", "Low", "~440 Hz", "66%", "V1+V3"), SidCells.GLOBAL.indices.map { global[it] })
+    }
+
     /**
      * Renders 60fps frames of jittering registers (vibrato, pulse width and cutoff sweeps, decaying envelope,
-     * hard restart) and stacks title bands and explanations of sampled frames: texts should stay in place and
-     * change rarely.
+     * hard restart) on two chips at phone geometry and stacks title bands and cells of the first voice and global
+     * rows of sampled frames: cells should stay in place while values follow registers without delay.
      */
-    private fun renderSidSequence(name: String) {
+    @Test
+    @Config(qualifiers = "w675dp-h1507dp-256dpi")
+    fun sidSequence() {
         val width = 1080
-        val height = 1700
+        val height = 1330
         val view = SidDashboardView(ApplicationProvider.getApplicationContext())
-        var now = 0L
-        view.clock = { now }
         view.measure(
             View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY)
@@ -314,30 +376,43 @@ class ChipDashboardRenderTest {
         val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val regs = sidRegs.copyOf()
         val frames = ArrayList<Bitmap>()
-        val explanations = ArrayList<IntArray>()
-        for (frame in 0 until 150) {
+        var geometry: List<Float>? = null
+        val pitches = HashSet<String>()
+        val notes = HashSet<String>()
+        val pulses = HashSet<String>()
+        for (frame in 0 until 60) {
             val t = frame * 1000L / 60
-            now = t
             jitter(regs, t)
-            view.setGaugesData(makeSidData(1, regs), 1, "PAL, MOS6581")
+            view.setGaugesData(makeSidData(2, regs), 2, sidStatus(2))
             bitmap.eraseColor(0)
             view.draw(Canvas(bitmap))
-            if (frame % 15 == 14) {
+            val grid = view.voiceGrid
+            val current = grid.left.toList() + grid.right.toList() + grid.line.map { it.toFloat() } + grid.scale
+            if (geometry == null) {
+                geometry = current
+            } else {
+                assertEquals("frame $frame", geometry, current)
+            }
+            val texts = view.voiceTexts[0][0]
+            pitches.add(texts.cells[SidCells.PITCH])
+            notes.add(texts.cells[SidCells.NOTE])
+            pulses.add(view.voiceTexts[0][1].cells[SidCells.DUTY])
+            if (frame % 6 == 0) {
                 val rowH = view.gaugesRowHeight.toInt()
                 val cellH = view.gaugesCellHeight.toInt()
-                // title band and explanation of each row
-                val strip = Bitmap.createBitmap(width, 4 * (TITLE_BAND + rowH - cellH), Bitmap.Config.ARGB_8888)
+                val band = minOf(TITLE_BAND, cellH)
+                val strip = Bitmap.createBitmap(width, 2 * (band + rowH - cellH), Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(strip)
                 var y = 0
-                for (row in 0 until 4) {
+                for (row in intArrayOf(0, 3)) {
                     val top = rowH * row
                     canvas.drawBitmap(
                         bitmap,
-                        android.graphics.Rect(0, top, width, top + TITLE_BAND),
-                        android.graphics.Rect(0, y, width, y + TITLE_BAND),
+                        android.graphics.Rect(0, top, width, top + band),
+                        android.graphics.Rect(0, y, width, y + band),
                         null
                     )
-                    y += TITLE_BAND
+                    y += band
                     canvas.drawBitmap(
                         bitmap,
                         android.graphics.Rect(0, top + cellH, width, top + rowH),
@@ -347,11 +422,6 @@ class ChipDashboardRenderTest {
                     y += rowH - cellH
                 }
                 frames.add(strip)
-                // the first line of explanation: waveform and pitch
-                val lineH = (rowH - cellH) / 2
-                val pixels = IntArray(width * lineH)
-                bitmap.getPixels(pixels, 0, width, 0, cellH, width, lineH)
-                explanations.add(pixels)
             }
         }
         System.getenv("ZXTUNE_SCREENSHOTS")?.let { dir ->
@@ -365,11 +435,12 @@ class ChipDashboardRenderTest {
                 y += frame.height + gap
             }
             File(dir).mkdirs()
-            File(dir, "$name.png").outputStream().use { strip.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            File(dir, "sidcells-filmstrip.png").outputStream().use { strip.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        // waveform and pitch of the first voice (triangle with vibrato) are not changed
-        val changed = explanations.zipWithNext().count { (a, b) -> !a.contentEquals(b) }
-        assertEquals(0, changed)
+        // vibrato is followed live by pitch, while the note is kept
+        assertTrue(pitches.toString(), pitches.size > 5)
+        assertEquals(setOf("C5"), notes)
+        assertTrue(pulses.toString(), pulses.size > 5)
     }
 
     // triangle with vibrato on V1 (+-70 cents), pulse width sweep and hard restarts on V2, release on V3, cutoff sweep
@@ -390,10 +461,7 @@ class ChipDashboardRenderTest {
         regs[0x16] = cutoff shr 3
     }
 
-    @Test
-    fun sidSequence() = renderSidSequence("sidtext-sequence")
-
     private companion object {
-        const val TITLE_BAND = 150
+        const val TITLE_BAND = 70
     }
 }

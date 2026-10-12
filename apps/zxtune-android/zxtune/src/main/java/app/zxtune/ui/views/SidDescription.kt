@@ -12,7 +12,7 @@ import kotlin.math.roundToInt
 /**
  * Translates SID registers into musical terms, so the dashboard is understandable without datasheet:
  * - short values for gauges title bands (waveform, envelope level and phase, note, filter)
- * - plain language sentence describing what is heard from each voice
+ * - plain words for cells grid under gauges (see [Words] and [SidCells]), one value per cell
  * Timings and frequencies depend on chip clock and model, see [Chip].
  */
 internal object SidDescription {
@@ -32,12 +32,12 @@ internal object SidDescription {
         }
     }
 
-    enum class Phase(val short: String) {
-        ATTACK("Atk"),
-        DECAY("Dec"),
-        SUSTAIN("Sus"),
-        RELEASE("Rel"),
-        IDLE("Off")
+    enum class Phase(val short: String, val word: String) {
+        ATTACK("Atk", Words.ATTACK),
+        DECAY("Dec", Words.DECAY),
+        SUSTAIN("Sus", Words.SUSTAIN),
+        RELEASE("Rel", Words.RELEASE),
+        IDLE("Off", Words.SILENT)
     }
 
     const val PAL_CLOCK = 985248
@@ -97,29 +97,23 @@ internal object SidDescription {
      * @param control voice control register, waveform bits are in high nibble
      * @return short name for title band, e.g. "Saw", "Pulse 37%", "Saw+Tri"
      */
-    fun waveShort(control: Int, pulseWidth: Int) = waveName(control, pulsePercent(pulseWidth), false)
+    fun waveShort(control: Int, pulseWidth: Int) = waveName(control, pulsePercent(pulseWidth))
 
-    fun waveLong(control: Int, pulseWidth: Int) = waveName(control, pulsePercent(pulseWidth), true)
-
-    fun waveName(control: Int, pulsePercent: Int, long: Boolean): String {
+    fun waveName(control: Int, pulsePercent: Int): String {
         val parts = buildList {
             // order matches common naming of combined waveforms (e.g. "Pulse+Saw")
             if (control and NOISE != 0) add("Noise")
-            if (control and PULSE != 0) {
-                add(if (long) "pulse $pulsePercent% duty" else "Pulse $pulsePercent%")
-            }
-            if (control and SAWTOOTH != 0) add(if (long) "sawtooth" else "Saw")
-            if (control and TRIANGLE != 0) add(if (long) "triangle" else "Tri")
+            if (control and PULSE != 0) add("Pulse")
+            if (control and SAWTOOTH != 0) add("Saw")
+            if (control and TRIANGLE != 0) add("Tri")
         }
         return when {
-            parts.isEmpty() -> if (long) "no waveform" else "None"
-
-            parts.size == 1 -> parts[0].replaceFirstChar { it.uppercase() }
-
-            long -> parts.joinToString("+").replaceFirstChar { it.uppercase() } + " mix"
+            parts.isEmpty() -> "None"
 
             // pulse width is less important than combination itself in narrow title
-            else -> parts.joinToString("+") { it.substringBefore(' ') }
+            parts.size == 1 && parts[0] == "Pulse" -> "Pulse $pulsePercent%"
+
+            else -> parts.joinToString("+")
         }
     }
 
@@ -185,6 +179,132 @@ internal object SidDescription {
 
     fun cutoffText(hz: Float) = "~${formatHz(hz)}"
 
+    // human readable values for cells, see [SidCells]
+    fun waveWord(control: Int) = when {
+        control and TEST != 0 -> Words.RESET
+
+        control and 0xf0 == 0 -> Words.NONE
+
+        // single waveforms are spelled fully, mixes are abbreviated to fit
+        control and 0xf0 == NOISE -> Words.NOISE
+
+        control and 0xf0 == PULSE -> Words.PULSE
+
+        control and 0xf0 == SAWTOOTH -> Words.SAW
+
+        control and 0xf0 == TRIANGLE -> Words.TRIANGLE
+
+        else -> waveName(control, 0)
+    }
+
+    fun hasPulse(control: Int) = control and PULSE != 0
+
+    fun hasSync(control: Int) = control and SYNC != 0
+
+    // ring modulation affects only triangle waveform
+    fun hasRing(control: Int) = control and RING != 0 && control and TRIANGLE != 0
+
+    /**
+     * @return name of modulation applied to voice from its modulator (see [modulatorOf])
+     */
+    fun modulationWord(control: Int, voice: Int): String {
+        val sync = hasSync(control)
+        val ring = hasRing(control)
+        val source = modulatorOf(voice) + 1
+        return when {
+            sync && ring -> Words.SYNC_RING
+            sync -> "${Words.SYNC} V$source"
+            ring -> "${Words.RING} V$source"
+            else -> Words.DASH
+        }
+    }
+
+    fun filterWord(filtered: Boolean, mode: Int, muted: Boolean) = when {
+        // filtered voice is heard only through enabled filter outputs
+        filtered -> if (mode and 7 == 0) Words.MUTED else modeWord(mode)
+
+        // typical trick to use voice 3 as modulation source only
+        muted -> Words.MUTED
+
+        else -> Words.DASH
+    }
+
+    // voice 3 is disconnected from output only if it's not filtered
+    fun isMuted(voice: Int, mode: Int, routing: Int) = voice == 2 && mode and MODE_VOICE3_OFF != 0 && routing and (1 shl voice) == 0
+
+    fun modeWord(mode: Int) = Words.MODES[mode and 7]
+
+    fun routingWord(routing: Int) = if (routing and 15 == 0) {
+        Words.NONE
+    } else {
+        (0 until 4).filter { routing and (1 shl it) != 0 }.joinToString("+") { if (it == 3) Words.EXT else "V${it + 1}" }
+    }
+
+    fun percent(value: Int) = "$value%"
+
+    // Spaced units are easier to read in narrow cells, digits are tabular so values don't move
+    fun hzWord(hz: Int) = "$hz Hz"
+
+    /**
+     * Cutoff is rough estimation, so it's rounded to 2 significant digits
+     * @return value to compare and format, in Hz
+     */
+    fun roundCutoff(hz: Float) = when {
+        hz >= 10000f -> (hz / 1000f).roundToInt() * 1000
+        hz >= 1000f -> (hz / 100f).roundToInt() * 100
+        hz >= 100f -> (hz / 10f).roundToInt() * 10
+        else -> hz.roundToInt()
+    }
+
+    fun cutoffWord(roundedHz: Int) = when {
+        roundedHz >= 10000 -> "~${roundedHz / 1000} kHz"
+        roundedHz >= 1000 -> "~${roundedHz / 1000}.${roundedHz / 100 % 10} kHz"
+        else -> "~$roundedHz Hz"
+    }
+
+    fun durationWord(ms: Int) = when {
+        ms >= 1000 && ms % 1000 == 0 -> "${ms / 1000} s"
+        ms >= 1000 -> "${ms / 1000}.${ms / 100 % 10} s"
+        else -> "$ms ms"
+    }
+
+    /**
+     * Words displayed to user, collected in one place to be localized later
+     */
+    object Words {
+        const val WAVE = "Wave"
+        const val DUTY = "Duty"
+        const val NOTE = "Note"
+        const val PITCH = "Pitch"
+        const val MOD = "Mod"
+        const val FILTER = "Filter"
+        const val LEVEL = "Level"
+        const val STAGE = "Stage"
+        const val ATTACK = "Attack"
+        const val DECAY = "Decay"
+        const val SUSTAIN = "Sustain"
+        const val RELEASE = "Release"
+        const val VOLUME = "Volume"
+        const val CUTOFF = "Cutoff"
+        const val RESONANCE = "Resonance"
+        const val ROUTED = "Filtered"
+
+        const val NOISE = "Noise"
+        const val PULSE = "Pulse"
+        const val SAW = "Saw"
+        const val TRIANGLE = "Triangle"
+        const val NONE = "None"
+        const val RESET = "Reset"
+        const val SYNC = "Sync"
+        const val RING = "Ring"
+        const val SYNC_RING = "Sync+Ring"
+        const val MUTED = "Muted"
+        const val SILENT = "Off"
+        const val EXT = "Ext"
+        const val DASH = "\u2014"
+        val MODES = arrayOf("Off", "Low", "Band", "Low+Band", "High", "Notch", "Band+High", "All")
+    }
+
     fun modeShort(mode: Int) = when (mode and 7) {
         0 -> "Off"
         MODE_LOWPASS -> "LP"
@@ -195,150 +315,6 @@ internal object SidDescription {
         MODE_BANDPASS or MODE_HIGHPASS -> "BP+HP"
         else -> "All"
     }
-
-    private fun modeLong(mode: Int) = when (mode and 7) {
-        0 -> "no filter output"
-        MODE_LOWPASS -> "low-pass"
-        MODE_BANDPASS -> "band-pass"
-        MODE_HIGHPASS -> "high-pass"
-        MODE_LOWPASS or MODE_HIGHPASS -> "notch (band-reject)"
-        MODE_LOWPASS or MODE_BANDPASS -> "low+band-pass"
-        MODE_BANDPASS or MODE_HIGHPASS -> "band+high-pass"
-        else -> "all-pass"
-    }
-
-    /*
-     * Plain language explanation is split to fixed slots (see [SLOTS]), so each part is drawn at the same place
-     * and changes of one part don't move others.
-     */
-    const val SLOT_WAVE = 0
-    const val SLOT_PITCH = 1
-    const val SLOT_FILTER = 2
-    const val SLOT_ENVELOPE = 3
-
-    // global row uses the same slots
-    const val SLOT_VOLUME = 0
-    const val SLOT_ROUTING = 1
-    const val SLOT_RESONANCE = 2
-    const val SLOT_VOICE3 = 3
-    const val SLOTS = 4
-
-    /**
-     * Widest typical texts of slots (both voice and global rows) to reserve space, rarer longer ones are cut
-     */
-    val SLOT_TEMPLATES = arrayOf(
-        arrayOf("Sawtooth+triangle mix", "Pulse 100% duty", "Volume 100%"),
-        arrayOf("at C#5, hard-synced to V1", "at C#5, ring-modulated by V3", "low+band-pass ~12.5kHz on V1+V3"),
-        arrayOf("filtered low-pass ~12.5kHz", "filtered band-pass ~12.5kHz", "resonance 100%"),
-        arrayOf("attack 250ms, decay 2.4s to sustain 100%", "releasing 100% over 750ms", "V3 disconnected"),
-    )
-
-    fun waveSlot(control: Int, pulsePercent: Int) = if (control and TEST != 0) "Oscillator reset (test bit)" else waveName(control, pulsePercent, true)
-
-    /**
-     * @param note name of note or empty if out of range
-     */
-    fun pitchSlot(control: Int, hz: Float, note: String, voice: Int): String {
-        if (control and TEST != 0) {
-            return ""
-        }
-        val modulator = "V${modulatorOf(voice) + 1}"
-        val parts = ArrayList<String>(3)
-        when {
-            hz < 1f -> Unit
-            control and NOISE != 0 -> parts.add("${formatHz(hz)} rate")
-            note.isNotEmpty() -> parts.add("at $note")
-            else -> parts.add("at ${formatHz(hz)}")
-        }
-        if (control and SYNC != 0) parts.add("hard-synced to $modulator")
-        // ring modulation affects only triangle waveform
-        if (control and RING != 0 && control and TRIANGLE != 0) parts.add("ring-modulated by $modulator")
-        return parts.joinToString(", ")
-    }
-
-    fun filterSlot(filtered: Boolean, mode: Int, cutoffHz: Float, muted: Boolean) = when {
-        filtered -> "filtered ${modeLong(mode)} ${cutoffText(cutoffHz)}"
-
-        // typical trick to use voice 3 as modulation source only
-        muted -> "muted (3OFF)"
-
-        else -> ""
-    }
-
-    fun isMuted(voice: Int, mode: Int, routing: Int) = voice == 2 && mode and MODE_VOICE3_OFF != 0 && routing and (1 shl voice) == 0
-
-    fun envelopeSlot(phase: Phase, attackDecay: Int, sustainRelease: Int, envelopePercent: Int): String {
-        val release = formatMs(decayMs(sustainRelease))
-        val sustain = "sustain ${sustainPercent(sustainRelease shr 4)}%"
-        return when (phase) {
-            Phase.ATTACK -> "attack ${formatMs(attackMs(attackDecay shr 4))}, decay ${formatMs(decayMs(attackDecay))} to $sustain"
-            Phase.DECAY -> "decay ${formatMs(decayMs(attackDecay))} to $sustain"
-            Phase.SUSTAIN -> "$sustain, release $release"
-            Phase.RELEASE -> "releasing $envelopePercent% over $release"
-            Phase.IDLE -> "silent"
-        }
-    }
-
-    /**
-     * Plain language description of what is heard from the voice, e.g.
-     * "Noise 523Hz rate, filtered low-pass ~1.2kHz, sustain 60%, release 750ms"
-     */
-    fun voiceExplanation(state: ChipState, voice: Int, trend: Int, chip: Chip): String {
-        val ctrl = state.control(voice)
-        val hz = frequencyHz(state.frequency(voice), chip)
-        val slots = arrayOf(
-            waveSlot(ctrl, pulsePercent(state.pulseWidth(voice))),
-            pitchSlot(ctrl, hz, ChipWidgets.noteName(hz), voice),
-            filterSlot(
-                state.routing and (1 shl voice) != 0,
-                state.mode,
-                cutoffHz(state.cutoff, chip),
-                isMuted(voice, state.mode, state.routing)
-            ),
-            envelopeSlot(phase(state, voice, trend), adReg(state, voice), srReg(state, voice), envelopePercent(state, voice))
-        )
-        return joinSlots(slots, true)
-    }
-
-    // pitch continues waveform name (e.g. "Saw at C4"), other slots are separate clauses
-    private fun joinSlots(slots: Array<String>, continuePitch: Boolean) = buildString {
-        slots.forEachIndexed { idx, slot ->
-            if (slot.isNotEmpty()) {
-                val continues = continuePitch && idx == SLOT_PITCH && !slot.startsWith("hard-") &&
-                    !slot.startsWith("ring-")
-                if (isNotEmpty()) append(if (continues) " " else ", ")
-                append(slot)
-            }
-        }
-    }
-
-    fun volumeSlot(volume: Int) = "Volume ${percentOf15(volume)}"
-
-    fun routingSlot(routing: Int, mode: Int, cutoffHz: Float): String {
-        if (routing == 0) {
-            return "filter unused"
-        }
-        val voices = (0 until 4).filter { routing and (1 shl it) != 0 }
-            .joinToString("+") { if (it == 3) "Ext" else "V${it + 1}" }
-        return "${modeLong(mode)} ${cutoffText(cutoffHz)} on $voices"
-    }
-
-    fun resonanceSlot(routing: Int, resonance: Int) = if (routing == 0) "" else "resonance ${percentOf15(resonance)}"
-
-    fun voice3Slot(mode: Int) = if (mode and MODE_VOICE3_OFF != 0) "V3 disconnected" else ""
-
-    /**
-     * Global filter and volume description, e.g. "Volume 100%, low-pass ~1.2kHz on V1+V3, resonance 47%"
-     */
-    fun filterExplanation(state: ChipState, chip: Chip) = joinSlots(
-        arrayOf(
-            volumeSlot(state.volume),
-            routingSlot(state.routing, state.mode, cutoffHz(state.cutoff, chip)),
-            resonanceSlot(state.routing, state.resonance),
-            voice3Slot(state.mode)
-        ),
-        false
-    )
 
     private fun adReg(state: ChipState, voice: Int) = state.attackDecay(voice)
 
