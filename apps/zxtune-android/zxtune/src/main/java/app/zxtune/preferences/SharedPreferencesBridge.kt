@@ -25,7 +25,7 @@ object SharedPreferencesBridge {
 
     private fun dumpExistingProperties(prefs: Map<String, *>, target: RawPropertiesAdapter) {
         for ((key, value) in prefs) {
-            target.setProperty(key, value!!)
+            value?.let { target.setProperty(key, it) }
         }
     }
 }

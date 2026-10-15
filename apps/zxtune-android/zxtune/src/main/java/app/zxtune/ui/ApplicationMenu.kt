@@ -15,21 +15,21 @@ import app.zxtune.R
 import app.zxtune.ResultActivity
 import app.zxtune.analytics.Analytics
 import app.zxtune.device.PowerManagement
+import app.zxtune.rescue.RescueActivity
 import app.zxtune.ui.utils.item
 import kotlin.system.exitProcess
 
 class ApplicationMenu(private val activity: FragmentActivity) : MenuProvider {
 
-    override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) =
-        menuInflater.inflate(R.menu.main, menu).also {
-            // onPrepareMenu called only on showing
-            menu.item(R.id.action_problems).let { item ->
-                PowerManagement.create(activity).hasProblem.observe(activity) {
-                    item.isVisible = it
-                }
+    override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) = menuInflater.inflate(R.menu.main, menu).also {
+        // onPrepareMenu called only on showing
+        menu.item(R.id.action_problems).let { item ->
+            PowerManagement.create(activity).hasProblem.observe(activity) {
+                item.isVisible = it
             }
-            menu.item(R.id.action_rate).isVisible = Features.UserRating.isAvailable()
         }
+        menu.item(R.id.action_rate).isVisible = Features.UserRating.isAvailable()
+    }
 
     override fun onPrepareMenu(menu: Menu) = menu.run {
         item(R.id.action_prefs).intent = PreferencesActivity.createIntent(activity)
@@ -49,6 +49,11 @@ class ApplicationMenu(private val activity: FragmentActivity) : MenuProvider {
 
         R.id.action_rate -> {
             rate()
+            true
+        }
+
+        R.id.action_rescue -> {
+            tryOpenIntent(RescueActivity.createIntent(activity))
             true
         }
 

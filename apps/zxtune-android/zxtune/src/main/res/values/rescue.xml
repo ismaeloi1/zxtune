@@ -24,5 +24,11 @@
     <string name="rescue_unsupported">This Android version has no system file picker, backup is not available.</string>
     <string name="rescue_cancelled">Cancelled</string>
     <string name="rescue_working">Working…</string>
+    <string name="crash_report_title">Crash report</string>
+    <string name="crash_report_share">Share</string>
+    <string name="crash_report_copy">Copy</string>
+    <string name="crash_report_close">Close</string>
+    <string name="crash_report_none">No crash recorded</string>
+    <string name="rescue_crash_report">Show crash report</string>
     <string name="pref_rescue_summary">Export or import the playlist, export a diagnostic log</string>
 </resources>

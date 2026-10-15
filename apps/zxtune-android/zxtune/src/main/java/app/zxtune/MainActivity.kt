@@ -24,6 +24,7 @@ import androidx.viewpager.widget.ViewPager
 import androidx.viewpager.widget.ViewPager.OnPageChangeListener
 import app.zxtune.analytics.Analytics
 import app.zxtune.device.media.MediaModel
+import app.zxtune.rescue.CrashReport
 import app.zxtune.ui.ViewPagerAdapter
 import app.zxtune.ui.utils.applyEdgeToEdge
 import app.zxtune.ui.utils.padWithSystemBars
@@ -55,6 +56,9 @@ class MainActivity : AppCompatActivity(R.layout.main_activity) {
         }
         setupMediaController()
         Analytics.sendUiEvent(Analytics.UiAction.OPEN)
+        if (savedInstanceState == null) {
+            CrashReport.showIfNew(this)
+        }
 
         // TODO: move to MainApplication
         if (BuildConfig.BUILD_TYPE != "release") {

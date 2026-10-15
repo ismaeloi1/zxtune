@@ -17,8 +17,9 @@ object Preferences {
     private lateinit var dataStore: DataStore
 
     @JvmStatic
-    fun getDefaultSharedPreferences(context: Context): SharedPreferences =
+    fun getDefaultSharedPreferences(context: Context): SharedPreferences = TolerantSharedPreferences(
         context.getSharedPreferences("${context.packageName}_preferences", Context.MODE_PRIVATE)
+    )
 
     fun getProviderClient(context: Context): ProviderClient {
         if (!this::providerClient.isInitialized) {

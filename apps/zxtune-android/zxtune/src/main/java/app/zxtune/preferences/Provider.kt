@@ -66,11 +66,14 @@ class Provider : ContentProvider() {
     @Synchronized
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? = when (method) {
         METHOD_GET -> arg?.let { get(it) }
+
         METHOD_LIST -> list(arg)
+
         METHOD_PUT -> extras?.let {
             put(it)
             null
         }
+
         else -> null
     }
 
@@ -82,8 +85,8 @@ class Provider : ContentProvider() {
 
     private fun list(prefix: String?) = Bundle().apply {
         for ((key, value) in prefs.all) {
-            if (prefix == null || key.startsWith(prefix)) {
-                copyPref(key, value!!, this)
+            if (value != null && (prefix == null || key.startsWith(prefix))) {
+                copyPref(key, value, this)
             }
         }
     }
@@ -97,7 +100,7 @@ class Provider : ContentProvider() {
     }
 
     private fun setPref(key: String, value: Any, editor: SharedPreferences.Editor) = with(editor) {
-        LOG.d { "${key}=${value}" }
+        LOG.d { "$key=$value" }
         when (value) {
             is Long -> putLong(key, value)
             is Int -> putInt(key, value)
@@ -128,12 +131,14 @@ class Provider : ContentProvider() {
     }
 }
 
-private fun copyPref(key: String, value: Any, result: Bundle) = with(result) {
+// Values of other types may be left by another build installed over this one, skipping them keeps
+// whole listing (and every client reading preferences at startup) working
+internal fun copyPref(key: String, value: Any, result: Bundle) = with(result) {
     when (value) {
         is Long -> putLong(key, value)
         is Int -> putInt(key, value)
         is String -> putString(key, value)
         is Boolean -> putBoolean(key, value)
-        else -> throw IllegalArgumentException("Invalid type for $key: ${value.javaClass.name}")
+        else -> LOG.d { "Skip unsupported type for $key: ${value.javaClass.name}" }
     }
 }

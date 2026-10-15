@@ -115,7 +115,10 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
     }
   }
 
-  public final void restoreSession() {
+  /**
+   * @param onDone called when restoring is finished in any way
+   */
+  public final void restoreSession(Runnable onDone) {
     final String path = prefs.getString(PREF_LAST_PLAYED_PATH, null);
     if (path != null) {
       final long position = prefs.getLong(PREF_LAST_PLAYED_POSITION, 0);
@@ -127,9 +130,13 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
             restoreSession(Uri.parse(path), TimeStamp.fromMilliseconds(position));
           } catch (Exception e) {
             Log.w(TAG, e, "Failed to restore session");
+          } finally {
+            onDone.run();
           }
         }
       }.start();
+    } else {
+      onDone.run();
     }
   }
 

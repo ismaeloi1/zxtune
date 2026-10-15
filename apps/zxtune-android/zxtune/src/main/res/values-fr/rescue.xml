@@ -24,4 +24,10 @@
     <string name="rescue_cancelled">Annulé</string>
     <string name="rescue_working">En cours…</string>
     <string name="pref_rescue_summary">Exporter ou importer la playlist, exporter un journal de diagnostic</string>
+    <string name="crash_report_title">Rapport de plantage</string>
+    <string name="crash_report_share">Partager</string>
+    <string name="crash_report_copy">Copier</string>
+    <string name="crash_report_close">Fermer</string>
+    <string name="crash_report_none">Aucun plantage enregistré</string>
+    <string name="rescue_crash_report">Afficher le rapport de plantage</string>
 </resources>

@@ -25,6 +25,7 @@ object Diagnostics {
                 "(SDK ${Build.VERSION.SDK_INT})\n"
         )
         writer.write("\n---- rescue summary ----\n$summary\n")
+        writer.write("\n---- crashes ----\n${CrashReport.collect(ctx, onlyNew = false)?.text ?: "none"}\n")
         writer.write("\n---- databases ----\n${databases(ctx)}")
         writer.write("\n---- shared preferences ----\n${sharedPrefs(ctx)}")
         writer.write("\n---- persisted uri permissions ----\n${permissions(ctx)}")

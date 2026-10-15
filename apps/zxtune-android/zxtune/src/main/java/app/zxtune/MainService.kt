@@ -10,6 +10,7 @@ import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
 import app.zxtune.analytics.Analytics
 import app.zxtune.core.jni.Api
+import app.zxtune.device.StartupGuard
 import app.zxtune.device.media.AudioFocusConnection
 import app.zxtune.device.media.BrowseTree
 import app.zxtune.device.media.MediaSessionControl
@@ -25,10 +26,12 @@ import app.zxtune.preferences.Preferences
 import app.zxtune.preferences.Preferences.getDefaultSharedPreferences
 import app.zxtune.preferences.SharedPreferencesBridge.subscribe
 import app.zxtune.ui.playlist.Entry
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withTimeout
@@ -182,18 +185,40 @@ class MainService : MediaBrowserServiceCompat() {
             LOG.d { "Initialize" }
             trace.beginMethod("initialize")
             val ctx = svc.applicationContext
-            loadJni(ctx)
+            val guard = StartupGuard.create(ctx)
+            // optional startup work is skipped to get usable playback out of a crash loop
+            val safeMode = guard.begin()
+            if (safeMode) {
+                android.util.Log.w(TAG, "Previous starts failed, skip optional startup work")
+            }
+            loadJni(ctx, connectOptions = !safeMode)
             trace.checkpoint("jni")
             PlaybackServiceLocal(ctx, Preferences.getDataStore(ctx)).apply {
                 service = this
                 addResource(this)
             }
             trace.checkpoint("svc")
-            session = createSession(ctx)
+            session = createSession(ctx, syncQueue = !safeMode)
             addResource(StatusNotification.connect(svc, session))
             addResource(WidgetHandler.connect(ctx, session))
             trace.checkpoint("cbs")
-            service.restoreSession()
+            val restored = CompletableDeferred<Unit>()
+            if (safeMode) {
+                restored.complete(Unit)
+            } else {
+                service.restoreSession { restored.complete(Unit) }
+            }
+            // restoring may crash later than the delay (e.g. long seeking), so it's awaited too
+            val healthy = scope.launch {
+                delay(StartupGuard.HEALTHY_DELAY_MS)
+                restored.await()
+                guard.healthy()
+            }
+            addResource {
+                healthy.cancel()
+                // orderly shutdown (e.g. short browsing session at boot) is not a failed start
+                guard.healthy()
+            }
             trace.checkpoint("session")
             trace.endMethod()
         }
@@ -207,8 +232,12 @@ class MainService : MediaBrowserServiceCompat() {
             resources.add(res)
         }
 
-        private fun loadJni(ctx: Context) = scope.launch {
+        private fun loadJni(ctx: Context, connectOptions: Boolean) = scope.launch {
             val api = Api.load().await()
+            if (!connectOptions) {
+                // stored values are passed to native code, so they are suspected too
+                return@launch
+            }
             runCatching {
                 LOG.d { "JNI is ready" }
                 val prefs = getDefaultSharedPreferences(ctx)
@@ -219,7 +248,7 @@ class MainService : MediaBrowserServiceCompat() {
             }
         }
 
-        private fun createSession(ctx: Context): MediaSessionCompat {
+        private fun createSession(ctx: Context, syncQueue: Boolean): MediaSessionCompat {
             addResource(AudioFocusConnection.create(ctx, service))
             addResource(NoisyAudioConnection.create(ctx, service))
             val ctrl = MediaSessionControl.subscribe(ctx, service).also {
@@ -227,7 +256,9 @@ class MainService : MediaBrowserServiceCompat() {
             }
             // live artwork is not attached: Android Auto crossfades each artwork change through white,
             // so animated frames flash instead of animating
-            syncQueue(ctx, ctrl.session)
+            if (syncQueue) {
+                syncQueue(ctx, ctrl.session)
+            }
             return ctrl.session
         }
 

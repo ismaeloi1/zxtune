@@ -86,6 +86,9 @@ class RescueActivity : Activity() {
         savedInstanceState?.getString("base")?.let { exportBaseName = it }
         status.text = log
         refresh()
+        if (savedInstanceState == null) {
+            CrashReport.showIfNew(this)
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -130,6 +133,7 @@ class RescueActivity : Activity() {
             visibility = View.GONE
         }
         button(R.string.rescue_export_log) { startLogExport() }.isEnabled = hasPicker
+        button(R.string.rescue_crash_report) { CrashReport.show(this, onlyNew = false) }
         status = TextView(this).apply {
             setTextIsSelectable(true)
             movementMethod = ScrollingMovementMethod()

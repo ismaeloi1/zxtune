@@ -16,6 +16,8 @@ import com.github.anrwatchdog.ANRWatchDog;
 
 import app.zxtune.analytics.Analytics;
 import app.zxtune.device.ui.Notifications;
+import app.zxtune.rescue.CrashReport;
+import app.zxtune.rescue.ProcessName;
 
 public class MainApplication extends Application {
 
@@ -26,6 +28,8 @@ public class MainApplication extends Application {
 
   @Override
   public void onCreate() {
+    // before anything else to catch crashes of initialization too
+    CrashReport.INSTANCE.install(this);
     TRACE.beginMethod("onCreate");
     TRACE.checkpoint("step");
 
@@ -39,7 +43,8 @@ public class MainApplication extends Application {
   public synchronized static void initialize(Context ctx) {
     if (globalContext == null) {
       globalContext = ctx;
-      if (!"robolectric".equals(Build.PRODUCT)) {
+      // rescue screen should work even if regular initialization is what crashes
+      if (!"robolectric".equals(Build.PRODUCT) && !ProcessName.isRescue(ctx)) {
         Analytics.initialize(ctx);
         Notifications.setup(ctx);
         setupANRWatchdog();
