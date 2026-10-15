@@ -1005,14 +1005,14 @@ class SidDashboardView @JvmOverloads constructor(
 
         // widest titles and values of gauges
         private val VOICE_TEMPLATE = arrayOf(
-            TitleTemplate("S1V1 Wave F SRTF", "Pulse 50% Sync", arrayOf(SidDescription.GATE_MARK)),
+            TitleTemplate("S1V1 Wave F SRTF", "Pulse+Tri Sync Ring", arrayOf(SidDescription.GATE_MARK)),
             TitleTemplate("Env FFFF", "100%", SidDescription.Phase.values().map { it.short }.toTypedArray(), Paint.Align.LEFT),
-            TitleTemplate("Freq FFFF", "C#5", arrayOf("1047Hz", "3.8kHz"))
+            TitleTemplate("Freq FFFF", "G#8", arrayOf("1047Hz", "3.8kHz"))
         )
         private val GLOBAL_TEMPLATE = arrayOf(
             TitleTemplate("Vol 15", "", arrayOf("100%")),
             TitleTemplate("Res 15", "", arrayOf("100%")),
-            TitleTemplate("Filter LBH 2047", "Notch", arrayOf("~9.9kHz", "~18kHz", "~880Hz"))
+            TitleTemplate("Filter LBH 2047", "BP+HP", arrayOf("~9.9kHz", "~18kHz", "~880Hz"))
         )
         private val VOICE_GAUGES = Array(3) {
             intArrayOf(ChipGauges.wave(it), ChipGauges.envelope(it), ChipGauges.frequency(it))
