@@ -66,7 +66,7 @@ class OscilloscopeActivity : AppCompatActivity() {
         setContentView(panel)
         updateLayout(resources.configuration)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        requestHighestRefreshRate()
+        window.requestHighestRefreshRate()
 
         MediaModel.of(this).run {
             whenLifecycleStarted {
@@ -127,22 +127,6 @@ class OscilloscopeActivity : AppCompatActivity() {
         WindowInsetsControllerCompat(window, window.decorView).run {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-        }
-    }
-
-    // Use maximal refresh rate of display for current resolution (e.g. 120Hz)
-    private fun requestHighestRefreshRate() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            return
-        }
-        @Suppress("DEPRECATION")
-        val display = windowManager.defaultDisplay ?: return
-        val current = display.mode
-        val best = display.supportedModes.filter {
-            it.physicalWidth == current.physicalWidth && it.physicalHeight == current.physicalHeight
-        }.maxByOrNull { it.refreshRate } ?: return
-        window.attributes = window.attributes.apply {
-            preferredDisplayModeId = best.modeId
         }
     }
 

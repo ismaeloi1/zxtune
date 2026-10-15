@@ -187,6 +187,7 @@ class OscilloscopeView @JvmOverloads constructor(
         private var frames = 0
         private var framesStart = 0L
         private var drawNanos = 0L
+        private var dataNanos = 0L
         private var maxDrawNanos = 0L
         private var maxIntervalNanos = 0L
         private var lastFrameStart = 0L
@@ -225,8 +226,9 @@ class OscilloscopeView @JvmOverloads constructor(
             // narrow cells don't need many points, less data to transfer and draw for many voices
             val points = (width * (grid?.columns?.narrowest ?: 1f)).toInt().coerceIn(MIN_POINTS, POINTS)
             this.points = points
+            val dataStart = System.nanoTime()
             val layout = runCatching {
-                ScopeLayout(src.getScope(samples, points, windowMs))
+                ScopeLayout(src.getScope(samples, points, windowMs)).also { dataNanos += System.nanoTime() - dataStart }
             }.getOrElse {
                 LOG.w(it) { "Failed to get scope data" }
                 return
@@ -418,15 +420,17 @@ class OscilloscopeView @JvmOverloads constructor(
                 val fps = frames * 1e9 / period
                 statistics = String.format(
                     java.util.Locale.US,
-                    "gpu: %.1f fps, frame %.2f ms (max %.1f), draw %.2f ms (max %.1f)",
+                    "gpu: %.1f fps, frame %.2f ms (max %.1f), draw %.2f ms (max %.1f), data %.2f ms",
                     fps,
                     1000 / fps,
                     maxIntervalNanos / 1e6,
                     drawNanos / 1e6 / frames,
-                    maxDrawNanos / 1e6
+                    maxDrawNanos / 1e6,
+                    dataNanos / 1e6 / frames
                 )
                 frames = 0
                 drawNanos = 0
+                dataNanos = 0
                 maxDrawNanos = 0
                 maxIntervalNanos = 0
             }
