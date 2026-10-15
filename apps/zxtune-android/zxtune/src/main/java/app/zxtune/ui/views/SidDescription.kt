@@ -122,7 +122,8 @@ internal object SidDescription {
      */
     fun waveFlags(control: Int) = buildString {
         if (control and SYNC != 0) append(" Sync")
-        if (control and RING != 0) append(" Ring")
+        // ring bit without triangle is silently ignored by chip, so don't claim it (matches Mod cell)
+        if (hasRing(control)) append(" Ring")
         if (control and TEST != 0) append(" Test")
     }
 
