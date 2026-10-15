@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rescue_title">Sauvegarde de la playlist</string>
+    <string name="rescue_launcher_label">ZXTune sauvegarde</string>
+    <string name="rescue_shortcut_short">Sauvegarde</string>
+    <string name="rescue_shortcut_long">Sauvegarde de la playlist</string>
+    <string name="rescue_intro">Exporte la playlist actuelle directement depuis la base de données de l\'application, sans le lecteur. À utiliser avant de désinstaller, puis importer le fichier dans la nouvelle installation. Enregistrez les fichiers dans un dossier partagé (par ex. Download ou Documents) pour qu\'ils survivent à la désinstallation.</string>
+    <string name="rescue_export">Exporter la playlist</string>
+    <string name="rescue_include_saved">Copier aussi les playlists enregistrées (%d trouvées)</string>
+    <string name="rescue_import">Importer une playlist</string>
+    <string name="rescue_grant_folder">Autoriser l\'accès au dossier %s</string>
+    <string name="rescue_grant_storage">Autoriser l\'accès au stockage</string>
+    <string name="rescue_export_log">Exporter le journal de diagnostic</string>
+    <string name="rescue_db_summary">Base de la playlist : %1$d entrées (source : %2$s, version du schéma %3$s)</string>
+    <string name="rescue_choose_m3u">Choisissez maintenant où enregistrer la copie M3U8 (Annuler pour ignorer).</string>
+    <string name="rescue_exported">%1$d entrées exportées vers %2$s</string>
+    <string name="rescue_unresolved">%d entrées n\'ont pas de chemin de fichier local (sources distantes ou inconnues), leurs identifiants d\'origine sont conservés.</string>
+    <string name="rescue_saved_exported">%1$d playlists enregistrées copiées vers %2$s</string>
+    <string name="rescue_imported">%1$d entrées importées, %2$d déjà présentes, %3$d ignorées</string>
+    <string name="rescue_skipped_item">Ignorée : %s</string>
+    <string name="rescue_folder_granted">Accès autorisé : %s</string>
+    <string name="rescue_log_saved">Journal de diagnostic enregistré dans %s</string>
+    <string name="rescue_unsupported">Cette version d\'Android n\'a pas de sélecteur de fichiers système, la sauvegarde n\'est pas disponible.</string>
+    <string name="rescue_cancelled">Annulé</string>
+    <string name="rescue_working">En cours…</string>
+    <string name="pref_rescue_summary">Exporter ou importer la playlist, exporter un journal de diagnostic</string>
+</resources>

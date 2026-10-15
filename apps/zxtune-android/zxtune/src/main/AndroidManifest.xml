@@ -64,6 +64,23 @@
                 <data android:mimeType="application/zip" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
+            <meta-data
+                    android:name="android.app.shortcuts"
+                    android:resource="@xml/shortcuts" />
+        </activity>
+        <!-- Own launcher entry and process keep playlist backup reachable when main UI is broken -->
+        <activity
+                android:name=".rescue.RescueActivity"
+                android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+                android:exported="true"
+                android:label="@string/rescue_launcher_label"
+                android:process=":rescue"
+                android:taskAffinity="${applicationId}.rescue"
+                android:theme="@android:style/Theme.DeviceDefault">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
         <activity
                 android:name=".PreferencesActivity"

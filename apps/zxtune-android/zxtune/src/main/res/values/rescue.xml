@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Playlist backup/restore that works without the player service, see rescue/RescueActivity.kt -->
+    <string name="rescue_title">Playlist backup</string>
+    <string name="rescue_launcher_label">ZXTune backup</string>
+    <string name="rescue_shortcut_short">Backup</string>
+    <string name="rescue_shortcut_long">Playlist backup</string>
+    <string name="rescue_intro">Exports the current playlist straight from the app database, without the player. Use it before uninstalling, then import the file in the fresh installation. Save the files to a shared folder (e.g. Download or Documents) so they survive uninstalling.</string>
+    <string name="rescue_export">Export playlist</string>
+    <string name="rescue_include_saved">Also copy saved playlists (%d found)</string>
+    <string name="rescue_import">Import playlist</string>
+    <string name="rescue_grant_folder">Grant access to folder %s</string>
+    <string name="rescue_grant_storage">Grant storage permission</string>
+    <string name="rescue_export_log">Export diagnostic log</string>
+    <string name="rescue_db_summary">Playlist database: %1$d entries (source: %2$s, schema version %3$s)</string>
+    <string name="rescue_choose_m3u">Now choose where to save the M3U8 copy (Cancel to skip).</string>
+    <string name="rescue_exported">%1$d entries exported to %2$s</string>
+    <string name="rescue_unresolved">%d entries have no local file path (remote or unknown sources), their original identifiers are kept.</string>
+    <string name="rescue_saved_exported">%1$d saved playlists copied to %2$s</string>
+    <string name="rescue_imported">Imported %1$d entries, %2$d already in playlist, %3$d skipped</string>
+    <string name="rescue_skipped_item">Skipped: %s</string>
+    <string name="rescue_folder_granted">Access granted: %s</string>
+    <string name="rescue_log_saved">Diagnostic log saved to %s</string>
+    <string name="rescue_unsupported">This Android version has no system file picker, backup is not available.</string>
+    <string name="rescue_cancelled">Cancelled</string>
+    <string name="rescue_working">Working…</string>
+    <string name="pref_rescue_summary">Export or import the playlist, export a diagnostic log</string>
+</resources>

@@ -22,6 +22,7 @@ import app.zxtune.analytics.Analytics
 import app.zxtune.device.car.CarVisualSettings
 import app.zxtune.preferences.Mt32Roms
 import app.zxtune.preferences.Preferences
+import app.zxtune.rescue.RescueActivity
 import app.zxtune.ui.CarDisclaimerDialog
 import app.zxtune.ui.utils.FragmentIntProperty
 import app.zxtune.ui.utils.ThemeUtils
@@ -39,6 +40,7 @@ class PreferencesActivity :
 
         private const val CAR_PREFERENCES_KEY = "ui.car"
         private const val CAR_LEGAL_KEY = "ui.car.legal"
+        private const val RESCUE_KEY = "rescue"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -103,6 +105,10 @@ class PreferencesActivity :
                 }
             }
             setupCarPreferences()
+            findPreference<Preference>(RESCUE_KEY)?.setOnPreferenceClickListener {
+                startActivity(RescueActivity.createIntent(requireContext()))
+                true
+            }
         }
 
         // Enabling is intercepted to show legal notice first, disabling is immediate

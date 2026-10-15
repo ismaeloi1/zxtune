@@ -306,4 +306,12 @@
                 android:summary="@string/pref_car_summary"
                 android:title="@string/pref_car_title" />
     </PreferenceCategory>
+    <!-- playlist backup -->
+    <PreferenceCategory android:title="@string/rescue_title">
+        <Preference
+                android:key="rescue"
+                android:persistent="false"
+                android:summary="@string/pref_rescue_summary"
+                android:title="@string/rescue_title" />
+    </PreferenceCategory>
 </PreferenceScreen>

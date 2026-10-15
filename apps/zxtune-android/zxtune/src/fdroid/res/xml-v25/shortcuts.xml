@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- targetPackage cannot use placeholders, so each applicationId has its own copy -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+            android:enabled="true"
+            android:icon="@drawable/ic_launcher"
+            android:shortcutId="rescue"
+            android:shortcutLongLabel="@string/rescue_shortcut_long"
+            android:shortcutShortLabel="@string/rescue_shortcut_short">
+        <intent
+                android:action="android.intent.action.VIEW"
+                android:targetClass="app.zxtune.rescue.RescueActivity"
+                android:targetPackage="app.zxtune.fdroid" />
+    </shortcut>
+</shortcuts>
