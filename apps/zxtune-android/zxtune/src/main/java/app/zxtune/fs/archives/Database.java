@@ -379,5 +379,13 @@ class Database {
       Utils.cleanupDb(db);
       onCreate(db);
     }
+
+    // Version follows the build, so installing an older build over newer one (e.g. custom build over
+    // auto-updated official one) must not fail - it's just a cache to be rebuilt.
+    @Override
+    public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+      Log.d(TAG, "Downgrading database %d -> %d", oldVersion, newVersion);
+      onUpgrade(db, oldVersion, newVersion);
+    }
   }
 }
