@@ -573,7 +573,7 @@ namespace Sound
           // YM2612 DAC), so traces are centered by displayed range as Furnace's default DC offset correction does
           RemoveOffset(out, points);
         });
-        const auto computeUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
+        const int64_t computeUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
         ComputeUsSum += computeUs;
         ComputeUsMax = std::max(ComputeUsMax, computeUs);
         ++ComputeCalls;
