@@ -38,6 +38,8 @@ namespace Sound
     const uint_t MAX_WINDOW_MS = 200;
     const uint_t MAX_VOICES = 32;
     const uint_t MAX_FULL_RATE_TRIGGERS = 8;
+    // corrscope's rate, higher display refresh rates reuse found phase (see CorrelationTrigger::Config::MaxRate)
+    const uint_t TRIGGER_SEARCH_RATE = 60;
     // ~-66dB
     const int SILENCE_LEVEL = 16;
     // pitch estimation window for voices without frequency state
@@ -213,10 +215,10 @@ namespace Sound
         }
       }
 
-      void Run(uint_t count, const std::function<void(uint_t)>& task)
+      void Run(uint_t count, bool parallel, const std::function<void(uint_t)>& task)
       {
         // threads are started on demand since scope may be created for each playback but never displayed
-        if (!Started && count >= 2)
+        if (!Started && parallel && count >= 2)
         {
           Started = true;
           // leave cores for audio rendering and UI
@@ -226,7 +228,7 @@ namespace Sound
             Threads.emplace_back([this]() { Work(); });
           }
         }
-        if (Threads.empty() || count < 2)
+        if (Threads.empty() || count < 2 || !parallel)
         {
           for (uint_t idx = 0; idx < count; ++idx)
           {
@@ -542,13 +544,17 @@ namespace Sound
         while (Triggers.size() < channels)
         {
           const auto kernelSize = Samplerate * TRIGGER_MS / 1000 / stride;
-          Triggers.emplace_back(new CorrelationTrigger(kernelSize, stride, Samplerate));
+          CorrelationTrigger::Config cfg;
+          cfg.MaxRate = TRIGGER_SEARCH_RATE;
+          Triggers.emplace_back(new CorrelationTrigger(kernelSize, stride, Samplerate, cfg));
         }
         const int64_t renderSamples = Samplerate * std::clamp(windowMs, MIN_WINDOW_MS, MAX_WINDOW_MS) / 1000;
         const int64_t triggerSamples = Samplerate * TRIGGER_MS / 1000;
         std::atomic<uint_t> triggered = 0;
         // channels are independent, so triggered in parallel
-        Pool.Run(channels, [&](uint_t chan) {
+        // Waking of other cores costs more power than serial processing of few voices.
+        // Many voices are processed in parallel to fit into high refresh rate frame
+        Pool.Run(channels, channels > MAX_FULL_RATE_TRIGGERS, [&](uint_t chan) {
           const auto& ring = Voices.empty() ? Master : Voices[chan].Samples;
           const auto offset = Voices.empty() ? 0 : Voices[chan].Offset;
           const RingWave wave(ring, offset);
@@ -567,7 +573,10 @@ namespace Sound
           // YM2612 DAC), so traces are centered by displayed range as Furnace's default DC offset correction does
           RemoveOffset(out, points);
         });
-        LastComputeUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
+        const auto computeUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
+        ComputeUsSum += computeUs;
+        ComputeUsMax = std::max(ComputeUsMax, computeUs);
+        ++ComputeCalls;
         LastChannels = channels;
         LastTriggered = triggered;
         Layout result;
@@ -630,7 +639,11 @@ namespace Sound
         String result = Description;
         result += result.empty() ? "" : "\n";
         result += "scope: " + std::to_string(LastTriggered) + "/" + std::to_string(LastChannels) + " ch, trigger "
-                  + std::to_string(LastComputeUs) + "us, sync " + (LastPlayingHint >= 0 ? "device" : "estimated");
+                  + std::to_string(ComputeCalls ? ComputeUsSum / ComputeCalls : 0) + "us (max "
+                  + std::to_string(ComputeUsMax) + "), sync " + (LastPlayingHint >= 0 ? "device" : "estimated");
+        // searches are made not at each call, so average since last status is more informative
+        ComputeUsSum = ComputeUsMax = 0;
+        ComputeCalls = 0;
         if (LastGaugesUs)
         {
           result += ", gauges " + std::to_string(LastGaugesUs) + "us";
@@ -955,7 +968,10 @@ namespace Sound
       std::atomic<Clock::rep> LastRequest = 0;
       std::vector<ChipStates> Chips;
       String Description;
-      int64_t LastComputeUs = 0;
+      // since last status request
+      mutable int64_t ComputeUsSum = 0;
+      mutable int64_t ComputeUsMax = 0;
+      mutable int64_t ComputeCalls = 0;
       uint_t LastChannels = 0;
       uint_t LastTriggered = 0;
       uint_t TriggersStride = 0;

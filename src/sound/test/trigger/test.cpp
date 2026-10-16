@@ -10,6 +10,7 @@
 
 #include "sound/impl/correlation_trigger.h"
 
+#include <chrono>
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -53,16 +54,26 @@ namespace Sound
     return phases;
   }
 
-  void TestPhaseLock(double startFreq, double endFreq)
+  CorrelationTrigger::Config LimitedRate(uint_t rate)
+  {
+    CorrelationTrigger::Config cfg;
+    cfg.MaxRate = rate;
+    return cfg;
+  }
+
+  void TestPhaseLock(double startFreq, double endFreq, const CorrelationTrigger::Config& cfg = {})
   {
     VectorWave wave;
     const auto phases = MakePulse(wave, startFreq, endFreq);
-    CorrelationTrigger trigger(KERNEL, STRIDE, SAMPLERATE);
+    CorrelationTrigger trigger(KERNEL, STRIDE, SAMPLERATE, cfg);
+    uint_t searches = 0;
+    const auto start = std::chrono::steady_clock::now();
     double maxDeviation = 0;
     for (uint_t frame = 30; frame < 300; ++frame)
     {
       const int64_t pos = int64_t(frame) * FRAME;
       const auto result = trigger.GetTrigger(wave, pos, FRAME);
+      searches += trigger.IsSearched();
       if (result < 0 || result >= int64_t(phases.size()))
       {
         throw std::runtime_error("Trigger out of range");
@@ -75,7 +86,9 @@ namespace Sound
       const auto phase = phases[result];
       maxDeviation = std::max(maxDeviation, std::min(phase, 1 - phase));
     }
-    std::cout << "Freq " << startFreq << "->" << endFreq << "Hz: max phase deviation " << maxDeviation << std::endl;
+    const auto us = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - start).count();
+    std::cout << "Freq " << startFreq << "->" << endFreq << "Hz, max rate " << cfg.MaxRate << ": max phase deviation "
+              << maxDeviation << ", searches " << searches << "/270, " << us / 270 << "us/frame" << std::endl;
     if (maxDeviation > 0.05)
     {
       throw std::runtime_error("Unstable trigger");
@@ -107,6 +120,10 @@ int main()
     Sound::TestPhaseLock(110, 120);
     Sound::TestPhaseLock(220, 233);
     Sound::TestPhaseLock(880, 900);
+    // 120fps display with searches at 60 per second (30 is already visibly unstable for gliding pitch)
+    Sound::TestPhaseLock(110, 120, Sound::LimitedRate(60));
+    Sound::TestPhaseLock(220, 233, Sound::LimitedRate(60));
+    Sound::TestPhaseLock(880, 900, Sound::LimitedRate(60));
     Sound::TestSilence();
     std::cout << "All tests passed" << std::endl;
     return 0;

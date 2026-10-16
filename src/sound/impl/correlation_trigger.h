@@ -38,6 +38,7 @@
 
 #include "types.h"
 
+#include <array>
 #include <complex>
 #include <memory>
 #include <vector>
@@ -73,6 +74,9 @@ namespace Sound
       float MaxFreq = 4000.0f;
       float SlopeWidth = 0.25f;
       float ResetBelow = 0.3f;
+      //! Full correlation searches per second, 0 for each call. Triggers between searches keep phase of the last
+      //! found one using estimated period, so higher display refresh rates don't cost more CPU
+      uint_t MaxRate = 0;
     };
 
     //! @param kernelSize correlation buffer size in subsamples
@@ -83,9 +87,15 @@ namespace Sound
     ~CorrelationTrigger();
 
     //! @param pos estimated position of wave to display
-    //! @param samplesPerFrame distance between consequent calls
+    //! @param frameSamples distance between consequent calls
     //! @return found trigger position
-    int64_t GetTrigger(const TriggerWave& wave, int64_t pos, uint_t samplesPerFrame);
+    int64_t GetTrigger(const TriggerWave& wave, int64_t pos, uint_t frameSamples);
+
+    //! @return true if last GetTrigger call performed full search
+    bool IsSearched() const
+    {
+      return Searched;
+    }
 
     //! @brief Forget all the accumulated state (e.g. after seek)
     void Reset();
@@ -103,9 +113,10 @@ namespace Sound
     bool IsWindowInvalid(uint_t period) const;
     void CalcSlopeFinder(uint_t period);
     void CorrelateValid(const Buffer& data, const Buffer& kernel, Buffer& result);
-    void CorrelateValid2(const Buffer& data, const Buffer& kernel1, const Buffer& kernel2, Buffer& result1,
-                         Buffer& result2);
+    void CorrelateValid2(const Buffer& data, const Buffer& kernel1, const std::vector<std::complex<float>>& spectrum2,
+                         Buffer& result1, Buffer& result2);
     uint_t FindPeak(Buffer& corr, const Buffer& peaks, int radius) const;
+    bool Extrapolate(int64_t pos, uint_t samplesPerFrame, int64_t& trigger);
     void UpdateBuffer(Buffer& data, float resultMean, uint_t period);
 
   private:
@@ -131,6 +142,17 @@ namespace Sound
     static const uint_t PERIOD_RATE = 60;
     int64_t PrevTrigger = 0;
     bool HasPrevTrigger = false;
+    // last searched triggers to estimate period with sub-sample precision, longer distance reduces search jitter
+    static const uint_t SEARCHES_HISTORY = 4;
+    std::array<int64_t, SEARCHES_HISTORY> SearchedTriggers = {};
+    uint_t SearchesCount = 0;
+    uint_t SearchAge = 0;
+    bool Searched = false;
+    // spectrum of SlopeFinder, changed only with period
+    std::vector<std::complex<float>> SlopeSpectrum;
+    std::vector<std::complex<float>> PeriodTwiddles;
+    Buffer Power;
+    float PrevWindowStd = -1;
 
     // temporaries
     Buffer Data;
@@ -140,6 +162,5 @@ namespace Sound
     Buffer Aligned;
     std::vector<std::complex<float>> TmpA;
     std::vector<std::complex<float>> TmpB;
-    std::vector<std::complex<float>> TmpC;
   };
 }  // namespace Sound
