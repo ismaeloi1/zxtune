@@ -3,6 +3,7 @@ package app.zxtune.ui
 import android.content.Context
 import app.zxtune.preferences.Preferences
 import app.zxtune.ui.views.OscilloscopeView
+import app.zxtune.ui.views.ScopeDisplay
 import app.zxtune.ui.views.SidDashboardView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -14,8 +15,9 @@ internal object OscilloscopeSettings {
     private const val WINDOW_KEY = "ui.oscilloscope.window_ms"
     private const val GAUGE_WINDOW_KEY = "ui.oscilloscope.gauge_window_ms"
     private const val GAIN_KEY = "ui.oscilloscope.gain"
+    private const val MAX_FPS_KEY = "ui.oscilloscope.max_fps"
 
-    suspend fun apply(ctx: Context, oscilloscope: OscilloscopeView, dashboard: SidDashboardView) {
+    suspend fun apply(ctx: Context, oscilloscope: ScopeDisplay, dashboard: SidDashboardView) {
         val prefs = withContext(Dispatchers.IO) {
             Preferences.getDataStore(ctx).also {
                 // load cache in background
@@ -24,6 +26,7 @@ internal object OscilloscopeSettings {
         }
         oscilloscope.windowMs = prefs.getInt(WINDOW_KEY, OscilloscopeView.DEFAULT_WINDOW_MS)
         oscilloscope.gainPercent = prefs.getString(GAIN_KEY, null)?.toIntOrNull() ?: OscilloscopeView.AUTO_GAIN
+        oscilloscope.maxFps = prefs.getString(MAX_FPS_KEY, null)?.toIntOrNull() ?: 0
         dashboard.waveWindowMs = prefs.getInt(GAUGE_WINDOW_KEY, SidDashboardView.DEFAULT_WAVE_WINDOW_MS)
     }
 }

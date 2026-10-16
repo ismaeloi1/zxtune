@@ -649,7 +649,9 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
 
     companion object {
         const val SMOOTH_SIZE = 8
-        private const val EASING = 0.35f
+
+        // for ~30fps updates of dashboard
+        private const val EASING = 0.8f
 
         /*
          * Operators are numbered as in Furnace tracker (OP1..OP4, src/gui/guiConst.cpp opOrder), Nuked-OPN2 and

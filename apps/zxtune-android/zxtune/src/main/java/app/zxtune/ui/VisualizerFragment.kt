@@ -111,17 +111,18 @@ class VisualizerFragment : Fragment() {
                     }
                 }
             }.distinctUntilChanged { old, new -> old === new }
-        // oscilloscope keeps last picture while paused (pause is implemented as stop) instead of being blanked like spectrum
-        val scopeSource: Flow<Visualizer?> =
+        // oscilloscope keeps last picture while paused (pause is implemented as stop) instead of being blanked like spectrum,
+        // but it's not updated to save power
+        val scopeSource: Flow<Pair<Visualizer, Boolean>?> =
             visualizer.combine(playbackState) { visualizer, playbackState ->
                 ifNotNulls(visualizer, playbackState?.state) { src, state ->
                     if (state in SCOPE_STATES) {
-                        src
+                        src to (state == PlaybackStateCompat.STATE_PLAYING)
                     } else {
-                        VisualizerStub
+                        null
                     }
                 }
-            }.distinctUntilChanged { old, new -> old === new }
+            }.distinctUntilChanged { old, new -> old?.first === new?.first && old?.second == new?.second }
         viewLifecycleOwner.whenLifecycleStarted {
             launch {
                 // may be changed in preferences
@@ -136,10 +137,11 @@ class VisualizerFragment : Fragment() {
             }
             launch {
                 combine(scopeSource, state, isTabVisible) { src, state, isTabVisible ->
-                    src.takeIf { state == State.OSCILLOSCOPE && isTabVisible && it !== VisualizerStub }
-                }.distinctUntilChanged { old, new -> old === new }.collect {
-                    oscilloscope.setSource(it)
-                    dashboard.setSource(it, oscilloscope::getStatistics)
+                    src.takeIf { state == State.OSCILLOSCOPE && isTabVisible }
+                }.distinctUntilChanged { old, new -> old?.first === new?.first && old?.second == new?.second }.collect {
+                    val isLive = it?.second ?: false
+                    oscilloscope.setSource(it?.first, isLive)
+                    dashboard.setSource(it?.first, oscilloscope::getStatistics, isLive)
                 }
             }
             launch {

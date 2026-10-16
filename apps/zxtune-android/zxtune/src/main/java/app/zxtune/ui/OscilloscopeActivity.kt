@@ -66,7 +66,6 @@ class OscilloscopeActivity : AppCompatActivity() {
         setContentView(panel)
         updateLayout(resources.configuration)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        window.requestHighestRefreshRate()
 
         MediaModel.of(this).run {
             whenLifecycleStarted {

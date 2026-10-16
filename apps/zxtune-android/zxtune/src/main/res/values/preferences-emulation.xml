@@ -194,6 +194,22 @@
         <item>800</item>
     </string-array>
     <string name="pref_oscilloscope_gain_default" translatable="false">0</string>
+    <string name="pref_oscilloscope_max_fps_title">Frame rate limit</string>
+    <string-array name="pref_oscilloscope_max_fps_entries">
+        <item>Display refresh rate</item>
+        <item>120 fps</item>
+        <item>90 fps</item>
+        <item>60 fps</item>
+        <item>30 fps</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_max_fps_values" translatable="false">
+        <item>0</item>
+        <item>120</item>
+        <item>90</item>
+        <item>60</item>
+        <item>30</item>
+    </string-array>
+    <string name="pref_oscilloscope_max_fps_default" translatable="false">0</string>
     <string name="pref_oscilloscope_window_title">Waveforms window, ms</string>
     <string name="pref_oscilloscope_window_summary">Displayed duration of each voice waveform</string>
     <integer name="pref_oscilloscope_window_default">40</integer>

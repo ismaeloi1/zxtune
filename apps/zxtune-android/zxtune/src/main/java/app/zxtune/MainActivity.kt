@@ -26,7 +26,6 @@ import app.zxtune.analytics.Analytics
 import app.zxtune.device.media.MediaModel
 import app.zxtune.rescue.CrashReport
 import app.zxtune.ui.ViewPagerAdapter
-import app.zxtune.ui.requestHighestRefreshRate
 import app.zxtune.ui.utils.applyEdgeToEdge
 import app.zxtune.ui.utils.padWithSystemBars
 import app.zxtune.ui.utils.whenLifecycleStarted
@@ -46,8 +45,6 @@ class MainActivity : AppCompatActivity(R.layout.main_activity) {
         super.onCreate(savedInstanceState)
 
         setupUi()
-        // scope views need every frame of high refresh rate displays
-        window.requestHighestRefreshRate()
 
         // On the content frame rather than per pane: it covers the tab strip, the top panel and
         // every page's listing at once, and puts the controls above the navigation bar

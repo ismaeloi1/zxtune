@@ -168,6 +168,13 @@
                 android:key="ui.oscilloscope.gain"
                 android:title="@string/pref_oscilloscope_gain_title"
                 app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_oscilloscope_max_fps_default"
+                android:entries="@array/pref_oscilloscope_max_fps_entries"
+                android:entryValues="@array/pref_oscilloscope_max_fps_values"
+                android:key="ui.oscilloscope.max_fps"
+                android:title="@string/pref_oscilloscope_max_fps_title"
+                app:useSimpleSummaryProvider="true" />
         <SeekBarPreference
                 android:defaultValue="@integer/pref_oscilloscope_window_default"
                 android:key="ui.oscilloscope.window_ms"

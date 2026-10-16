@@ -43,6 +43,7 @@ class SidDashboardView @JvmOverloads constructor(
 
     @Volatile
     private var source: Visualizer? = null
+    private var isLive = true
 
     /**
      * Displayed duration of oscillators and volume gauges
@@ -173,16 +174,28 @@ class SidDashboardView @JvmOverloads constructor(
     private val summaryWidths = FloatArray(MAX_VOICES)
     private val summaryKinds = IntArray(MAX_VOICES) { -1 }
 
+    // Gauges are history of slow changing values, so lower than display refresh rate is enough to save power.
+    // Redrawn only on data change (e.g. not when silent).
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (source == null || !isAttachedToWindow) {
                 return
             }
-            requestData(frameTimeNanos)
-            invalidate()
             Choreographer.getInstance().postFrameCallback(this)
+            if (frameTimeNanos - lastUpdateTime < UPDATE_PERIOD_NS) {
+                return
+            }
+            lastUpdateTime = frameTimeNanos
+            requestData(frameTimeNanos)
+            val stats = statsProvider?.invoke() ?: ""
+            if (stats != lastStats) {
+                lastStats = stats
+                invalidate()
+            }
         }
     }
+    private var lastUpdateTime = 0L
+    private var lastStats = ""
 
     init {
         setBackgroundColor(Color.BLACK)
@@ -194,11 +207,18 @@ class SidDashboardView @JvmOverloads constructor(
      * @param src data source or null to stop updating
      * @param stats provider of additional (UI side) statistics lines
      */
-    fun setSource(src: Visualizer?, stats: (() -> String)? = null) {
-        val wasActive = source != null
+    fun setSource(src: Visualizer?, stats: (() -> String)? = null, isLive: Boolean = true) {
+        val wasActive = source != null && this.isLive
         source = src
         statsProvider = stats
-        if (src != null && !wasActive) {
+        this.isLive = isLive
+        if (src != null && !isLive) {
+            // single picture for paused playback
+            Choreographer.getInstance().removeFrameCallback(frameCallback)
+            lastStatusTime = 0
+            requestData(System.nanoTime())
+        } else if (src != null && !wasActive) {
+            lastUpdateTime = 0
             Choreographer.getInstance().postFrameCallback(frameCallback)
         } else if (src == null) {
             Choreographer.getInstance().removeFrameCallback(frameCallback)
@@ -248,8 +268,11 @@ class SidDashboardView @JvmOverloads constructor(
                 }
                 val target = 1 - readyBuffer
                 val current = layout
+                var changed: Boolean
                 if (current.hasRegisters) {
                     val chips = runCatching { src.getGauges(buffers[target], waveWindowMs) }.getOrDefault(0)
+                    changed = chips != readyChips || readyVoices != 0 ||
+                        !buffers[target].sameRange(buffers[readyBuffer], chips * ChipGauges.SIZE)
                     readyBuffer = target
                     readyVoices = 0
                     readyChips = chips
@@ -260,18 +283,26 @@ class SidDashboardView @JvmOverloads constructor(
                         voiceBuffers[target] = ByteArray(size)
                     }
                     val voices = runCatching { src.getVoiceGauges(voiceBuffers[target], waveWindowMs) }.getOrDefault(0)
+                    changed = voices != readyVoices || readyChips != 0 ||
+                        !voiceBuffers[target].sameRange(voiceBuffers[readyBuffer], voices * VoiceGauges.SIZE)
                     readyBuffer = target
                     readyChips = 0
                     readyVoices = voices
                 } else {
+                    changed = readyChips != 0 || readyVoices != 0
                     readyChips = 0
                     readyVoices = 0
                 }
                 if (needStatus) {
-                    status = runCatching { src.getStatus() }.getOrElse {
+                    val newStatus = runCatching { src.getStatus() }.getOrElse {
                         LOG.w(it) { "Failed to get status" }
                         ""
                     }
+                    changed = changed || newStatus != status
+                    status = newStatus
+                }
+                if (changed) {
+                    postInvalidate()
                 }
             } finally {
                 requestPending.set(false)
@@ -1026,6 +1057,21 @@ class SidDashboardView @JvmOverloads constructor(
         private const val MAX_VOICES = 64
 
         private const val STATUS_PERIOD_NS = 500_000_000L
+
+        // ~30fps
+        private const val UPDATE_PERIOD_NS = 31_000_000L
+
+        private fun ByteArray.sameRange(rh: ByteArray, size: Int): Boolean {
+            if (this.size < size || rh.size < size) {
+                return false
+            }
+            for (idx in 0 until size) {
+                if (this[idx] != rh[idx]) {
+                    return false
+                }
+            }
+            return true
+        }
 
         // Waveform bits and flags: Sync, Ring modulation, Test, Filtered
         internal fun waveTitle(control: Int, filtered: Boolean) = buildString {
