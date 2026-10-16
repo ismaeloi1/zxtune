@@ -19,7 +19,7 @@ private val LOG = Logger("ScopeFeed")
  * Requests waveforms on own thread paced by vsync (no binder calls on UI thread), limits frame rate and skips
  * frames with the same data (e.g. paused or silent playback), so the picture is kept without any GPU work.
  */
-internal class ScopeFeed(private val sink: Sink) {
+internal class ScopeFeed(context: android.content.Context, private val sink: Sink) {
 
     /**
      * Called on feed thread with new data, frame is valid only during the call
@@ -76,7 +76,19 @@ internal class ScopeFeed(private val sink: Sink) {
     private var layoutId = -1
     private var voicesLayout = VoicesLayout.MASTER
     private var lastFrameTime = 0L
+    private var lastVsyncTime = 0L
+    private var vsyncPeriod = DEFAULT_VSYNC_NS
+    private var vsyncWindowMin = Long.MAX_VALUE
+    private var vsyncWindowSize = 0
     private var isRunning = false
+    private val hint = WorkHint(context)
+
+    /**
+     * Expected interval between frames, for performance hints
+     */
+    @Volatile
+    var targetNanos = DEFAULT_VSYNC_NS
+        private set
 
     private val thread = sharedThread
     private val handler = android.os.Handler(thread.looper)
@@ -90,10 +102,13 @@ internal class ScopeFeed(private val sink: Sink) {
                 return
             }
             choreographer.postFrameCallback(this)
+            trackVsync(frameTimeNanos)
             if (isThrottled(frameTimeNanos)) {
                 return
             }
+            val start = System.nanoTime()
             update()
+            hint.report(targetNanos, System.nanoTime() - start)
         }
     }
 
@@ -112,6 +127,8 @@ internal class ScopeFeed(private val sink: Sink) {
                 choreographer.postFrameCallback(frameCallback)
             } else {
                 choreographer.removeFrameCallback(frameCallback)
+                hint.release()
+                lastVsyncTime = 0
             }
         }
     }
@@ -144,6 +161,25 @@ internal class ScopeFeed(private val sink: Sink) {
         if (!isRunning) {
             update()
         }
+    }
+
+    // refresh rate may change at any moment (e.g. by power saving or adaptive refresh rate)
+    private fun trackVsync(frameTimeNanos: Long) {
+        if (lastVsyncTime != 0L) {
+            // minimal interval among several ones, so skipped vsyncs are ignored
+            val interval = frameTimeNanos - lastVsyncTime
+            if (interval >= MIN_VSYNC_NS) {
+                vsyncWindowMin = minOf(vsyncWindowMin, interval)
+            }
+            if (++vsyncWindowSize == VSYNC_WINDOW && vsyncWindowMin != Long.MAX_VALUE) {
+                vsyncPeriod = vsyncWindowMin
+                vsyncWindowMin = Long.MAX_VALUE
+                vsyncWindowSize = 0
+            }
+        }
+        lastVsyncTime = frameTimeNanos
+        val fps = maxFps
+        targetNanos = if (fps > 0) maxOf(vsyncPeriod, 1_000_000_000L / fps) else vsyncPeriod
     }
 
     // vsync timestamps are jittered, so some slack is allowed to not skip frames at exact limit
@@ -223,6 +259,11 @@ internal class ScopeFeed(private val sink: Sink) {
             HandlerThread("ScopeFeed", Process.THREAD_PRIORITY_DISPLAY).apply { start() }
         }
         private const val THROTTLE_SLACK_NS = 2_000_000L
+        private const val DEFAULT_VSYNC_NS = 16_666_667L
+
+        // 240Hz
+        private const val MIN_VSYNC_NS = 4_000_000L
+        private const val VSYNC_WINDOW = 32
 
         private fun ShortArray.contentEquals(rh: ShortArray, size: Int): Boolean {
             for (idx in 0 until size) {

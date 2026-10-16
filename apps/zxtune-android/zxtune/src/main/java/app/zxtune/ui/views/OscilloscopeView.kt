@@ -38,7 +38,7 @@ class OscilloscopeView @JvmOverloads constructor(
     private val labelTextSize = labelTextSize(context)
     private val pending = ScopeFeed.Frame()
     private var hasPending = false
-    private val feed = ScopeFeed { frame ->
+    private val feed = ScopeFeed(context) { frame ->
         synchronized(pending) {
             frame.samples.copyInto(pending.samples, 0, 0, frame.channels * frame.points)
             pending.channels = frame.channels
@@ -139,6 +139,7 @@ class OscilloscopeView @JvmOverloads constructor(
         private var backgroundGeneration = -1
         private var width = 1
         private var height = 1
+        private val hint = WorkHint(context)
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             lineProgram = createProgram(LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER)
@@ -177,7 +178,9 @@ class OscilloscopeView @JvmOverloads constructor(
             val grid = frame.grid ?: return
             drawBackground(grid)
             drawChannels(grid)
-            feed.stats.frame("gles", start, System.nanoTime())
+            val end = System.nanoTime()
+            feed.stats.frame("gles", start, end)
+            hint.report(feed.targetNanos, end - start)
         }
 
         private fun drawBackground(grid: ScopeGrid) {
