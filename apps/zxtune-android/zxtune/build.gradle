@@ -129,6 +129,9 @@ dependencies {
     developImplementation 'com.squareup.leakcanary:leakcanary-android:2.14'
 }
 
+// Oscilloscope Vulkan renderer is separate small library built by the same make-based task
+android.sourceSets.main.jni.srcDirs += ['src/main/vulkan']
+
 apply from: "${treeRoot}/make/android/android.gradle"
 apply from: "${treeRoot}/make/android/nativelibs.gradle"
 

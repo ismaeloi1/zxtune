@@ -48,6 +48,7 @@ class OscilloscopeView @JvmOverloads constructor(
             hasPending = true
         }
         requestRender()
+        true
     }
     private val activity = ScopeActivity(this, feed)
 

@@ -22,7 +22,7 @@
             android:layout_height="match_parent"
             android:visibility="gone">
 
-        <app.zxtune.ui.views.OscilloscopeView
+        <app.zxtune.ui.views.OscilloscopeFrame
                 android:id="@+id/oscilloscope"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

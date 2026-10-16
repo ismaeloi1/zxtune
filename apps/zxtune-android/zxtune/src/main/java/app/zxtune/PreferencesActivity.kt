@@ -14,6 +14,7 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.XmlRes
 import androidx.appcompat.app.AppCompatActivity
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.lifecycleScope
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
@@ -22,6 +23,7 @@ import app.zxtune.analytics.Analytics
 import app.zxtune.device.car.CarVisualSettings
 import app.zxtune.preferences.Mt32Roms
 import app.zxtune.preferences.Preferences
+import app.zxtune.preferences.VulkanDriver
 import app.zxtune.rescue.RescueActivity
 import app.zxtune.ui.CarDisclaimerDialog
 import app.zxtune.ui.utils.FragmentIntProperty
@@ -94,6 +96,10 @@ class PreferencesActivity :
             uri?.let { copyMt32Roms(it) }
         }
 
+        private val selectVulkanDriver = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            uri?.let { installVulkanDriver(it) }
+        }
+
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             preferenceManager.preferenceDataStore = Preferences.getDataStore(requireContext())
             setPreferencesFromResource(layout, rootKey)
@@ -105,6 +111,7 @@ class PreferencesActivity :
                 }
             }
             setupCarPreferences()
+            setupVulkanDriverPreferences()
             findPreference<Preference>(RESCUE_KEY)?.setOnPreferenceClickListener {
                 startActivity(RescueActivity.createIntent(requireContext()))
                 true
@@ -132,6 +139,52 @@ class PreferencesActivity :
                 CarDisclaimerDialog.showInformation(requireContext())
                 true
             }
+        }
+
+        private fun setupVulkanDriverPreferences() {
+            val driver = findPreference<Preference>(VulkanDriver.PATH_KEY) ?: return
+            val ctx = requireContext()
+            if (!VulkanDriver.isSupported(ctx)) {
+                driver.isEnabled = false
+                driver.summary = getString(R.string.pref_oscilloscope_vulkan_driver_unsupported)
+                findPreference<Preference>(VulkanDriver.ENABLED_KEY)?.isEnabled = false
+                return
+            }
+            updateVulkanDriverSummary(driver)
+            driver.setOnPreferenceClickListener {
+                // drivers are distributed as zip archives or raw libraries without standard mime type
+                selectVulkanDriver.launch(arrayOf("*/*"))
+                true
+            }
+        }
+
+        private fun updateVulkanDriverSummary(pref: Preference) {
+            val ctx = requireContext()
+            lifecycleScope.launch {
+                val info = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    VulkanDriver.getInstalled(ctx)
+                }
+                findPreference<Preference>(VulkanDriver.ENABLED_KEY)?.isEnabled = info != null
+                pref.summary = info?.let {
+                    getString(R.string.pref_oscilloscope_vulkan_driver_summary, it.name)
+                } ?: getString(R.string.pref_oscilloscope_vulkan_driver_summary_empty)
+            }
+        }
+
+        private fun installVulkanDriver(uri: Uri) = lifecycleScope.launch {
+            val ctx = requireContext()
+            runCatching {
+                VulkanDriver.install(ctx, uri, DocumentFile.fromSingleUri(ctx, uri)?.name)
+            }.onSuccess {
+                findPreference<SwitchPreferenceCompat>(VulkanDriver.ENABLED_KEY)?.isChecked = true
+            }.onFailure {
+                Toast.makeText(
+                    ctx,
+                    getString(R.string.pref_oscilloscope_vulkan_driver_failed, it.message ?: it.javaClass.simpleName),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+            findPreference<Preference>(VulkanDriver.PATH_KEY)?.let { updateVulkanDriverSummary(it) }
         }
 
         private fun updateMt32RomsSummary(pref: Preference) {

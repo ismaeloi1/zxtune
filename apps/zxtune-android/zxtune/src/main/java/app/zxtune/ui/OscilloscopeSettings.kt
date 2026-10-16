@@ -2,8 +2,10 @@ package app.zxtune.ui
 
 import android.content.Context
 import app.zxtune.preferences.Preferences
+import app.zxtune.preferences.VulkanDriver
+import app.zxtune.ui.views.OscilloscopeFrame
 import app.zxtune.ui.views.OscilloscopeView
-import app.zxtune.ui.views.ScopeDisplay
+import app.zxtune.ui.views.ScopeBackend
 import app.zxtune.ui.views.SidDashboardView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,14 +18,21 @@ internal object OscilloscopeSettings {
     private const val GAUGE_WINDOW_KEY = "ui.oscilloscope.gauge_window_ms"
     private const val GAIN_KEY = "ui.oscilloscope.gain"
     private const val MAX_FPS_KEY = "ui.oscilloscope.max_fps"
+    private const val BACKEND_KEY = "ui.oscilloscope.backend"
 
-    suspend fun apply(ctx: Context, oscilloscope: ScopeDisplay, dashboard: SidDashboardView) {
+    suspend fun apply(ctx: Context, oscilloscope: OscilloscopeFrame, dashboard: SidDashboardView) {
         val prefs = withContext(Dispatchers.IO) {
             Preferences.getDataStore(ctx).also {
                 // load cache in background
                 it.getInt(WINDOW_KEY, 0)
             }
         }
+        val driver = withContext(Dispatchers.IO) {
+            VulkanDriver.getInstalled(ctx)?.takeIf {
+                prefs.getBoolean(VulkanDriver.ENABLED_KEY, false) && VulkanDriver.isSupported(ctx)
+            }
+        }
+        oscilloscope.setBackend(prefs.getString(BACKEND_KEY, null) ?: ScopeBackend.PREF_AUTO, driver)
         oscilloscope.windowMs = prefs.getInt(WINDOW_KEY, OscilloscopeView.DEFAULT_WINDOW_MS)
         oscilloscope.gainPercent = prefs.getString(GAIN_KEY, null)?.toIntOrNull() ?: OscilloscopeView.AUTO_GAIN
         oscilloscope.maxFps = prefs.getString(MAX_FPS_KEY, null)?.toIntOrNull() ?: 0

@@ -25,7 +25,7 @@ import app.zxtune.playback.stubs.VisualizerStub
 import app.zxtune.preferences.Preferences
 import app.zxtune.ui.utils.item
 import app.zxtune.ui.utils.whenLifecycleStarted
-import app.zxtune.ui.views.OscilloscopeView
+import app.zxtune.ui.views.OscilloscopeFrame
 import app.zxtune.ui.views.SidDashboardView
 import app.zxtune.ui.views.SpectrumAnalyzerView
 import app.zxtune.utils.ifNotNulls
@@ -50,7 +50,7 @@ import kotlinx.coroutines.withContext
 @OptIn(ExperimentalAtomicApi::class)
 class VisualizerFragment : Fragment() {
     private lateinit var analyzer: SpectrumAnalyzerView
-    private lateinit var oscilloscope: OscilloscopeView
+    private lateinit var oscilloscope: OscilloscopeFrame
     private lateinit var dashboard: SidDashboardView
     private val setVisibilityJob = AtomicReference<Job?>(null)
     private val isTabVisible = MutableStateFlow(true)

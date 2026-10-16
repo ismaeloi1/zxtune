@@ -210,6 +210,25 @@
         <item>30</item>
     </string-array>
     <string name="pref_oscilloscope_max_fps_default" translatable="false">0</string>
+    <string name="pref_oscilloscope_backend_title">Graphics backend</string>
+    <string-array name="pref_oscilloscope_backend_entries">
+        <item>Automatic (Vulkan if available)</item>
+        <item>Vulkan</item>
+        <item>OpenGL ES</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_backend_values" translatable="false">
+        <item>auto</item>
+        <item>vulkan</item>
+        <item>gles</item>
+    </string-array>
+    <string name="pref_oscilloscope_backend_default" translatable="false">auto</string>
+    <string name="pref_oscilloscope_vulkan_driver_title">Custom Vulkan driver</string>
+    <string name="pref_oscilloscope_vulkan_driver_summary_empty">Select driver package (zip with meta.json or .so library, e.g. Mesa Turnip for Adreno GPUs)</string>
+    <string name="pref_oscilloscope_vulkan_driver_summary">Installed: %s</string>
+    <string name="pref_oscilloscope_vulkan_driver_unsupported">Not supported on this device (requires Android 9+ and 64-bit ARM)</string>
+    <string name="pref_oscilloscope_vulkan_driver_failed">Failed to install driver: %s</string>
+    <string name="pref_oscilloscope_vulkan_driver_enabled_title">Use custom Vulkan driver</string>
+    <string name="pref_oscilloscope_vulkan_driver_enabled_summary">System driver is used if custom one fails to load</string>
     <string name="pref_oscilloscope_window_title">Waveforms window, ms</string>
     <string name="pref_oscilloscope_window_summary">Displayed duration of each voice waveform</string>
     <integer name="pref_oscilloscope_window_default">40</integer>

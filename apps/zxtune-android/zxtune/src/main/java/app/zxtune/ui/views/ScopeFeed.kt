@@ -25,7 +25,10 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
      * Called on feed thread with new data, frame is valid only during the call
      */
     fun interface Sink {
-        fun onFrame(frame: Frame)
+        /**
+         * @return false if frame was not displayed, so the same data should be passed again
+         */
+        fun onFrame(frame: Frame): Boolean
     }
 
     class Frame {
@@ -246,9 +249,10 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
             stats.skip()
             return
         }
-        previous = current
-        current = frame
-        sink.onFrame(frame)
+        if (sink.onFrame(frame)) {
+            previous = current
+            current = frame
+        }
     }
 
     companion object {

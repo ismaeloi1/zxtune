@@ -18,7 +18,7 @@ import androidx.core.view.isVisible
 import app.zxtune.device.media.MediaModel
 import app.zxtune.playback.Visualizer
 import app.zxtune.ui.utils.whenLifecycleStarted
-import app.zxtune.ui.views.OscilloscopeView
+import app.zxtune.ui.views.OscilloscopeFrame
 import app.zxtune.ui.views.ScopePanelLayout
 import app.zxtune.ui.views.SidDashboardView
 import app.zxtune.utils.ifNotNulls
@@ -35,14 +35,14 @@ import kotlinx.coroutines.launch
  * avoiding them wastes a band of screen height.
  */
 class OscilloscopeActivity : AppCompatActivity() {
-    private lateinit var oscilloscope: OscilloscopeView
+    private lateinit var oscilloscope: OscilloscopeFrame
     private lateinit var dashboard: SidDashboardView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // window geometry should be final before content is laid out
         setupImmersiveMode()
-        oscilloscope = OscilloscopeView(this).apply {
+        oscilloscope = OscilloscopeFrame(this).apply {
             setOnClickListener { finish() }
         }
         dashboard = SidDashboardView(this)
