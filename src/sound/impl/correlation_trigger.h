@@ -143,7 +143,7 @@ namespace Sound
     int64_t PrevTrigger = 0;
     bool HasPrevTrigger = false;
     // last searched triggers to estimate period with sub-sample precision, longer distance reduces search jitter
-    static const uint_t SEARCHES_HISTORY = 4;
+    static constexpr uint_t SEARCHES_HISTORY = 4;
     std::array<int64_t, SEARCHES_HISTORY> SearchedTriggers = {};
     uint_t SearchesCount = 0;
     uint_t SearchAge = 0;
