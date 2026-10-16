@@ -7,6 +7,9 @@
 
 package app.zxtune.rpc;
 
+import android.os.SharedMemory;
+import app.zxtune.rpc.ISharedVisualizer;
+
 interface IVisualizer {
   int getSpectrum(out byte[] levels);
   // data contains 16-bit native endian samples
@@ -15,4 +18,6 @@ interface IVisualizer {
   int getVoiceGauges(out byte[] data, int waveWindowMs);
   String getLayout();
   String getStatus();
+  // API 27+, null if not supported
+  ISharedVisualizer openShared(in SharedMemory buffer);
 }
