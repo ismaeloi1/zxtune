@@ -2,7 +2,7 @@
 import argparse
 import json
 import wave
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 import numpy as np
 
@@ -62,16 +62,39 @@ def _overlap(ref, test, lag):
 
 
 def compare(ref_path: str, test_path: str, max_lag_s: float = 5.0, window_s: float = 1.0,
-            search_s: float = 20.0) -> Dict[str, object]:
+            search_s: float = 20.0, local_s: float = 0.05, expected_lag_s: Optional[float] = None,
+            radius_s: float = 0.15) -> Dict[str, object]:
     ref, rr = read_wav(ref_path)
     test, tr = read_wav(test_path)
     rate = rr
     refm = ref.mean(axis=1)
     testm = _resample(test.mean(axis=1), tr, rr)
     max_lag = int(max_lag_s * rate)
-    # coarse lag on a leading segment of the test signal (avoid silence at the start)
-    seg = int(search_s * rate)
-    lag, peak = best_lag(refm[:seg + max_lag], testm[:seg], max_lag)
+    # coarse lag from onset envelopes (robust to phase drift), then waveform refinement
+    hop = rate // 100
+    def onset(x):
+        n = len(x) // hop
+        e = np.sqrt((x[:n * hop].reshape(n, hop) ** 2).mean(axis=1))
+        return np.diff(e).clip(0)
+    eref, etest = onset(refm), onset(testm)
+    seg_e = int(search_s * 100)
+    if expected_lag_s is None:
+        elag, _ = best_lag(eref[:seg_e + max_lag // hop], etest[:seg_e], max_lag // hop)
+        coarse = elag * hop
+        rad = 2 * hop
+    else:
+        coarse = int(round(expected_lag_s * rate))
+        rad = int(radius_s * rate)
+    seg = int(min(search_s, 5.0) * rate)
+    # start the refinement where the test signal has content
+    act = np.flatnonzero(np.abs(testm) > 100)
+    start = int(act[0]) if len(act) else 0
+    lo = max(0, coarse + start - rad)
+    ref_seg = refm[lo:coarse + start + seg + rad]
+    fine, _ = best_lag(ref_seg, testm[start:start + seg], 2 * rad)
+    if fine < 0:
+        fine = 0
+    lag = lo + fine - start
     a, b = _overlap(refm, testm, lag)
     gain = float((a * b).sum() / ((b * b).sum() or 1.0))
     err = a - gain * b
@@ -85,7 +108,32 @@ def compare(ref_path: str, test_path: str, max_lag_s: float = 5.0, window_s: flo
         d = np.sqrt((x * x).sum() * (y * y).sum())
         corrs.append(float((x * y).sum() / d) if d else 0.0)
     corrs_np = np.array(corrs) if corrs else np.array([0.0])
+    # timing-tolerant view: re-align every window locally (tracks tempo drift / sub-frame jitter)
+    local = []
+    drift = 0
+    search = int(local_s * rate)
+    lags = []
+    for i in range(search, len(b) - win - search, win):
+        y = b[i:i + win]
+        if np.sqrt((y * y).mean()) < 30:
+            continue
+        j0 = i + lag + drift
+        if j0 - search < 0 or j0 + win + search > len(refm):
+            continue
+        seg_ref = refm[j0 - search:j0 + win + search]
+        l2, c2 = best_lag(seg_ref, y, 2 * search)
+        l2 -= search
+        if abs(l2) <= search:
+            drift += l2
+            x = refm[j0 + l2:j0 + l2 + win]
+            d = np.sqrt((x * x).sum() * (y * y).sum())
+            local.append(float((x * y).sum() / d) if d else 0.0)
+            lags.append(drift)
+    local_np = np.array(local) if local else np.array([0.0])
     return {
+        "local_corr_median": float(np.median(local_np)), "local_corr_p10": float(np.percentile(local_np, 10)),
+        "local_windows_below_0.9": int((local_np < 0.9).sum()),
+        "drift_end_ms": (lags[-1] / rate * 1000.0) if lags else 0.0,
         "lag_samples": lag, "lag_seconds": lag / rate, "rate": rate,
         "overlap_seconds": len(a) / rate, "global_corr": float(np.corrcoef(a, b)[0, 1]) if len(a) > 1 else 0.0,
         "gain": gain, "snr_db": float(snr),
@@ -101,8 +149,9 @@ def main(argv=None):
     ap.add_argument("test")
     ap.add_argument("--max-lag", type=float, default=5.0)
     ap.add_argument("--window", type=float, default=1.0)
+    ap.add_argument("--expected-lag", type=float, help="known offset of test inside reference (s)")
     a = ap.parse_args(argv)
-    print(json.dumps(compare(a.reference, a.test, a.max_lag, a.window), indent=1))
+    print(json.dumps(compare(a.reference, a.test, a.max_lag, a.window, expected_lag_s=a.expected_lag), indent=1))
 
 
 if __name__ == "__main__":

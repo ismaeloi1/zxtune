@@ -56,7 +56,7 @@ void WriteWav(const char* path, const std::vector<short>& s, unsigned rate) {
 void Usage() {
   fprintf(stderr,
           "usage: spcreplay --spc SNAP.spc --log PORTS.tsv --start-clock C --out OUT.wav\n"
-          "       [--seconds N] [--no-sync] [--rate HZ] [--end-clock E]\n");
+          "       [--seconds N] [--no-sync] [--rate HZ] [--end-clock E]\n       [--snap-at CLOCK DSPREGS.bin]\n");
   exit(2);
 }
 
@@ -67,6 +67,8 @@ int main(int argc, char** argv) {
   long long start_clock = 0, end_clock = -1;
   double seconds = 0;
   bool sync = true;
+  long long snap_at = -1;
+  const char* snap_path = nullptr;
   unsigned rate = 32040;
   for (int i = 1; i < argc; ++i) {
     std::string a = argv[i];
@@ -79,6 +81,7 @@ int main(int argc, char** argv) {
     else if (a == "--seconds") seconds = atof(next());
     else if (a == "--no-sync") sync = false;
     else if (a == "--rate") rate = atoi(next());
+    else if (a == "--snap-at") { snap_at = atoll(next()); snap_path = next(); }
     else Usage();
   }
   if (!spc_path || !log_path || !out_path) Usage();
@@ -170,6 +173,20 @@ int main(int argc, char** argv) {
     now = target;
   }
   long long end = now + 32 * 32;
+  if (snap_at >= 0) {
+    // save the emulator state at absolute replay clock snap_at (debug aid)
+    flush_to(snap_at);
+    emu.end_frame((int)(snap_at - frame_base));
+    frame_base = snap_at;
+    out.insert(out.end(), buf.begin(), buf.begin() + emu.sample_count());
+    emu.set_output(buf.data(), buf.size());
+    // 128 DSP registers (debug aid; RAM is not exposed by this snes_spc build)
+    std::vector<unsigned char> st(128);
+    for (int r = 0; r < 128; ++r) st[r] = emu.get_dsp().read(r);
+    FILE* f = fopen(snap_path, "wb");
+    fwrite(st.data(), 1, st.size(), f);
+    fclose(f);
+  }
   if (seconds > 0) end = (long long)(seconds * rate * 32);
   flush_to(end + kChunk);
   if (seconds > 0 && (long long)out.size() > (long long)(seconds * rate) * 2) out.resize((size_t)(seconds * rate) * 2);

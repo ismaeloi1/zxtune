@@ -184,7 +184,7 @@ def assemble(src: str, org: int) -> bytes:
                 out += bytes([v & 0xFF, v >> 8 & 0xFF])
             return out
         text = re.sub(r"\s+", " ", line)
-        text = re.sub(r"([a-z_][a-z0-9_]*)", lambda m: _lab(m, labels, final), text)
+        text = re.sub(r"(?<![$0-9a-z_])([a-z_][a-z0-9_]*)", lambda m: _lab(m, labels, final), text)
         # normalise 1-space after mnemonic and no spaces elsewhere
         parts = text.split(" ", 1)
         text = parts[0] + (" " + parts[1].replace(" ", "") if len(parts) > 1 else "")
