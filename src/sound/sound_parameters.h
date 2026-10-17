@@ -77,6 +77,8 @@ namespace Parameters::ZXTune::Sound
 }  // namespace Parameters::ZXTune::Sound
 
 //! @brief Oscilloscope correlation trigger, see corrscope's CorrelationTriggerConfig for meaning
+//! Defaults differ from corrscope's template as recommended by its help for evolving notes (lower edge strength,
+//! full responsiveness, buffer reset on new notes), it was the most stable for all the chips on test tunes
 namespace Parameters::ZXTune::Sound::Scope
 {
   const auto PREFIX = Sound::PREFIX + "scope"_id;
@@ -85,11 +87,11 @@ namespace Parameters::ZXTune::Sound::Scope
   //! Values of strengths, rates and widths are in percents
   const IntType PERCENTS = 100;
 
-  //! Correlation buffer width in ms (corrscope's trigger_ms)
-  const IntType TRIGGER_WIDTH_DEFAULT = 40;
+  //! Correlation buffer width in ms (corrscope's trigger_ms), its default for new projects
+  const IntType TRIGGER_WIDTH_DEFAULT = 60;
   const auto TRIGGER_WIDTH = TRIGGER_PREFIX + "width"_id;
 
-  const IntType EDGE_STRENGTH_DEFAULT = 100;
+  const IntType EDGE_STRENGTH_DEFAULT = 50;
   const auto EDGE_STRENGTH = TRIGGER_PREFIX + "edge_strength"_id;
 
   //! In wave periods
@@ -99,14 +101,14 @@ namespace Parameters::ZXTune::Sound::Scope
   const IntType BUFFER_STRENGTH_DEFAULT = 100;
   const auto BUFFER_STRENGTH = TRIGGER_PREFIX + "buffer_strength"_id;
 
-  const IntType RESPONSIVENESS_DEFAULT = 50;
+  const IntType RESPONSIVENESS_DEFAULT = 100;
   const auto RESPONSIVENESS = TRIGGER_PREFIX + "responsiveness"_id;
 
   //! In wave periods
   const IntType BUFFER_FALLOFF_DEFAULT = 50;
   const auto BUFFER_FALLOFF = TRIGGER_PREFIX + "buffer_falloff"_id;
 
-  const IntType RESET_BELOW_DEFAULT = 30;
+  const IntType RESET_BELOW_DEFAULT = 70;
   const auto RESET_BELOW = TRIGGER_PREFIX + "reset_below"_id;
 
   //! DC removal rate
@@ -131,8 +133,8 @@ namespace Parameters::ZXTune::Sound::Scope
   const IntType POST_RADIUS_DEFAULT = 0;
   const auto POST_RADIUS = TRIGGER_PREFIX + "post_radius"_id;
 
-  //! Full searches per second, 0 for each frame
-  const IntType SEARCH_RATE_DEFAULT = 60;
+  //! Full searches per second, 0 for each frame (phase between searches is extrapolated, it's less stable)
+  const IntType SEARCH_RATE_DEFAULT = 0;
   const auto SEARCH_RATE = TRIGGER_PREFIX + "search_rate"_id;
 
   //! Trigger input subsampling, 0 for automatic (depends on samplerate and voices count)
