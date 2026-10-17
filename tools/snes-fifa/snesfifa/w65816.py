@@ -148,3 +148,173 @@ def lorom_offset(addr: int) -> int:
 def lorom_address(offset: int, fast: bool = True) -> int:
     bank = offset // 0x8000
     return ((0x80 if fast else 0) | bank) << 16 | (0x8000 + offset % 0x8000)
+
+
+def load_coverage(path: str) -> Dict[int, Tuple[bool, bool]]:
+    """Read a snestrace --coverage file: 'pc m x count' (m/x = 1 means 8-bit)."""
+    flags: Dict[int, Tuple[bool, bool]] = {}
+    with open(path) as f:
+        for line in f:
+            p = line.split()
+            if len(p) >= 4:
+                flags[int(p[0], 16)] = (p[1] == "0", p[2] == "0")  # (m16, x16)
+    return flags
+
+
+def disassemble_traced(read: Callable[[int], int], start: int, end: int,
+                       flags: Dict[int, Tuple[bool, bool]]) -> List[str]:
+    """Disassemble using M/X flags observed at run time; unexecuted code falls back to
+    REP/SEP tracking from the last executed instruction. Unexecuted lines are marked '?'."""
+    out = []
+    pc = start
+    m16 = x16 = False
+    while pc < end:
+        seen = pc in flags
+        if seen:
+            m16, x16 = flags[pc]
+        op = read(pc)
+        text, n, _ = format_insn(read, pc, m16, x16)
+        raw = " ".join(f"{read((pc & 0xFF0000) | ((pc + k) & 0xFFFF)):02x}" for k in range(n))
+        out.append(f"{' ' if seen else '?'}{pc >> 16:02x}:{pc & 0xFFFF:04x}  {raw:<12} {text}")
+        if op == 0xC2:
+            v = read(pc + 1)
+            m16 = m16 or bool(v & 0x20)
+            x16 = x16 or bool(v & 0x10)
+        elif op == 0xE2:
+            v = read(pc + 1)
+            m16 = m16 and not (v & 0x20)
+            x16 = x16 and not (v & 0x10)
+        pc += n
+    return out
+
+
+# ---------------------------------------------------------------- assembler
+_BRANCH8 = {"bpl", "bmi", "bvc", "bvs", "bcc", "bcs", "bne", "beq", "bra"}
+_BRANCH16 = {"brl", "per"}
+
+
+def _operand_mode(mn: str, opnd: str):
+    """Classify operand syntax -> (mode candidates, value string(s))."""
+    import re
+    o = opnd.replace(" ", "")
+    if o == "":
+        return ["imp"], []
+    if o == "a":
+        return ["acc"], []
+    m = re.fullmatch(r"#\$([0-9a-f]+)", o)
+    if m:
+        return ["immm", "immx", "imm8"], [m.group(1)]
+    if mn in _BRANCH8 and re.fullmatch(r"\$[0-9a-f]+", o):
+        return ["rel"], [o[1:]]
+    if mn in _BRANCH16 and re.fullmatch(r"\$[0-9a-f]+", o):
+        return ["rell"], [o[1:]]
+    m = re.fullmatch(r"\$([0-9a-f]+),\$([0-9a-f]+)", o)
+    if m and mn in ("mvn", "mvp"):
+        return ["move"], [m.group(1), m.group(2)]
+    pats = [
+        (r"\$([0-9a-f]+)", {2: "dp", 4: "abs", 6: "long"}),
+        (r"\$([0-9a-f]+),x", {2: "dpx", 4: "absx", 6: "longx"}),
+        (r"\$([0-9a-f]+),y", {2: "dpy", 4: "absy"}),
+        (r"\$([0-9a-f]+),s", {2: "sr"}),
+        (r"\(\$([0-9a-f]+)\)", {2: "idp", 4: "iabs"}),
+        (r"\(\$([0-9a-f]+),x\)", {2: "idpx", 4: "iabsx"}),
+        (r"\(\$([0-9a-f]+)\),y", {2: "idpy"}),
+        (r"\(\$([0-9a-f]+),s\),y", {2: "isry"}),
+        (r"\[\$([0-9a-f]+)\]", {2: "ildp", 4: "ilabs"}),
+        (r"\[\$([0-9a-f]+)\],y", {2: "ildpy"}),
+    ]
+    for rx, sizes in pats:
+        m = re.fullmatch(rx, o)
+        if m:
+            mode = sizes.get(len(m.group(1)))
+            if mode is None:
+                raise ValueError(f"bad operand width: {mn} {opnd}")
+            return [mode], [m.group(1)]
+    raise ValueError(f"cannot parse operand: {mn} {opnd}")
+
+
+def assemble(src: str, org: int, symbols: Optional[Dict[str, int]] = None) -> bytes:
+    """Two-pass 65816 assembler for small stubs. Syntax as produced by the disassembler
+    (lowercase, `$hex`, width of the hex literal selects dp/abs/long and imm8/imm16).
+    Labels: `name:`; references: `name` (16-bit), `<name` (low byte), `>name` (24-bit),
+    `^name` (bank byte). Directives: `.db`, `.dw`, `.dl`."""
+    import re
+    index = {}
+    for op, (mn, mode) in enumerate(OPCODES):
+        index.setdefault((mn, mode), op)
+    lines = [l.split(";")[0].strip().lower() for l in src.splitlines()]
+    lines = [l for l in lines if l]
+    labels: Dict[str, int] = {}
+
+    def sub(text, final):
+        def rep(m):
+            pre, name = m.group(1), m.group(2)
+            if name in labels:
+                v = labels[name]
+            elif final:
+                raise ValueError(f"undefined label {name}")
+            else:
+                v = 0
+            if pre == "<":
+                return f"${v & 0xFF:02x}"
+            if pre == ">":
+                return f"${v & 0xFFFFFF:06x}"
+            if pre == "^":
+                return f"${v >> 16 & 0xFF:02x}"
+            return f"${v & 0xFFFF:04x}"
+        return re.sub(r"([<>^]?)(?<![$0-9a-z_])([a-z_][a-z0-9_]*)\b", lambda m: rep(m) if m.group(2) not in ("a", "x", "y", "s") else m.group(0), text)
+
+    for final in (False, True):
+        pc = org
+        out = bytearray()
+        for line in lines:
+            if line.endswith(":"):
+                labels[line[:-1]] = pc
+                continue
+            mn, _, opnd = line.partition(" ")
+            if mn in (".db", ".dw", ".dl"):
+                width = {".db": 1, ".dw": 2, ".dl": 3}[mn]
+                for item in opnd.split(","):
+                    item = sub(item.strip(), final)
+                    v = int(item[1:], 16) if item.startswith("$") else int(item, 0)
+                    out += v.to_bytes(width, "little")
+                    pc += width
+                continue
+            opnd = sub(opnd, final) if opnd else ""
+            modes, vals = _operand_mode(mn, opnd)
+            code = None
+            for md in modes:
+                if (mn, md) in index:
+                    code, mode = index[(mn, md)], md
+                    break
+            if code is None and modes[0] == "dp" and (mn, "abs") in index:
+                code, mode = index[(mn, "abs")], "abs"
+            if code is None:
+                raise ValueError(f"no opcode for {line}")
+            b = bytearray([code])
+            if mode in ("rel", "rell"):
+                tgt = int(vals[0], 16)
+                n = 2 if mode == "rel" else 3
+                d = (tgt & 0xFFFF) - ((pc + n) & 0xFFFF)
+                if mode == "rel":
+                    if final and not -128 <= d <= 127:
+                        raise ValueError(f"branch out of range: {line}")
+                    b.append(d & 0xFF)
+                else:
+                    b += (d & 0xFFFF).to_bytes(2, "little")
+            elif mode == "move":
+                b += bytes([int(vals[1], 16), int(vals[0], 16)])
+            elif vals:
+                v = int(vals[0], 16)
+                width = len(vals[0]) // 2 if mode in ("immm", "immx", "imm8") else {
+                    "dp": 1, "dpx": 1, "dpy": 1, "sr": 1, "idp": 1, "idpx": 1, "idpy": 1, "isry": 1,
+                    "ildp": 1, "ildpy": 1, "abs": 2, "absx": 2, "absy": 2, "iabs": 2, "iabsx": 2,
+                    "ilabs": 2, "long": 3, "longx": 3}[mode]
+                if mode == "imm8":
+                    width = 1
+                b += v.to_bytes(width, "little")
+            out += b
+            pc += len(b)
+    if symbols is not None:
+        symbols.update(labels)
+    return bytes(out)

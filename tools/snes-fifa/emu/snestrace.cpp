@@ -65,7 +65,7 @@ void OnSmpWrite(int port, uint8 v) {
 
 void OnExec(uint32 pbpc) {
   g_last_pc = pbpc;
-  if (g_coverage_on) g_coverage[pbpc]++;
+  if (g_coverage_on) g_coverage[pbpc | (uint32_t)(Registers.P.B.l & 0x30) << 20]++;
   if (g_exec && g_frame >= g_exec_from && g_frame <= g_exec_to) {
     fprintf(g_exec, "%u %06x A=%04x X=%04x Y=%04x S=%04x D=%04x DB=%02x P=%02x E=%d\n", g_frame, pbpc,
             Registers.A.W, Registers.X.W, Registers.Y.W, Registers.S.W, Registers.D.W, Registers.DB,
@@ -292,7 +292,7 @@ int main(int argc, char** argv) {
   if (!wav_path.empty()) WriteWav(wav_path, g_audio, 32040);
   if (!cov_path.empty()) {
     FILE* f = fopen(cov_path.c_str(), "w");
-    for (auto& kv : g_coverage) fprintf(f, "%06x %llu\n", kv.first, (unsigned long long)kv.second);
+    for (auto& kv : g_coverage) fprintf(f, "%06x %d %d %llu\n", kv.first & 0xffffff, (kv.first >> 25) & 1, (kv.first >> 24) & 1, (unsigned long long)kv.second);
     fclose(f);
   }
   fprintf(stderr, "snestrace: %u frames, %zu audio frames, smp_clock=%llu\n", frames, g_audio.size() / 2,
