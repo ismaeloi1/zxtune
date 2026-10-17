@@ -151,6 +151,18 @@ int main(int argc, char** argv)
       {"6581_curve(fp)", FILTER_6581_CURVE, 0, 100, {{ENGINE, 1}, {MODEL, 0}, {MODEL_FORCE, 1}}},
       {"6581_range(fp)", FILTER_6581_RANGE, 0, 100, {{ENGINE, 1}, {MODEL, 0}, {MODEL_FORCE, 1}}},
       {"8580_curve(fp)", FILTER_8580_CURVE, 0, 100, {{ENGINE, 1}, {MODEL, 1}, {MODEL_FORCE, 1}}},
+      {"6581_preset(fp)", FILTER_6581_PRESET, 0, 18, {{ENGINE, 1}, {MODEL, 0}, {MODEL_FORCE, 1}}},
+      {"6581_preset(reSID)", FILTER_6581_PRESET, 0, 7, {{ENGINE, 0}, {MODEL, 0}, {MODEL_FORCE, 1}}},
+      {"8580_preset(fp)",
+       FILTER_8580_PRESET,
+       0,
+       1,
+       {{ENGINE, 1}, {MODEL, 1}, {MODEL_FORCE, 1}, {FILTER_8580_CURVE, 100}}},
+      {"8580_preset(reSID)",
+       FILTER_8580_PRESET,
+       0,
+       1,
+       {{ENGINE, 0}, {MODEL, 1}, {MODEL_FORCE, 1}, {FILTER_8580_CURVE, 100}}},
       {"combined_wf(fp)", COMBINED_WAVEFORMS, 0, 2, {{ENGINE, 1}}},
       {"combined_wf(fp6581)", COMBINED_WAVEFORMS, 0, 2, {{ENGINE, 1}, {MODEL, 0}, {MODEL_FORCE, 1}}},
       {"interpolation(reSID)", INTERPOLATION, 0, 2, {{ENGINE, 0}}},
@@ -171,7 +183,8 @@ int main(int argc, char** argv)
               Parameters::Identifier(INTERPOLATION), Parameters::Identifier(DIGIBOOST),
               Parameters::Identifier(FILTER_BIAS), Parameters::Identifier(FILTER_6581_CURVE),
               Parameters::Identifier(FILTER_6581_RANGE), Parameters::Identifier(FILTER_8580_CURVE),
-              Parameters::Identifier(COMBINED_WAVEFORMS)})
+              Parameters::Identifier(COMBINED_WAVEFORMS), Parameters::Identifier(FILTER_6581_PRESET),
+              Parameters::Identifier(FILTER_8580_PRESET)})
         {
           global->RemoveValue(id);
         }

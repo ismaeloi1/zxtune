@@ -11,6 +11,7 @@
 #include "module/players/external/sid.h"
 
 #include "module/players/duration.h"
+#include "module/players/external/sid/filters.h"
 #include "module/players/external/sid/roms.h"
 #include "module/players/external/sid/songlengths.h"
 #include "module/players/platforms.h"
@@ -41,6 +42,7 @@
 #include "3rdparty/sidplayfp/src/sidplayfp/sidplayfp.h"
 
 #include <algorithm>
+#include <array>
 #include <memory>
 #include <optional>
 #include <thread>
@@ -197,10 +199,23 @@ namespace Module::Sid
       return 0 != Get(DIGIBOOST, DIGIBOOST_DEFAULT);
     }
 
+    //! @return volts
     double GetFilterBias() const
     {
       using namespace Parameters::ZXTune::Core::SID;
-      return std::clamp(Get(FILTER_BIAS, FILTER_BIAS_DEFAULT), FILTER_BIAS_MIN, FILTER_BIAS_MAX);
+      return std::clamp(Get(FILTER_BIAS, FILTER_BIAS_DEFAULT), FILTER_BIAS_MIN, FILTER_BIAS_MAX) / 1000.0;
+    }
+
+    int_t GetFilter6581Preset() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return static_cast<int_t>(Get(FILTER_6581_PRESET, FILTER_6581_PRESET_DEFAULT));
+    }
+
+    int_t GetFilter8580Preset() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return static_cast<int_t>(Get(FILTER_8580_PRESET, FILTER_8580_PRESET_DEFAULT));
     }
 
     double GetFilter6581Curve() const
@@ -384,7 +399,10 @@ namespace Module::Sid
       const bool useResidFp = sidParams.GetUseResidFp();
       sidbuilder* const builder = useResidFp ? static_cast<sidbuilder*>(&GetResidFp()) : &GetResid();
       const bool useFilter = sidParams.GetUseFilter();
-      FilterSettings newFilter{.UseResidFp = useResidFp, .UseFilter = useFilter};
+      FilterSettings newFilter{.UseResidFp = useResidFp,
+                               .UseFilter = useFilter,
+                               .Preset6581 = sidParams.GetFilter6581Preset(),
+                               .Preset8580 = sidParams.GetFilter8580Preset()};
       if (useResidFp)
       {
         newFilter.Curve6581 = sidParams.GetFilter6581Curve();
@@ -403,16 +421,20 @@ namespace Module::Sid
         {
           auto& fp = GetResidFp();
           fp.filter(useFilter);
-          fp.filter6581Curve(newFilter.Curve6581);
-          fp.filter6581Range(newFilter.Range6581);
-          fp.filter8580Curve(newFilter.Curve8580);
+          ApplyResidFp6581Filter(fp, newFilter);
+          const auto* preset8580 = FindFilter8580Preset(newFilter.Preset8580);
+          fp.filter8580Curve(preset8580 ? FilterModel::FitResidFp8580Curve(*preset8580) : newFilter.Curve8580);
           fp.combinedWaveformsStrength(newFilter.CombinedWaveforms);
         }
         else
         {
           auto& resid = GetResid();
           resid.filter(useFilter);
-          resid.bias(newFilter.Bias);
+          const auto* preset6581 = FindFilter6581Preset(newFilter.Preset6581);
+          resid.bias(preset6581 ? FilterModel::FitResid6581Bias(*preset6581) : newFilter.Bias);
+          const auto* preset8580 = FindFilter8580Preset(newFilter.Preset8580);
+          resid.filter8580Cutoff(preset8580 ? preset8580->GetFrequency(CUTOFF_VALUES - 1)
+                                            : FilterModel::RESID_8580_MAX_CUTOFF);
         }
         Filter = newFilter;
         change = Change::STATE;
@@ -557,6 +579,32 @@ namespace Module::Sid
       return *ResidFp;
     }
 
+    struct FilterSettings;
+
+    static void ApplyResidFp6581Filter(ReSIDfpBuilder& fp, const FilterSettings& settings)
+    {
+      const auto* preset = FindFilter6581Preset(settings.Preset6581);
+      if (!preset)
+      {
+        fp.filter6581Curve(settings.Curve6581);
+        fp.filter6581Range(settings.Range6581);
+        return;
+      }
+      // resid-fp models are parallel fixed resistance and FET, the first one is reSIDfp's "snake" transistor
+      // controlled by global uCox. reSID model is the same as reSIDfp one at fixed uCox.
+      const auto uCox = preset->Type == CutoffCurve::TYPE3 ? FilterModel::Get6581Ucox(preset->Params[0])
+                                                           : FilterModel::RESID_UCOX;
+      const auto range = FilterModel::GetResidFpRange(uCox);
+      fp.filter6581Range(range);
+      const auto effectiveUcox = FilterModel::GetResidFpUcox(range);
+      std::array<double, CUTOFF_VALUES> dac;
+      for (uint_t fc = 0; fc < CUTOFF_VALUES; ++fc)
+      {
+        dac[fc] = FilterModel::Get6581DacVoltage(FilterModel::Engine::RESIDFP, preset->GetFrequency(fc), effectiveUcox);
+      }
+      fp.filter6581Dac(dac.data());
+    }
+
     void SetSink(sidbuilder* builder, SidVoicesSink* sink)
     {
       if (builder && builder == Resid.get())
@@ -658,6 +706,8 @@ namespace Module::Sid
     {
       bool UseResidFp = false;
       bool UseFilter = false;
+      int_t Preset6581 = 0;
+      int_t Preset8580 = 0;
       double Curve6581 = 0;
       double Range6581 = 0;
       double Curve8580 = 0;

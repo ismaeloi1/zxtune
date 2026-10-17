@@ -276,9 +276,9 @@ namespace Parameters::ZXTune::Core
     //@}
 
     //@{
-    //! @name reSID 6581 filter DAC bias in millivolts, -500..500
-    const IntType FILTER_BIAS_MIN = -500;
-    const IntType FILTER_BIAS_MAX = 500;
+    //! @name reSID 6581 filter DAC bias in millivolts, -1000..1000
+    const IntType FILTER_BIAS_MIN = -1000;
+    const IntType FILTER_BIAS_MAX = 1000;
     const IntType FILTER_BIAS_DEFAULT = 0;
     const auto FILTER_BIAS = PREFIX + "filter_bias"_id;
     //@}
@@ -294,6 +294,16 @@ namespace Parameters::ZXTune::Core
     //! 8580 filter curve: 0 - light, 100 - dark
     const IntType FILTER_8580_CURVE_DEFAULT = 50;
     const auto FILTER_8580_CURVE = PREFIX + "filter_8580_curve"_id;
+    //@}
+
+    //@{
+    //! @name Filters presets: measured or tuned cutoff curves of JSIDPlay2 and VICE, applied to both engines.
+    //! See module/players/external/sid/filters.cpp for values. Custom one uses FILTER_BIAS/FILTER_*_CURVE/RANGE
+    const IntType FILTER_PRESET_CUSTOM = 0;
+    const IntType FILTER_6581_PRESET_DEFAULT = FILTER_PRESET_CUSTOM;
+    const auto FILTER_6581_PRESET = PREFIX + "filter_6581_preset"_id;
+    const IntType FILTER_8580_PRESET_DEFAULT = FILTER_PRESET_CUSTOM;
+    const auto FILTER_8580_PRESET = PREFIX + "filter_8580_preset"_id;
     //@}
 
     //@{
