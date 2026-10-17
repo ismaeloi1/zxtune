@@ -65,8 +65,14 @@ public:
     /**
      * The bias is given in millivolts, and a maximum reasonable
      * control range is approximately -500 to 500.
+     * zxtune: really in volts, see reSID::Filter::adjust_filter_bias (VICE divides millivolts by 1000).
      */
     void bias(double dac_bias);
+
+    /**
+     * zxtune: 8580 cutoff frequency at maximal FC in Hz, default is 12500.
+     */
+    void filter8580Cutoff(double maxCutoff);
 
     /**
      * Set receiver for separate voices output, nullptr to disable.

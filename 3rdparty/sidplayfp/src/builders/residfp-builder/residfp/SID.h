@@ -339,6 +339,13 @@ public:
     void setFilter6581Range ( double adjustment );
 
     /**
+     * zxtune: set cutoff DAC output voltages for 6581 model.
+     *
+     * @see Filter6581::setFilterDac(const double*)
+     */
+    void setFilter6581Dac(const double* voltages);
+
+    /**
      * Set filter curve parameter for 8580 model.
      *
      * @see Filter8580::setFilterCurve(double)

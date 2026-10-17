@@ -206,6 +206,15 @@ void SID::setFilter6581Range(double adjustment)
     }
 }
 
+void SID::setFilter6581Dac(const double* voltages)
+{
+    filter6581->setFilterDac(voltages);
+    for (int i = 0; i < 3; i++)
+    {
+        voiceFilter6581[i]->setFilterDac(voltages);
+    }
+}
+
 void SID::setFilter8580Curve(double filterCurve)
 {
     filter8580->setFilterCurve(filterCurve);

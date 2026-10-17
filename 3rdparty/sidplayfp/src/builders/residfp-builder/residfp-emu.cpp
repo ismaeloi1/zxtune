@@ -96,6 +96,11 @@ void ReSIDfp::filter6581Range(double adjustment)
    m_sid.setFilter6581Range(adjustment);
 }
 
+void ReSIDfp::filter6581Dac(const double* voltages)
+{
+   m_sid.setFilter6581Dac(voltages);
+}
+
 void ReSIDfp::filter8580Curve(double filterCurve)
 {
    m_sid.setFilter8580Curve(filterCurve);

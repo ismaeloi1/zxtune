@@ -357,6 +357,13 @@ public:
      *                   This also affects the range. Default is 0.5
      */
     void setFilterRange(double adjustment);
+
+    /**
+     * zxtune: set cutoff DAC output for every cutoff register value.
+     *
+     * @param voltages 2048 values in volts
+     */
+    void setFilterDac(const double* voltages);
 };
 
 } // namespace reSIDfp

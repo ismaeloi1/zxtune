@@ -516,6 +516,16 @@ void SID::adjust_filter_bias(double dac_bias) {
   }
 }
 
+// ----------------------------------------------------------------------------
+// zxtune: adjust the MOS 8580 cutoff frequency at maximal FC.
+// ----------------------------------------------------------------------------
+void SID::adjust_filter_8580_cutoff(double max_cutoff) {
+  filter.adjust_filter_8580_cutoff(max_cutoff);
+  for (int i = 0; i < 3; i++) {
+    voice_filter[i].adjust_filter_8580_cutoff(max_cutoff);
+  }
+}
+
 
 // ----------------------------------------------------------------------------
 // Enable external filter.

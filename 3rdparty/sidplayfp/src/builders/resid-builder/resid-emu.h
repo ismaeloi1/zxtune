@@ -86,6 +86,8 @@ public:
 
     // Specific to resid
     void bias(double dac_bias);
+    // zxtune
+    void filter8580Cutoff(double maxCutoff);
     void filter(bool enable);
 };
 

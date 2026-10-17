@@ -95,6 +95,11 @@ void ReSID::bias(double dac_bias)
     m_sid.adjust_filter_bias(dac_bias);
 }
 
+void ReSID::filter8580Cutoff(double maxCutoff)
+{
+    m_sid.adjust_filter_8580_cutoff(maxCutoff);
+}
+
 // Standard component options
 void ReSID::reset(uint8_t volume)
 {

@@ -284,6 +284,18 @@ unsigned short* FilterModelConfig6581::getDAC(double adjustment) const
     return f0_dac;
 }
 
+unsigned short* FilterModelConfig6581::getDAC(const double* voltages) const
+{
+    unsigned short* f0_dac = new unsigned short[1 << DAC_BITS];
+
+    for (unsigned int i = 0; i < (1 << DAC_BITS); i++)
+    {
+        f0_dac[i] = getNormalizedValue(voltages[i]);
+    }
+
+    return f0_dac;
+}
+
 Integrator* FilterModelConfig6581::buildIntegrator()
 {
     return new Integrator6581(this, WL_snake);

@@ -350,6 +350,8 @@ public:
 
   void enable_filter(bool enable);
   void adjust_filter_bias(double dac_bias);
+  // zxtune: MOS 8580 cutoff frequency at maximal FC
+  void adjust_filter_8580_cutoff(double max_cutoff);
   void set_chip_model(chip_model model);
   void set_voice_mask(reg4 mask);
 
@@ -418,6 +420,8 @@ protected:
   int _8_div_Q;
   // FIXME: Temporarily used for MOS 8580 emulation.
   int w0;
+  // zxtune: w0 at maximal FC
+  int w0_8580;
   int _1024_div_Q;
 
   chip_model sid_model;

@@ -46,6 +46,13 @@ void Filter6581::setFilterCurve(double curvePosition)
     updateCenterFrequency();
 }
 
+void Filter6581::setFilterDac(const double* voltages)
+{
+    delete [] f0_dac;
+    f0_dac = FilterModelConfig6581::getInstance()->getDAC(voltages);
+    updateCenterFrequency();
+}
+
 void Filter6581::setFilterRange(double adjustment)
 {
     FilterModelConfig6581::getInstance()->setFilterRange(adjustment);

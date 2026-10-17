@@ -89,6 +89,14 @@ public:
     void filter8580Curve(double filterCurve);
 
     /**
+     * zxtune: set 6581 cutoff DAC output voltages for every cutoff register value,
+     * e.g. to emulate measured filter curves. Reset by filter6581Curve.
+     *
+     * @param voltages 2048 values in volts
+     */
+    void filter6581Dac(const double* voltages);
+
+    /**
      * Set combined waveforms strength.
      *
      * @param cws 

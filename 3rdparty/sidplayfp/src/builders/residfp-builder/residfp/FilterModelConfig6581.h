@@ -96,6 +96,15 @@ public:
     unsigned short* getDAC(double adjustment) const;
 
     /**
+     * zxtune: construct a DAC table from output voltages.
+     * Supports custom cutoff curves.
+     *
+     * @param voltages 2048 values in volts
+     * @return the DAC table
+     */
+    unsigned short* getDAC(const double* voltages) const;
+
+    /**
      * Construct an integrator solver.
      *
      * @return the integrator

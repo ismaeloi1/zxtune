@@ -425,6 +425,10 @@ Filter::Filter()
         class_init = true;
     }
 
+    // zxtune: defaults for adjustable parameters
+    Vw_bias = 0;
+    // 1.048576*2*pi*12500
+    w0_8580 = 82355;
     enable_filter(true);
     set_chip_model(MOS6581);
     set_voice_mask(0x07);
@@ -452,6 +456,16 @@ void Filter::enable_filter(bool enable)
 void Filter::adjust_filter_bias(double dac_bias)
 {
     Vw_bias = int(dac_bias*model_filter[sid_model].vo_N16);
+    set_w0();
+}
+
+// ----------------------------------------------------------------------------
+// zxtune: adjust the MOS 8580 cutoff frequency at maximal FC, default is 12.5kHz.
+// ----------------------------------------------------------------------------
+void Filter::adjust_filter_8580_cutoff(double max_cutoff)
+{
+    // See set_w0()
+    w0_8580 = int(1.048576*2*3.14159265358979323846*max_cutoff + 0.5);
     set_w0();
 }
 
@@ -548,7 +562,7 @@ void Filter::set_w0()
     // Multiply with 1.048576 to facilitate division by 1 000 000 by right-
     // shifting 20 times (2 ^ 20 = 1048576).
     // 1.048576*2*pi*12500 = 82355
-    w0 = 82355*(fc + 1) >> 11;
+    w0 = w0_8580*(fc + 1) >> 11;
 }
 
 /*

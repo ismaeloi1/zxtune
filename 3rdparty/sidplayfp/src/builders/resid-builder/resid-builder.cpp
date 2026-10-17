@@ -74,3 +74,8 @@ void ReSIDBuilder::bias(double dac_bias)
 {
     std::for_each(sidobjs.begin(), sidobjs.end(), applyParameter<libsidplayfp::ReSID, double>(&libsidplayfp::ReSID::bias, dac_bias));
 }
+
+void ReSIDBuilder::filter8580Cutoff(double maxCutoff)
+{
+    std::for_each(sidobjs.begin(), sidobjs.end(), applyParameter<libsidplayfp::ReSID, double>(&libsidplayfp::ReSID::filter8580Cutoff, maxCutoff));
+}
