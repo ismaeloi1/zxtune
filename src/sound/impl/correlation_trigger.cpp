@@ -29,6 +29,8 @@ namespace Sound
     const float SIGN_AMPLIFICATION = 1000.0f;
     // corrscope's SpectrumConfig.max_octaves_to_resample
     const float MAX_OCTAVES_TO_RESAMPLE = 1.0f;
+    // postponed searches are performed at least this often
+    const uint_t MIN_SEARCH_RATE = 15;
 
     uint_t NextPowerOfTwo(uint_t val)
     {
@@ -286,14 +288,13 @@ namespace Sound
                                        int64_t& trigger)
   {
     SearchAge += samplesPerFrame;
-    if (!Cfg.MaxRate || !HasPrevTrigger || !CachedPeriod)
+    if (!HasPrevTrigger || !CachedPeriod)
     {
       return false;
     }
-    // postponed search is limited to not lose tracking
-    const auto interval = Samplerate / Cfg.MaxRate;
-    if (SearchAge >= (canSearch ? interval : 2 * interval))
+    if (canSearch ? !Cfg.MaxRate || SearchAge >= Samplerate / Cfg.MaxRate : SearchAge >= Samplerate / MIN_SEARCH_RATE)
     {
+      // postponed search is limited to not lose tracking
       return false;
     }
     // subsampled period is too rough to be multiplied by several periods passed since the last search

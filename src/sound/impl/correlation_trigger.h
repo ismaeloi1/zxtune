@@ -96,7 +96,8 @@ namespace Sound
 
     //! @param pos estimated position of wave to display
     //! @param frameSamples distance between consequent calls
-    //! @param canSearch false to postpone due search (e.g. to spread searches of many triggers among frames)
+    //! @param canSearch false to postpone due search (e.g. to spread searches of many triggers among frames), phase is
+    //!        extrapolated then (searches are performed at least 15 times per second anyway)
     //! @return found trigger position
     int64_t GetTrigger(const TriggerWave& wave, int64_t pos, uint_t frameSamples, bool canSearch = true);
 
