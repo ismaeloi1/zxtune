@@ -57,3 +57,14 @@ def zero_regions(rom: bytes, regions: Sequence[Tuple[int, int]]) -> bytes:
     for a, b in regions:
         z[a:b] = b"\x00" * (b - a)
     return bytes(z)
+
+
+def verify(snestrace: str, full: Dict[int, bytes], reduced: Dict[int, bytes], frames: int) -> List[int]:
+    """Songs whose port write stream differs between the full and the reduced ROM."""
+    work = tempfile.mkdtemp(prefix="snsfver")
+    bad = []
+    for t in full:
+        if port_stream_hash(snestrace, full[t], frames, work, f"f{t}") != \
+                port_stream_hash(snestrace, reduced[t], frames, work, f"r{t}"):
+            bad.append(t)
+    return bad

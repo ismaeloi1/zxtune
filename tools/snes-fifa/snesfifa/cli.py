@@ -69,6 +69,10 @@ def cmd_minimize(a, rom=None):
     need = [r for r in coarse if r not in un and r[0] >= 0x8000]
     fine = [(x, x + 0x1000) for s, e in need for x in range(s, e, 0x1000)]
     un += minimize.find_unneeded(st, roms, fine, a.frames, keep)
+    reduced = {t: fifa.build_rom(minimize.zero_regions(rom, un), t) for t in fifa.SONGS}
+    bad = minimize.verify(st, roms, reduced, 2 * a.frames)
+    if bad:
+        sys.exit(f"minimised ROM differs for songs {bad}; rerun with a larger --frames")
     json.dump(un, open(os.path.join(a.out, "minimize.json"), "w"))
     kept = len(rom) - sum(e - s for s, e in un)
     print(f"ROM bytes still needed: {kept} of {len(rom)}")

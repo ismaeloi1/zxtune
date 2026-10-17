@@ -24,6 +24,8 @@ SONG_TABLE = 0x80DA34         # 4 bytes per song: 24-bit pointer to song data (s
 SAMPLESET_OF_SONG = 0x80DA04  # 2 bytes per song: sample-set id
 SAMPLESET_TABLE = 0x80D91C    # 4 bytes per sample set: 24-bit pointer to the set descriptor
 SONGS = list(range(1, 9))     # songs 1..8 (see docs)
+SAMPLE_MAP_PTR = 0x7A         # dp long pointer: sample id -> DIR slot map used when keying notes
+SAMPLE_MAPS = {"frontend": 0x80D8B4, "match": 0x80D8E8}   # set by $80:DB54 / $80:DB2D in the game
 
 # free ROM space used for the SNSF stub: $80:F6B7-$80:FEFF is $FF-filled in this dump
 STUB_ORG = 0x80F6C0
@@ -66,7 +68,7 @@ def identify(rom: bytes) -> Dict[str, object]:
     return info
 
 
-def stub_source() -> str:
+def stub_source(sample_map: int = 0x80D8B4) -> str:
     """SNSF driver stub: init hardware + sound, start song (byte at TRACK_BYTE), tick from NMI."""
     return f"""
 track:
@@ -121,6 +123,10 @@ reset_fast:
  lda #${SOUND_DEFS & 0xFFFF:04x}
  sta $42
  jsl ${SOUND_RESET:06x}
+ lda #${sample_map & 0xFFFF:04x}
+ sta $7a
+ lda #${sample_map >> 16:04x}
+ sta $7c
  sep #$20
  lda #$01
  sta ${MUSIC_ENABLE:06x}
@@ -166,12 +172,13 @@ zero:
 """
 
 
-def build_rom(rom: bytes, track: int = 1) -> bytes:
+def build_rom(rom: bytes, track: int = 1, sample_map: int = 0x80D8B4) -> bytes:
     """Return a copy of the ROM with the SNSF stub installed and vectors redirected."""
     out = bytearray(rom)
     org = TRACK_BYTE
-    code = w65816.assemble(stub_source(), org)
-    labels = _labels(stub_source(), org)
+    src = stub_source(sample_map)
+    code = w65816.assemble(src, org)
+    labels = _labels(src, org)
     start = w65816.lorom_offset(org)
     end = start + len(code)
     if end > w65816.lorom_offset(0x80FF00) or any(b != 0xFF for b in rom[start:end]):

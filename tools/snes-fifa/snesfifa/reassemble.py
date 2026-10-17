@@ -265,7 +265,8 @@ def _player_src(stream: int, dict_addr: int, clocks_per_frame: float = 20503.0) 
 
 
 def tokenize(cmds: Sequence[Command], first: int, loop_start: int, end: int,
-             dsp_regs: bytes, clocks_per_frame: float = 0.0) -> Tuple[List[bytes], List[bytes], int, Dict[str, int]]:
+             dsp_regs: bytes, clocks_per_frame: float = 0.0, sub_unit: int = 256
+             ) -> Tuple[List[bytes], List[bytes], int, Dict[str, int]]:
     """Return (tokens, dictionary entries, index of the loop-start token, stats).
     With clocks_per_frame > 0, sub-frame wait tokens keep each command's position in its frame."""
     regs = list(dsp_regs)
@@ -294,7 +295,7 @@ def tokenize(cmds: Sequence[Command], first: int, loop_start: int, end: int,
         if loop_token is None and c.frame >= loop_start:
             loop_token = len(tokens)
         if fbase is not None and c.cmd != 7:
-            k = int((c.clock - c.frame * clocks_per_frame - fbase) // 256)
+            k = int((c.clock - c.frame * clocks_per_frame - fbase) // sub_unit) * (sub_unit // 256)
             k = min(k, 63)
             if k > sub:
                 tokens.append(bytes([0xC0 | k]))
@@ -446,26 +447,63 @@ def layout(items, tokens, regions: List[Tuple[int, int]], loop_token: int) -> Op
     return {a: bytes(b) for a, b in chunks.items()}, start
 
 
-def build(cmds: Sequence[Command], snap: spcfile.Spc, snap_clock: int, first: int, loop_start: int,
+def build(cmds, snap, snap_clock, first, loop_start, loop_frames, outdir, track, ref_wav=None,
+          clocks_per_frame=20503.0, ref_lag_s=None):
+    """Try sub-frame timing at 256-clock resolution, then 1024, then frame-only timing,
+    and keep the first variant that fits in ARAM."""
+    tried = []
+    for unit in (256, 1024, 0):
+        res = _build(cmds, snap, snap_clock, first, loop_start, loop_frames, outdir, track, ref_wav,
+                     clocks_per_frame, ref_lag_s, sub_unit=unit)
+        res["subframe_unit_clocks"] = unit
+        tried.append({k: res.get(k) for k in ("subframe_unit_clocks", "needed_total", "free_total", "fits")})
+        if res.get("fits"):
+            break
+    res["attempts"] = tried
+    return res
+
+
+def _build(cmds: Sequence[Command], snap: spcfile.Spc, snap_clock: int, first: int, loop_start: int,
           loop_frames: float, outdir: str, track: int, ref_wav: Optional[str] = None,
           clocks_per_frame: float = 20503.0, ref_lag_s: Optional[float] = None,
-          subframe: bool = True) -> Dict[str, object]:
+          sub_unit: int = 256) -> Dict[str, object]:
     end = loop_start + int(round(loop_frames))
     ram = bytearray(snap.ram)
     dsp = bytes(snap.dsp)
     tokens, entries, loop_tok, stats = tokenize(cmds, first, loop_start, end, dsp,
-                                                clocks_per_frame if subframe else 0.0)
+                                                clocks_per_frame if sub_unit else 0.0, sub_unit or 256)
     items = lz_items(tokens, loop_tok)
-    # free regions
+    # samples actually used by this song (SRCN of every note + generic SRCN writes)
+    used = {e[4] for e in entries}
+    used |= {t[2] for t in tokens if t[0] == 0xA8 and t[1] & 0x0F == 4}
     dir_page = dsp[0x5D]
-    nslots = 0
-    sample_end = 0
     from . import brr
-    for s in brr.directory(bytes(ram), dir_page, 64):
-        if s.start < 0x0800 or s.start >= 0xFFC0 or not s.data:
+    slots = []
+    for smp in brr.directory(bytes(ram), dir_page, 64):
+        if smp.start < 0x0800 or smp.start >= 0xFFC0 or not smp.data:
             break
-        nslots += 1
-        sample_end = max(sample_end, s.start + len(s.data), s.loop)
+        slots.append(smp)
+    nslots = len(slots)
+    # compact ARAM: keep used samples only, packed from $087C, DIR rewritten (indices kept)
+    pos = 0x087C
+    new_ram = bytearray(ram)
+    for smp in slots:
+        if smp.index not in used:
+            continue
+        loop_off = smp.loop - smp.start
+        if not 0 <= loop_off < len(smp.data) + 9:
+            loop_off = 0
+        new_ram[pos:pos + len(smp.data)] = smp.data
+        e = dir_page * 0x100 + 4 * smp.index
+        new_ram[e:e + 4] = bytes([pos & 0xFF, pos >> 8, (pos + loop_off) & 0xFF, (pos + loop_off) >> 8])
+        pos += len(smp.data)
+    sample_end = pos
+    for smp in slots:
+        if smp.index not in used:  # point unused entries at sample 0's data (never keyed)
+            e = dir_page * 0x100 + 4 * smp.index
+            new_ram[e:e + 4] = new_ram[dir_page * 0x100 + 4 * min(used):dir_page * 0x100 + 4 * min(used) + 4]
+    new_ram[sample_end:0xFFC0] = bytes(0xFFC0 - sample_end)
+    ram = new_ram
     region_a = (dir_page * 0x100 + 4 * nslots, 0x087C)
     region_b = (sample_end, 0xFFC0)
     player = spc700.assemble(_player_src(0, 0), region_a[0])
@@ -481,20 +519,30 @@ def build(cmds: Sequence[Command], snap: spcfile.Spc, snap_clock: int, first: in
         "free_region_b": [hex(region_b[0]), hex(region_b[1]), max(0, region_b[1] - region_b[0])],
         "free_total": (region_a[1] - region_a[0]) + max(0, region_b[1] - region_b[0]),
         "needed_total": len(player) + len(dict_bytes) + lz_bytes,
-        "sample_bytes": sample_end - 0x087C, "stats": stats,
+        "sample_bytes_all": sum(len(x.data) for x in slots), "sample_bytes_used": sample_end - 0x087C,
+        "samples_used": sorted(used), "stats": stats,
     }
     regions = [(stream_a_start, region_a[1])]
     if region_b[1] - region_b[0] > 16:
         regions.append(region_b)
     if stream_a_start >= region_a[1]:
-        result["fits"] = False
-        result["reason"] = "player + dictionary do not fit in the driver area"
-        return result
+        # dictionary goes to the start of region B instead
+        syms_dict_addr = region_b[0]
+        regions = [(region_a[0] + len(player), region_a[1]), (region_b[0] + len(dict_bytes), region_b[1])]
+        result["dictionary_in"] = "B"
+        if region_b[0] + len(dict_bytes) > region_b[1]:
+            result["fits"] = False
+            result["reason"] = (f"player ({len(player)} B) + note dictionary ({len(dict_bytes)} B) + stream "
+                                f"({lz_bytes} B after LZ) = {result['needed_total']} B, but only "
+                                f"{result['free_total']} B of ARAM are free next to the used samples")
+            return result
+    regions = [(a, b) for a, b in regions if b - a > 16]
     placed = layout(items, tokens, regions, loop_tok)
     if placed is None:
         result["fits"] = False
-        result["reason"] = (f"stream needs {lz_bytes} bytes after LZ, only "
-                            f"{sum(b - a for a, b in regions)} free after player+dictionary")
+        result["reason"] = (f"player ({len(player)} B) + note dictionary ({len(dict_bytes)} B) + stream "
+                            f"({lz_bytes} B after LZ) = {result['needed_total']} B, but only "
+                            f"{result['free_total']} B of ARAM are free next to the used samples")
         return result
     chunks, start = placed
     # re-assemble the player with the real stream address
