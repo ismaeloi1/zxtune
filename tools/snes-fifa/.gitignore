@@ -1,0 +1,24 @@
+# ROM images (never commit game data)
+*.sfc
+*.smc
+*.fig
+*.swc
+*.bin
+# audio and music rips / renders
+*.wav
+*.flac
+*.spc
+*.snsf
+*.minisnsf
+*.snsflib
+*.brr
+*.mid
+# captures, logs, generated output
+*.tsv
+*.log
+*.state
+captures/
+out/
+build/
+__pycache__/
+*.pyc
