@@ -8,6 +8,7 @@ import android.os.SharedMemory;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import app.zxtune.Log;
+import app.zxtune.playback.FrameResult;
 import app.zxtune.playback.ScopeLayout;
 import app.zxtune.playback.Visualizer;
 import java.nio.ByteBuffer;
@@ -18,8 +19,8 @@ public final class VisualizerProxy {
 
     private static final String TAG = VisualizerProxy.class.getName();
 
-    // shared buffer layout: scope samples, then gauges
-    private static final int SCOPE_BYTES = 32 * 512 * 2;
+    // shared buffer layout: scope samples (up to 32 channels by 2048 points), then gauges
+    private static final int SCOPE_BYTES = 32 * 2048 * 2;
     private static final int GAUGES_BYTES = 64 * 1024;
 
     // Data of each frame (tens of kilobytes) is not copied through binder: only small request is
@@ -171,6 +172,73 @@ public final class VisualizerProxy {
                 throw new IllegalStateException(e);
             } catch (RemoteException e) {
                 Log.w(TAG, e, "getScope()");
+                return 0;
+            }
+        }
+
+        @Override
+        public long getFrame(
+                short[] data,
+                int points,
+                int windowMs,
+                byte[] gauges,
+                int gaugesKind,
+                int waveWindowMs) {
+            final Object sh = getShared();
+            if (sh != null && Build.VERSION.SDK_INT >= 27 && gauges.length <= GAUGES_BYTES) {
+                return getFrameShared(
+                        (SharedClient) sh,
+                        data,
+                        points,
+                        windowMs,
+                        gauges,
+                        gaugesKind,
+                        waveWindowMs);
+            }
+            return FrameResult.request(
+                    this, data, points, windowMs, gauges, gaugesKind, waveWindowMs);
+        }
+
+        // Single transaction and the same moment for waveforms and gauges
+        @RequiresApi(27)
+        private long getFrameShared(
+                SharedClient sh,
+                short[] data,
+                int points,
+                int windowMs,
+                byte[] gauges,
+                int gaugesKind,
+                int waveWindowMs) {
+            try {
+                synchronized (scopeLock) {
+                    synchronized (gaugesLock) {
+                        final int size = Math.min(gauges.length, GAUGES_BYTES);
+                        final long result =
+                                sh.remote.getFrame(
+                                        points,
+                                        windowMs,
+                                        SCOPE_BYTES,
+                                        size,
+                                        gaugesKind,
+                                        waveWindowMs);
+                        final int layout = (int) result;
+                        final int count =
+                                Math.min(
+                                        ScopeLayout.channelsOf(layout) * points,
+                                        Math.min(data.length, SCOPE_BYTES / 2));
+                        sh.scope.position(0);
+                        sh.scope.get(data, 0, count);
+                        if ((result >>> 32) != 0) {
+                            sh.gauges.position(0);
+                            sh.gauges.get(gauges, 0, size);
+                        }
+                        return result;
+                    }
+                }
+            } catch (DeadObjectException e) {
+                throw new IllegalStateException(e);
+            } catch (RemoteException e) {
+                Log.w(TAG, e, "getFrame()");
                 return 0;
             }
         }
@@ -365,6 +433,61 @@ public final class VisualizerProxy {
                 return layout;
             } catch (Exception e) {
                 Log.w(TAG, e, "getScope()");
+            }
+            return 0;
+        }
+
+        @Override
+        public long getFrame(
+                int points,
+                int windowMs,
+                int gaugesOffset,
+                int gaugesSize,
+                int gaugesKind,
+                int waveWindowMs) {
+            synchronized (scope) {
+                synchronized (buffer) {
+                    return getFrameData(
+                            points, windowMs, gaugesOffset, gaugesSize, gaugesKind, waveWindowMs);
+                }
+            }
+        }
+
+        private long getFrameData(
+                int points,
+                int windowMs,
+                int gaugesOffset,
+                int gaugesSize,
+                int gaugesKind,
+                int waveWindowMs) {
+            try {
+                if (gaugesOffset < SCOPE_BYTES
+                        || gaugesSize < 0
+                        || gaugesOffset > buffer.capacity() - gaugesSize) {
+                    return 0;
+                }
+                final int capacity = scope.capacity();
+                if (scopeData.length != capacity) {
+                    scopeData = new short[capacity];
+                }
+                if (gaugesData.length != gaugesSize) {
+                    gaugesData = new byte[gaugesSize];
+                }
+                final long result =
+                        delegate.getFrame(
+                                scopeData, points, windowMs, gaugesData, gaugesKind, waveWindowMs);
+                final int count =
+                        Math.min(ScopeLayout.channelsOf((int) result) * points, SCOPE_BYTES / 2);
+                scope.position(0);
+                scope.put(scopeData, 0, count);
+                if ((result >>> 32) != 0) {
+                    final ByteBuffer target = buffer.duplicate();
+                    target.position(gaugesOffset);
+                    target.put(gaugesData, 0, gaugesSize);
+                }
+                return result;
+            } catch (Exception e) {
+                Log.w(TAG, e, "getFrame()");
             }
             return 0;
         }

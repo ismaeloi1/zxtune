@@ -9,7 +9,7 @@ import android.os.HandlerThread
 import android.os.Process
 import android.view.Choreographer
 import app.zxtune.Logger
-import app.zxtune.playback.ScopeLayout
+import app.zxtune.playback.FrameResult
 import app.zxtune.playback.Visualizer
 import app.zxtune.playback.VoicesLayout
 
@@ -18,6 +18,7 @@ private val LOG = Logger("ScopeFeed")
 /**
  * Requests waveforms on own thread paced by vsync (no binder calls on UI thread), limits frame rate and skips
  * frames with the same data (e.g. paused or silent playback), so the picture is kept without any GPU work.
+ * Dashboard gauges of the same moment are requested by the same call, see [gauges].
  */
 internal class ScopeFeed(context: android.content.Context, private val sink: Sink) {
 
@@ -57,6 +58,12 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
 
     @Volatile
     var windowMs = OscilloscopeView.DEFAULT_WINDOW_MS
+
+    /**
+     * Receiver of dashboard gauges, if any
+     */
+    @Volatile
+    var gauges: GaugesExchange? = null
 
     /**
      * Frames per second limit, 0 for display refresh rate
@@ -211,14 +218,21 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         val force = forceUpdate
         forceUpdate = false
         val points = current.grid?.points(w) ?: ScopeGrid.MAX_POINTS
+        val exchange = gauges?.takeIf { it.isEnabled }
+        val gaugesLayout = voicesLayout
+        val gaugesKind = exchange?.let { GaugesExchange.kindOf(gaugesLayout) } ?: FrameResult.GAUGES_NONE
+        val gaugesBuffer = exchange?.buffer(gaugesKind, gaugesLayout) ?: EMPTY
         val dataStart = System.nanoTime()
-        val layout = try {
-            ScopeLayout(src.getScope(frame.samples, points, windowMs))
+        val result = try {
+            FrameResult(
+                src.getFrame(frame.samples, points, windowMs, gaugesBuffer, gaugesKind, exchange?.waveWindowMs ?: 0)
+            )
         } catch (e: Exception) {
             LOG.w(e) { "Failed to get scope data" }
             return
         }
         stats.data(System.nanoTime() - dataStart)
+        val layout = result.scope
         val channels = layout.channels.coerceAtMost(MAX_CHANNELS)
         frame.channels = channels
         frame.points = points
@@ -240,6 +254,9 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
             layoutSource = src
             layoutId = layout.id
             frame.grid = null
+        } else {
+            // gauges of another layout are dropped, the next frame has them right
+            exchange?.publish(gaugesKind, result.gauges, gaugesLayout)
         }
         if (frame.grid?.channels != channels || w != current.width || h != current.height || force) {
             frame.grid = frame.grid?.takeIf { it.channels == channels } ?: ScopeGrid.of(voicesLayout, channels)
@@ -257,6 +274,7 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
 
     companion object {
         const val MAX_CHANNELS = 32
+        private val EMPTY = ByteArray(0)
 
         // Single thread for all the views (usually only one is visible), so nothing to release
         private val sharedThread by lazy {

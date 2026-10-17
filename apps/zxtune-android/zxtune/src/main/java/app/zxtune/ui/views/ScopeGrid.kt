@@ -31,9 +31,11 @@ internal class ScopeGrid private constructor(
     fun width(chan: Int) = columns.width(cellColumns[chan])
 
     /**
-     * Narrow cells don't need many points, less data to transfer and draw for many voices
+     * Two points per pixel column of the narrowest cell: samples range of each column is displayed by its minimum and
+     * maximum (see [app.zxtune.playback.Visualizer.getScope]), so nothing is lost by decimation. Short windows have
+     * less samples than points, then all of them are displayed.
      */
-    fun points(viewWidth: Int) = (viewWidth * columns.narrowest).toInt().coerceIn(MIN_POINTS, MAX_POINTS)
+    fun points(viewWidth: Int) = (viewWidth * columns.narrowest * 2).toInt().coerceIn(MIN_POINTS, MAX_POINTS)
 
     /**
      * Height of labels band in pixels, see [labelSize]
@@ -104,7 +106,7 @@ internal class ScopeGrid private constructor(
     }
 
     companion object {
-        const val MAX_POINTS = 512
+        const val MAX_POINTS = 2048
         const val MIN_POINTS = 128
 
         // labels are never drawn over traces, so they are shrunk for short cells to keep traces high enough

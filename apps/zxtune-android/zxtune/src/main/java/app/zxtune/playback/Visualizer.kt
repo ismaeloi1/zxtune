@@ -46,6 +46,16 @@ interface Visualizer {
     fun getVoiceGauges(data: ByteArray, waveWindowMs: Int): Int
 
     /**
+     * Waveforms (see [getScope]) and gauges (see [getGauges] and [getVoiceGauges]) of the same moment by single
+     * request, so all the views display the same moment and remote visualizer is called once per frame
+     * @param gauges array for gauges data, not used if [gaugesKind] is [FrameResult.GAUGES_NONE]
+     * @param gaugesKind one of FrameResult.GAUGES_* values
+     * @return packed result, see [FrameResult]
+     */
+    @Throws(Exception::class)
+    fun getFrame(data: ShortArray, points: Int, windowMs: Int, gauges: ByteArray, gaugesKind: Int, waveWindowMs: Int): Long
+
+    /**
      * @return voices layout description, see [VoicesLayout]. Changes are signalled via [ScopeLayout.id]
      */
     @Throws(Exception::class)
@@ -74,6 +84,50 @@ value class ScopeLayout(private val packed: Int) {
     companion object {
         @JvmStatic
         fun channelsOf(packed: Int) = ScopeLayout(packed).channels
+    }
+}
+
+/**
+ * Decoded result of [Visualizer.getFrame]
+ */
+@JvmInline
+value class FrameResult(private val packed: Long) {
+    val scope
+        get() = ScopeLayout(packed.toInt())
+
+    /** Count of stored chips or voices */
+    val gauges
+        get() = (packed ushr 32).toInt()
+
+    companion object {
+        const val GAUGES_NONE = 0
+        const val GAUGES_CHIPS = 1
+        const val GAUGES_VOICES = 2
+
+        @JvmStatic
+        fun pack(scope: Int, gauges: Int) = (scope.toLong() and 0xffffffffL) or (gauges.toLong() shl 32)
+
+        /**
+         * Implementation by separate requests, e.g. for visualizers without shared memory
+         */
+        @JvmStatic
+        fun request(
+            src: Visualizer,
+            data: ShortArray,
+            points: Int,
+            windowMs: Int,
+            gauges: ByteArray,
+            gaugesKind: Int,
+            waveWindowMs: Int,
+        ): Long {
+            val scope = src.getScope(data, points, windowMs)
+            val count = when (gaugesKind) {
+                GAUGES_CHIPS -> src.getGauges(gauges, waveWindowMs)
+                GAUGES_VOICES -> src.getVoiceGauges(gauges, waveWindowMs)
+                else -> 0
+            }
+            return pack(scope, count)
+        }
     }
 }
 
@@ -164,6 +218,10 @@ class VoiceGauges(private val data: ByteArray, private val offset: Int) : Gauges
     /** Signed chip specific field */
     fun signedField(idx: Int) = data[stateOffset + 10 + idx].toInt()
 
+    /** Progress (0..1) of the last level and frequency column, see [ChipGauges.phase] */
+    val phase
+        get() = (data[offset + SIZE - 1].toInt() and 0xff) / 256f
+
     /** Text of voice (e.g. instrument name), empty if not provided */
     val text: String
         get() {
@@ -223,6 +281,13 @@ class ChipGauges(private val data: ByteArray, private val offset: Int) : GaugesD
     val state
         get() = ChipState(data, offset + GAUGES * COLUMNS * 2)
 
+    /**
+     * Progress (0..1) of the last column of slow gauges (envelope, frequency, resonance, cutoff). Columns are aligned
+     * to absolute time, so history is scrolled by this part of column for smooth movement.
+     */
+    val phase
+        get() = (data[offset + SIZE - 1].toInt() and 0xff) / 256f
+
     companion object {
         // see Sound::Scope::GAUGES_SIZE
         const val GAUGES = 12
@@ -236,6 +301,8 @@ class ChipGauges(private val data: ByteArray, private val offset: Int) : GaugesD
         const val VOLUME = 9
         const val RESONANCE = 10
         const val CUTOFF = 11
+
+        fun isSlow(gauge: Int) = gauge in 3..8 || gauge == RESONANCE || gauge == CUTOFF
     }
 }
 

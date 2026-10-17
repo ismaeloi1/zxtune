@@ -14,4 +14,6 @@ interface ISharedVisualizer {
   // size bytes at offset, see IVisualizer.getGauges
   int getGauges(int offset, int size, int waveWindowMs);
   int getVoiceGauges(int offset, int size, int waveWindowMs);
+  // scope samples at buffer start and gauges (see Visualizer.getFrame) at offset by single transaction
+  long getFrame(int points, int windowMs, int gaugesOffset, int gaugesSize, int gaugesKind, int waveWindowMs);
 }

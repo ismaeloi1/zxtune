@@ -45,7 +45,9 @@ class OscilloscopeActivity : AppCompatActivity() {
         oscilloscope = OscilloscopeFrame(this).apply {
             setOnClickListener { finish() }
         }
-        dashboard = SidDashboardView(this)
+        dashboard = SidDashboardView(this).also {
+            it.attachTo(oscilloscope)
+        }
         val panel = ScopePanelLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,

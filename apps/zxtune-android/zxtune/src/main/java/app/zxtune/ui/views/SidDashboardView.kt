@@ -6,19 +6,21 @@
 package app.zxtune.ui.views
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.graphics.RectF
 import android.graphics.Typeface
 import android.os.Build
 import android.util.AttributeSet
 import android.util.TypedValue
-import android.view.Choreographer
 import android.view.View
 import app.zxtune.Logger
 import app.zxtune.playback.ChipGauges
 import app.zxtune.playback.ChipState
+import app.zxtune.playback.FrameResult
 import app.zxtune.playback.GaugesData
 import app.zxtune.playback.Visualizer
 import app.zxtune.playback.VoiceGauges
@@ -35,6 +37,9 @@ private val LOG = Logger("SidDashboard")
  * Other chips are displayed per voice as cards: title band with live summary, level and pitch history and
  * hardware specific state (see [ChipWidgets]).
  * And multiline status text below. Chips are displayed side by side.
+ * Gauges are delivered by oscilloscope (see [attachTo]) with waveforms of the same moment, so view is redrawn at each
+ * frame of oscilloscope. Static parts (frames, captions, separators) are cached in bitmap and only live values are
+ * drawn at each frame.
  */
 class SidDashboardView @JvmOverloads constructor(
     context: Context,
@@ -43,38 +48,47 @@ class SidDashboardView @JvmOverloads constructor(
 
     @Volatile
     private var source: Visualizer? = null
-    private var isLive = true
+
+    /**
+     * Gauges data, filled by oscilloscope's data thread
+     */
+    val exchange = GaugesExchange().apply {
+        listener = { postInvalidateOnAnimation() }
+    }
 
     /**
      * Displayed duration of oscillators and volume gauges
      */
-    @Volatile
-    var waveWindowMs = DEFAULT_WAVE_WINDOW_MS
+    var waveWindowMs by exchange::waveWindowMs
     private var statsProvider: (() -> String)? = null
 
-    // Data is requested on background thread to keep UI responsive, binder calls may take time
+    // Status is requested on background thread to keep UI responsive, binder calls may take time
     private val executor = Executors.newSingleThreadExecutor()
     private val requestPending = AtomicBoolean(false)
-    private val buffers = Array(2) { ByteArray(MAX_CHIPS * ChipGauges.SIZE) }
-    private var voiceBuffers = Array(2) { ByteArray(0) }
-    private var readyBuffer = 0
-
-    @Volatile
-    private var readyChips = 0
-
-    @Volatile
-    private var readyVoices = 0
-
-    @Volatile
-    private var layout = VoicesLayout.MASTER
 
     // not created at each frame
-    private var columns = ChipColumns(layout.groups)
-    private var columnsLayout = layout
+    private var columns = ChipColumns(VoicesLayout.MASTER.groups)
+    private var columnsLayout = VoicesLayout.MASTER
 
     @Volatile
     private var status = ""
     private var lastStatusTime = 0L
+
+    // status and statistics lines, split only on change
+    private var statusSource = ""
+    private var statsSource = ""
+    private val textLines = ArrayList<String>()
+
+    // static part of picture, see [Pass]
+    private var pass = Pass.ALL
+    private var staticLayer: Bitmap? = null
+    private var staticKey = 0L
+
+    @androidx.annotation.VisibleForTesting
+    internal var staticRedraws = 0
+    private val layerPaint = Paint().apply {
+        color = Color.WHITE
+    }
 
     private val density = resources.displayMetrics.density
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -144,6 +158,10 @@ class SidDashboardView @JvmOverloads constructor(
     private val lines = FloatArray(ChipGauges.COLUMNS * 4)
     private val widgets = ChipWidgets(density, sp(TEXT_SIZE_SP))
     private val smooth = Array(MAX_VOICES) { FloatArray(ChipWidgets.SMOOTH_SIZE) }
+    private val widgetTexts = Array(MAX_VOICES) { ChipWidgets.TextMemo() }
+
+    // card titles with and without group name and key mark, see [cardTitle]
+    private val cardTitles = Array(MAX_VOICES) { arrayOfNulls<String>(4) }
 
     @androidx.annotation.VisibleForTesting
     internal val voiceTexts = Array(MAX_CHIPS) { Array(3) { SidVoiceText() } }
@@ -174,29 +192,6 @@ class SidDashboardView @JvmOverloads constructor(
     private val summaryWidths = FloatArray(MAX_VOICES)
     private val summaryKinds = IntArray(MAX_VOICES) { -1 }
 
-    // Gauges are history of slow changing values, so lower than display refresh rate is enough to save power.
-    // Redrawn only on data change (e.g. not when silent).
-    private val frameCallback = object : Choreographer.FrameCallback {
-        override fun doFrame(frameTimeNanos: Long) {
-            if (source == null || !isAttachedToWindow) {
-                return
-            }
-            Choreographer.getInstance().postFrameCallback(this)
-            if (frameTimeNanos - lastUpdateTime < UPDATE_PERIOD_NS) {
-                return
-            }
-            lastUpdateTime = frameTimeNanos
-            requestData(frameTimeNanos)
-            val stats = statsProvider?.invoke() ?: ""
-            if (stats != lastStats) {
-                lastStats = stats
-                invalidate()
-            }
-        }
-    }
-    private var lastUpdateTime = 0L
-    private var lastStats = ""
-
     init {
         setBackgroundColor(Color.BLACK)
         // consume taps to not toggle parent's visualizer or close fullscreen
@@ -204,104 +199,69 @@ class SidDashboardView @JvmOverloads constructor(
     }
 
     /**
+     * Gauges are requested by oscilloscope together with waveforms of the same moment
+     */
+    fun attachTo(display: ScopeDisplay) {
+        display.gauges = exchange
+    }
+
+    /**
      * @param src data source or null to stop updating
      * @param stats provider of additional (UI side) statistics lines
+     * @param isLive false for single picture (e.g. paused playback), see [ScopeDisplay.setSource]
      */
+    @Suppress("UNUSED_PARAMETER")
     fun setSource(src: Visualizer?, stats: (() -> String)? = null, isLive: Boolean = true) {
-        val wasActive = source != null && this.isLive
         source = src
         statsProvider = stats
-        this.isLive = isLive
-        if (src != null && !isLive) {
-            // single picture for paused playback
-            Choreographer.getInstance().removeFrameCallback(frameCallback)
-            lastStatusTime = 0
-            requestData(System.nanoTime())
-        } else if (src != null && !wasActive) {
-            lastUpdateTime = 0
-            Choreographer.getInstance().postFrameCallback(frameCallback)
-        } else if (src == null) {
-            Choreographer.getInstance().removeFrameCallback(frameCallback)
-            readyChips = 0
-            readyVoices = 0
-            layout = VoicesLayout.MASTER
+        exchange.isEnabled = src != null
+        if (src != null) {
+            lastStatusTime = System.nanoTime()
+            requestStatus()
+        } else {
+            exchange.publish(FrameResult.GAUGES_NONE, 0, VoicesLayout.MASTER)
             invalidate()
         }
     }
 
     @androidx.annotation.VisibleForTesting
     internal fun setVoicesData(voicesLayout: VoicesLayout, data: ByteArray, voices: Int, statusText: String) {
-        layout = voicesLayout
-        voiceBuffers[readyBuffer] = data
-        readyVoices = voices
+        val kind = FrameResult.GAUGES_VOICES
+        val target = exchange.buffer(kind, voicesLayout)
+        data.copyInto(target, 0, 0, minOf(data.size, target.size))
+        exchange.publish(kind, voices, voicesLayout)
         status = statusText
     }
 
     @androidx.annotation.VisibleForTesting
     internal fun setGaugesData(data: ByteArray, chips: Int, statusText: String) {
-        layout = VoicesLayout.parse("registers")
-        data.copyInto(buffers[readyBuffer], 0, 0, minOf(data.size, buffers[readyBuffer].size))
-        readyVoices = 0
-        readyChips = chips
+        val layout = VoicesLayout.parse("registers\nSID\tVoice 1\tVoice 2\tVoice 3")
+        val kind = FrameResult.GAUGES_CHIPS
+        val target = exchange.buffer(kind, layout)
+        data.copyInto(target, 0, 0, minOf(data.size, target.size))
+        exchange.publish(kind, chips, layout)
         status = statusText
     }
 
     override fun onDetachedFromWindow() {
-        Choreographer.getInstance().removeFrameCallback(frameCallback)
+        staticLayer?.recycle()
+        staticLayer = null
         super.onDetachedFromWindow()
     }
 
-    private fun requestData(nowNanos: Long) {
+    private fun requestStatus() {
         val src = source ?: return
         if (!requestPending.compareAndSet(false, true)) {
             return
         }
-        val needStatus = nowNanos - lastStatusTime > STATUS_PERIOD_NS
-        if (needStatus) {
-            lastStatusTime = nowNanos
-        }
         executor.execute {
             try {
-                if (needStatus) {
-                    // cheap enough to not track layout changes precisely
-                    layout = runCatching { VoicesLayout.parse(src.getLayout()) }.getOrDefault(VoicesLayout.MASTER)
+                val newStatus = runCatching { src.getStatus() }.getOrElse {
+                    LOG.w(it) { "Failed to get status" }
+                    ""
                 }
-                val target = 1 - readyBuffer
-                val current = layout
-                var changed: Boolean
-                if (current.hasRegisters) {
-                    val chips = runCatching { src.getGauges(buffers[target], waveWindowMs) }.getOrDefault(0)
-                    changed = chips != readyChips || readyVoices != 0 ||
-                        !buffers[target].sameRange(buffers[readyBuffer], chips * ChipGauges.SIZE)
-                    readyBuffer = target
-                    readyVoices = 0
-                    readyChips = chips
-                } else if (current.voicesCount != 0) {
-                    // binder transfers whole array, so keep it as small as possible
-                    val size = current.voicesCount * VoiceGauges.SIZE
-                    if (voiceBuffers[target].size != size) {
-                        voiceBuffers[target] = ByteArray(size)
-                    }
-                    val voices = runCatching { src.getVoiceGauges(voiceBuffers[target], waveWindowMs) }.getOrDefault(0)
-                    changed = voices != readyVoices || readyChips != 0 ||
-                        !voiceBuffers[target].sameRange(voiceBuffers[readyBuffer], voices * VoiceGauges.SIZE)
-                    readyBuffer = target
-                    readyChips = 0
-                    readyVoices = voices
-                } else {
-                    changed = readyChips != 0 || readyVoices != 0
-                    readyChips = 0
-                    readyVoices = 0
-                }
-                if (needStatus) {
-                    val newStatus = runCatching { src.getStatus() }.getOrElse {
-                        LOG.w(it) { "Failed to get status" }
-                        ""
-                    }
-                    changed = changed || newStatus != status
+                if (newStatus != status) {
                     status = newStatus
-                }
-                if (changed) {
                     postInvalidate()
                 }
             } finally {
@@ -310,29 +270,100 @@ class SidDashboardView @JvmOverloads constructor(
         }
     }
 
+    // Static part depends only on geometry and layout, but not on values
+    private fun staticKeyOf(data: GaugesExchange.Data, lines: Int): Long {
+        var key = width.toLong()
+        key = key * 31 + height
+        key = key * 31 + data.kind
+        key = key * 31 + data.count
+        key = key * 31 + System.identityHashCode(data.layout)
+        key = key * 31 + lines
+        if (data.kind == FrameResult.GAUGES_VOICES) {
+            // cards layout depends on voice kind
+            for (voice in 0 until minOf(data.count, data.bytes.size / VoiceGauges.SIZE)) {
+                key = key * 31 + VoiceGauges(data.bytes, voice * VoiceGauges.SIZE).kind
+            }
+        }
+        return key
+    }
+
+    private fun updateTextLines() {
+        val stats = statsProvider?.invoke() ?: ""
+        val currentStatus = status
+        if (currentStatus === statusSource && stats === statsSource) {
+            return
+        }
+        statusSource = currentStatus
+        statsSource = stats
+        textLines.clear()
+        currentStatus.lines().filterTo(textLines) { it.isNotBlank() }
+        stats.lines().filterTo(textLines) { it.isNotBlank() }
+    }
+
     override fun onDraw(canvas: Canvas) {
-        val lines = buildList {
-            addAll(status.lines().filter { it.isNotBlank() })
-            statsProvider?.invoke()?.lines()?.filter { it.isNotBlank() }?.let { addAll(it) }
+        val data = exchange.acquire()
+        val now = System.nanoTime()
+        if (source != null && now - lastStatusTime > STATUS_PERIOD_NS) {
+            lastStatusTime = now
+            requestStatus()
         }
+        updateTextLines()
+        val textHeight = textPaint.fontSpacing * textLines.size + padding()
+        val areaHeight = height - textHeight
+        if (width > 0 && height > 0) {
+            val key = staticKeyOf(data, textLines.size)
+            val layer = staticLayer?.takeIf { it.width == width && it.height == height }
+                ?: Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8).also {
+                    staticLayer?.recycle()
+                    staticLayer = it
+                    staticKey = key.inv()
+                }
+            if (key != staticKey) {
+                staticKey = key
+                ++staticRedraws
+                val layerCanvas = Canvas(layer)
+                layerCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+                drawContent(layerCanvas, data, areaHeight, Pass.STATIC)
+            }
+            // alpha only bitmap is drawn by paint's color
+            canvas.drawBitmap(layer, 0f, 0f, layerPaint)
+        }
+        drawContent(canvas, data, areaHeight, Pass.DYNAMIC)
         val lineHeight = textPaint.fontSpacing
-        val textHeight = lineHeight * lines.size + padding()
-        if (readyVoices != 0) {
-            drawVoices(canvas, height - textHeight)
-        } else {
-            drawGauges(canvas, height - textHeight)
-        }
-        var y = height - textHeight + padding() / 2 - textPaint.ascent()
-        for (line in lines) {
+        var y = areaHeight + padding() / 2 - textPaint.ascent()
+        for (line in textLines) {
             canvas.drawText(line, padding(), y, textPaint)
             y += lineHeight
         }
     }
 
+    private fun drawContent(canvas: Canvas, data: GaugesExchange.Data, areaHeight: Float, current: Pass) {
+        pass = current
+        when (data.kind) {
+            FrameResult.GAUGES_VOICES -> drawVoices(canvas, data, areaHeight)
+            FrameResult.GAUGES_CHIPS -> drawGauges(canvas, data, areaHeight)
+        }
+        pass = Pass.ALL
+    }
+
+    /**
+     * Static elements are drawn once into layer (white with alpha), live ones at each frame over it
+     */
+    private enum class Pass {
+        ALL,
+        STATIC,
+        DYNAMIC;
+
+        val isStatic
+            get() = this != DYNAMIC
+        val isDynamic
+            get() = this != STATIC
+    }
+
     // Chips are placed side by side as in oscilloscope above: 3 gauges columns per chip.
     // Each row (voice or global filter/volume state) ends with grid of value cells, if fits.
-    private fun drawGauges(canvas: Canvas, areaHeight: Float) {
-        val chips = readyChips
+    private fun drawGauges(canvas: Canvas, data: GaugesExchange.Data, areaHeight: Float) {
+        val chips = minOf(data.count, data.bytes.size / ChipGauges.SIZE)
         if (chips == 0 || areaHeight < density * 40) {
             return
         }
@@ -347,22 +378,26 @@ class SidDashboardView @JvmOverloads constructor(
         gaugesRowHeight = rowH
         gaugesCellHeight = cellH
         for (idx in 0 until chips) {
-            val gauges = ChipGauges(buffers[readyBuffer], idx * ChipGauges.SIZE)
+            val gauges = ChipGauges(data.bytes, idx * ChipGauges.SIZE)
             val last = gauges.state
             val left = groupW * idx
             val chipLabel = if (chips > 1) idx + 1 else 0
             for (voice in 0 until 3) {
                 val texts = voiceTexts[idx][voice]
                 val row = idx * 4 + voice
-                texts.update(last, voice, envelopeTrend(gauges, last, voice), chip, chipLabel)
+                if (pass.isDynamic) {
+                    texts.update(last, voice, envelopeTrend(gauges, last, voice), chip, chipLabel)
+                }
                 drawGaugesRow(canvas, gauges, VOICE_GAUGES[voice], texts.titles, voiceTemplates, left, rowH * voice, cellW, cellH, row)
                 drawCells(canvas, voiceGrid, texts.cells, voiceFitted[idx * 3 + voice], left, rowH * voice + cellH)
             }
             val texts = globalTexts[idx]
-            texts.update(last, chip)
+            if (pass.isDynamic) {
+                texts.update(last, chip)
+            }
             drawGaugesRow(canvas, gauges, GLOBAL_GAUGES, texts.titles, globalTemplates, left, rowH * 3, cellW, cellH, idx * 4 + 3)
             drawCells(canvas, globalGrid, texts.cells, globalFitted[idx], left, rowH * 3 + cellH)
-            if (idx != 0) {
+            if (idx != 0 && pass.isStatic) {
                 canvas.drawLine(left, 0f, left, areaHeight, separatorPaint)
             }
         }
@@ -636,7 +671,7 @@ class SidDashboardView @JvmOverloads constructor(
             val cellTop = y0 + lineH * grid.line[idx]
             val captionBaseline = cellTop - captionPaint.ascent()
             val valueBaseline = captionBaseline + captionPaint.descent() - cellPaint.ascent()
-            if (grid.left[idx] > 0f) {
+            if (grid.left[idx] > 0f && pass.isStatic) {
                 // thin separator in the middle of gap makes cells look as separate boxes
                 val x = cellLeft - grid.gap / 2
                 canvas.drawLine(x, cellTop + density, x, cellTop + lineH - density * 3, cellFramePaint)
@@ -647,9 +682,11 @@ class SidDashboardView @JvmOverloads constructor(
             val w = cellRight - cellLeft
             captionPaint.textAlign = align
             cellPaint.textAlign = align
-            canvas.drawText(grid.captions[idx].get(grid.specs[idx].caption, w, captionPaint), x, captionBaseline, captionPaint)
+            if (pass.isStatic) {
+                canvas.drawText(grid.captions[idx].get(grid.specs[idx].caption, w, captionPaint), x, captionBaseline, captionPaint)
+            }
             val value = texts[idx]
-            if (value.isNotEmpty()) {
+            if (value.isNotEmpty() && pass.isDynamic) {
                 canvas.drawText(fitted[idx].get(value, w, cellPaint), x, valueBaseline, cellPaint)
             }
         }
@@ -660,19 +697,17 @@ class SidDashboardView @JvmOverloads constructor(
     }
 
     // Chips are placed side by side as in oscilloscope above, see [ChipColumns], card per voice
-    private fun drawVoices(canvas: Canvas, areaHeight: Float) {
-        val voices = readyVoices
-        val current = layout
+    private fun drawVoices(canvas: Canvas, gaugesData: GaugesExchange.Data, areaHeight: Float) {
+        val current = gaugesData.layout
+        val data = gaugesData.bytes
+        val voices = minOf(gaugesData.count, data.size / VoiceGauges.SIZE)
         if (voices == 0 || areaHeight < density * 40) {
-            return
-        }
-        val data = voiceBuffers[readyBuffer]
-        if (data.size < voices * VoiceGauges.SIZE) {
             return
         }
         if (columnsLayout !== current) {
             columns = ChipColumns(current.groups)
             columnsLayout = current
+            cardTitles.forEach { it.fill(null) }
         }
         val columns = columns
         val fullW = width.toFloat()
@@ -682,7 +717,7 @@ class SidDashboardView @JvmOverloads constructor(
             // chips with less voices get taller cards
             val cellH = areaHeight / rows
             val first = columns.column(groupIdx, 0)
-            if (first != 0) {
+            if (first != 0 && pass.isStatic) {
                 val x = fullW * columns.left(first)
                 canvas.drawLine(x, 0f, x, areaHeight, separatorPaint)
             }
@@ -714,10 +749,14 @@ class SidDashboardView @JvmOverloads constructor(
         val smoothValues = smooth[voice]
         val pad = density * 2
         rect.set(left + pad, top + pad, left + w - pad, top + h - pad)
-        canvas.drawRect(rect, framePaint)
+        if (pass.isStatic) {
+            canvas.drawRect(rect, framePaint)
+        }
         // title band is separated from graphs to keep both readable
         val stable = summaries[voice]
-        stable.update(gauges)
+        if (pass.isDynamic) {
+            stable.update(gauges)
+        }
         val summary = stable.text
         if (summaryKinds[voice] != gauges.kind) {
             summaryKinds[voice] = gauges.kind
@@ -725,17 +764,19 @@ class SidDashboardView @JvmOverloads constructor(
         }
         summaryWidths[voice] = maxOf(summaryWidths[voice], summaryPaint.measureText(summary))
         val reserved = summaryWidths[voice]
-        val key = if (gauges.isKeyOn) " \u25CF" else ""
+        val keyOn = gauges.isKeyOn
         // group name is omitted if there's no space for it
-        val full = "$group $name$key"
+        val full = cardTitle(voice, group, name, keyOn, true)
         val available = rect.width() - density * 9 - reserved
-        val title = if (titlePaint.measureText(full) <= available) full else "$name$key"
+        val title = if (titlePaint.measureText(full) <= available) full else cardTitle(voice, group, name, keyOn, false)
         val band = drawTitleBand(canvas, rect, title, summary, reserved)
         body.set(rect.left + pad * 2, band + pad, rect.right - pad * 2, rect.bottom - pad * 2)
         if (body.height() < density * 18) {
             // no space for details, only current level
             history.set(body)
-            drawHistory(canvas, history, gauges, false)
+            if (pass.isDynamic) {
+                drawHistory(canvas, history, gauges, false)
+            }
             return
         }
         val wide = body.width() > body.height() * 2.2f
@@ -751,11 +792,25 @@ class SidDashboardView @JvmOverloads constructor(
             history.set(body.left, body.top, body.right, split - pad)
             widget.set(body.left, split + pad * 2, body.right, body.bottom)
         }
-        if (widgets.draw(canvas, widget, gauges, smoothValues)) {
+        if (pass.isDynamic && widgets.draw(canvas, widget, gauges, smoothValues, widgetTexts[voice])) {
             drawHistory(canvas, history, gauges, true)
-        } else {
+        } else if (pass.isDynamic) {
             drawHistory(canvas, body, gauges, true)
         }
+    }
+
+    private fun cardTitle(voice: Int, group: String, name: String, keyOn: Boolean, withGroup: Boolean): String {
+        val slot = (if (keyOn) 1 else 0) + (if (withGroup) 2 else 0)
+        return cardTitles[voice][slot] ?: buildString {
+            if (withGroup) {
+                append(group)
+                append(' ')
+            }
+            append(name)
+            if (keyOn) {
+                append(" \u25CF")
+            }
+        }.also { cardTitles[voice][slot] = it }
     }
 
     // Title has priority over summary: summary is shrunk and cut if both don't fit
@@ -776,13 +831,17 @@ class SidDashboardView @JvmOverloads constructor(
         val value = ellipsize(summary, room, summaryPaint)
         // gap keeps title and summary regions apart
         val available = inner - minOf(reserved * summaryPaint.textSize / valueBaseSize, room) - titleGap()
-        drawCardTitle(canvas, title, card.left + pad, baseline, available, titleWidth)
-        if (value.length >= 4 || value == summary) {
-            canvas.drawText(value, card.right - pad, baseline, summaryPaint)
+        if (pass.isDynamic) {
+            drawCardTitle(canvas, title, card.left + pad, baseline, available, titleWidth)
+            if (value.length >= 4 || value == summary) {
+                canvas.drawText(value, card.right - pad, baseline, summaryPaint)
+            }
         }
         summaryPaint.textSize = valueBaseSize
         val bottom = baseline + titlePaint.descent() + pad
-        canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
+        if (pass.isStatic) {
+            canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
+        }
         return bottom
     }
 
@@ -804,21 +863,28 @@ class SidDashboardView @JvmOverloads constructor(
         val baseline = card.top + pad - titlePaint.ascent()
         val inner = card.width() - pad * 3
         val title = texts[SidRowText.title(idx)]
+        val dynamic = pass.isDynamic
         val bottom = if (!secondLine) {
             val valueWidth = if (valueScale > 0f) templates.valueWidth(idx) * valueScale + titleGap() else 0f
-            drawTitle(canvas, fit, title, card.left + pad, baseline, inner - valueWidth, templates.titleWidth[idx])
-            if (valueScale > 0f) {
-                drawGaugeValue(canvas, texts, templates, idx, card.right - pad, baseline, valueScale, fit.main)
+            if (dynamic) {
+                drawTitle(canvas, fit, title, card.left + pad, baseline, inner - valueWidth, templates.titleWidth[idx])
+                if (valueScale > 0f) {
+                    drawGaugeValue(canvas, texts, templates, idx, card.right - pad, baseline, valueScale, fit.main)
+                }
             }
             baseline + titlePaint.descent() + pad
         } else {
-            drawTitle(canvas, fit, title, card.left + pad, baseline, inner, templates.titleWidth[idx])
             val valueBaseline = baseline + titlePaint.descent() - valuePaint.ascent()
-            val room = card.width() - pad * 2
-            drawGaugeValue(canvas, texts, templates, idx, card.right - pad, valueBaseline, valueScale, fit.main, room)
+            if (dynamic) {
+                drawTitle(canvas, fit, title, card.left + pad, baseline, inner, templates.titleWidth[idx])
+                val room = card.width() - pad * 2
+                drawGaugeValue(canvas, texts, templates, idx, card.right - pad, valueBaseline, valueScale, fit.main, room)
+            }
             valueBaseline + valuePaint.descent() + pad
         }
-        canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
+        if (pass.isStatic) {
+            canvas.drawLine(card.left, bottom, card.right, bottom, framePaint)
+        }
         return bottom
     }
 
@@ -933,8 +999,12 @@ class SidDashboardView @JvmOverloads constructor(
             return
         }
         val columnWidth = area.width() / VoiceGauges.COLUMNS
+        // the last column is in progress, so history is scrolled smoothly by its part
+        val shift = columnWidth * (1 - gauges.phase)
+        canvas.save()
+        canvas.clipRect(area)
         for (col in 0 until VoiceGauges.COLUMNS) {
-            val x = area.left + columnWidth * (col + 0.5f)
+            val x = area.left + columnWidth * (col + 0.5f) + shift
             val idx = col * 4
             lines[idx] = x
             lines[idx + 1] = area.bottom - area.height() * gauges.max(VoiceGauges.LEVEL, col) / 255f
@@ -944,6 +1014,7 @@ class SidDashboardView @JvmOverloads constructor(
         dimTracePaint.strokeWidth = maxOf(columnWidth, density)
         canvas.drawLines(lines, dimTracePaint)
         if (!withPitch) {
+            canvas.restore()
             return
         }
         var count = 0
@@ -952,7 +1023,7 @@ class SidDashboardView @JvmOverloads constructor(
             if (value == 0) {
                 continue
             }
-            val x = area.left + columnWidth * (col + 0.5f)
+            val x = area.left + columnWidth * (col + 0.5f) + shift
             val yMax = area.bottom - area.height() * value / 255f
             val yMin = area.bottom - area.height() * gauges.min(VoiceGauges.FREQUENCY, col) / 255f
             lines[count++] = x
@@ -963,6 +1034,7 @@ class SidDashboardView @JvmOverloads constructor(
         tracePaint.strokeWidth = maxOf(columnWidth, density * 1.5f)
         canvas.drawLines(lines, 0, count, tracePaint)
         tracePaint.strokeWidth = TRACE_WIDTH * density
+        canvas.restore()
     }
 
     // Each column is vertical line between min and max values, as in JSIDPlay2
@@ -983,18 +1055,27 @@ class SidDashboardView @JvmOverloads constructor(
     ) {
         val pad = density
         rect.set(left + pad, top + pad, left + w - pad, top + h - pad)
-        canvas.drawRect(rect, framePaint)
+        if (pass.isStatic) {
+            canvas.drawRect(rect, framePaint)
+        }
         val plotTop = drawGaugeTitleBand(canvas, rect, texts, templates, idx, secondLine, valueScale, fit) + pad * 2
         val plotHeight = rect.bottom - pad * 2 - plotTop
-        if (plotHeight <= 0) {
+        if (plotHeight <= 0 || !pass.isDynamic) {
             return
         }
         val plotLeft = rect.left + pad
         val columnWidth = (rect.width() - pad * 2) / ChipGauges.COLUMNS
+        // slow gauges' last column is in progress, so history is scrolled smoothly by its part
+        val slow = ChipGauges.isSlow(gauge) && gauges is ChipGauges
+        val shift = if (slow) columnWidth * (1 - (gauges as ChipGauges).phase) else 0f
+        if (slow) {
+            canvas.save()
+            canvas.clipRect(plotLeft, plotTop - pad, rect.right - pad, rect.bottom - pad)
+        }
         // minimal visible segment for flat parts
         val minHeight = tracePaint.strokeWidth
         for (col in 0 until ChipGauges.COLUMNS) {
-            val x = plotLeft + columnWidth * (col + 0.5f)
+            val x = plotLeft + columnWidth * (col + 0.5f) + shift
             val yMax = plotTop + plotHeight * (1 - gauges.max(gauge, col) / 255f)
             val yMin = plotTop + plotHeight * (1 - gauges.min(gauge, col) / 255f)
             val center = (yMin + yMax) / 2
@@ -1008,6 +1089,9 @@ class SidDashboardView @JvmOverloads constructor(
         tracePaint.strokeWidth = maxOf(columnWidth, density)
         canvas.drawLines(lines, tracePaint)
         tracePaint.strokeWidth = TRACE_WIDTH * density
+        if (slow) {
+            canvas.restore()
+        }
     }
 
     private fun padding() = density * 4
@@ -1057,21 +1141,6 @@ class SidDashboardView @JvmOverloads constructor(
         private const val MAX_VOICES = 64
 
         private const val STATUS_PERIOD_NS = 500_000_000L
-
-        // ~30fps
-        private const val UPDATE_PERIOD_NS = 31_000_000L
-
-        private fun ByteArray.sameRange(rh: ByteArray, size: Int): Boolean {
-            if (this.size < size || rh.size < size) {
-                return false
-            }
-            for (idx in 0 until size) {
-                if (this[idx] != rh[idx]) {
-                    return false
-                }
-            }
-            return true
-        }
 
         // Waveform bits and flags: Sync, Ring modulation, Test, Filtered
         internal fun waveTitle(control: Int, filtered: Boolean) = buildString {

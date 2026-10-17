@@ -38,6 +38,11 @@ interface ScopeDisplay {
     var maxFps: Int
 
     /**
+     * Receiver of dashboard gauges requested together with waveforms
+     */
+    var gauges: GaugesExchange?
+
+    /**
      * @param src source of data or null to stop updating (last picture is kept)
      * @param isLive false to display single picture from source (e.g. paused playback)
      */

@@ -19,6 +19,8 @@ object VisualizerStub : Visualizer {
 
     override fun getVoiceGauges(data: ByteArray, waveWindowMs: Int) = 0
 
+    override fun getFrame(data: ShortArray, points: Int, windowMs: Int, gauges: ByteArray, gaugesKind: Int, waveWindowMs: Int) = 0L
+
     override fun getLayout() = ""
 
     override fun getStatus() = ""

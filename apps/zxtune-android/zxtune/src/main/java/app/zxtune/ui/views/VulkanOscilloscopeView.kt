@@ -57,6 +57,8 @@ class VulkanOscilloscopeView internal constructor(
 
     override var windowMs by feed::windowMs
 
+    override var gauges by feed::gauges
+
     @Volatile
     override var gainPercent = OscilloscopeView.AUTO_GAIN
 
@@ -67,8 +69,16 @@ class VulkanOscilloscopeView internal constructor(
             activity.update()
         }
 
+    // the same string while statistics are not changed, so dashboard doesn't split it at each frame
+    private var statsSource = ""
+    private var statsText = ""
+
     override fun getStatistics() = feed.stats.text.let { stats ->
-        if (stats.isNotEmpty() && description.isNotEmpty()) "$stats\nvk: $description" else stats
+        if (stats !== statsSource) {
+            statsSource = stats
+            statsText = if (stats.isNotEmpty() && description.isNotEmpty()) "$stats\nvk: $description" else stats
+        }
+        statsText
     }
 
     override fun setSource(src: Visualizer?, isLive: Boolean) {

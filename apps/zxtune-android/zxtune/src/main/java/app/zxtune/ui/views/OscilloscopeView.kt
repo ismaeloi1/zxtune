@@ -68,6 +68,8 @@ class OscilloscopeView @JvmOverloads constructor(
 
     override var windowMs by feed::windowMs
 
+    override var gauges by feed::gauges
+
     @Volatile
     override var gainPercent = AUTO_GAIN
 

@@ -69,7 +69,9 @@ class VisualizerFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) = MediaModel.of(requireActivity()).run {
         analyzer = view.findViewById(R.id.spectrum)
         oscilloscope = view.findViewById(R.id.oscilloscope)
-        dashboard = view.findViewById(R.id.dashboard)
+        dashboard = view.findViewById<SidDashboardView>(R.id.dashboard).also {
+            it.attachTo(oscilloscope)
+        }
         val oscilloscopePanel = view.findViewById<View>(R.id.oscilloscope_panel)
         val coverArtView = view.findViewById<ImageView>(R.id.coverart)
         // TODO: use clicks stream, state may switch different modes
