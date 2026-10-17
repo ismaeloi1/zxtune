@@ -95,6 +95,110 @@ namespace Sound
     }
   }
 
+  // Post trigger slides to exact rising edge at full rate, so subsampled search error is removed
+  void TestPostTrigger()
+  {
+    VectorWave wave;
+    const auto phases = MakePulse(wave, 220, 220);
+    CorrelationTrigger::Config cfg;
+    cfg.PostRadius = 4;
+    CorrelationTrigger trigger(KERNEL, STRIDE, SAMPLERATE, cfg);
+    const double samplesPerPeriod = double(SAMPLERATE) / 220;
+    double maxDeviation = 0;
+    for (uint_t frame = 30; frame < 300; ++frame)
+    {
+      const auto result = trigger.GetTrigger(wave, int64_t(frame) * FRAME, FRAME);
+      // the first sample of high level, i.e. phase is less than one sample after edge
+      const auto phase = phases[result];
+      maxDeviation = std::max(maxDeviation, std::min(phase, 1 - phase) * samplesPerPeriod);
+    }
+    std::cout << "Post trigger: max deviation " << maxDeviation << " samples" << std::endl;
+    if (maxDeviation > 1)
+    {
+      throw std::runtime_error("Imprecise post trigger");
+    }
+  }
+
+  // Falling edge of pulse is at phase 0.3 of MakePulse
+  void TestFallingEdge()
+  {
+    VectorWave wave;
+    const auto phases = MakePulse(wave, 220, 220);
+    CorrelationTrigger::Config cfg;
+    cfg.EdgeDirection = -1;
+    cfg.PostRadius = 4;
+    CorrelationTrigger trigger(KERNEL, STRIDE, SAMPLERATE, cfg);
+    double maxDeviation = 0;
+    for (uint_t frame = 30; frame < 300; ++frame)
+    {
+      const auto result = trigger.GetTrigger(wave, int64_t(frame) * FRAME, FRAME);
+      maxDeviation = std::max(maxDeviation, std::abs(phases[result] - 0.3));
+    }
+    std::cout << "Falling edge: max phase deviation " << maxDeviation << std::endl;
+    if (maxDeviation > 0.02)
+    {
+      throw std::runtime_error("Falling edge is not tracked");
+    }
+  }
+
+  // Note changes by fifth up and down each 0.5s, trigger should lock to the new note quickly
+  void TestNoteChanges(bool pitchTracking)
+  {
+    VectorWave wave;
+    const std::size_t size = SAMPLERATE * 4;
+    wave.Data.resize(size);
+    std::vector<double> phases(size);
+    double phase = 0;
+    for (std::size_t idx = 0; idx < size; ++idx)
+    {
+      phases[idx] = phase - std::floor(phase);
+      wave.Data[idx] = (phases[idx] < 0.3 ? 0.6f : -0.6f) + 0.2f * std::sin(2 * 3.14159265 * 3 * phase);
+      phase += ((idx / (SAMPLERATE / 2)) & 1 ? 330.0 : 220.0) / SAMPLERATE;
+    }
+    CorrelationTrigger::Config cfg;
+    cfg.PitchTracking = pitchTracking;
+    CorrelationTrigger trigger(KERNEL, STRIDE, SAMPLERATE, cfg);
+    uint_t unlocked = 0;
+    uint_t frames = 0;
+    for (uint_t frame = 30; frame * FRAME < size - SAMPLERATE / 10; ++frame, ++frames)
+    {
+      const auto result = trigger.GetTrigger(wave, int64_t(frame) * FRAME, FRAME);
+      const auto ph = phases[result];
+      unlocked += std::min(ph, 1 - ph) > 0.05;
+    }
+    std::cout << "Note changes (pitch tracking " << pitchTracking << "): unlocked frames " << unlocked << "/" << frames
+              << std::endl;
+    // each note change may take a few frames
+    if (unlocked > 8 * 3)
+    {
+      throw std::runtime_error("Note changes are not tracked");
+    }
+  }
+
+  // Postponed searches keep phase by extrapolation
+  void TestPostponedSearches()
+  {
+    VectorWave wave;
+    const auto phases = MakePulse(wave, 220, 233);
+    CorrelationTrigger trigger(KERNEL, STRIDE, SAMPLERATE, LimitedRate(60));
+    double maxDeviation = 0;
+    uint_t searches = 0;
+    for (uint_t frame = 30; frame < 300; ++frame)
+    {
+      // only every third frame is allowed to search
+      const auto result = trigger.GetTrigger(wave, int64_t(frame) * FRAME, FRAME, frame % 3 == 0);
+      searches += trigger.IsSearched();
+      const auto phase = phases[result];
+      maxDeviation = std::max(maxDeviation, std::min(phase, 1 - phase));
+    }
+    std::cout << "Postponed searches: max phase deviation " << maxDeviation << ", searches " << searches << "/270"
+              << std::endl;
+    if (maxDeviation > 0.05 || searches > 100)
+    {
+      throw std::runtime_error("Postponed searches failed");
+    }
+  }
+
   void TestSilence()
   {
     VectorWave wave;
@@ -125,6 +229,11 @@ int main()
     Sound::TestPhaseLock(220, 233, Sound::LimitedRate(60));
     Sound::TestPhaseLock(880, 900, Sound::LimitedRate(60));
     Sound::TestSilence();
+    Sound::TestPostTrigger();
+    Sound::TestFallingEdge();
+    Sound::TestNoteChanges(false);
+    Sound::TestNoteChanges(true);
+    Sound::TestPostponedSearches();
     std::cout << "All tests passed" << std::endl;
     return 0;
   }
