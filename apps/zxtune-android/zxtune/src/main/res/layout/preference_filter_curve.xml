@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Chart takes the whole width of preferences list, title is aligned with other preferences -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="?android:attr/listPreferredItemPaddingLeft"
+        android:paddingLeft="?android:attr/listPreferredItemPaddingLeft"
+        android:paddingTop="8dp"
+        android:paddingEnd="?android:attr/listPreferredItemPaddingRight"
+        android:paddingRight="?android:attr/listPreferredItemPaddingRight"
+        android:paddingBottom="8dp">
+
+    <TextView
+            android:id="@android:id/title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceListItem" />
+
+    <app.zxtune.ui.views.FilterCurveView
+            android:id="@+id/filter_curve"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+</LinearLayout>

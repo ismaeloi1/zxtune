@@ -275,6 +275,25 @@
                 android:defaultValue="@integer/pref_zxtune_sid_filter_default"
                 android:key="zxtune.core.sid.filter"
                 app:title="@string/pref_zxtune_sid_filter_title" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_sid_filter_preset_default"
+                android:entries="@array/pref_zxtune_sid_filter_6581_preset_entries"
+                android:entryValues="@array/pref_zxtune_sid_filter_6581_preset_values"
+                android:key="zxtune.core.sid.filter_6581_preset"
+                android:title="@string/pref_zxtune_sid_filter_6581_preset_title"
+                app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_sid_filter_preset_default"
+                android:entries="@array/pref_zxtune_sid_filter_8580_preset_entries"
+                android:entryValues="@array/pref_zxtune_sid_filter_8580_preset_values"
+                android:key="zxtune.core.sid.filter_8580_preset"
+                android:title="@string/pref_zxtune_sid_filter_8580_preset_title"
+                app:useSimpleSummaryProvider="true" />
+        <app.zxtune.ui.FilterCurvePreference
+                android:key="ui.sid.filter_curve"
+                android:persistent="false"
+                android:selectable="false"
+                android:title="@string/pref_zxtune_sid_filter_curve_title" />
         <SwitchPreferenceCompat
                 android:defaultValue="@integer/pref_zxtune_sid_digiboost_default"
                 android:key="zxtune.core.sid.digiboost"
@@ -283,12 +302,13 @@
         <SeekBarPreference
                 android:defaultValue="@integer/pref_zxtune_sid_filter_bias_default"
                 android:key="zxtune.core.sid.filter_bias"
-                android:max="500"
+                android:max="1000"
                 android:summary="@string/pref_zxtune_sid_filter_bias_summary"
                 android:title="@string/pref_zxtune_sid_filter_bias_title"
-                app:min="-500"
+                app:min="-1000"
                 app:seekBarIncrement="10"
-                app:showSeekBarValue="true" />
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
         <SeekBarPreference
                 android:defaultValue="@integer/pref_zxtune_sid_filter_6581_curve_default"
                 android:key="zxtune.core.sid.filter_6581_curve"
@@ -296,7 +316,8 @@
                 android:summary="@string/pref_zxtune_sid_filter_curve_summary"
                 android:title="@string/pref_zxtune_sid_filter_6581_curve_title"
                 app:min="0"
-                app:showSeekBarValue="true" />
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
         <SeekBarPreference
                 android:defaultValue="@integer/pref_zxtune_sid_filter_6581_range_default"
                 android:key="zxtune.core.sid.filter_6581_range"
@@ -304,7 +325,8 @@
                 android:summary="@string/pref_zxtune_sid_filter_range_summary"
                 android:title="@string/pref_zxtune_sid_filter_6581_range_title"
                 app:min="0"
-                app:showSeekBarValue="true" />
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
         <SeekBarPreference
                 android:defaultValue="@integer/pref_zxtune_sid_filter_8580_curve_default"
                 android:key="zxtune.core.sid.filter_8580_curve"
@@ -312,7 +334,8 @@
                 android:summary="@string/pref_zxtune_sid_filter_curve_summary"
                 android:title="@string/pref_zxtune_sid_filter_8580_curve_title"
                 app:min="0"
-                app:showSeekBarValue="true" />
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
         <DropDownPreference
                 android:defaultValue="@string/pref_zxtune_sid_combined_waveforms_default"
                 android:entries="@array/pref_zxtune_sid_combined_waveforms_entries"

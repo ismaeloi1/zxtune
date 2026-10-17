@@ -296,7 +296,7 @@
     <integer name="pref_zxtune_sid_digiboost_default">0</integer>
     <!-- zxtune.core.sid.filter_bias -->
     <string name="pref_zxtune_sid_filter_bias_title">reSID: MOS6581 filter bias, mV</string>
-    <string name="pref_zxtune_sid_filter_bias_summary">reSID engine, MOS6581 only: shifts filter cutoff frequency mapping</string>
+    <string name="pref_zxtune_sid_filter_bias_summary">reSID engine, MOS6581 custom filter only: shifts filter cutoff frequency mapping</string>
     <integer name="pref_zxtune_sid_filter_bias_default">0</integer>
     <!-- zxtune.core.sid.filter_*_curve/range -->
     <string name="pref_zxtune_sid_filter_6581_curve_title">reSIDfp: MOS6581 filter curve</string>
@@ -305,8 +305,100 @@
     <integer name="pref_zxtune_sid_filter_6581_range_default">50</integer>
     <string name="pref_zxtune_sid_filter_8580_curve_title">reSIDfp: MOS8580 filter curve</string>
     <integer name="pref_zxtune_sid_filter_8580_curve_default">50</integer>
-    <string name="pref_zxtune_sid_filter_curve_summary">reSIDfp engine only: 0 - light, 100 - dark</string>
-    <string name="pref_zxtune_sid_filter_range_summary">reSIDfp engine only: 0 - dark, 100 - light</string>
+    <string name="pref_zxtune_sid_filter_curve_summary">reSIDfp engine, custom filter only: 0 - light, 100 - dark</string>
+    <string name="pref_zxtune_sid_filter_range_summary">reSIDfp engine, custom filter only: 0 - dark, 100 - light</string>
+    <!-- zxtune.core.sid.filter_*_preset, ids match module/players/external/sid/filters.cpp -->
+    <string name="pref_zxtune_sid_filter_6581_preset_title">MOS6581 filter preset</string>
+    <string name="pref_zxtune_sid_filter_8580_preset_title">MOS8580 filter preset</string>
+    <string-array name="pref_zxtune_sid_filter_6581_preset_entries" translatable="false">
+        <item>Custom</item>
+        <item>JSIDPlay2 reSID: Lightest</item>
+        <item>JSIDPlay2 reSID: Lighter</item>
+        <item>JSIDPlay2 reSID: Light</item>
+        <item>JSIDPlay2 reSID: Average</item>
+        <item>JSIDPlay2 reSID: Dark</item>
+        <item>JSIDPlay2 reSID: Darker</item>
+        <item>JSIDPlay2 reSID: Darkest</item>
+        <item>VICE default (reSID bias +500 mV)</item>
+        <item>ReSID 6581 (resid-fp fit)</item>
+        <item>Alankila 6581R4AR 3789</item>
+        <item>Alankila 6581R3 3984 #1</item>
+        <item>Alankila 6581R3 3984 #2</item>
+        <item>Lord Nightmare 6581R3 4285</item>
+        <item>Lord Nightmare 6581R3 4485</item>
+        <item>Lord Nightmare 6581R4 1986S</item>
+        <item>ZrX 6581R3 0384</item>
+        <item>ZrX 6581R3 1984</item>
+        <item>ZrX 6581R3 3684</item>
+        <item>ZrX 6581R3 3985</item>
+        <item>ZrX 6581R4AR 2286</item>
+        <item>Trurl 6581R3 0784</item>
+        <item>Trurl 6581R3 0486S</item>
+        <item>Trurl 6581R3 3384</item>
+        <item>Trurl 6581R3 4885</item>
+        <item>Trurl 6581R4AR 3789</item>
+        <item>Trurl 6581R4AR 4486</item>
+        <item>Nata 6581R3 2083</item>
+        <item>Grue 6581R4AR 3488</item>
+        <item>KruLLo</item>
+        <item>Enigma 6581R3 4885</item>
+        <item>Enigma 6581R3 1585</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_filter_6581_preset_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+        <item>11</item>
+        <item>12</item>
+        <item>13</item>
+        <item>14</item>
+        <item>15</item>
+        <item>16</item>
+        <item>17</item>
+        <item>18</item>
+        <item>19</item>
+        <item>20</item>
+        <item>21</item>
+        <item>22</item>
+        <item>23</item>
+        <item>24</item>
+        <item>25</item>
+        <item>26</item>
+        <item>27</item>
+        <item>28</item>
+        <item>29</item>
+        <item>30</item>
+        <item>31</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_filter_8580_preset_entries" translatable="false">
+        <item>Custom</item>
+        <item>JSIDPlay2 reSID: Light</item>
+        <item>JSIDPlay2 reSID: Average</item>
+        <item>JSIDPlay2 reSID: Dark</item>
+        <item>Trurl 8580R5 1489</item>
+        <item>Trurl 8580R5 3691</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_filter_8580_preset_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+    </string-array>
+    <string name="pref_zxtune_sid_filter_preset_default" translatable="false">0</string>
+    <string name="pref_zxtune_sid_filter_curve_title">Filter cutoff curve</string>
+    <string name="pref_zxtune_sid_filter_curve_legend_emulated">emulated</string>
+    <string name="pref_zxtune_sid_filter_curve_legend_reference">preset reference</string>
+    <string name="pref_zxtune_sid_filter_curve_idle">Cutoff register \u2192 frequency. Play a SID tune to see live cutoff</string>
     <!-- zxtune.core.sid.combined_waveforms -->
     <string name="pref_zxtune_sid_combined_waveforms_title">reSIDfp: combined waveforms</string>
     <string-array name="pref_zxtune_sid_combined_waveforms_entries">

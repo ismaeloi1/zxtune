@@ -48,6 +48,8 @@ class EnginePreferencesTest {
         "zxtune.core.sid.filter_6581_range" to "50",
         "zxtune.core.sid.filter_8580_curve" to "50",
         "zxtune.core.sid.combined_waveforms" to "0",
+        "zxtune.core.sid.filter_6581_preset" to "0",
+        "zxtune.core.sid.filter_8580_preset" to "0",
         "zxtune.core.mt32.model" to "0",
         "zxtune.core.mt32.voices" to "0",
     )
