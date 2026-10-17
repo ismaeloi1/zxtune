@@ -69,7 +69,8 @@ def load_snsf(path: str, depth: int = 0) -> Tuple[bytearray, Dict[str, str]]:
     """Resolve an SNSF (and its _lib chain) into a ROM image. Returns (rom, merged tags)."""
     if depth > 10:
         raise ValueError("_lib nesting too deep")
-    data = open(path, "rb").read()
+    with open(path, "rb") as f:
+        data = f.read()
     version, program, _reserved, tags = unpack_psf(data)
     if version != SNSF_VERSION:
         raise ValueError(f"not an SNSF (version {version:#x})")
@@ -84,7 +85,8 @@ def load_snsf(path: str, depth: int = 0) -> Tuple[bytearray, Dict[str, str]]:
     while f"_lib{n}" in tags:
         lib_img, _ = load_snsf(os.path.join(base, tags[f"_lib{n}"]), depth + 1)
         # additional libs overlay only their own region
-        lib_prog = unpack_psf(open(os.path.join(base, tags[f"_lib{n}"]), "rb").read())[1]
+        with open(os.path.join(base, tags[f"_lib{n}"]), "rb") as f:
+            lib_prog = unpack_psf(f.read())[1]
         _apply(image, lib_prog)
         n += 1
     merged.update({k: v for k, v in tags.items() if not k.startswith("_lib")})

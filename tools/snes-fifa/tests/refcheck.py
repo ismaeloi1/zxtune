@@ -13,7 +13,8 @@ def bapu_spc700_reference():
     path = os.path.join(SNES9X, "apu", "bapu", "smp", "debugger", "disassembler.cpp")
     if not os.path.exists(path):
         return None
-    src = open(path).read()
+    with open(path) as f:
+        src = f.read()
     entries = re.findall(r'case 0x([0-9a-f]{2}): sprintf\(t, "([^"]*)"(.*?)\);\s*break;', src)
     out = []
     b1, b2, pc = 0x34, 0x92, 0x1000
@@ -40,7 +41,8 @@ def snes9x_65816_reference():
     path = os.path.join(SNES9X, "debug.cpp")
     if not os.path.exists(path):
         return None
-    src = open(path).read()
+    with open(path) as f:
+        src = f.read()
     mn = re.search(r"S9xMnemonics\[256\]\s*=\s*\{(.*?)\};", src, re.S).group(1)
     mnem = re.findall(r'"([A-Z]{3})"', mn)
     am = re.search(r"AddrModes\[256\]\s*=\s*\{(.*?)\};", src, re.S).group(1)
