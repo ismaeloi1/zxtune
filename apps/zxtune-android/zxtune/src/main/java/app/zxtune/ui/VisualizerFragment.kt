@@ -129,6 +129,9 @@ class VisualizerFragment : Fragment() {
             launch {
                 // may be changed in preferences
                 OscilloscopeSettings.apply(requireContext(), oscilloscope, dashboard)
+                OscilloscopeSettings.changes.collect {
+                    OscilloscopeSettings.apply(requireContext(), oscilloscope, dashboard)
+                }
             }
             launch {
                 playingSource.collectLatest { src ->
@@ -182,6 +185,7 @@ class VisualizerFragment : Fragment() {
     private var controlsState = State.OFF
     private var switchMode: (() -> Unit)? = null
     private var fullscreenItem: MenuItem? = null
+    private var settingsItem: MenuItem? = null
     private var modeItem: MenuItem? = null
 
     // Items are updated directly, invalidating menu would recreate items of all the host's providers
@@ -189,6 +193,7 @@ class VisualizerFragment : Fragment() {
         override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
             menuInflater.inflate(R.menu.visualizer, menu)
             fullscreenItem = menu.item(R.id.action_visualizer_fullscreen)
+            settingsItem = menu.item(R.id.action_visualizer_settings)
             modeItem = menu.item(R.id.action_visualizer_mode)
             updateControls()
         }
@@ -196,6 +201,11 @@ class VisualizerFragment : Fragment() {
         override fun onMenuItemSelected(menuItem: MenuItem) = when (menuItem.itemId) {
             R.id.action_visualizer_fullscreen -> {
                 OscilloscopeActivity.start(requireContext())
+                true
+            }
+
+            R.id.action_visualizer_settings -> {
+                ScopeSettingsDialog.show(childFragmentManager)
                 true
             }
 
@@ -216,6 +226,7 @@ class VisualizerFragment : Fragment() {
     private fun updateControls() {
         val isScope = controlsState == State.OSCILLOSCOPE
         fullscreenItem?.isVisible = isScope
+        settingsItem?.isVisible = isScope
         modeItem?.run {
             isVisible = controlsState.isVisible
             setIcon(if (isScope) R.drawable.ic_spectrum else R.drawable.ic_oscilloscope)

@@ -26,6 +26,7 @@ import app.zxtune.preferences.Preferences
 import app.zxtune.preferences.VulkanDriver
 import app.zxtune.rescue.RescueActivity
 import app.zxtune.ui.CarDisclaimerDialog
+import app.zxtune.ui.TriggerPresetsBinding
 import app.zxtune.ui.utils.FragmentIntProperty
 import app.zxtune.ui.utils.ThemeUtils
 import app.zxtune.ui.utils.applyEdgeToEdge
@@ -43,6 +44,18 @@ class PreferencesActivity :
         private const val CAR_PREFERENCES_KEY = "ui.car"
         private const val CAR_LEGAL_KEY = "ui.car.legal"
         private const val RESCUE_KEY = "rescue"
+        private const val OSCILLOSCOPE_KEY = "ui.oscilloscope"
+
+        /**
+         * Nested screens opened by preferences with android:fragment attribute
+         */
+        @XmlRes
+        fun nestedScreenOf(key: String?) = when (key) {
+            "zxtune.sound.mixer.3" -> R.xml.preferences_mixer3
+            CAR_PREFERENCES_KEY -> R.xml.preferences_car
+            OSCILLOSCOPE_KEY -> R.xml.preferences_oscilloscope
+            else -> null
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -70,11 +83,7 @@ class PreferencesActivity :
     override fun onPreferenceStartFragment(
         caller: PreferenceFragmentCompat,
         pref: Preference
-    ) = when (pref.key) {
-        "zxtune.sound.mixer.3" -> openNested(R.xml.preferences_mixer3)
-        CAR_PREFERENCES_KEY -> openNested(R.xml.preferences_car)
-        else -> false
-    }
+    ) = nestedScreenOf(pref.key)?.let { openNested(it) } ?: false
 
     private fun openNested(@XmlRes layout: Int): Boolean {
         supportFragmentManager
@@ -112,6 +121,7 @@ class PreferencesActivity :
             }
             setupCarPreferences()
             setupVulkanDriverPreferences()
+            TriggerPresetsBinding.bind(this)
             findPreference<Preference>(RESCUE_KEY)?.setOnPreferenceClickListener {
                 startActivity(RescueActivity.createIntent(requireContext()))
                 true

@@ -75,4 +75,15 @@
         <item name="android:background">?android:colorBackground</item>
         <item name="android:windowNoTitle">false</item>
     </style>
+
+    <!-- Live settings panel over oscilloscope: oscilloscope is visible and animated behind it -->
+    <style name="ScopeSettingsDialog" parent="Theme.AppCompat.Dialog">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowCloseOnTouchOutside">true</item>
+        <item name="colorAccent">@color/accent</item>
+    </style>
 </resources>
