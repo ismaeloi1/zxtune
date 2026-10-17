@@ -11,6 +11,7 @@
 #pragma once
 
 #include "module/voices_scope.h"
+#include "parameters/accessor.h"
 #include "sound/chunk.h"
 
 #include "string_type.h"
@@ -53,14 +54,18 @@ namespace Sound
     //! @param points points per channel to get
     //! @param playing index of currently heard sample (as passed to Played), negative to estimate it internally
     //! @param windowMs displayed waveform duration (corrscope's render_ms)
-    //! @param target [channels][points] array of normalized samples
+    //! @param target [channels][points] array of normalized samples. If window contains more samples than points,
+    //!        each pair of points is minimum and maximum (in time order) of corresponding samples range
+    //!        (as oscilloscope displays them), else samples are linearly interpolated
     virtual Layout Get(uint_t maxChannels, uint_t points, int64_t playing, uint_t windowMs, int16_t* target) = 0;
 
     //! Gauges layout per chip (JSIDPlay2-like):
     //! - GAUGES_COUNT gauges by GAUGE_COLUMNS columns of (min, max) bytes, normalized to 0..255
     //!   order: wave1..3, envelope1..3, frequency1..3, volume, resonance, cutoff
     //!   wave and volume gauges cover requested window, others are 16384 cycles per column (~4.2s)
-    //! - last chip registers 0x00..0x18 snapshot padded to STATE_RECORD_SIZE
+    //!   slow columns are aligned to absolute position, the last one is in progress
+    //! - last chip registers 0x00..0x18, oscillators 0x19..0x1b, envelopes 0x1c..0x1e snapshot
+    //! - progress of the last slow column (0..255) at STATE_RECORD_SIZE - 1 for smooth scrolling
     static const uint_t GAUGES_COUNT = 12;
     static const uint_t GAUGE_COLUMNS = 256;
     static const uint_t STATE_RECORD_SIZE = 32;
@@ -81,9 +86,10 @@ namespace Sound
     //! Gauges layout per voice of chips without registers:
     //! - VOICE_GAUGES_COUNT gauges by GAUGE_COLUMNS columns of (min, max) bytes, normalized to 0..255
     //!   order: wave (covers requested window), level (dB down to -48dB), frequency (log scale, 7 octaves from A0)
-    //!   level and frequency are 16384 C64 cycles per column, as for SID gauges
+    //!   level and frequency are 16384 C64 cycles per column, as for SID gauges (including alignment)
     //! - last voice state: frequency (float Hz), level (float dB), flags, kind (see Module::VoiceState),
     //!   12 bytes of chip specific fields, 16 bytes of text, padded to VOICE_STATE_SIZE, little endian
+    //! - progress of the last slow column (0..255) at VOICE_STATE_SIZE - 1
     static const uint_t VOICE_GAUGES_COUNT = 3;
     static const uint_t VOICE_STATE_SIZE = 48;
     static const uint_t VOICE_GAUGES_SIZE = VOICE_GAUGES_COUNT * GAUGE_COLUMNS * 2 + VOICE_STATE_SIZE;
@@ -99,5 +105,7 @@ namespace Sound
     virtual String GetStatus() const = 0;
 
     static Ptr Create(uint_t samplerate);
+    //! @param params trigger configuration (see Parameters::ZXTune::Sound::Scope), changes are applied on the fly
+    static Ptr Create(uint_t samplerate, Parameters::Accessor::Ptr params);
   };
 }  // namespace Sound
