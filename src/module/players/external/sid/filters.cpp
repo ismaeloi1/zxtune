@@ -12,10 +12,12 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numbers>
+// <numbers> is missing in the Android NDK libc++
+#include <cmath>
 
 namespace Module::Sid
 {
+  constexpr double PI = 3.14159265358979323846;
   const uint_t CUTOFF_BITS = 11;
 
   /*
@@ -147,7 +149,7 @@ namespace Module::Sid
       const auto base = Params[0];
       const auto dynamic = Params[3] + Params[1] / std::pow(Params[2], GetKinkedDac(fc, Params[4]));
       const auto resistance = base * dynamic / (base + dynamic);
-      return std::sqrt(Params[5]) / (2 * std::numbers::pi * 470e-12 * resistance);
+      return std::sqrt(Params[5]) / (2 * PI * 470e-12 * resistance);
     }
     default:
       return Params[0] * fc + Params[1];
@@ -266,7 +268,7 @@ namespace Module::Sid
       const auto u = (vg - VTH - WORKING_POINT) / (2 * UT);
       // d/dVd of Is*ln^2(1 + e^u), Is = 2*uCox*Ut^2*W/L
       const auto vcr = 2 * UT * WL_VCR * uCox * std::log1p(std::exp(u)) / (1 + std::exp(-u));
-      return (snake + vcr) / (2 * std::numbers::pi * CAPACITOR);
+      return (snake + vcr) / (2 * PI * CAPACITOR);
     }
 
     struct Correction
@@ -364,8 +366,7 @@ namespace Module::Sid
       // where Filter8580::setFilterCurve maps curve to cp = 1.8 - curve * 3/5
       const auto cp = 1.8 - std::clamp(curve, 0.0, 1.0) * 3 / 5;
       const auto vgst = 4.76 * cp - VTH_8580 - WORKING_POINT_8580;
-      return Correct(RESIDFP_8580_CORRECTION,
-                     UCOX_8580 * Get8580DacWL(fc) * vgst / (2 * std::numbers::pi * CAPACITOR_8580));
+      return Correct(RESIDFP_8580_CORRECTION, UCOX_8580 * Get8580DacWL(fc) * vgst / (2 * PI * CAPACITOR_8580));
     }
 
     double GetResid8580Cutoff(uint_t fc, double maxCutoff)
