@@ -50,7 +50,11 @@ void LogEvent(const char* kind, int port, int value) {
           (unsigned long long)snesfifa_smp_clock, g_frame, CPU.Cycles, g_last_pc);
 }
 
-void OnCpuWrite(int port, uint8 v) { LogEvent("CW", port, v); }
+void OnCpuWrite(int port, uint8 v) {
+  LogEvent("CW", port, v);
+  // log the first read after every write, so the value a polling loop waited for is kept
+  for (int p = 0; p < 4; ++p) g_last_read[p] = -1;
+}
 
 void OnCpuRead(int port, uint8 v) {
   if (g_reads_mode == 0) return;
@@ -284,7 +288,7 @@ int main(int argc, char** argv) {
         uint32_t addr = strtoul(fa.arg.substr(0, e).c_str(), nullptr, 16) & 0x1ffff;
         Memory.RAM[addr] = strtoul(fa.arg.substr(e + 1).c_str(), nullptr, 16);
       }
-      if (g_log) fprintf(g_log, "# frame %u action %s %s\n", g_frame, fa.kind.c_str(), fa.arg.c_str());
+      if (g_log) fprintf(g_log, "# frame %u action %s %s smp_clock %llu\n", g_frame, fa.kind.c_str(), fa.arg.c_str(), (unsigned long long)snesfifa_smp_clock);
     }
   }
   if (g_log) fclose(g_log);
