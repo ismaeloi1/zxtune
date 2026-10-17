@@ -44,8 +44,15 @@ class OscilloscopeActivity : AppCompatActivity() {
         setupImmersiveMode()
         oscilloscope = OscilloscopeFrame(this).apply {
             setOnClickListener { finish() }
+            // live settings panel over oscilloscope
+            setOnLongClickListener {
+                ScopeSettingsDialog.show(supportFragmentManager)
+                true
+            }
         }
-        dashboard = SidDashboardView(this)
+        dashboard = SidDashboardView(this).also {
+            it.attachTo(oscilloscope)
+        }
         val panel = ScopePanelLayout(this).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -71,6 +78,9 @@ class OscilloscopeActivity : AppCompatActivity() {
             whenLifecycleStarted {
                 launch {
                     OscilloscopeSettings.apply(this@OscilloscopeActivity, oscilloscope, dashboard)
+                    OscilloscopeSettings.changes.collect {
+                        OscilloscopeSettings.apply(this@OscilloscopeActivity, oscilloscope, dashboard)
+                    }
                 }
                 visualizer.combine(playbackState) { visualizer, playbackState ->
                     ifNotNulls(visualizer, playbackState?.state) { src, state ->

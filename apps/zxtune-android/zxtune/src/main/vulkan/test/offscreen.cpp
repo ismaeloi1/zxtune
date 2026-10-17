@@ -222,7 +222,7 @@ namespace VulkanScope
   struct TestScene
   {
     static const uint32_t CHANNELS = 6;
-    static const uint32_t POINTS = 512;
+    static const uint32_t POINTS = 2048;
 
     std::vector<float> Traces;
     std::vector<uint8_t> Background;

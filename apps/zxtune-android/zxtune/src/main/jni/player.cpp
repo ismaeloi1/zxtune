@@ -242,9 +242,10 @@ namespace
       : Duration(holder.GetModuleInformation().Duration)
       , Samplerate(samplerate)
       , LocalParameters(Parameters::CreateSynchronizedContainer())
-      , Renderer(Module::CreatePipelinedRenderer(
-            holder, samplerate, Parameters::CreateMergedAccessor(LocalParameters, std::move(globalParams))))
-      , ScopeData(Sound::Scope::Create(samplerate))
+      , MergedParameters(Parameters::CreateMergedAccessor(LocalParameters, std::move(globalParams)))
+      , Renderer(Module::CreatePipelinedRenderer(holder, samplerate, MergedParameters))
+      // trigger settings are global options changed on the fly
+      , ScopeData(Sound::Scope::Create(samplerate, MergedParameters))
     {
       Require(Duration.Get() != 0);
       if (auto* const voices = dynamic_cast<Module::VoicesScopeSource*>(Renderer.get()))
@@ -375,6 +376,7 @@ namespace
     const Time::Milliseconds Duration;
     const uint_t Samplerate;
     const Parameters::Container::Ptr LocalParameters;
+    const Parameters::Accessor::Ptr MergedParameters;
     const Module::Renderer::Ptr Renderer;
     BufferTarget Buffer;
     RenderingPerformanceAccountant RenderingPerformance;

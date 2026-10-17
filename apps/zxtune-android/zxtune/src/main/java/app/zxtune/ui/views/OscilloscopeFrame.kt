@@ -52,6 +52,12 @@ class OscilloscopeFrame @JvmOverloads constructor(
             display?.maxFps = value
         }
 
+    override var gauges: GaugesExchange? = null
+        set(value) {
+            field = value
+            display?.gauges = value
+        }
+
     /**
      * @param preference see [ScopeBackend.select]
      * @param customDriver Vulkan driver to use instead of system one
@@ -126,6 +132,7 @@ class OscilloscopeFrame @JvmOverloads constructor(
         view.windowMs = windowMs
         view.gainPercent = gainPercent
         view.maxFps = maxFps
+        view.gauges = gauges
         view.setSource(source, isLive)
     }
 }

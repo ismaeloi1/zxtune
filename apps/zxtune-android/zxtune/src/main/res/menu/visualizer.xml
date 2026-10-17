@@ -11,6 +11,13 @@
             app:showAsAction="always"
             tools:ignore="AlwaysShowAction" />
     <item
+            android:id="@+id/action_visualizer_settings"
+            android:icon="@drawable/ic_tune"
+            android:title="@string/scope_settings"
+            android:visible="false"
+            app:showAsAction="always"
+            tools:ignore="AlwaysShowAction" />
+    <item
             android:id="@+id/action_visualizer_mode"
             android:icon="@drawable/ic_oscilloscope"
             android:title="@string/visualizer_oscilloscope"

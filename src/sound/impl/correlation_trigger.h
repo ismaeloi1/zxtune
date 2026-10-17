@@ -60,7 +60,7 @@ namespace Sound
   class CorrelationTrigger
   {
   public:
-    //! Default values match corrscope's template config
+    //! Default values match corrscope's template config (except post trigger, which is disabled there)
     struct Config
     {
       float EdgeStrength = 1.0f;
@@ -74,6 +74,14 @@ namespace Sound
       float MaxFreq = 4000.0f;
       float SlopeWidth = 0.25f;
       float ResetBelow = 0.3f;
+      //! Steep edges at zero crossings for waves without clear edges (e.g. NES triangle)
+      float SignStrength = 0.0f;
+      //! 1 for rising edges, -1 for falling ones (e.g. sampled trumpets)
+      int EdgeDirection = 1;
+      //! Rescale buffer on pitch changes, so waves don't jump on new notes
+      bool PitchTracking = true;
+      //! Zero crossing post trigger radius in full rate samples, 0 to disable
+      uint_t PostRadius = 0;
       //! Full correlation searches per second, 0 for each call. Triggers between searches keep phase of the last
       //! found one using estimated period, so higher display refresh rates don't cost more CPU
       uint_t MaxRate = 0;
@@ -88,8 +96,13 @@ namespace Sound
 
     //! @param pos estimated position of wave to display
     //! @param frameSamples distance between consequent calls
+    //! @param canSearch false to postpone due search (e.g. to spread searches of many triggers among frames), phase is
+    //!        extrapolated then (searches are performed at least 15 times per second anyway)
     //! @return found trigger position
-    int64_t GetTrigger(const TriggerWave& wave, int64_t pos, uint_t frameSamples);
+    int64_t GetTrigger(const TriggerWave& wave, int64_t pos, uint_t frameSamples, bool canSearch = true);
+
+    //! @return true if the next GetTrigger call should perform full search
+    bool IsSearchDue(uint_t frameSamples) const;
 
     //! @return true if last GetTrigger call performed full search
     bool IsSearched() const
@@ -116,8 +129,12 @@ namespace Sound
     void CorrelateValid2(const Buffer& data, const Buffer& kernel1, const std::vector<std::complex<float>>& spectrum2,
                          Buffer& result1, Buffer& result2);
     uint_t FindPeak(Buffer& corr, const Buffer& peaks, int radius) const;
-    bool Extrapolate(int64_t pos, uint_t samplesPerFrame, int64_t& trigger);
+    bool Extrapolate(const TriggerWave& wave, int64_t pos, uint_t samplesPerFrame, bool canSearch, int64_t& trigger);
     void UpdateBuffer(Buffer& data, float resultMean, uint_t period);
+    void GetData(const TriggerWave& wave, int64_t begin, uint_t count, uint_t stride, float* target) const;
+    void AmplifySigns();
+    void RescaleBuffer(uint_t period);
+    int64_t ZeroCrossing(const TriggerWave& wave, int64_t pos);
 
   private:
     const Config Cfg;
@@ -160,6 +177,8 @@ namespace Sound
     Buffer CorrQuality;
     Buffer Corr;
     Buffer Aligned;
+    Buffer Rescaled;
+    Buffer Around;
     std::vector<std::complex<float>> TmpA;
     std::vector<std::complex<float>> TmpB;
   };

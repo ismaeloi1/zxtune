@@ -161,53 +161,12 @@
     </PreferenceCategory>
     <!-- oscilloscope -->
     <PreferenceCategory android:title="@string/pref_oscilloscope_title">
-        <DropDownPreference
-                android:defaultValue="@string/pref_oscilloscope_gain_default"
-                android:entries="@array/pref_oscilloscope_gain_entries"
-                android:entryValues="@array/pref_oscilloscope_gain_values"
-                android:key="ui.oscilloscope.gain"
-                android:title="@string/pref_oscilloscope_gain_title"
-                app:useSimpleSummaryProvider="true" />
-        <DropDownPreference
-                android:defaultValue="@string/pref_oscilloscope_max_fps_default"
-                android:entries="@array/pref_oscilloscope_max_fps_entries"
-                android:entryValues="@array/pref_oscilloscope_max_fps_values"
-                android:key="ui.oscilloscope.max_fps"
-                android:title="@string/pref_oscilloscope_max_fps_title"
-                app:useSimpleSummaryProvider="true" />
-        <DropDownPreference
-                android:defaultValue="@string/pref_oscilloscope_backend_default"
-                android:entries="@array/pref_oscilloscope_backend_entries"
-                android:entryValues="@array/pref_oscilloscope_backend_values"
-                android:key="ui.oscilloscope.backend"
-                android:title="@string/pref_oscilloscope_backend_title"
-                app:useSimpleSummaryProvider="true" />
         <Preference
-                android:key="ui.oscilloscope.vulkan_driver"
+                android:fragment="app.zxtune.PreferencesActivity$Fragment"
+                android:key="ui.oscilloscope"
                 android:persistent="false"
-                android:title="@string/pref_oscilloscope_vulkan_driver_title"
-                android:summary="@string/pref_oscilloscope_vulkan_driver_summary_empty" />
-        <SwitchPreferenceCompat
-                android:defaultValue="false"
-                android:key="ui.oscilloscope.vulkan_driver.enabled"
-                android:summary="@string/pref_oscilloscope_vulkan_driver_enabled_summary"
-                android:title="@string/pref_oscilloscope_vulkan_driver_enabled_title" />
-        <SeekBarPreference
-                android:defaultValue="@integer/pref_oscilloscope_window_default"
-                android:key="ui.oscilloscope.window_ms"
-                android:max="100"
-                android:summary="@string/pref_oscilloscope_window_summary"
-                android:title="@string/pref_oscilloscope_window_title"
-                app:min="5"
-                app:showSeekBarValue="true" />
-        <SeekBarPreference
-                android:defaultValue="@integer/pref_oscilloscope_gauge_window_default"
-                android:key="ui.oscilloscope.gauge_window_ms"
-                android:max="40"
-                android:summary="@string/pref_oscilloscope_gauge_window_summary"
-                android:title="@string/pref_oscilloscope_gauge_window_title"
-                app:min="2"
-                app:showSeekBarValue="true" />
+                android:summary="@string/pref_oscilloscope_summary"
+                android:title="@string/pref_oscilloscope_title" />
     </PreferenceCategory>
     <!-- mt32 -->
     <PreferenceCategory android:title="@string/pref_zxtune_mt32_title">

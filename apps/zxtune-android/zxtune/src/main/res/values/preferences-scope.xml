@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- oscilloscope settings screen and overlay panel -->
+    <string name="pref_oscilloscope_summary">Display, trigger and performance</string>
+    <string name="pref_oscilloscope_display_title">Display</string>
+    <string name="pref_oscilloscope_trigger_title">Trigger</string>
+    <string name="pref_oscilloscope_trigger_summary">Correlation trigger as in corrscope: wave is aligned by edges and similarity with previous frames</string>
+    <string name="pref_oscilloscope_trigger_preset_title">Preset</string>
+    <string-array name="pref_oscilloscope_trigger_preset_entries">
+        <item>Default (stable, 60 ms)</item>
+        <item>corrscope template (40 ms)</item>
+        <item>Chiptune square/pulse</item>
+        <item>Bass, low notes</item>
+        <item>NES triangle</item>
+        <item>Power saving</item>
+        <item>Custom</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_trigger_preset_values" translatable="false">
+        <item>default</item>
+        <item>corrscope</item>
+        <item>chiptune</item>
+        <item>bass</item>
+        <item>triangle</item>
+        <item>power_saving</item>
+        <item>custom</item>
+    </string-array>
+    <string name="pref_oscilloscope_trigger_preset_default" translatable="false">default</string>
+    <string name="pref_oscilloscope_trigger_width_title">Trigger width, ms</string>
+    <string name="pref_oscilloscope_trigger_width_summary">History buffer size, should exceed two periods of the lowest notes</string>
+    <string name="pref_oscilloscope_trigger_edge_title">Edge strength, %</string>
+    <string name="pref_oscilloscope_trigger_edge_summary">Prefer steep rising edges: new notes are caught better, but sustained ones jump more</string>
+    <string name="pref_oscilloscope_trigger_slope_title">Slope width, % of period</string>
+    <string name="pref_oscilloscope_trigger_buffer_title">Buffer strength, %</string>
+    <string name="pref_oscilloscope_trigger_buffer_summary">Prefer similarity with previous frames</string>
+    <string name="pref_oscilloscope_trigger_responsiveness_title">Buffer responsiveness, %</string>
+    <string name="pref_oscilloscope_trigger_falloff_title">Buffer falloff, % of period</string>
+    <string name="pref_oscilloscope_trigger_reset_title">Reset below match, %</string>
+    <string name="pref_oscilloscope_trigger_reset_summary">Forget history on new notes when wave doesn\'t match it</string>
+    <string name="pref_oscilloscope_trigger_mean_title">DC removal rate, %</string>
+    <string name="pref_oscilloscope_trigger_sign_title">Sign amplification, %</string>
+    <string name="pref_oscilloscope_trigger_sign_summary">Steep zero crossings for waves without clear edges (e.g. triangle)</string>
+    <string name="pref_oscilloscope_trigger_diameter_title">Search range, % of width</string>
+    <string name="pref_oscilloscope_trigger_falling_title">Falling edges</string>
+    <string name="pref_oscilloscope_trigger_falling_summary">E.g. for sampled trumpets</string>
+    <string name="pref_oscilloscope_trigger_pitch_title">Pitch tracking</string>
+    <string name="pref_oscilloscope_trigger_pitch_summary">Rescale history on pitch changes</string>
+    <string name="pref_oscilloscope_trigger_post_title">Zero crossing post trigger, samples</string>
+    <string name="pref_oscilloscope_trigger_post_summary">Slide to the nearest rising zero crossing, 0 to disable</string>
+    <string name="pref_oscilloscope_trigger_rate_title">Full searches</string>
+    <string-array name="pref_oscilloscope_trigger_rate_entries">
+        <item>Every frame</item>
+        <item>60 per second</item>
+        <item>30 per second</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_trigger_rate_values" translatable="false">
+        <item>0</item>
+        <item>60</item>
+        <item>30</item>
+    </string-array>
+    <string name="pref_oscilloscope_trigger_rate_default" translatable="false">0</string>
+    <string name="pref_oscilloscope_trigger_subsampling_title">Trigger subsampling</string>
+    <string-array name="pref_oscilloscope_trigger_subsampling_entries">
+        <item>Automatic</item>
+        <item>None (full rate)</item>
+        <item>2</item>
+        <item>4</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_trigger_subsampling_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>4</item>
+    </string-array>
+    <string name="pref_oscilloscope_trigger_subsampling_default" translatable="false">0</string>
+    <string name="scope_settings">Live settings</string>
+</resources>

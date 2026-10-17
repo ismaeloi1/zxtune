@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Oscilloscope settings, used by preferences screen and live settings panel over oscilloscope -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="@string/pref_oscilloscope_display_title">
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_oscilloscope_window_default"
+                android:key="ui.oscilloscope.window_ms"
+                android:max="100"
+                android:summary="@string/pref_oscilloscope_window_summary"
+                android:title="@string/pref_oscilloscope_window_title"
+                app:min="5"
+                app:showSeekBarValue="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_oscilloscope_gain_default"
+                android:entries="@array/pref_oscilloscope_gain_entries"
+                android:entryValues="@array/pref_oscilloscope_gain_values"
+                android:key="ui.oscilloscope.gain"
+                android:title="@string/pref_oscilloscope_gain_title"
+                app:useSimpleSummaryProvider="true" />
+        <SeekBarPreference
+                android:defaultValue="@integer/pref_oscilloscope_gauge_window_default"
+                android:key="ui.oscilloscope.gauge_window_ms"
+                android:max="40"
+                android:summary="@string/pref_oscilloscope_gauge_window_summary"
+                android:title="@string/pref_oscilloscope_gauge_window_title"
+                app:min="2"
+                app:showSeekBarValue="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_oscilloscope_max_fps_default"
+                android:entries="@array/pref_oscilloscope_max_fps_entries"
+                android:entryValues="@array/pref_oscilloscope_max_fps_values"
+                android:key="ui.oscilloscope.max_fps"
+                android:title="@string/pref_oscilloscope_max_fps_title"
+                app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_oscilloscope_backend_default"
+                android:entries="@array/pref_oscilloscope_backend_entries"
+                android:entryValues="@array/pref_oscilloscope_backend_values"
+                android:key="ui.oscilloscope.backend"
+                android:title="@string/pref_oscilloscope_backend_title"
+                app:useSimpleSummaryProvider="true" />
+        <Preference
+                android:key="ui.oscilloscope.vulkan_driver"
+                android:persistent="false"
+                android:title="@string/pref_oscilloscope_vulkan_driver_title"
+                android:summary="@string/pref_oscilloscope_vulkan_driver_summary_empty" />
+        <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="ui.oscilloscope.vulkan_driver.enabled"
+                android:summary="@string/pref_oscilloscope_vulkan_driver_enabled_summary"
+                android:title="@string/pref_oscilloscope_vulkan_driver_enabled_title" />
+    </PreferenceCategory>
+    <!-- defaults are the same as native ones, see Parameters::ZXTune::Sound::Scope and TriggerPresets -->
+    <PreferenceCategory
+            android:summary="@string/pref_oscilloscope_trigger_summary"
+            android:title="@string/pref_oscilloscope_trigger_title">
+        <DropDownPreference
+                android:defaultValue="@string/pref_oscilloscope_trigger_preset_default"
+                android:entries="@array/pref_oscilloscope_trigger_preset_entries"
+                android:entryValues="@array/pref_oscilloscope_trigger_preset_values"
+                android:key="ui.oscilloscope.trigger_preset"
+                android:title="@string/pref_oscilloscope_trigger_preset_title"
+                app:useSimpleSummaryProvider="true" />
+        <SeekBarPreference
+                android:defaultValue="60"
+                android:key="zxtune.sound.scope.trigger.width"
+                android:max="200"
+                android:summary="@string/pref_oscilloscope_trigger_width_summary"
+                android:title="@string/pref_oscilloscope_trigger_width_title"
+                app:min="10"
+                app:seekBarIncrement="5"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="50"
+                android:key="zxtune.sound.scope.trigger.edge_strength"
+                android:max="300"
+                android:summary="@string/pref_oscilloscope_trigger_edge_summary"
+                android:title="@string/pref_oscilloscope_trigger_edge_title"
+                app:min="0"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="25"
+                android:key="zxtune.sound.scope.trigger.slope_width"
+                android:max="100"
+                android:title="@string/pref_oscilloscope_trigger_slope_title"
+                app:min="5"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="100"
+                android:key="zxtune.sound.scope.trigger.buffer_strength"
+                android:max="300"
+                android:summary="@string/pref_oscilloscope_trigger_buffer_summary"
+                android:title="@string/pref_oscilloscope_trigger_buffer_title"
+                app:min="0"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="100"
+                android:key="zxtune.sound.scope.trigger.responsiveness"
+                android:max="100"
+                android:title="@string/pref_oscilloscope_trigger_responsiveness_title"
+                app:min="0"
+                app:seekBarIncrement="5"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="50"
+                android:key="zxtune.sound.scope.trigger.buffer_falloff"
+                android:max="200"
+                android:title="@string/pref_oscilloscope_trigger_falloff_title"
+                app:min="10"
+                app:seekBarIncrement="5"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="70"
+                android:key="zxtune.sound.scope.trigger.reset_below"
+                android:max="100"
+                android:summary="@string/pref_oscilloscope_trigger_reset_summary"
+                android:title="@string/pref_oscilloscope_trigger_reset_title"
+                app:min="0"
+                app:seekBarIncrement="5"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.sound.scope.trigger.mean_responsiveness"
+                android:max="100"
+                android:title="@string/pref_oscilloscope_trigger_mean_title"
+                app:min="0"
+                app:seekBarIncrement="5"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.sound.scope.trigger.sign_strength"
+                android:max="300"
+                android:summary="@string/pref_oscilloscope_trigger_sign_summary"
+                android:title="@string/pref_oscilloscope_trigger_sign_title"
+                app:min="0"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true" />
+        <SeekBarPreference
+                android:defaultValue="50"
+                android:key="zxtune.sound.scope.trigger.diameter"
+                android:max="100"
+                android:title="@string/pref_oscilloscope_trigger_diameter_title"
+                app:min="10"
+                app:seekBarIncrement="5"
+                app:showSeekBarValue="true" />
+        <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:key="zxtune.sound.scope.trigger.falling"
+                android:summary="@string/pref_oscilloscope_trigger_falling_summary"
+                android:title="@string/pref_oscilloscope_trigger_falling_title" />
+        <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="zxtune.sound.scope.trigger.pitch_tracking"
+                android:summary="@string/pref_oscilloscope_trigger_pitch_summary"
+                android:title="@string/pref_oscilloscope_trigger_pitch_title" />
+        <SeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.sound.scope.trigger.post_radius"
+                android:max="16"
+                android:summary="@string/pref_oscilloscope_trigger_post_summary"
+                android:title="@string/pref_oscilloscope_trigger_post_title"
+                app:min="0"
+                app:showSeekBarValue="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_oscilloscope_trigger_rate_default"
+                android:entries="@array/pref_oscilloscope_trigger_rate_entries"
+                android:entryValues="@array/pref_oscilloscope_trigger_rate_values"
+                android:key="zxtune.sound.scope.trigger.search_rate"
+                android:title="@string/pref_oscilloscope_trigger_rate_title"
+                app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_oscilloscope_trigger_subsampling_default"
+                android:entries="@array/pref_oscilloscope_trigger_subsampling_entries"
+                android:entryValues="@array/pref_oscilloscope_trigger_subsampling_values"
+                android:key="zxtune.sound.scope.trigger.subsampling"
+                android:title="@string/pref_oscilloscope_trigger_subsampling_title"
+                app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+</PreferenceScreen>

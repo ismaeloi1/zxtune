@@ -3,6 +3,7 @@ package app.zxtune.device.car
 import android.graphics.Bitmap
 import android.graphics.Color
 import app.zxtune.playback.ChipGauges
+import app.zxtune.playback.FrameResult
 import app.zxtune.playback.Visualizer
 import app.zxtune.playback.VoiceGauges
 import kotlin.math.PI
@@ -43,6 +44,8 @@ class CarVisualRendererTest {
             fillGauges(data, chips * ChipGauges.SIZE)
             return chips
         }
+
+        override fun getFrame(data: ShortArray, points: Int, windowMs: Int, gauges: ByteArray, gaugesKind: Int, waveWindowMs: Int) = FrameResult.request(this, data, points, windowMs, gauges, gaugesKind, waveWindowMs)
 
         override fun getVoiceGauges(data: ByteArray, waveWindowMs: Int): Int {
             fillGauges(data, voices * VoiceGauges.SIZE)

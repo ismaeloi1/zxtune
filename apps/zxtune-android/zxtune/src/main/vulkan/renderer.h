@@ -33,7 +33,7 @@ namespace VulkanScope
   {
   public:
     static const uint32_t MAX_CHANNELS = 32;
-    static const uint32_t MAX_POINTS = 512;
+    static const uint32_t MAX_POINTS = 2048;
     static const int AUTO_GAIN = 0;
 
     //! @param finalLayout layout of targets after rendering (e.g. for presentation or copying)

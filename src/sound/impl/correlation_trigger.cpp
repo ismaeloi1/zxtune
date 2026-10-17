@@ -25,6 +25,12 @@ namespace Sound
     const float EDGE_COMPENSATION = 0.9f;
     const float MAX_AMPLIFICATION = 2.0f;
     const float PI = 3.14159265358979f;
+    // see corrscope's sign_times_peak
+    const float SIGN_AMPLIFICATION = 1000.0f;
+    // corrscope's SpectrumConfig.max_octaves_to_resample
+    const float MAX_OCTAVES_TO_RESAMPLE = 1.0f;
+    // postponed searches are performed at least this often
+    const uint_t MIN_SEARCH_RATE = 15;
 
     uint_t NextPowerOfTwo(uint_t val)
     {
@@ -85,7 +91,9 @@ namespace Sound
     return {a.real() * b.real() - a.imag() * b.imag(), a.real() * b.imag() + a.imag() * b.real()};
   }
 
-  // Iterative radix-2 complex FFT
+  // Iterative radix-2 complex FFT. Twiddles of each stage are stored contiguously (as separate real and imaginary
+  // parts) and butterflies operate on plain floats, so compilers vectorize inner loops (e.g. by NEON's interleaved
+  // loads). It's the main cost of triggering.
   class CorrelationTrigger::FFT
   {
   public:
@@ -93,15 +101,18 @@ namespace Sound
 
     explicit FFT(uint_t size)
       : Size(size)
-      , Twiddles(size / 2)
-      , InverseTwiddles(size / 2)
       , Reverse(size)
     {
-      for (uint_t idx = 0; idx < size / 2; ++idx)
+      // stages of len = 8..size, half of len twiddles each
+      for (uint_t half = 4; half < size; half <<= 1)
       {
-        const float angle = -2 * PI * idx / size;
-        Twiddles[idx] = Complex(std::cos(angle), std::sin(angle));
-        InverseTwiddles[idx] = std::conj(Twiddles[idx]);
+        for (uint_t idx = 0; idx < half; ++idx)
+        {
+          const double angle = -PI * double(idx) / half;
+          TwiddlesRe.push_back(static_cast<float>(std::cos(angle)));
+          TwiddlesIm.push_back(static_cast<float>(std::sin(angle)));
+          InverseTwiddlesIm.push_back(-TwiddlesIm.back());
+        }
       }
       uint_t bits = 0;
       while ((1u << bits) < size)
@@ -133,45 +144,92 @@ namespace Sound
           std::swap(data[idx], data[Reverse[idx]]);
         }
       }
-      // first stage has only trivial twiddle
-      for (uint_t start = 0; start < Size; start += 2)
+      // std::complex<float> is guaranteed to be array of two floats
+      auto* const d = reinterpret_cast<float*>(data);
+      if (Size >= 4)
       {
-        const Complex u = data[start];
-        const Complex v = data[start + 1];
-        data[start] = u + v;
-        data[start + 1] = u - v;
-      }
-      const auto* const twiddles = inverse ? InverseTwiddles.data() : Twiddles.data();
-      for (uint_t len = 4; len <= Size; len <<= 1)
-      {
-        const uint_t half = len / 2;
-        const uint_t step = Size / len;
-        for (uint_t start = 0; start < Size; start += len)
+        // the first two stages have only trivial twiddles (1 and -i, or i for inverse)
+        const float sign = inverse ? -1.0f : 1.0f;
+        for (uint_t start = 0; start < Size * 2; start += 8)
         {
-          for (uint_t idx = 0; idx < half; ++idx)
-          {
-            const Complex w = twiddles[idx * step];
-            const Complex u = data[start + idx];
-            const Complex v = Mul(data[start + idx + half], w);
-            data[start + idx] = u + v;
-            data[start + idx + half] = u - v;
-          }
+          float* const x = d + start;
+          const float a0r = x[0] + x[2];
+          const float a0i = x[1] + x[3];
+          const float a1r = x[0] - x[2];
+          const float a1i = x[1] - x[3];
+          const float a2r = x[4] + x[6];
+          const float a2i = x[5] + x[7];
+          const float a3r = x[4] - x[6];
+          const float a3i = x[5] - x[7];
+          // a3 * -i
+          const float vr = a3i * sign;
+          const float vi = -a3r * sign;
+          x[0] = a0r + a2r;
+          x[1] = a0i + a2i;
+          x[4] = a0r - a2r;
+          x[5] = a0i - a2i;
+          x[2] = a1r + vr;
+          x[3] = a1i + vi;
+          x[6] = a1r - vr;
+          x[7] = a1i - vi;
+        }
+      }
+      else if (Size == 2)
+      {
+        const float ur = d[0];
+        const float ui = d[1];
+        d[0] = ur + d[2];
+        d[1] = ui + d[3];
+        d[2] = ur - d[2];
+        d[3] = ui - d[3];
+      }
+      const auto* const twiddlesIm = inverse ? InverseTwiddlesIm.data() : TwiddlesIm.data();
+      std::size_t offset = 0;
+      for (std::size_t half = 4; half < Size; half <<= 1)
+      {
+        const float* const wr = TwiddlesRe.data() + offset;
+        const float* const wi = twiddlesIm + offset;
+        offset += half;
+        for (std::size_t start = 0; start < Size; start += half * 2)
+        {
+          Butterflies(d + start * 2, d + (start + half) * 2, wr, wi, half);
         }
       }
       if (inverse)
       {
         const float scale = 1.0f / Size;
-        for (uint_t idx = 0; idx < Size; ++idx)
+        for (uint_t idx = 0; idx < Size * 2; ++idx)
         {
-          data[idx] *= scale;
+          d[idx] *= scale;
         }
       }
     }
 
   private:
+    // 64-bit indices and no aliasing allow vectorization
+    static void Butterflies(float* __restrict a, float* __restrict b, const float* __restrict wr,
+                            const float* __restrict wi, std::size_t count)
+    {
+      for (std::size_t idx = 0; idx < count; ++idx)
+      {
+        const float br = b[idx * 2];
+        const float bi = b[idx * 2 + 1];
+        const float vr = br * wr[idx] - bi * wi[idx];
+        const float vi = br * wi[idx] + bi * wr[idx];
+        const float ar = a[idx * 2];
+        const float ai = a[idx * 2 + 1];
+        a[idx * 2] = ar + vr;
+        a[idx * 2 + 1] = ai + vi;
+        b[idx * 2] = ar - vr;
+        b[idx * 2 + 1] = ai - vi;
+      }
+    }
+
+  private:
     const uint_t Size;
-    std::vector<Complex> Twiddles;
-    std::vector<Complex> InverseTwiddles;
+    std::vector<float> TwiddlesRe;
+    std::vector<float> TwiddlesIm;
+    std::vector<float> InverseTwiddlesIm;
     std::vector<uint_t> Reverse;
   };
 
@@ -221,11 +279,22 @@ namespace Sound
     PrevWindowStd = -1;
   }
 
-  bool CorrelationTrigger::Extrapolate(int64_t pos, uint_t samplesPerFrame, int64_t& trigger)
+  bool CorrelationTrigger::IsSearchDue(uint_t frameSamples) const
+  {
+    return !Cfg.MaxRate || !HasPrevTrigger || !CachedPeriod || SearchAge + frameSamples >= Samplerate / Cfg.MaxRate;
+  }
+
+  bool CorrelationTrigger::Extrapolate(const TriggerWave& wave, int64_t pos, uint_t samplesPerFrame, bool canSearch,
+                                       int64_t& trigger)
   {
     SearchAge += samplesPerFrame;
-    if (!Cfg.MaxRate || !HasPrevTrigger || !CachedPeriod || SearchAge >= Samplerate / Cfg.MaxRate)
+    if (!HasPrevTrigger || !CachedPeriod)
     {
+      return false;
+    }
+    if (canSearch ? !Cfg.MaxRate || SearchAge >= Samplerate / Cfg.MaxRate : SearchAge >= Samplerate / MIN_SEARCH_RATE)
+    {
+      // postponed search is limited to not lose tracking
       return false;
     }
     // subsampled period is too rough to be multiplied by several periods passed since the last search
@@ -247,15 +316,116 @@ namespace Sound
       }
     }
     const auto periods = std::floor((pos - lastSearched) / period + 0.5f);
-    trigger = std::max(lastSearched + int64_t(std::lround(periods * period)), PrevTrigger);
+    trigger = lastSearched + int64_t(std::lround(periods * period));
+    // rounding error of extrapolated phase is visible as jitter, while the edge is nearby
+    if (Cfg.PostRadius)
+    {
+      trigger = ZeroCrossing(wave, trigger);
+    }
+    trigger = std::max(trigger, PrevTrigger);
     PrevTrigger = trigger;
     return true;
   }
 
-  int64_t CorrelationTrigger::GetTrigger(const TriggerWave& wave, int64_t pos, uint_t frameSamples)
+  void CorrelationTrigger::GetData(const TriggerWave& wave, int64_t begin, uint_t count, uint_t stride,
+                                   float* target) const
+  {
+    wave.GetPadded(begin, count, stride, target);
+    // as corrscope does by wave amplification, so both main and post triggers look for rising edges
+    if (Cfg.EdgeDirection < 0)
+    {
+      std::transform(target, target + count, target, [](float v) { return -v; });
+    }
+  }
+
+  void CorrelationTrigger::AmplifySigns()
+  {
+    const float peak = AbsMax(Data.data(), Data.size());
+    const float scale = SIGN_AMPLIFICATION / (peak + MIN_AMPLITUDE);
+    for (auto& v : Data)
+    {
+      v += Cfg.SignStrength * peak * std::tanh(v * scale);
+    }
+  }
+
+  // Simplified corrscope's pitch tracking: buffer is resampled by ratio of estimated periods instead of log-frequency
+  // spectra correlation, which is much cheaper. Resampling is limited to one octave as there, so period estimation
+  // errors (usually octave jumps) are not applied.
+  void CorrelationTrigger::RescaleBuffer(uint_t period)
+  {
+    if (PrevPeriod <= 0 || period == 0)
+    {
+      return;
+    }
+    const float ratio = float(period) / PrevPeriod;
+    if (std::abs(std::log2(ratio)) > MAX_OCTAVES_TO_RESAMPLE)
+    {
+      return;
+    }
+    const auto size = static_cast<uint_t>(CorrBuffer.size());
+    if (AbsMax(CorrBuffer.data(), size) == 0)
+    {
+      return;
+    }
+    // if pitch is doubled, period and buffer are halved
+    const auto newSize = std::max<uint_t>(static_cast<uint_t>(std::lround(size * ratio)), 2);
+    if (newSize == size)
+    {
+      return;
+    }
+    Rescaled.resize(newSize);
+    const float step = float(size - 1) / (newSize - 1);
+    for (uint_t idx = 0; idx < newSize; ++idx)
+    {
+      const float src = idx * step;
+      const auto lo = std::min(static_cast<uint_t>(src), size - 2);
+      const float frac = src - lo;
+      Rescaled[idx] = CorrBuffer[lo] + (CorrBuffer[lo + 1] - CorrBuffer[lo]) * frac;
+    }
+    // centered, as corrscope's midpad
+    if (newSize < size)
+    {
+      const auto before = (size - newSize) / 2;
+      std::fill(CorrBuffer.begin(), CorrBuffer.end(), 0.0f);
+      std::copy(Rescaled.begin(), Rescaled.end(), CorrBuffer.begin() + before);
+    }
+    else
+    {
+      const auto before = (newSize - size) / 2;
+      std::copy_n(Rescaled.begin() + before, size, CorrBuffer.begin());
+    }
+  }
+
+  // corrscope's ZeroCrossingTrigger: slides to the nearest rising edge at full rate, so subsampled correlation and
+  // extrapolated phase are refined to exact sample
+  int64_t CorrelationTrigger::ZeroCrossing(const TriggerWave& wave, int64_t pos)
+  {
+    const auto radius = static_cast<int>(Cfg.PostRadius);
+    Around.resize(2 * radius + 1);
+    GetData(wave, pos - radius, 2 * radius + 1, 1, Around.data());
+    const auto at = [this, radius](int delta) { return Around[radius + delta] - PrevMean; };
+    const float center = at(0);
+    if (center == 0)
+    {
+      return pos + 1;
+    }
+    const int direction = center < 0 ? 1 : -1;
+    for (int delta = 1; delta <= radius; ++delta)
+    {
+      const float val = at(delta * direction);
+      if (direction > 0 ? val >= 0 : val <= 0)
+      {
+        // first non-negative sample after crossing
+        return pos + delta * direction + (val <= 0 ? 1 : 0);
+      }
+    }
+    return pos + direction * radius;
+  }
+
+  int64_t CorrelationTrigger::GetTrigger(const TriggerWave& wave, int64_t pos, uint_t frameSamples, bool canSearch)
   {
     int64_t extrapolated = 0;
-    if (Extrapolate(pos, frameSamples, extrapolated))
+    if (Extrapolate(wave, pos, frameSamples, canSearch, extrapolated))
     {
       Searched = false;
       return extrapolated;
@@ -271,7 +441,11 @@ namespace Sound
     const auto dataBegin = triggerBegin - int64_t(Stride * A);
 
     Data.resize(dataSize);
-    wave.GetPadded(dataBegin, dataSize, Stride, Data.data());
+    GetData(wave, dataBegin, dataSize, Stride, Data.data());
+    if (Cfg.SignStrength != 0)
+    {
+      AmplifySigns();
+    }
 
     const float mean = Mean(Data.data(), dataSize);
     PeriodData.resize(dataSize);
@@ -305,6 +479,10 @@ namespace Sound
     if (IsWindowInvalid(period))
     {
       CalcSlopeFinder(period);
+      if (Cfg.PitchTracking)
+      {
+        RescaleBuffer(period);
+      }
       PrevPeriod = static_cast<int>(period);
     }
 
@@ -372,6 +550,10 @@ namespace Sound
                            : -1;
     const auto peakOffset = FindPeak(Corr, peaks, radius);
     auto trigger = triggerBegin + int64_t(Stride * peakOffset);
+    if (Cfg.PostRadius)
+    {
+      trigger = ZeroCrossing(wave, trigger);
+    }
     if (HasPrevTrigger)
     {
       trigger = std::max(trigger, PrevTrigger);
@@ -381,7 +563,7 @@ namespace Sound
     SearchedTriggers[SearchesCount++ % SEARCHES_HISTORY] = trigger;
 
     Aligned.resize(kernelSize);
-    wave.GetPadded(trigger - int64_t((kernelSize / 2) * Stride), kernelSize, Stride, Aligned.data());
+    GetData(wave, trigger - int64_t((kernelSize / 2) * Stride), kernelSize, Stride, Aligned.data());
     const float resultMean = Mean(Aligned.data(), kernelSize);
     UpdateBuffer(Aligned, resultMean, period);
     return trigger;

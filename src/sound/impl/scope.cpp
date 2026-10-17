@@ -12,6 +12,8 @@
 
 #include "sound/impl/correlation_trigger.h"
 
+#include "sound/sound_parameters.h"
+
 #include "make_ptr.h"
 
 #include <algorithm>
@@ -33,13 +35,18 @@ namespace Sound
   {
     // ~2.7s at 48kHz, enough to cover output buffers latency
     const uint_t RING_SIZE = 1 << 17;
-    const uint_t TRIGGER_MS = 40;
     const uint_t MIN_WINDOW_MS = 1;
     const uint_t MAX_WINDOW_MS = 200;
     const uint_t MAX_VOICES = 32;
     const uint_t MAX_FULL_RATE_TRIGGERS = 8;
-    // corrscope's rate, higher display refresh rates reuse found phase (see CorrelationTrigger::Config::MaxRate)
-    const uint_t TRIGGER_SEARCH_RATE = 60;
+    // searches are spread among frames, so serial processing of not so many voices fits into frame, while waking of
+    // other cores costs power and delays (e.g. if they are busy or slow)
+    const uint_t MAX_SERIAL_TRIGGERS = 16;
+    // Searching at each frame is the most stable, but many voices (e.g. 3SID, OPL3) don't fit into high refresh rate
+    // frame then, so the rest of voices extrapolate phase and are searched at next frames
+    const uint_t MAX_SEARCHES_PER_FRAME = 4;
+    const uint_t MIN_TRIGGER_MS = 5;
+    const uint_t MAX_TRIGGER_MS = 200;
     // ~-66dB
     const int SILENCE_LEVEL = 16;
     // pitch estimation window for voices without frequency state
@@ -107,6 +114,36 @@ namespace Sound
       const int64_t Offset;
     };
 
+    struct Column
+    {
+      uint8_t Min = 255;
+      uint8_t Max = 0;
+
+      void Add(uint8_t val)
+      {
+        Min = std::min(Min, val);
+        Max = std::max(Max, val);
+      }
+
+      void Add(const Column& rh)
+      {
+        Min = std::min(Min, rh.Min);
+        Max = std::max(Max, rh.Max);
+      }
+    };
+
+    // Slow gauges history covers ~4s by GAUGE_COLUMNS columns, it's recalculated on each request (up to display
+    // refresh rate) for all voices. So complete columns are calculated once and kept by absolute index.
+    template<std::size_t Count>
+    struct SlowColumn
+    {
+      int64_t Index = -1;
+      std::array<Column, Count> Values = {};
+    };
+
+    template<std::size_t Count>
+    using SlowColumns = std::array<SlowColumn<Count>, 512>;
+
     struct VoiceRecord
     {
       int64_t Index = 0;
@@ -130,6 +167,8 @@ namespace Sound
         uint8_t Frequency = 0;
       };
       std::array<CachedColumn, 512> AudioColumns;
+      // level and frequency
+      SlowColumns<2> Slow;
     };
 
     // ~4s of 4ms snapshots
@@ -152,13 +191,37 @@ namespace Sound
       // osc1..3, volume for each sample
       std::array<Ring, 4> Fast;
       std::array<std::vector<int16_t>, 4> FastStaging;
+      // envelope1..3, frequency1..3, resonance, cutoff
+      SlowColumns<8> Slow;
+    };
+
+    // logarithm per each state record is too expensive for history of thousands records
+    class EnvelopeLevels
+    {
+    public:
+      EnvelopeLevels()
+      {
+        for (uint_t env = 0; env < 256; ++env)
+        {
+          // dB scale down to -48dB
+          const float level = env ? 1.0f + 20.0f * std::log10(env / 255.0f) / 48.0f : 0.0f;
+          Table[env] = static_cast<uint8_t>(std::clamp(level, 0.0f, 1.0f) * 255);
+        }
+      }
+
+      uint8_t operator[](uint_t env) const
+      {
+        return Table[env & 255];
+      }
+
+    private:
+      std::array<uint8_t, 256> Table = {};
     };
 
     uint8_t EnvelopeLevel(uint_t env)
     {
-      // dB scale down to -48dB
-      const float level = env ? 1.0f + 20.0f * std::log10(env / 255.0f) / 48.0f : 0.0f;
-      return static_cast<uint8_t>(std::clamp(level, 0.0f, 1.0f) * 255);
+      static const EnvelopeLevels LEVELS;
+      return LEVELS[env];
     }
 
     uint8_t LevelOfDb(float db)
@@ -181,18 +244,6 @@ namespace Sound
       const float level = freq ? 1.0f + std::log2(freq / 65535.0f) / 7 : 0.0f;
       return static_cast<uint8_t>(std::clamp(level, 0.0f, 1.0f) * 255);
     }
-
-    struct Column
-    {
-      uint8_t Min = 255;
-      uint8_t Max = 0;
-
-      void Add(uint8_t val)
-      {
-        Min = std::min(Min, val);
-        Max = std::max(Max, val);
-      }
-    };
 
     using Clock = std::chrono::steady_clock;
 
@@ -314,12 +365,110 @@ namespace Sound
       uint_t Done = 0;
       uint_t Busy = 0;
     };
+    struct TriggerSettings
+    {
+      CorrelationTrigger::Config Trigger;
+      uint_t WidthMs = Parameters::ZXTune::Sound::Scope::TRIGGER_WIDTH_DEFAULT;
+      uint_t Subsampling = Parameters::ZXTune::Sound::Scope::SUBSAMPLING_DEFAULT;
+
+      TriggerSettings()
+      {
+        Trigger.MaxRate = Parameters::ZXTune::Sound::Scope::SEARCH_RATE_DEFAULT;
+        Trigger.PostRadius = Parameters::ZXTune::Sound::Scope::POST_RADIUS_DEFAULT;
+      }
+
+      static TriggerSettings Load(const Parameters::Accessor& params)
+      {
+        using namespace Parameters::ZXTune::Sound::Scope;
+        const auto get = [&params](Parameters::Identifier name, Parameters::IntType def) {
+          return Parameters::GetInteger(params, name, def);
+        };
+        const auto ratio = [&get](Parameters::Identifier name, Parameters::IntType def, float max) {
+          return std::clamp(float(get(name, def)) / PERCENTS, 0.0f, max);
+        };
+        TriggerSettings res;
+        auto& cfg = res.Trigger;
+        cfg.EdgeStrength = ratio(EDGE_STRENGTH, EDGE_STRENGTH_DEFAULT, 10);
+        cfg.SlopeWidth = ratio(SLOPE_WIDTH, SLOPE_WIDTH_DEFAULT, 1);
+        cfg.BufferStrength = ratio(BUFFER_STRENGTH, BUFFER_STRENGTH_DEFAULT, 10);
+        cfg.Responsiveness = ratio(RESPONSIVENESS, RESPONSIVENESS_DEFAULT, 1);
+        cfg.BufferFalloff = ratio(BUFFER_FALLOFF, BUFFER_FALLOFF_DEFAULT, 10);
+        cfg.ResetBelow = ratio(RESET_BELOW, RESET_BELOW_DEFAULT, 1);
+        cfg.MeanResponsiveness = ratio(MEAN_RESPONSIVENESS, MEAN_RESPONSIVENESS_DEFAULT, 1);
+        cfg.SignStrength = ratio(SIGN_STRENGTH, SIGN_STRENGTH_DEFAULT, 10);
+        // too narrow range is useless and zero breaks searching
+        cfg.TriggerDiameter = std::max(ratio(DIAMETER, DIAMETER_DEFAULT, 1), 0.05f);
+        cfg.EdgeDirection = get(FALLING, FALLING_DEFAULT) ? -1 : 1;
+        cfg.PitchTracking = get(PITCH_TRACKING, PITCH_TRACKING_DEFAULT) != 0;
+        cfg.PostRadius =
+            static_cast<uint_t>(std::clamp<Parameters::IntType>(get(POST_RADIUS, POST_RADIUS_DEFAULT), 0, 64));
+        cfg.MaxRate =
+            static_cast<uint_t>(std::clamp<Parameters::IntType>(get(SEARCH_RATE, SEARCH_RATE_DEFAULT), 0, 1000));
+        res.WidthMs = static_cast<uint_t>(
+            std::clamp<Parameters::IntType>(get(TRIGGER_WIDTH, TRIGGER_WIDTH_DEFAULT), MIN_TRIGGER_MS, MAX_TRIGGER_MS));
+        res.Subsampling =
+            static_cast<uint_t>(std::clamp<Parameters::IntType>(get(SUBSAMPLING, SUBSAMPLING_DEFAULT), 0, 8));
+        return res;
+      }
+    };
+
+    // Some of the views (e.g. narrow cells of many voices) need less points than samples in window, plain
+    // decimation would hide or alias high frequencies (e.g. noise looks like low tone)
+    void Resample(const Ring& ring, int64_t begin, int64_t count, uint_t points, int16_t* out)
+    {
+      if (count <= int64_t(points))
+      {
+        const auto last = std::max<int64_t>(count - 1, 0);
+        for (uint_t idx = 0; idx < points; ++idx)
+        {
+          const auto pos = points > 1 ? double(idx) * last / (points - 1) : 0.0;
+          const auto lo = static_cast<int64_t>(pos);
+          const auto frac = pos - lo;
+          const int a = ring.At(begin + lo);
+          const int b = frac > 0 ? ring.At(begin + lo + 1) : a;
+          out[idx] = static_cast<int16_t>(a + std::lround((b - a) * frac));
+        }
+        return;
+      }
+      const uint_t bins = points / 2;
+      for (uint_t bin = 0; bin < bins; ++bin)
+      {
+        const auto from = begin + count * bin / bins;
+        const auto to = begin + count * (bin + 1) / bins;
+        int16_t lo = ring.At(from);
+        int16_t hi = lo;
+        int64_t loPos = from;
+        int64_t hiPos = from;
+        for (auto idx = from + 1; idx < to; ++idx)
+        {
+          const auto smp = ring.At(idx);
+          if (smp < lo)
+          {
+            lo = smp;
+            loPos = idx;
+          }
+          else if (smp > hi)
+          {
+            hi = smp;
+            hiPos = idx;
+          }
+        }
+        out[bin * 2] = loPos <= hiPos ? lo : hi;
+        out[bin * 2 + 1] = loPos <= hiPos ? hi : lo;
+      }
+      if (points & 1)
+      {
+        out[points - 1] = points > 1 ? out[points - 2] : ring.At(begin);
+      }
+    }
+
     class ScopeImpl : public Scope
     {
     public:
-      explicit ScopeImpl(uint_t samplerate)
+      ScopeImpl(uint_t samplerate, Parameters::Accessor::Ptr params)
         : Samplerate(samplerate)
         , Stride(samplerate > 32000 ? 2 : 1)
+        , Params(std::move(params))
       {}
 
       // Render thread
@@ -508,13 +657,18 @@ namespace Sound
 
       Layout Get(uint_t maxChannels, uint_t points, int64_t playing, uint_t windowMs, int16_t* target) override
       {
-        const auto start = Clock::now();
-        LastRequest = start.time_since_epoch().count();
+        const auto request = Clock::now();
+        LastRequest = request.time_since_epoch().count();
         const std::scoped_lock guard(Lock);
+        // waiting for render thread or gauges request is not a cost of triggering, but delays frame anyway
+        const auto start = Clock::now();
+        WaitUsMax = std::max<int64_t>(WaitUsMax,
+                                      std::chrono::duration_cast<std::chrono::microseconds>(start - request).count());
         if (!HasPlayed || !points || !maxChannels)
         {
           return {};
         }
+        UpdateSettings();
         LastPlayingHint = playing;
         // precise position from output device is preferred
         const auto pos = playing >= 0 ? playing : GetPlaybackPosition();
@@ -535,7 +689,8 @@ namespace Sound
 
         const uint_t channels = std::min<uint_t>(Voices.empty() ? 1 : static_cast<uint_t>(Voices.size()), maxChannels);
         // many voices (e.g. OPL3) require cheaper triggering to fit into high refresh rate frames
-        const auto stride = channels > MAX_FULL_RATE_TRIGGERS ? Stride * 2 : Stride;
+        const auto stride = Settings.Subsampling ? Settings.Subsampling
+                                                 : (channels > MAX_FULL_RATE_TRIGGERS ? Stride * 2 : Stride);
         if (stride != TriggersStride)
         {
           Triggers.clear();
@@ -543,32 +698,53 @@ namespace Sound
         }
         while (Triggers.size() < channels)
         {
-          const auto kernelSize = Samplerate * TRIGGER_MS / 1000 / stride;
-          CorrelationTrigger::Config cfg;
-          cfg.MaxRate = TRIGGER_SEARCH_RATE;
-          Triggers.emplace_back(new CorrelationTrigger(kernelSize, stride, Samplerate, cfg));
+          const auto kernelSize = Samplerate * Settings.WidthMs / 1000 / stride;
+          Triggers.emplace_back(new CorrelationTrigger(kernelSize, stride, Samplerate, Settings.Trigger));
         }
         const int64_t renderSamples = Samplerate * std::clamp(windowMs, MIN_WINDOW_MS, MAX_WINDOW_MS) / 1000;
-        const int64_t triggerSamples = Samplerate * TRIGGER_MS / 1000;
+        const int64_t triggerSamples = Samplerate * Settings.WidthMs / 1000;
+        // Full searches are spread among frames to keep cost of each frame flat (e.g. 3 voices searched at 60 per
+        // second on 120Hz display are 2+1 searches per frame instead of 3+0)
+        Silent.resize(channels);
+        CanSearch.resize(channels);
+        const auto range = std::max(renderSamples, triggerSamples);
+        for (uint_t chan = 0; chan < channels; ++chan)
+        {
+          const auto& ring = Voices.empty() ? Master : Voices[chan].Samples;
+          const auto offset = Voices.empty() ? 0 : Voices[chan].Offset;
+          // silent voices (e.g. unused chip channels) are not triggered, stable flat line is displayed
+          Silent[chan] = IsSilent(ring, pos + offset - range, pos + offset + range);
+        }
+        const auto rate = Settings.Trigger.MaxRate;
+        auto budget = std::min(
+            MAX_SEARCHES_PER_FRAME,
+            rate ? std::max<uint_t>(1, (channels * rate * samplesPerFrame + Samplerate - 1) / Samplerate) : channels);
+        for (uint_t idx = 0; idx < channels; ++idx)
+        {
+          const auto chan = (SearchCursor + idx) % channels;
+          const bool can = budget && !Silent[chan] && Triggers[chan]->IsSearchDue(samplesPerFrame);
+          CanSearch[chan] = can;
+          budget -= can;
+          if (can)
+          {
+            SearchCursor = chan + 1;
+          }
+        }
         std::atomic<uint_t> triggered = 0;
         // channels are independent, so triggered in parallel
         // Waking of other cores costs more power than serial processing of few voices.
         // Many voices are processed in parallel to fit into high refresh rate frame
-        Pool.Run(channels, channels > MAX_FULL_RATE_TRIGGERS, [&](uint_t chan) {
+        Pool.Run(channels, channels > MAX_SERIAL_TRIGGERS, [&](uint_t chan) {
           const auto& ring = Voices.empty() ? Master : Voices[chan].Samples;
           const auto offset = Voices.empty() ? 0 : Voices[chan].Offset;
           const RingWave wave(ring, offset);
-          // silent voices (e.g. unused chip channels) are not triggered, stable flat line is displayed
-          const auto range = std::max(renderSamples, triggerSamples);
-          const auto silent = IsSilent(ring, pos + offset - range, pos + offset + range);
-          const auto trigger = silent ? pos : Triggers[chan]->GetTrigger(wave, pos, samplesPerFrame);
+          const bool silent = Silent[chan] != 0;
+          const auto trigger = silent ? pos
+                                      : Triggers[chan]->GetTrigger(wave, pos, samplesPerFrame, CanSearch[chan] != 0);
           triggered += !silent;
           const auto begin = trigger - renderSamples / 2 + offset;
           auto* out = target + chan * points;
-          for (uint_t idx = 0; idx < points; ++idx)
-          {
-            out[idx] = ring.At(begin + int64_t(idx) * renderSamples / points);
-          }
+          Resample(ring, begin, renderSamples, points, out);
           // Some chips' voices are unipolar (e.g. AY/YM channels are DAC levels of 0..max) or have DC offset (e.g. idle
           // YM2612 DAC), so traces are centered by displayed range as Furnace's default DC offset correction does
           RemoveOffset(out, points);
@@ -594,13 +770,16 @@ namespace Sound
         {
           return 0;
         }
+        const auto start = Clock::now();
         const auto pos = playing >= 0 ? playing : GetPlaybackPosition();
         const auto chips = std::min<uint_t>(static_cast<uint_t>(Chips.size()), maxChips);
         for (uint_t chip = 0; chip < chips; ++chip)
         {
-          FillGauges(Chips[chip], pos + Voices[chip * VoicesPerChip].Offset,
+          const auto& voice = Voices[chip * VoicesPerChip];
+          FillGauges(Chips[chip], pos + voice.Offset, int64_t(voice.Samples.Size()),
                      std::clamp(waveWindowMs, MIN_WINDOW_MS, MAX_WINDOW_MS), target + std::size_t(chip) * GAUGES_SIZE);
         }
+        TrackGauges(start);
         return chips;
       }
 
@@ -629,7 +808,7 @@ namespace Sound
           FillVoiceGauges(voice, pos + voice.Offset, std::clamp(waveWindowMs, MIN_WINDOW_MS, MAX_WINDOW_MS),
                           target + std::size_t(idx) * VOICE_GAUGES_SIZE);
         }
-        LastGaugesUs = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
+        TrackGauges(start);
         return voices;
       }
 
@@ -640,20 +819,24 @@ namespace Sound
         result += result.empty() ? "" : "\n";
         result += "scope: " + std::to_string(LastTriggered) + "/" + std::to_string(LastChannels) + " ch, trigger "
                   + std::to_string(ComputeCalls ? ComputeUsSum / ComputeCalls : 0) + "us (max "
-                  + std::to_string(ComputeUsMax) + "), sync " + (LastPlayingHint >= 0 ? "device" : "estimated");
-        // searches are made not at each call, so average since last status is more informative
-        ComputeUsSum = ComputeUsMax = 0;
-        ComputeCalls = 0;
-        if (LastGaugesUs)
+                  + std::to_string(ComputeUsMax) + ", wait " + std::to_string(WaitUsMax) + "), sync "
+                  + (LastPlayingHint >= 0 ? "device" : "estimated");
+        if (GaugesCalls)
         {
-          result += ", gauges " + std::to_string(LastGaugesUs) + "us";
+          result +=
+              ", gauges " + std::to_string(GaugesUsSum / GaugesCalls) + "us (max " + std::to_string(GaugesUsMax) + ")";
         }
+        // searches are made not at each call, so average since last status is more informative
+        ComputeUsSum = ComputeUsMax = WaitUsMax = 0;
+        ComputeCalls = 0;
+        GaugesUsSum = GaugesUsMax = 0;
+        GaugesCalls = 0;
         return result;
       }
 
     private:
       // end is index of currently heard sample in chip's samples
-      void FillGauges(const ChipStates& chip, int64_t end, uint_t waveWindowMs, uint8_t* target) const
+      void FillGauges(ChipStates& chip, int64_t end, int64_t committed, uint_t waveWindowMs, uint8_t* target) const
       {
         auto store = [target](uint_t gauge, uint_t col, const Column& c) {
           auto* out = target + (gauge * GAUGE_COLUMNS + col) * 2;
@@ -685,43 +868,40 @@ namespace Sound
             store(val == 3 ? 9 : val, col, c);
           }
         }
-        // slow gauges from state snapshots
+        // slow gauges from state snapshots, columns are aligned to absolute position to cache them
+        const auto colSamples = std::max<int64_t>(int64_t(SLOW_COLUMN_CYCLES) * Samplerate / CPU_CLOCK, 1);
+        const auto current = end / colSamples;
         const auto& recs = chip.Records;
-        const double slowSamples = double(SLOW_COLUMN_CYCLES) * Samplerate / CPU_CLOCK;
-        const auto windowStart = end - int64_t(GAUGE_COLUMNS * slowSamples);
-        auto it = std::lower_bound(recs.begin(), recs.end(), windowStart,
-                                   [](const StateRecord& rec, int64_t p) { return rec.Index < p; });
-        const StateRecord* last = it != recs.begin() ? &*(it - 1) : nullptr;
+        const StateRecord* last = nullptr;
         for (uint_t col = 0; col < GAUGE_COLUMNS; ++col)
         {
-          const auto to = end - int64_t((GAUGE_COLUMNS - col - 1) * slowSamples);
-          Column cols[8];
-          auto addRecord = [&cols](const StateRecord& rec) {
-            const auto& d = rec.Data;
-            for (uint_t voice = 0; voice < 3; ++voice)
-            {
-              cols[voice].Add(EnvelopeLevel(d[0x1c + voice]));
-              cols[3 + voice].Add(FrequencyLevel(d[voice * 7] | (d[voice * 7 + 1] << 8)));
-            }
-            cols[6].Add(static_cast<uint8_t>((d[0x17] >> 4) * 17));
-            cols[7].Add(static_cast<uint8_t>(((d[0x15] & 7) | (d[0x16] << 3)) >> 3));
-          };
-          if (last)
-          {
-            addRecord(*last);
-          }
-          for (; it != recs.end() && it->Index < to; ++it)
-          {
-            addRecord(*it);
-            last = &*it;
-          }
+          const auto colIdx = current - GAUGE_COLUMNS + 1 + col;
+          const auto& values =
+              GetSlowColumn(chip.Slow, colIdx, colSamples, end, committed, recs,
+                            [](const StateRecord& rec, std::array<Column, 8>& cols) {
+                              const auto& d = rec.Data;
+                              for (uint_t voice = 0; voice < 3; ++voice)
+                              {
+                                cols[voice].Add(EnvelopeLevel(d[0x1c + voice]));
+                                cols[3 + voice].Add(FrequencyLevel(d[voice * 7] | (d[voice * 7 + 1] << 8)));
+                              }
+                              cols[6].Add(static_cast<uint8_t>((d[0x17] >> 4) * 17));
+                              cols[7].Add(static_cast<uint8_t>(((d[0x15] & 7) | (d[0x16] << 3)) >> 3));
+                            });
           for (uint_t idx = 0; idx < 3; ++idx)
           {
-            store(3 + idx, col, cols[idx]);
-            store(6 + idx, col, cols[3 + idx]);
+            store(3 + idx, col, values[idx]);
+            store(6 + idx, col, values[3 + idx]);
           }
-          store(10, col, cols[6]);
-          store(11, col, cols[7]);
+          store(10, col, values[6]);
+          store(11, col, values[7]);
+        }
+        // registers of currently heard moment
+        auto it = std::lower_bound(recs.begin(), recs.end(), end,
+                                   [](const StateRecord& rec, int64_t p) { return rec.Index < p; });
+        if (it != recs.begin())
+        {
+          last = &*(it - 1);
         }
         auto* regs = target + GAUGES_COUNT * GAUGE_COLUMNS * 2;
         std::memset(regs, 0, STATE_RECORD_SIZE);
@@ -729,6 +909,42 @@ namespace Sound
         {
           std::memcpy(regs, last->Data.data(), STATE_RECORD_SIZE);
         }
+        regs[STATE_RECORD_SIZE - 1] = ColumnPhase(end, colSamples);
+      }
+
+      static uint8_t ColumnPhase(int64_t end, int64_t colSamples)
+      {
+        return static_cast<uint8_t>((end % colSamples) * 256 / colSamples);
+      }
+
+      // Min/max of values in column of records history (records state lasts until the next one).
+      // @param committed samples count with all the records already stored, so later columns may be changed yet
+      template<std::size_t Count, class Records, class Add>
+      static const std::array<Column, Count>& GetSlowColumn(SlowColumns<Count>& cache, int64_t colIdx,
+                                                            int64_t colSamples, int64_t end, int64_t committed,
+                                                            const Records& recs, Add add)
+      {
+        auto& cached = cache[colIdx & (cache.size() - 1)];
+        if (cached.Index == colIdx)
+        {
+          return cached.Values;
+        }
+        const auto from = colIdx * colSamples;
+        const auto to = std::min(from + colSamples, end);
+        cached.Values = {};
+        auto it =
+            std::lower_bound(recs.begin(), recs.end(), from, [](const auto& rec, int64_t p) { return rec.Index < p; });
+        if (it != recs.begin())
+        {
+          add(*(it - 1), cached.Values);
+        }
+        for (; it != recs.end() && it->Index < to; ++it)
+        {
+          add(*it, cached.Values);
+        }
+        const bool complete = from + colSamples <= std::min(end, committed);
+        cached.Index = complete ? colIdx : -1;
+        return cached.Values;
       }
 
       // constant level (e.g. AY/YM channel with tone and noise disabled) is silent too
@@ -806,54 +1022,42 @@ namespace Sound
             store(0, col, c);
           }
         }
-        // slow gauges, columns are aligned to absolute position to allow caching of audio analysis
+        // slow gauges, columns are aligned to absolute position to allow caching
         const auto colSamples = std::max<int64_t>(int64_t(SLOW_COLUMN_CYCLES) * Samplerate / CPU_CLOCK, 1);
-        // only complete columns are displayed
-        const auto lastCol = end / colSamples - 1;
+        const auto current = end / colSamples;
+        const auto committed = int64_t(voice.Samples.Size());
         const auto& recs = voice.Records;
-        auto it = std::lower_bound(recs.begin(), recs.end(), (lastCol - GAUGE_COLUMNS + 1) * colSamples,
-                                   [](const VoiceRecord& rec, int64_t p) { return rec.Index < p; });
-        const VoiceRecord* last = it != recs.begin() ? &*(it - 1) : nullptr;
         for (uint_t col = 0; col < GAUGE_COLUMNS; ++col)
         {
-          const auto colIdx = lastCol - GAUGE_COLUMNS + 1 + col;
-          const auto to = (colIdx + 1) * colSamples;
-          Column level;
-          Column freq;
-          bool levelFromState = false;
-          bool freqFromState = false;
-          auto addRecord = [&](const VoiceRecord& rec) {
-            const auto& st = rec.State;
-            if (st.Flags & Module::VoiceState::HAS_LEVEL)
-            {
-              levelFromState = true;
-              level.Add(LevelOfDb(st.Level));
-            }
-            if (st.Flags & Module::VoiceState::HAS_FREQUENCY)
-            {
-              freqFromState = true;
-              // inaudible voice has no visible pitch
-              const bool audible = !(st.Flags & Module::VoiceState::HAS_LEVEL) || st.Level > -48.0f;
-              freq.Add(audible ? LevelOfFrequency(st.Frequency) : 0);
-            }
-          };
-          if (last)
+          const auto colIdx = current - GAUGE_COLUMNS + 1 + col;
+          // empty columns are filled from audio analysis
+          auto values = GetSlowColumn(voice.Slow, colIdx, colSamples, end, committed, recs,
+                                      [](const VoiceRecord& rec, std::array<Column, 2>& cols) {
+                                        const auto& st = rec.State;
+                                        if (st.Flags & Module::VoiceState::HAS_LEVEL)
+                                        {
+                                          cols[0].Add(LevelOfDb(st.Level));
+                                        }
+                                        if (st.Flags & Module::VoiceState::HAS_FREQUENCY)
+                                        {
+                                          // inaudible voice has no visible pitch
+                                          const bool audible = !(st.Flags & Module::VoiceState::HAS_LEVEL)
+                                                               || st.Level > -48.0f;
+                                          cols[1].Add(audible ? LevelOfFrequency(st.Frequency) : 0);
+                                        }
+                                      });
+          auto& level = values[0];
+          auto& freq = values[1];
+          const bool noLevel = level.Min > level.Max;
+          const bool noFreq = freq.Min > freq.Max;
+          if (noLevel || noFreq)
           {
-            addRecord(*last);
-          }
-          for (; it != recs.end() && it->Index < to; ++it)
-          {
-            addRecord(*it);
-            last = &*it;
-          }
-          if (!levelFromState || !freqFromState)
-          {
-            const auto& cached = AnalyzeColumn(voice, colIdx, colSamples);
-            if (!levelFromState)
+            const auto& cached = AnalyzeColumn(voice, colIdx, colSamples, committed);
+            if (noLevel)
             {
               level.Add(cached.Level);
             }
-            if (!freqFromState)
+            if (noFreq)
             {
               freq.Add(cached.Frequency);
             }
@@ -863,9 +1067,12 @@ namespace Sound
         }
         auto* state = target + VOICE_GAUGES_COUNT * GAUGE_COLUMNS * 2;
         std::memset(state, 0, VOICE_STATE_SIZE);
-        if (last)
+        // state of currently heard moment
+        const auto it = std::lower_bound(recs.begin(), recs.end(), end,
+                                         [](const VoiceRecord& rec, int64_t p) { return rec.Index < p; });
+        if (it != recs.begin())
         {
-          const auto& st = last->State;
+          const auto& st = (it - 1)->State;
           std::memcpy(state, &st.Frequency, sizeof(float));
           std::memcpy(state + 4, &st.Level, sizeof(float));
           state[8] = st.Flags;
@@ -873,10 +1080,12 @@ namespace Sound
           std::copy(st.Fields.begin(), st.Fields.end(), state + 10);
           std::copy(st.Text.begin(), st.Text.end(), state + 10 + Module::VoiceState::FIELDS);
         }
+        state[VOICE_STATE_SIZE - 1] = ColumnPhase(end, colSamples);
       }
 
       // level and pitch of voice audio in column, for voices without state
-      const Voice::CachedColumn& AnalyzeColumn(Voice& voice, int64_t colIdx, int64_t colSamples)
+      // @param committed samples count, later ones are not available yet
+      const Voice::CachedColumn& AnalyzeColumn(Voice& voice, int64_t colIdx, int64_t colSamples, int64_t committed)
       {
         auto& cached = voice.AudioColumns[colIdx & (voice.AudioColumns.size() - 1)];
         if (cached.Index == colIdx)
@@ -890,7 +1099,7 @@ namespace Sound
         {
           peak = std::max(peak, std::abs(int(voice.Samples.At(idx))));
         }
-        bool complete = true;
+        bool complete = to <= committed;
         cached.Level = peak ? LevelOfDb(20 * std::log10(peak / 32768.0f)) : 0;
         cached.Frequency = 0;
         if (peak && EstimatorBudget == 0)
@@ -942,6 +1151,30 @@ namespace Sound
         return std::max<int64_t>(played - LatencySamples, 0);
       }
 
+      void TrackGauges(Clock::time_point start)
+      {
+        const int64_t us = std::chrono::duration_cast<std::chrono::microseconds>(Clock::now() - start).count();
+        GaugesUsSum += us;
+        GaugesUsMax = std::max(GaugesUsMax, us);
+        ++GaugesCalls;
+      }
+
+      // new configuration is applied by triggers recreation, it's rare and done on user's action
+      void UpdateSettings()
+      {
+        if (!Params)
+        {
+          return;
+        }
+        const auto version = Params->Version();
+        if (version != ParamsVersion)
+        {
+          ParamsVersion = version;
+          Settings = TriggerSettings::Load(*Params);
+          Triggers.clear();
+        }
+      }
+
       void ResetTriggers()
       {
         for (auto& trigger : Triggers)
@@ -975,14 +1208,24 @@ namespace Sound
       uint_t LastChannels = 0;
       uint_t LastTriggered = 0;
       uint_t TriggersStride = 0;
+      // per channel flags of current request, read by workers
+      std::vector<uint8_t> Silent;
+      std::vector<uint8_t> CanSearch;
+      uint_t SearchCursor = 0;
       int64_t LastPlayingHint = -1;
       String LayoutDescription;
       WorkersPool Pool;
       uint_t LayoutId = 0;
       std::unique_ptr<CorrelationTrigger> Estimator;
       std::vector<float> EstimatorData;
-      int64_t LastGaugesUs = 0;
       uint_t EstimatorBudget = 0;
+      const Parameters::Accessor::Ptr Params;
+      uint_t ParamsVersion = ~uint_t(0);
+      TriggerSettings Settings;
+      mutable int64_t WaitUsMax = 0;
+      mutable int64_t GaugesUsSum = 0;
+      mutable int64_t GaugesUsMax = 0;
+      mutable int64_t GaugesCalls = 0;
       std::atomic<int64_t> LatencySamples = 0;
     };
 
@@ -990,6 +1233,11 @@ namespace Sound
 
   Scope::Ptr Scope::Create(uint_t samplerate)
   {
-    return MakePtr<ScopeDetails::ScopeImpl>(samplerate);
+    return MakePtr<ScopeDetails::ScopeImpl>(samplerate, Parameters::Accessor::Ptr());
+  }
+
+  Scope::Ptr Scope::Create(uint_t samplerate, Parameters::Accessor::Ptr params)
+  {
+    return MakePtr<ScopeDetails::ScopeImpl>(samplerate, std::move(params));
   }
 }  // namespace Sound

@@ -61,6 +61,40 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     private val box = RectF()
     private val boxes = Array(4) { RectF() }
 
+    // following are not allocated at each frame
+    private val area = RectF()
+    private val bar = RectF()
+    private val glyph = RectF()
+    private val levels2 = FloatArray(2)
+    private val levels4 = FloatArray(4)
+    private val waves2 = IntArray(2)
+    private val waves4 = IntArray(4)
+    private val pressed = BooleanArray(128)
+    private var memo = TextMemo()
+
+    /**
+     * Texts of widget built from registers values, rebuilt only on values change to not allocate them at each frame
+     */
+    class TextMemo {
+        @PublishedApi
+        internal val keys = LongArray(SLOTS) { Long.MIN_VALUE }
+
+        @PublishedApi
+        internal val texts = Array(SLOTS) { "" }
+
+        inline fun get(slot: Int, key: Long, make: () -> String): String {
+            if (keys[slot] != key) {
+                keys[slot] = key
+                texts[slot] = make()
+            }
+            return texts[slot]
+        }
+
+        companion object {
+            const val SLOTS = 4
+        }
+    }
+
     /**
      * Short text describing current state, displayed in title band
      */
@@ -68,9 +102,11 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
 
     /**
      * @param smooth per voice storage of displayed values, at least SMOOTH_SIZE
+     * @param texts per voice storage of displayed texts
      * @return true if widget is drawn
      */
-    fun draw(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray): Boolean {
+    fun draw(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray, texts: TextMemo = TextMemo()): Boolean {
+        memo = texts
         when (g.kind) {
             VoiceGauges.Kind.OPN_FM -> drawOpnFm(canvas, rect, g, smooth)
 
@@ -99,9 +135,14 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     // FM operators schema of OPN/OPM algorithms, see OP_NAMES for operators order
     private fun drawOpnFm(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
         val alg = g.field(0) and 7
-        val levels = FloatArray(4) { ease(smooth, it, g.field(2 + it) / 255f) }
+        val levels = levels4
+        for (op in 0 until 4) {
+            levels[op] = ease(smooth, op, g.field(2 + op) / 255f)
+        }
         val keys = g.field(10)
-        val info = "ALG$alg FB${g.field(1)}${panText(g.field(7))}"
+        val info = memo.get(0, alg.toLong() or (g.field(1).toLong() shl 8) or (g.field(7).toLong() shl 16)) {
+            "ALG$alg FB${g.field(1)}${panText(g.field(7))}"
+        }
         val schema = OPN_ALGORITHMS[alg]
         drawSchema(canvas, rect, schema, g.field(6), levels, keys, g.field(1), info, OP_NAMES, null)
     }
@@ -111,17 +152,29 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         val is4op = g.kind == VoiceGauges.Kind.OPL_4OP
         if (is4op) {
             val alg = g.field(0) and 3
-            val levels = FloatArray(4) { ease(smooth, it, g.field(2 + it) / 255f) }
-            val waves = IntArray(4) { g.field(6 + it) }
-            val info = "${OPL4_NAMES[alg]} FB${g.field(1)}${panText(g.field(11))}"
+            val levels = levels4
+            val waves = waves4
+            for (op in 0 until 4) {
+                levels[op] = ease(smooth, op, g.field(2 + op) / 255f)
+                waves[op] = g.field(6 + op)
+            }
+            val info = memo.get(0, alg.toLong() or (g.field(1).toLong() shl 8) or (g.field(11).toLong() shl 16)) {
+                "${OPL4_NAMES[alg]} FB${g.field(1)}${panText(g.field(11))}"
+            }
             val schema = OPL4_ALGORITHMS[alg]
             drawSchema(canvas, rect, schema, schema.carriers, levels, if (g.field(10) != 0) 0xf else 0, g.field(1), info,
                 OP_NAMES, waves)
         } else {
             val additive = g.field(0) and 1
-            val levels = FloatArray(2) { ease(smooth, it, g.field(2 + it) / 255f) }
-            val waves = IntArray(2) { g.field(4 + it) }
-            val info = "${if (additive != 0) "AM" else "FM"} FB${g.field(1)}${panText(g.field(7))}"
+            val levels = levels2
+            val waves = waves2
+            for (op in 0 until 2) {
+                levels[op] = ease(smooth, op, g.field(2 + op) / 255f)
+                waves[op] = g.field(4 + op)
+            }
+            val info = memo.get(1, additive.toLong() or (g.field(1).toLong() shl 8) or (g.field(7).toLong() shl 16)) {
+                "${if (additive != 0) "AM" else "FM"} FB${g.field(1)}${panText(g.field(7))}"
+            }
             val schema = OPL2_ALGORITHMS[additive]
             drawSchema(canvas, rect, schema, schema.carriers, levels, if (g.field(6) != 0) 3 else 0, g.field(1), info,
                 OP_NAMES, waves)
@@ -297,7 +350,8 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         val textHeight = text.fontSpacing
         if (rect.width() < rect.height() * 3) {
             drawFit(canvas, info, rect.left, rect.top - text.ascent(), rect.width())
-            return RectF(rect.left, rect.top + textHeight, rect.right, rect.bottom)
+            area.set(rect.left, rect.top + textHeight, rect.right, rect.bottom)
+            return area
         }
         val scale = min(1f, rect.height() / 2 / textHeight)
         text.textSize = baseTextSize * scale
@@ -308,7 +362,8 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         canvas.drawText(info, 0, split, rect.left, y, text)
         canvas.drawText(info, split + 1, info.length, rect.left, y + lineHeight, text)
         text.textSize = baseTextSize
-        return RectF(rect.left + infoWidth, rect.top, rect.right, rect.bottom)
+        area.set(rect.left + infoWidth, rect.top, rect.right, rect.bottom)
+        return area
     }
 
     private fun drawOperator(
@@ -365,26 +420,30 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     private fun drawDac(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
         val value = (g.field(1) - 128) / 128f
         drawFit(canvas, if (g.field(0) != 0) "DAC on" else "DAC off", rect.left, rect.top - text.ascent(), rect.width())
-        val bar = RectF(rect.left, rect.top + text.fontSpacing, rect.right, rect.bottom)
+        bar.set(rect.left, rect.top + text.fontSpacing, rect.right, rect.bottom)
         drawCenteredBar(canvas, bar, ease(smooth, 0, value))
     }
 
     // SN76489: 4 bit attenuation in 2dB steps, 10 bit period or noise mode
     private fun drawPsg(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
         val att = g.field(0)
-        val info = if (g.kind == VoiceGauges.Kind.PSG_TONE) {
-            val period = g.field(1) or (g.field(2) shl 8)
-            "N=%03X ATT %d%s".format(period, att, stereoText(g.field(3)))
-        } else {
-            "%s %s ATT %d%s".format(
-                if (g.field(1) != 0) "WHITE" else "PERIODIC",
-                NOISE_RATES.getOrElse(g.field(2)) { "?" },
-                att,
-                stereoText(g.field(3))
-            )
+        val key = g.kind.toLong() or (att.toLong() shl 8) or (g.field(1).toLong() shl 16) or
+            (g.field(2).toLong() shl 24) or (g.field(3).toLong() shl 32)
+        val info = memo.get(0, key) {
+            if (g.kind == VoiceGauges.Kind.PSG_TONE) {
+                val period = g.field(1) or (g.field(2) shl 8)
+                "N=%03X ATT %d%s".format(period, att, stereoText(g.field(3)))
+            } else {
+                "%s %s ATT %d%s".format(
+                    if (g.field(1) != 0) "WHITE" else "PERIODIC",
+                    NOISE_RATES.getOrElse(g.field(2)) { "?" },
+                    att,
+                    stereoText(g.field(3))
+                )
+            }
         }
         drawFit(canvas, info, rect.left, rect.top - text.ascent(), rect.right - (rect.left))
-        val bar = RectF(rect.left, rect.top + text.fontSpacing, rect.right, rect.bottom)
+        bar.set(rect.left, rect.top + text.fontSpacing, rect.right, rect.bottom)
         drawSegments(canvas, bar, ease(smooth, 0, (15 - att) / 15f), 15)
     }
 
@@ -404,44 +463,56 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         val pitch = g.field(8) or (g.field(9) shl 8)
         val flags = g.field(10)
         val barW = min(rect.width() * 0.18f, density * 18)
-        val bar = RectF(rect.left, rect.top, rect.left + barW, rect.bottom)
+        bar.set(rect.left, rect.top, rect.left + barW, rect.bottom)
         drawVerticalBar(canvas, bar, envx)
         val x = bar.right + density * 6
         var y = rect.top - text.ascent()
-        val envelope = if (mode == 4) {
-            "GAIN %02X".format(g.field(4))
-        } else {
-            "%s A%X D%X S%X R%02X".format(
-                ENV_MODES.getOrElse(mode) { "?" },
-                adsr1 and 15,
-                (adsr1 shr 4) and 7,
-                adsr2 shr 5,
-                adsr2 and 31
-            )
+        val envKey = mode.toLong() or (g.field(4).toLong() shl 8) or (adsr1.toLong() shl 16) or (adsr2.toLong() shl 24)
+        val envelope = memo.get(0, envKey) {
+            if (mode == 4) {
+                "GAIN %02X".format(g.field(4))
+            } else {
+                "%s A%X D%X S%X R%02X".format(
+                    ENV_MODES.getOrElse(mode) { "?" },
+                    adsr1 and 15,
+                    (adsr1 shr 4) and 7,
+                    adsr2 shr 5,
+                    adsr2 and 31
+                )
+            }
         }
         drawFit(canvas, envelope, x, y, rect.right - (x))
         y += text.fontSpacing
-        drawFit(canvas, "SRC %02X %.1fkHz".format(g.field(5), pitch * 32f / 4096f), x, y, rect.right - (x))
-        y += text.fontSpacing
-        val badges = buildString {
-            if (flags and 1 != 0) append("ECHO ")
-            if (flags and 2 != 0) append("PMOD ")
-            if (flags and 4 != 0) append("NOISE ")
+        val source = memo.get(1, g.field(5).toLong() or (pitch.toLong() shl 8)) {
+            "SRC %02X %.1fkHz".format(g.field(5), pitch * 32f / 4096f)
         }
+        drawFit(canvas, source, x, y, rect.right - (x))
+        y += text.fontSpacing
         if (y < rect.bottom) {
-            drawFit(canvas, "L%+d R%+d %s".format(g.signedField(6), g.signedField(7), badges), x, y, rect.right - (x))
+            val panKey = flags.toLong() or (g.field(6).toLong() shl 8) or (g.field(7).toLong() shl 16)
+            val pan = memo.get(2, panKey) {
+                val badges = buildString {
+                    if (flags and 1 != 0) append("ECHO ")
+                    if (flags and 2 != 0) append("PMOD ")
+                    if (flags and 4 != 0) append("NOISE ")
+                }
+                "L%+d R%+d %s".format(g.signedField(6), g.signedField(7), badges)
+            }
+            drawFit(canvas, pan, x, y, rect.right - (x))
         }
     }
 
     private fun drawMt32Part(canvas: Canvas, rect: RectF, g: VoiceGauges) {
         val notes = g.field(0)
         val partials = g.field(9)
-        drawFit(canvas, "KEYS %d PARTIALS %d".format(notes, partials), rect.left, rect.top - text.ascent(), rect.right - (rect.left))
-        val kb = RectF(rect.left, rect.top + text.fontSpacing, rect.right, rect.bottom)
+        val keys = memo.get(0, notes.toLong() or (partials.toLong() shl 8)) { "KEYS %d PARTIALS %d".format(notes, partials) }
+        drawFit(canvas, keys, rect.left, rect.top - text.ascent(), rect.right - (rect.left))
+        val kb = bar
+        kb.set(rect.left, rect.top + text.fontSpacing, rect.right, rect.bottom)
         if (kb.height() < density * 8) {
             return
         }
-        val pressed = BooleanArray(128)
+        pressed.fill(false)
         for (idx in 1..minOf(notes, 8)) {
             g.field(idx).takeIf { it != 0 }?.let { pressed[it and 127] = true }
         }
@@ -479,7 +550,7 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         }
     }
 
-    private fun isBlack(key: Int) = (key % 12) in intArrayOf(1, 3, 6, 8, 10)
+    private fun isBlack(key: Int) = BLACK_KEYS[key % 12]
 
     private fun drawMt32Partial(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
         // brightness follows envelope phase
@@ -495,20 +566,24 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     // 2A03: duty cycle glyph, 4 bit volume/envelope, sweep and DMC state
     private fun drawNes(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
         val glyphW = min(rect.width() * 0.3f, rect.height() * 1.6f)
-        val glyph = RectF(rect.left, rect.top, rect.left + glyphW, rect.bottom)
+        glyph.set(rect.left, rect.top, rect.left + glyphW, rect.bottom)
         val x = glyph.right + density * 6
-        val bar = RectF(x, rect.top + text.fontSpacing, rect.right, rect.bottom)
+        bar.set(x, rect.top + text.fontSpacing, rect.right, rect.bottom)
         when (g.kind) {
             VoiceGauges.Kind.NES_PULSE -> {
                 val duty = g.field(0) and 3
                 drawPulseGlyph(canvas, glyph, DUTIES[duty])
                 val period = g.field(3) or (g.field(4) shl 8)
-                val info = "%s %s%s P=%03X".format(
-                    DUTY_NAMES[duty],
-                    if (g.field(2) != 0) "VOL" else "ENV",
-                    if (g.field(6) != 0) " SWP" else "",
-                    period
-                )
+                val key = duty.toLong() or (g.field(2).toLong() shl 8) or (g.field(6).toLong() shl 16) or
+                    (period.toLong() shl 24)
+                val info = memo.get(0, key) {
+                    "%s %s%s P=%03X".format(
+                        DUTY_NAMES[duty],
+                        if (g.field(2) != 0) "VOL" else "ENV",
+                        if (g.field(6) != 0) " SWP" else "",
+                        period
+                    )
+                }
                 drawFit(canvas, info, x, rect.top - text.ascent(), rect.right - (x))
                 drawSegments(canvas, bar, ease(smooth, 0, g.field(1) / 15f), 15)
             }
@@ -516,21 +591,32 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
             VoiceGauges.Kind.NES_TRIANGLE -> {
                 drawTriangleGlyph(canvas, glyph)
                 val period = g.field(1) or (g.field(2) shl 8)
-                drawFit(canvas, "LIN %s P=%03X".format(if (g.field(0) != 0) "on" else "off", period), x, rect.top - text.ascent(), rect.right - (x))
+                val info = memo.get(1, g.field(0).toLong() or (period.toLong() shl 8)) {
+                    "LIN %s P=%03X".format(if (g.field(0) != 0) "on" else "off", period)
+                }
+                drawFit(canvas, info, x, rect.top - text.ascent(), rect.right - (x))
                 drawSegments(canvas, bar, ease(smooth, 0, if (g.isKeyOn) 1f else 0f), 15)
             }
 
             VoiceGauges.Kind.NES_NOISE -> {
                 drawNoiseGlyph(canvas, glyph, g.field(1) != 0)
-                drawFit(canvas, "%s RATE %X".format(if (g.field(1) != 0) "SHORT" else "LONG", g.field(2)), x, rect.top - text.ascent(), rect.right - (x))
+                val info = memo.get(2, g.field(1).toLong() or (g.field(2).toLong() shl 8)) {
+                    "%s RATE %X".format(if (g.field(1) != 0) "SHORT" else "LONG", g.field(2))
+                }
+                drawFit(canvas, info, x, rect.top - text.ascent(), rect.right - (x))
                 drawSegments(canvas, bar, ease(smooth, 0, g.field(0) / 15f), 15)
             }
 
             else -> {
-                drawFit(canvas, "RATE %X%s%s".format(g.field(1), if (g.field(3) != 0) " LOOP" else "", if (g.field(2) != 0) " PLAY" else ""), glyph.left, rect.top - text.ascent(), rect.right - (glyph.left))
+                val key = g.field(1).toLong() or (g.field(2).toLong() shl 8) or (g.field(3).toLong() shl 16)
+                val info = memo.get(3, key) {
+                    "RATE %X%s%s".format(g.field(1), if (g.field(3) != 0) " LOOP" else "", if (g.field(2) != 0) " PLAY" else "")
+                }
+                drawFit(canvas, info, glyph.left, rect.top - text.ascent(), rect.right - (glyph.left))
+                bar.set(glyph.left, bar.top, rect.right, rect.bottom)
                 drawLevelBar(
                     canvas,
-                    RectF(glyph.left, bar.top, rect.right, rect.bottom),
+                    bar,
                     ease(smooth, 0, g.field(0) / 127f),
                     32
                 )
@@ -728,6 +814,7 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         )
 
         private val NOTES = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+        private val BLACK_KEYS = BooleanArray(12) { it == 1 || it == 3 || it == 6 || it == 8 || it == 10 }
 
         fun noteName(hz: Float): String {
             if (hz <= 0f) return ""
