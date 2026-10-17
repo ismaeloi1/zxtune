@@ -1,0 +1,103 @@
+diff --git a/apu/apu.cpp b/apu/apu.cpp
+index 3d0efb5..0ec7315 100644
+--- a/apu/apu.cpp
++++ b/apu/apu.cpp
+@@ -14,6 +14,13 @@
+ #include "resampler.h"
+ 
+ #include "bapu/snes/snes.hpp"
++#include "../snesfifa_hooks.h"
++
++void (*snesfifa_cpu_port_write_hook)(int, uint8) = 0;
++void (*snesfifa_cpu_port_read_hook)(int, uint8) = 0;
++void (*snesfifa_smp_port_write_hook)(int, uint8) = 0;
++void (*snesfifa_cpu_exec_hook)(uint32) = 0;
++uint64 snesfifa_smp_clock = 0;
+ 
+ static const int APU_DEFAULT_INPUT_RATE = 32040;
+ static const int APU_SAMPLE_BLOCK       = 48;
+@@ -254,12 +261,15 @@ static inline int S9xAPUGetClockRemainder(int32 cpucycles)
+ uint8 S9xAPUReadPort(int port)
+ {
+     S9xAPUExecute();
+-    return ((uint8)SNES::smp.port_read(port & 3));
++    uint8 v = (uint8)SNES::smp.port_read(port & 3);
++    if (snesfifa_cpu_port_read_hook) snesfifa_cpu_port_read_hook(port & 3, v);
++    return v;
+ }
+ 
+ void S9xAPUWritePort(int port, uint8 byte)
+ {
+     S9xAPUExecute();
++    if (snesfifa_cpu_port_write_hook) snesfifa_cpu_port_write_hook(port & 3, byte);
+     SNES::cpu.port_write(port & 3, byte);
+ }
+ 
+@@ -273,6 +283,7 @@ void S9xAPUExecute(void)
+     int cycles = S9xAPUGetClock(CPU.Cycles);
+     spc::remainder = S9xAPUGetClockRemainder(CPU.Cycles);
+     SNES::smp.clock -= cycles;
++    snesfifa_smp_clock += cycles;
+     SNES::smp.enter();
+ 
+     S9xAPUSetReferenceTime(CPU.Cycles);
+diff --git a/apu/bapu/smp/memory.cpp b/apu/bapu/smp/memory.cpp
+index 3df43b1..21c553c 100644
+--- a/apu/bapu/smp/memory.cpp
++++ b/apu/bapu/smp/memory.cpp
+@@ -100,6 +100,7 @@ void SMP::mmio_write(unsigned addr, unsigned data) {
+   case 0xf5:
+   case 0xf6:
+   case 0xf7:
++    if (snesfifa_smp_port_write_hook) snesfifa_smp_port_write_hook(addr & 3, data);
+     port_write(addr, data);
+     break;
+ 
+diff --git a/apu/bapu/smp/smp.cpp b/apu/bapu/smp/smp.cpp
+index 2cf58af..501278b 100644
+--- a/apu/bapu/smp/smp.cpp
++++ b/apu/bapu/smp/smp.cpp
+@@ -4,6 +4,7 @@
+ char tmp[1024];
+ #endif
+ 
++#include "../../../snesfifa_hooks.h"
+ #include "../snes/snes.hpp"
+ 
+ #define SMP_CPP
+diff --git a/cpuexec.cpp b/cpuexec.cpp
+index ae00a5f..073bb73 100644
+--- a/cpuexec.cpp
++++ b/cpuexec.cpp
+@@ -5,6 +5,7 @@
+ \*****************************************************************************/
+ 
+ #include "snes9x.h"
++#include "snesfifa_hooks.h"
+ #include "memmap.h"
+ #include "cpuops.h"
+ #include "dma.h"
+@@ -177,6 +178,7 @@ void S9xMainLoop (void)
+ 			}
+ 
+ 			Registers.PCw++;
++			if (snesfifa_cpu_exec_hook) snesfifa_cpu_exec_hook(Registers.PBPC - 1);
+ 			(*Opcodes[Op].S9xOpcode)();
+ 		}
+ 
+diff --git a/snesfifa_hooks.h b/snesfifa_hooks.h
+new file mode 100644
+index 0000000..662801f
+--- /dev/null
++++ b/snesfifa_hooks.h
+@@ -0,0 +1,10 @@
++#ifndef SNESFIFA_HOOKS_H
++#define SNESFIFA_HOOKS_H
++/* Instrumentation hooks added by tools/snes-fifa (headless tracer). */
++#include "port.h"
++extern void (*snesfifa_cpu_port_write_hook)(int port, uint8 value);
++extern void (*snesfifa_cpu_port_read_hook)(int port, uint8 value);
++extern void (*snesfifa_smp_port_write_hook)(int port, uint8 value);
++extern void (*snesfifa_cpu_exec_hook)(uint32 pbpc);
++extern uint64 snesfifa_smp_clock;
++#endif
