@@ -63,12 +63,14 @@ def _overlap(ref, test, lag):
 
 def compare(ref_path: str, test_path: str, max_lag_s: float = 5.0, window_s: float = 1.0,
             search_s: float = 20.0, local_s: float = 0.05, expected_lag_s: Optional[float] = None,
-            radius_s: float = 0.15) -> Dict[str, object]:
+            radius_s: float = 0.15, limit_s: Optional[float] = None) -> Dict[str, object]:
     ref, rr = read_wav(ref_path)
     test, tr = read_wav(test_path)
     rate = rr
     refm = ref.mean(axis=1)
     testm = _resample(test.mean(axis=1), tr, rr)
+    if limit_s:
+        testm = testm[:int(limit_s * rate)]
     max_lag = int(max_lag_s * rate)
     # coarse lag from onset envelopes (robust to phase drift), then waveform refinement
     hop = rate // 100

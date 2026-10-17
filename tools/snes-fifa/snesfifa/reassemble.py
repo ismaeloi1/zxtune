@@ -577,4 +577,9 @@ def _build(cmds: Sequence[Command], snap: spcfile.Spc, snap_clock: int, first: i
                        stderr=subprocess.DEVNULL, check=False)
         os.remove(empty)
         result["validate_vs_emu"] = xcorr.compare(ref_wav, wav, expected_lag_s=ref_lag_s)
+        # first pass only (intro + one loop): after the loop point the original differs from any
+        # literal repeat because of the 65816's +-1 frame tempo jitter and dynamic voice allocation
+        first_pass = (loop_start - first + loop_frames) / 50.007
+        result["validate_vs_emu_first_pass"] = xcorr.compare(ref_wav, wav, expected_lag_s=ref_lag_s,
+                                                             limit_s=first_pass)
     return result
