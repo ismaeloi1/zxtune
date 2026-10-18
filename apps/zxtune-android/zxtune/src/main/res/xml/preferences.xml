@@ -302,6 +302,13 @@
                 android:key="zxtune.core.sid.combined_waveforms"
                 android:title="@string/pref_zxtune_sid_combined_waveforms_title"
                 app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="0"
+                android:entries="@array/pref_zxtune_sid_strong_pulse_saw_entries"
+                android:entryValues="@array/pref_zxtune_sid_strong_pulse_saw_values"
+                android:key="zxtune.core.sid.strong_pulse_saw"
+                android:title="@string/pref_zxtune_sid_strong_pulse_saw_title"
+                app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <!-- android auto -->
     <PreferenceCategory android:title="@string/pref_car_title">

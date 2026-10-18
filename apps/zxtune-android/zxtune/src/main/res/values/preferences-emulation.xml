@@ -469,4 +469,13 @@
         <item>1</item>
     </string-array>
     <string name="pref_zxtune_mt32_voices_default" translatable="false">0</string>
+    <string name="pref_zxtune_sid_strong_pulse_saw_title">6581 pulse+saw (reSIDfp)</string>
+    <string-array name="pref_zxtune_sid_strong_pulse_saw_entries">
+        <item>Normal (most 6581 chips)</item>
+        <item>Strong (chips with loud pulse+saw)</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_strong_pulse_saw_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
 </resources>
