@@ -10,6 +10,7 @@
 //   gauges=1        request gauges at each frame as dashboard does
 //   threaded=0      render and requests in separate threads in real time, to catch locks contention
 //   dump=<file>     traces of each frame as int16 [frames][channels][points]
+//   voices=<prefix> raw samples of each voice as int16 mono <prefix>.<voice>.raw (e.g. for reference triggers)
 //   slow=<us>       print frames with triggering slower than specified
 //   <name>=<value>  trigger parameter zxtune.sound.scope.trigger.<name> (e.g. edge_strength=100)
 // Stability: for each pair of consecutive frames the best horizontal alignment of the same channel's traces is
@@ -34,6 +35,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <memory>
 #include <string>
 #include <thread>
 #include <vector>
@@ -245,6 +247,7 @@ namespace
     bool Threaded = false;
     uint_t SlowUs = 0;
     std::string Dump;
+    std::string Voices;
     std::map<std::string, Parameters::IntType> Trigger;
   };
 
@@ -274,9 +277,9 @@ namespace
       Trigger.Add(triggered - start);
       if (Opts.SlowUs && triggered - start > std::chrono::microseconds(Opts.SlowUs))
       {
-        std::printf("slow frame %u at %lld: %lldus\n", FrameIndex, static_cast<long long>(playing),
-                    static_cast<long long>(
-                        std::chrono::duration_cast<std::chrono::microseconds>(triggered - start).count()));
+        std::printf(
+            "slow frame %u at %lld: %lldus\n", FrameIndex, static_cast<long long>(playing),
+            static_cast<long long>(std::chrono::duration_cast<std::chrono::microseconds>(triggered - start).count()));
       }
       ++FrameIndex;
       if (Opts.Gauges)
@@ -335,6 +338,82 @@ namespace
     Timings GaugesTime;
     Stability Stable;
     std::ofstream Dump;
+  };
+
+  // Passes voices to scope and stores them as is
+  class VoicesDump : public Module::VoicesScope
+  {
+  public:
+    VoicesDump(Module::VoicesScope::Ptr delegate, std::string prefix)
+      : Delegate(std::move(delegate))
+      , Prefix(std::move(prefix))
+    {}
+
+    ~VoicesDump() override
+    {
+      for (std::size_t idx = 0; idx < Samples.size(); ++idx)
+      {
+        std::ofstream out(Prefix + "." + std::to_string(idx) + ".raw", std::ios::binary);
+        out.write(reinterpret_cast<const char*>(Samples[idx].data()), Samples[idx].size() * sizeof(int16_t));
+      }
+    }
+
+    void SetVoicesGroups(const std::vector<Module::VoicesGroup>& groups, bool hasRegisters) override
+    {
+      Delegate->SetVoicesGroups(groups, hasRegisters);
+    }
+
+    bool IsActive() const override
+    {
+      return Delegate->IsActive();
+    }
+
+    uint_t GetStatePeriod() const override
+    {
+      return Delegate->GetStatePeriod();
+    }
+
+    void FeedState(uint_t chip, const uint8_t* registers, const uint8_t* osc, const uint8_t* env) override
+    {
+      Delegate->FeedState(chip, registers, osc, env);
+    }
+
+    void FeedChip(uint_t chip, const uint8_t* data, uint_t count) override
+    {
+      Delegate->FeedChip(chip, data, count);
+    }
+
+    void FeedVoices(uint_t firstVoice, const Module::VoiceState* states, uint_t count) override
+    {
+      Delegate->FeedVoices(firstVoice, states, count);
+    }
+
+    void SetDescription(const String& description) override
+    {
+      Delegate->SetDescription(description);
+    }
+
+    void Feed(uint_t firstVoice, uint_t voices, const int16_t* samples, uint_t count) override
+    {
+      Delegate->Feed(firstVoice, voices, samples, count);
+      if (Samples.size() < firstVoice + voices)
+      {
+        Samples.resize(firstVoice + voices);
+      }
+      for (uint_t voice = 0; voice < voices; ++voice)
+      {
+        auto& target = Samples[firstVoice + voice];
+        for (uint_t idx = 0; idx < count; ++idx)
+        {
+          target.push_back(samples[idx * voices + voice]);
+        }
+      }
+    }
+
+  private:
+    const Module::VoicesScope::Ptr Delegate;
+    const std::string Prefix;
+    std::vector<std::vector<int16_t>> Samples;
   };
 
   void RunDeterministic(Module::Renderer& renderer, Sound::Scope& scope, Requests& requests, const Options& opts,
@@ -461,6 +540,10 @@ int main(int argc, char** argv)
     {
       opts.Dump = value;
     }
+    else if (key == "voices")
+    {
+      opts.Voices = value;
+    }
     else
     {
       opts.Trigger[key] = std::atoll(value.c_str());
@@ -481,9 +564,18 @@ int main(int argc, char** argv)
                                           Parameters::Container::Create());
   auto renderer = Module::CreatePipelinedRenderer(*holder, global);
   const auto scope = Sound::Scope::Create(FREQ, global);
+  std::shared_ptr<VoicesDump> voicesDump;
   if (auto* voices = dynamic_cast<Module::VoicesScopeSource*>(renderer.get()))
   {
-    voices->SetVoicesScope(scope);
+    if (opts.Voices.empty())
+    {
+      voices->SetVoicesScope(scope);
+    }
+    else
+    {
+      voicesDump = std::make_shared<VoicesDump>(scope, opts.Voices);
+      voices->SetVoicesScope(voicesDump);
+    }
   }
   Requests requests(*scope, opts);
   // separate voices are rendered only for active scope
