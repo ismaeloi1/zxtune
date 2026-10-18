@@ -130,7 +130,7 @@ namespace Sound
                          Buffer& result1, Buffer& result2);
     uint_t FindPeak(Buffer& corr, const Buffer& peaks, int radius) const;
     bool Extrapolate(const TriggerWave& wave, int64_t pos, uint_t samplesPerFrame, bool canSearch, int64_t& trigger);
-    void UpdateBuffer(Buffer& data, float resultMean, uint_t period);
+    void UpdateBuffer(Buffer& data, float resultMean, uint_t period, float responsiveness);
     void GetData(const TriggerWave& wave, int64_t begin, uint_t count, uint_t stride, float* target) const;
     void AmplifySigns();
     void RescaleBuffer(uint_t period);

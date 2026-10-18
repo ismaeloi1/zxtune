@@ -31,6 +31,15 @@ namespace Sound
     const float MAX_OCTAVES_TO_RESAMPLE = 1.0f;
     // postponed searches are performed at least this often
     const uint_t MIN_SEARCH_RATE = 15;
+    // corrscope's default (and template's) frame rate. Its per frame parameters (responsiveness, search window) are
+    // tuned for it, so they are converted to time units to behave the same at any display refresh rate
+    const uint_t CORRSCOPE_FPS = 60;
+
+    // per frame exponential smoothing rate for frames of different duration, same time constant
+    float ScaleRate(float rate, float frames)
+    {
+      return rate >= 1 || rate <= 0 ? rate : 1.0f - std::pow(1.0f - rate, frames);
+    }
 
     uint_t NextPowerOfTwo(uint_t val)
     {
@@ -437,7 +446,10 @@ namespace Sound
     const auto kernelSize = A + B;
     const auto dataSize = A + TriggerDiameter + B;
 
-    const auto triggerBegin = std::max<int64_t>(pos - samplesPerFrame, pos - int64_t(Stride * TriggerDiameter / 2));
+    // Search range is not shifted forward at high refresh rates (corrscope limits it by frame to not go backward)
+    const auto windowFrame = std::max<int64_t>(samplesPerFrame, Samplerate / CORRSCOPE_FPS);
+    const auto triggerBegin = std::max<int64_t>(pos - windowFrame, pos - int64_t(Stride * TriggerDiameter / 2));
+    const float frames = float(samplesPerFrame) * CORRSCOPE_FPS / Samplerate;
     const auto dataBegin = triggerBegin - int64_t(Stride * A);
 
     Data.resize(dataSize);
@@ -453,7 +465,7 @@ namespace Sound
 
     if (Cfg.MeanResponsiveness != 0)
     {
-      PrevMean += Cfg.MeanResponsiveness * (mean - PrevMean);
+      PrevMean += ScaleRate(Cfg.MeanResponsiveness, frames) * (mean - PrevMean);
       if (Cfg.MeanResponsiveness != 1)
       {
         for (auto& v : Data)
@@ -565,7 +577,7 @@ namespace Sound
     Aligned.resize(kernelSize);
     GetData(wave, trigger - int64_t((kernelSize / 2) * Stride), kernelSize, Stride, Aligned.data());
     const float resultMean = Mean(Aligned.data(), kernelSize);
-    UpdateBuffer(Aligned, resultMean, period);
+    UpdateBuffer(Aligned, resultMean, period, ScaleRate(Cfg.Responsiveness, frames));
     return trigger;
   }
 
@@ -798,7 +810,7 @@ namespace Sound
     return bestIdx < 0 ? mid : bestIdx;
   }
 
-  void CorrelationTrigger::UpdateBuffer(Buffer& data, float resultMean, uint_t period)
+  void CorrelationTrigger::UpdateBuffer(Buffer& data, float resultMean, uint_t period, float responsiveness)
   {
     if (Cfg.BufferStrength == 0 || Cfg.Responsiveness == 0)
     {
@@ -820,7 +832,7 @@ namespace Sound
     NormalizeBuffer(CorrBuffer.data(), size);
     for (std::size_t idx = 0; idx < size; ++idx)
     {
-      CorrBuffer[idx] = CorrBuffer[idx] * (1 - Cfg.Responsiveness) + data[idx] * PrevWindow[idx] * Cfg.Responsiveness;
+      CorrBuffer[idx] = CorrBuffer[idx] * (1 - responsiveness) + data[idx] * PrevWindow[idx] * responsiveness;
     }
   }
 }  // namespace Sound
