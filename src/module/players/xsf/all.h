@@ -18,6 +18,8 @@ namespace Module::XSF
   Holder::Ptr CreateNCSFModule(const File& file, const FilesMap& additionalFiles,
                                Parameters::Container::Ptr properties);
   Holder::Ptr CreatePSFModule(const File& file, const FilesMap& additionalFiles, Parameters::Container::Ptr properties);
+  Holder::Ptr CreateSNSFModule(const File& file, const FilesMap& additionalFiles,
+                               Parameters::Container::Ptr properties);
   Holder::Ptr CreateSDSFModule(const File& file, const FilesMap& additionalFiles,
                                Parameters::Container::Ptr properties);
   Holder::Ptr Create2SFModule(const File& file, const FilesMap& additionalFiles, Parameters::Container::Ptr properties);

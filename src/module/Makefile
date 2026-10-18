@@ -22,7 +22,7 @@ jumbo.name := $(library_name)
 jumbo.excludes := $(addprefix players/, \
                    $(addprefix external/, asap.cpp flac.cpp gme.cpp libvgm.cpp mp3.cpp mt32.cpp ogg.cpp openmpt.cpp sid.cpp spc.cpp vgmstream.cpp wav/ffmpeg.cpp xmp.cpp) \
                    dac/abysshighestexperience.cpp \
-                   $(addprefix xsf/, 2sf.cpp gsf.cpp ncsf.cpp psf.cpp sdsf.cpp usf.cpp) \
+                   $(addprefix xsf/, 2sf.cpp gsf.cpp ncsf.cpp psf.cpp sdsf.cpp snsf.cpp snsf_emu.cpp usf.cpp) \
                   )
 
 include $(dirs.root)/makefile.mak

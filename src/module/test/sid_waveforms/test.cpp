@@ -1,6 +1,6 @@
 // Usage: module_test_sid_waveforms
 // Host check: levels of combined waveforms relative to pure ones for both engines, chip models and reSIDfp combined
-// waveforms strengths. Tunes are synthesized, so no files are required.
+// waveforms strengths, pulse+saw at several pulse widths. Tunes are synthesized, so no files are required.
 #include "module/players/pipeline.h"
 #include "module/test/sid_psid.h"
 
@@ -35,6 +35,10 @@ namespace
   };
   const std::size_t SAW = 1;
   const std::size_t SAW_TRI = 2;
+
+  // pulse is high while accumulator is above pulse width, so for >50% combined pulse+saw output starts in the upper
+  // half of saw period where 6581 pulls accumulator MSB down
+  const uint_t PULSE_WIDTHS[] = {0x200, 0x600, 0x7f0, 0x900, 0xc00};
 
   double RenderRms(const Module::Holder& holder, Parameters::Container::Ptr params)
   {
@@ -84,6 +88,11 @@ int main()
     {
       songs.push_back(SidTest::MakeVoice(SidTest::ToneRegister(440), w.Control));
     }
+    const auto pulseSawFirst = songs.size();
+    for (const auto pw : PULSE_WIDTHS)
+    {
+      songs.push_back(SidTest::MakeVoice(SidTest::ToneRegister(440), 0x61, pw));
+    }
     const auto psid = SidTest::MakePsid(songs);
     const auto global = Parameters::Container::Create();
     global->SetValue(Parameters::ZXTune::Sound::FREQUENCY, FREQ);
@@ -102,6 +111,7 @@ int main()
       Parameters::IntType Engine;
       Parameters::IntType Model;
       Parameters::IntType Strength;
+      Parameters::IntType StrongPulseSaw = STRONG_PULSE_SAW_DEFAULT;
     };
     std::vector<Config> configs;
     for (const auto model : {MODEL_6581, MODEL_8580})
@@ -111,12 +121,17 @@ int main()
       configs.push_back({"reSIDfp " + chip + " weak", ENGINE_RESIDFP, model, COMBINED_WAVEFORMS_WEAK});
       configs.push_back({"reSIDfp " + chip + " average", ENGINE_RESIDFP, model, COMBINED_WAVEFORMS_AVERAGE});
       configs.push_back({"reSIDfp " + chip + " strong", ENGINE_RESIDFP, model, COMBINED_WAVEFORMS_STRONG});
+      configs.push_back({"reSIDfp " + chip + " avg strPS", ENGINE_RESIDFP, model, COMBINED_WAVEFORMS_AVERAGE, 1});
     }
 
     std::printf("%-22s %8s", "dB relative to saw", "saw RMS");
     for (const auto& w : WAVES)
     {
       std::printf(" %13s", w.Name);
+    }
+    for (const auto pw : PULSE_WIDTHS)
+    {
+      std::printf("   P+S pw=%03x", pw);
     }
     std::printf("\n");
     bool ok = true;
@@ -127,6 +142,7 @@ int main()
       params->SetValue(MODEL, cfg.Model);
       params->SetValue(MODEL_FORCE, 1);
       params->SetValue(COMBINED_WAVEFORMS, cfg.Strength);
+      params->SetValue(STRONG_PULSE_SAW, cfg.StrongPulseSaw);
       std::vector<double> levels;
       for (const auto& holder : holders)
       {
@@ -138,6 +154,20 @@ int main()
         std::printf(" %13.1f", ToDb(lvl, levels[SAW]));
       }
       std::printf("\n");
+      const auto pulseSaw = [&](uint_t idx) { return ToDb(levels[pulseSawFirst + idx], levels[SAW]); };
+      // Both engines pull 6581 accumulator MSB down when combined output top bit is low, so with pulse width over
+      // 50% (pulse is low at the middle of saw period) the upper half is never reached and the output is silent.
+      // 8580 doesn't do it, reSIDfp optionally keeps MSB for pulse+saw as some 6581 chips do.
+      const bool msbPulldown = cfg.Model == MODEL_6581 && !cfg.StrongPulseSaw;
+      for (uint_t idx = 0; idx < std::size(PULSE_WIDTHS); ++idx)
+      {
+        const bool upperHalf = PULSE_WIDTHS[idx] > 0x800;
+        if (msbPulldown && upperHalf ? pulseSaw(idx) > -40 : pulseSaw(idx) < -25)
+        {
+          std::printf("  FAILED: unexpected pulse+saw level for pw=%03x\n", PULSE_WIDTHS[idx]);
+          ok = false;
+        }
+      }
       // Sampled 8580 saw+triangle (reSID tables, libsidplayfp combined-waveforms dumps) is a few dB below saw.
       // Older reSIDfp model dropped fractional top bit weight and made it ~20dB weaker for some strengths.
       if (cfg.Model == MODEL_8580 && ToDb(levels[SAW_TRI], levels[SAW]) < -10)

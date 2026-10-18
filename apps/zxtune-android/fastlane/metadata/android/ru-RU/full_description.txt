@@ -10,7 +10,7 @@
 * Sam Coupe (COP)
 * Commodore 64/128 MOS6581 (SID)
 * Amstrad CPC (AYC)
-* Super Nintendo (SPC)
+* Super Nintendo (SPC, SNSF)
 * мультиплатформенные (MTC, VGM, GYM, S98)
 * Nintendo (NSF, NSFe)
 * GameBoy (GBS, GSF)

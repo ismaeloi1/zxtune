@@ -104,6 +104,13 @@ public:
     void combinedWaveformsStrength(SidConfig::sid_cw_t cws);
 
     /**
+     * zxtune: do not pull down 6581 accumulator MSB with combined pulse and saw.
+     *
+     * @param enable
+     */
+    void combinedWaveformsStrongPS(bool enable);
+
+    /**
      * zxtune: set receiver for separate voices output, nullptr to disable.
      */
     void voicesSink(SidVoicesSink* sink) { m_voicesSink = sink; }

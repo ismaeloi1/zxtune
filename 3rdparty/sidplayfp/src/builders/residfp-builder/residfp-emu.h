@@ -88,6 +88,8 @@ public:
     void filter6581Dac(const double* voltages);
     void filter8580Curve(double filterCurve);
     void combinedWaveforms(SidConfig::sid_cw_t cws);
+    // zxtune
+    void strongPS(bool enable) { m_sid.enableStrongPS(enable); }
 };
 
 }
