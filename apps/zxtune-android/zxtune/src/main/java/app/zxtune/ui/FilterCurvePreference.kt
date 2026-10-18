@@ -14,6 +14,7 @@ import android.view.View
 import androidx.core.view.ViewCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.Preference
@@ -27,6 +28,7 @@ import app.zxtune.ui.views.FilterCurveView
 import app.zxtune.ui.views.SidFilterModel
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
@@ -48,7 +50,7 @@ class FilterCurvePreference @JvmOverloads constructor(
 
     @Volatile
     private var visualizer: Visualizer? = null
-    private var liveConnected = false
+    private var liveJob: Job? = null
     private val handler = Handler(Looper.getMainLooper())
     private val pending = AtomicBoolean(false)
     private var gaugesBuffer = ByteArray(0)
@@ -68,33 +70,52 @@ class FilterCurvePreference @JvmOverloads constructor(
         if (view !== curve) {
             view = curve
             curve.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
-                override fun onViewAttachedToWindow(v: View) = start()
+                override fun onViewAttachedToWindow(v: View) = start(v)
                 override fun onViewDetachedFromWindow(v: View) = stop()
             })
             if (ViewCompat.isAttachedToWindow(curve)) {
-                start()
+                start(curve)
             }
         }
         update()
     }
 
-    private fun start() {
-        connectLive()
+    // Preference outlives its views while hosting fragment is in back stack, so all the references are dropped here
+    override fun onDetached() {
+        stop()
+        view = null
+        super.onDetached()
+    }
+
+    private fun start(attached: View) {
+        connectLive(attached)
         handler.removeCallbacks(tick)
         handler.post(tick)
     }
 
-    private fun stop() = handler.removeCallbacks(tick)
+    private fun stop() {
+        handler.removeCallbacks(tick)
+        liveJob?.cancel()
+        liveJob = null
+        visualizer = null
+    }
 
-    private fun connectLive() {
-        if (liveConnected) {
+    // Bound to hosting fragment's view lifecycle (view tree owner), not to activity: activity scope retained the
+    // preference with its fragment after onDestroy (detected by LeakCanary)
+    private fun connectLive(attached: View) {
+        if (liveJob?.isActive == true) {
             return
         }
+        val owner = attached.findViewTreeLifecycleOwner() ?: return
         val activity = findActivity(context) ?: return
-        liveConnected = true
-        activity.lifecycleScope.launch {
-            activity.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                MediaModel.of(activity).visualizer.collect { visualizer = it }
+        val model = MediaModel.of(activity)
+        liveJob = owner.lifecycleScope.launch {
+            owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                try {
+                    model.visualizer.collect { visualizer = it }
+                } finally {
+                    visualizer = null
+                }
             }
         }
     }
