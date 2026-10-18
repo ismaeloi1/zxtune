@@ -59,6 +59,7 @@ namespace Formats::Chiptune
   Decoder::Ptr CreatePSF2Decoder();
   Decoder::Ptr CreateUSFDecoder();
   Decoder::Ptr CreateGSFDecoder();
+  Decoder::Ptr CreateSNSFDecoder();
   Decoder::Ptr Create2SFDecoder();
   Decoder::Ptr CreateNCSFDecoder();
   Decoder::Ptr CreateSSFDecoder();
