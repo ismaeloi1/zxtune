@@ -154,6 +154,9 @@ private:
 
     bool is6581; //-V730_NOINIT this is initialized in the SID constructor
 
+    // zxtune: strong P+S option, backported from libresidfp 1.3.0
+    bool strongPS;
+
 private:
     void shift_phase2(unsigned int waveform_old, unsigned int waveform_new);
 
@@ -178,6 +181,14 @@ public:
      * @param is6581 true if MOS6581, false if CSG8580
      */
     void setModel(bool is6581) { this->is6581 = is6581; }
+
+    /**
+     * Set strong P+S for 6581 model.
+     * If enabled when Pulse and Saw are combined the
+     * topbit is not pulled down, providing a stronger
+     * sound.
+     */
+    void setStrongPS(bool sps) { strongPS = sps; }
 
     /**
      * SID clocking.
@@ -221,7 +232,8 @@ public:
         floating_output_ttl(0),
         test(false),
         sync(false),
-        msb_rising(false) {}
+        msb_rising(false),
+        strongPS(false) {}
 
     /**
      * Write FREQ LO register.
@@ -401,8 +413,10 @@ unsigned int WaveformGenerator::output(const WaveformGenerator* ringModulator)
         // In the 6581 the top bit of the accumulator may be driven low by combined waveforms
         // when the sawtooth is selected
         // zxtune: also prevent unwanted sync, backported from libsidplayfp 2.12.0 (#169)
+        // zxtune: on some chips it doesn't happen with P+S, backported from libresidfp 1.3.0
         if (is6581
                 && (waveform & 0x2)
+                && !(strongPS && (waveform == 6))
                 && ((waveform_output & 0x800) == 0))
         {
             msb_rising = false;

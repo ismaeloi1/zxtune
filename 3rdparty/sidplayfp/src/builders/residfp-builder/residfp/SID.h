@@ -186,6 +186,13 @@ public:
     void setCombinedWaveforms(CombinedWaveforms cws);
 
     /**
+     * zxtune: set strong P+S for 6581 model, backported from libresidfp 1.3.0
+     *
+     * @param enable true to keep accumulator MSB with combined pulse and saw
+     */
+    void enableStrongPS(bool enable);
+
+    /**
      * SID reset.
      */
     void reset();

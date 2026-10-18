@@ -105,3 +105,8 @@ void ReSIDfpBuilder::combinedWaveformsStrength(SidConfig::sid_cw_t cws)
 {
     std::for_each(sidobjs.begin(), sidobjs.end(), applyParameter<libsidplayfp::ReSIDfp, SidConfig::sid_cw_t>(&libsidplayfp::ReSIDfp::combinedWaveforms, cws));
 }
+
+void ReSIDfpBuilder::combinedWaveformsStrongPS(bool enable)
+{
+    std::for_each(sidobjs.begin(), sidobjs.end(), applyParameter<libsidplayfp::ReSIDfp, bool>(&libsidplayfp::ReSIDfp::strongPS, enable));
+}

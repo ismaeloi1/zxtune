@@ -365,6 +365,14 @@ void SID::setCombinedWaveforms(CombinedWaveforms cws)
     }
 }
 
+void SID::enableStrongPS(bool enable)
+{
+    for (int i = 0; i < 3; i++)
+    {
+        voice[i]->wave()->setStrongPS(enable);
+    }
+}
+
 void SID::stateRegions(StateRegions &regions)
 {
     addStateRegion(regions, this);
