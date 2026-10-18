@@ -179,6 +179,8 @@ internal class StatusCallback private constructor(
             putNonEmptyString(ModuleAttributes.PROGRAM, item.program)
             putNonEmptyString(ModuleAttributes.STRINGS, item.strings)
             if (item is PlayableItem) {
+                // live settings panel shows only emulation settings of the playing tune's chips
+                putNonEmptyString(ModuleAttributes.TYPE, item.module.getProperty(ModuleAttributes.TYPE, ""))
                 putNonEmptyString(
                     ModuleAttributes.CHANNELS_NAMES,
                     item.module.getProperty(ModuleAttributes.CHANNELS_NAMES, "")

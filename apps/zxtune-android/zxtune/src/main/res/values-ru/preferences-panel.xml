@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="scope_settings_tab_scope">Осциллограф</string>
+    <string name="scope_settings_tab_general">Общие</string>
+    <string name="scope_settings_tab_all">Все настройки</string>
+    <string name="scope_settings_no_chip_settings">Нет настроек эмуляции для этого чипа</string>
+    <string name="scope_settings_next_track">со следующего трека</string>
+</resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- live settings panel over oscilloscope: shortcuts to pages -->
+    <string name="scope_settings_tab_scope">Scope</string>
+    <string name="scope_settings_tab_general">General</string>
+    <string name="scope_settings_tab_all">All settings</string>
+    <string name="scope_settings_no_chip_settings">No adjustable emulation settings for this chip</string>
+    <string name="scope_settings_next_track">applies to next track</string>
+    <!-- short chips names by preferences group (zxtune.core.<id>.*) -->
+    <string name="scope_settings_chip_aym" translatable="false">AY/YM</string>
+    <string name="scope_settings_chip_z80" translatable="false">Z80</string>
+    <string name="scope_settings_chip_fm" translatable="false">TurboFM</string>
+    <string name="scope_settings_chip_dac" translatable="false">DAC</string>
+    <string name="scope_settings_chip_saa" translatable="false">SAA1099</string>
+    <string name="scope_settings_chip_mt32" translatable="false">MT-32</string>
+    <string name="scope_settings_chip_sid" translatable="false">SID</string>
+</resources>

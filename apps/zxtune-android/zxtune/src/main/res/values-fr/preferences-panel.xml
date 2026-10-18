@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="scope_settings_tab_scope">Scope</string>
+    <string name="scope_settings_tab_general">Général</string>
+    <string name="scope_settings_tab_all">Tous les réglages</string>
+    <string name="scope_settings_no_chip_settings">Aucun réglage d\'émulation pour cette puce</string>
+    <string name="scope_settings_next_track">à partir du morceau suivant</string>
+</resources>
