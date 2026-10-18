@@ -36,6 +36,7 @@ namespace ZXTune::XSF
     { "PSF2"_id, &Formats::Chiptune::CreatePSF2Decoder, &Module::XSF::CreatePSFModule },
     { "USF"_id,  &Formats::Chiptune::CreateUSFDecoder,  &Module::XSF::CreateUSFModule },
     { "GSF"_id,  &Formats::Chiptune::CreateGSFDecoder,  &Module::XSF::CreateGSFModule },
+    { "SNSF"_id, &Formats::Chiptune::CreateSNSFDecoder, &Module::XSF::CreateSNSFModule },
     { "2SF"_id,  &Formats::Chiptune::Create2SFDecoder,  &Module::XSF::Create2SFModule },
     { "NCSF"_id, &Formats::Chiptune::CreateNCSFDecoder, &Module::XSF::CreateNCSFModule },
     { "SSF"_id,  &Formats::Chiptune::CreateSSFDecoder,  &Module::XSF::CreateSDSFModule },
