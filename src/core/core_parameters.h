@@ -313,6 +313,10 @@ namespace Parameters::ZXTune::Core
     const IntType COMBINED_WAVEFORMS_STRONG = 2;
     const IntType COMBINED_WAVEFORMS_DEFAULT = COMBINED_WAVEFORMS_AVERAGE;
     const auto COMBINED_WAVEFORMS = PREFIX + "combined_waveforms"_id;
+    //! reSIDfp 6581 pulse+saw: 0 - accumulator MSB is pulled down by the combined output as in most of the measured
+    //! chips (silent with pulse width over 50%), 1 - kept as in some chips (and reSID sampled tables), louder sound
+    const IntType STRONG_PULSE_SAW_DEFAULT = 0;
+    const auto STRONG_PULSE_SAW = PREFIX + "strong_pulse_saw"_id;
     //@}
   }  // namespace SID
 

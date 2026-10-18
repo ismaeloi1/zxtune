@@ -250,6 +250,12 @@ namespace Module::Sid
       }
     }
 
+    bool GetStrongPulseSaw() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return Get(STRONG_PULSE_SAW, STRONG_PULSE_SAW_DEFAULT) != 0;
+    }
+
   private:
     Parameters::IntType GetInterpolation() const
     {
@@ -409,6 +415,7 @@ namespace Module::Sid
         newFilter.Range6581 = sidParams.GetFilter6581Range();
         newFilter.Curve8580 = sidParams.GetFilter8580Curve();
         newFilter.CombinedWaveforms = sidParams.GetCombinedWaveforms();
+        newFilter.StrongPulseSaw = sidParams.GetStrongPulseSaw();
       }
       else
       {
@@ -425,6 +432,7 @@ namespace Module::Sid
           const auto* preset8580 = FindFilter8580Preset(newFilter.Preset8580);
           fp.filter8580Curve(preset8580 ? FilterModel::FitResidFp8580Curve(*preset8580) : newFilter.Curve8580);
           fp.combinedWaveformsStrength(newFilter.CombinedWaveforms);
+          fp.combinedWaveformsStrongPS(newFilter.StrongPulseSaw);
         }
         else
         {
@@ -712,6 +720,7 @@ namespace Module::Sid
       double Range6581 = 0;
       double Curve8580 = 0;
       SidConfig::sid_cw_t CombinedWaveforms = SidConfig::AVERAGE;
+      bool StrongPulseSaw = false;
       double Bias = 0;
 
       bool operator==(const FilterSettings&) const = default;
