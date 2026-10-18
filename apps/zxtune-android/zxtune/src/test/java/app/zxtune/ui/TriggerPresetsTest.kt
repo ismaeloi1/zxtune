@@ -50,8 +50,8 @@ class TriggerPresetsTest {
         val defaults = TriggerPresets.PARAMS.associate { it.name to it.default }
         assertEquals(
             mapOf(
-                "width" to 60, "edge_strength" to 50, "slope_width" to 25, "buffer_strength" to 100,
-                "responsiveness" to 100, "buffer_falloff" to 50, "reset_below" to 70, "mean_responsiveness" to 0,
+                "width" to 40, "edge_strength" to 100, "slope_width" to 25, "buffer_strength" to 100,
+                "responsiveness" to 50, "buffer_falloff" to 50, "reset_below" to 30, "mean_responsiveness" to 0,
                 "sign_strength" to 0, "diameter" to 50, "falling" to 0, "pitch_tracking" to 1, "post_radius" to 0,
                 "search_rate" to 0, "subsampling" to 0
             ),

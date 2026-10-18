@@ -55,13 +55,13 @@ object TriggerPresets {
     }
 
     val PARAMS = listOf(
-        Param("width", Type.INT, 60),
-        Param("edge_strength", Type.INT, 50),
+        Param("width", Type.INT, 40),
+        Param("edge_strength", Type.INT, 100),
         Param("slope_width", Type.INT, 25),
         Param("buffer_strength", Type.INT, 100),
-        Param("responsiveness", Type.INT, 100),
+        Param("responsiveness", Type.INT, 50),
         Param("buffer_falloff", Type.INT, 50),
-        Param("reset_below", Type.INT, 70),
+        Param("reset_below", Type.INT, 30),
         Param("mean_responsiveness", Type.INT, 0),
         Param("sign_strength", Type.INT, 0),
         Param("diameter", Type.INT, 50),
@@ -80,18 +80,14 @@ object TriggerPresets {
     }
 
     val PRESETS = listOf(
-        // The most stable on benchmark for all the chips: 60ms width (corrscope's default for new projects since 0.6)
-        // catches lower notes; help's advice for evolving notes: reduce edge strength to track sustained notes, reset
-        // buffer on new notes, boost responsiveness. Searched at each frame as corrscope does.
-        Preset(DEFAULT, emptyMap()),
         // corrscope's template_config (corrscope.py): trigger_ms=40, mean_responsiveness=0, edge_strength=1,
-        // responsiveness=0.5, reset_below=0.3, pitch_tracking=on
-        Preset("corrscope", mapOf("width" to 40, "edge_strength" to 100, "responsiveness" to 50, "reset_below" to 30)),
+        // responsiveness=0.5, reset_below=0.3, pitch_tracking=on. Searched at each frame as corrscope does.
+        Preset(DEFAULT, emptyMap()),
+        // Help's advice for evolving notes: reduce edge strength to track sustained notes, reset buffer on new notes,
+        // boost responsiveness; 60ms width (corrscope's default for new projects since 0.6) catches lower notes
+        Preset("evolving", mapOf("width" to 60, "edge_strength" to 50, "responsiveness" to 100, "reset_below" to 70)),
         // Help: increasing edge strength tracks new notes better, post trigger slides to exact edge
-        Preset(
-            "chiptune",
-            mapOf("width" to 40, "edge_strength" to 150, "responsiveness" to 50, "reset_below" to 30, "post_radius" to 4)
-        ),
+        Preset("chiptune", mapOf("edge_strength" to 150, "post_radius" to 4)),
         // Help: for low bass notes increase trigger width (period > 20ms requires > 40ms)
         Preset("bass", mapOf("width" to 100)),
         // Help: NES triangle waves - no DC removal, buffer strength 0, sign amplification 1
