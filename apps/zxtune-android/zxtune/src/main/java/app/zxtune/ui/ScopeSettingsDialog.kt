@@ -42,6 +42,7 @@ import app.zxtune.PreferencesActivity
 import app.zxtune.R
 import app.zxtune.core.ModuleAttributes
 import app.zxtune.device.media.MediaModel
+import app.zxtune.playback.StatusHeader
 import app.zxtune.playback.VoicesLayout
 import app.zxtune.preferences.DataStore
 import app.zxtune.preferences.Mt32Roms
@@ -136,7 +137,7 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
             }
             // emulation description is optional, scope statistics line follows it
             val description = runCatching { src.getStatus().lineSequence().first() }.getOrDefault("")
-                .takeUnless { it.startsWith("scope:") } ?: ""
+                .takeUnless { it.startsWith("scope:") || StatusHeader.isHeader(it) } ?: ""
             EmulationContext.detect(type, groups, description)
         }
     }

@@ -14,6 +14,7 @@
 
 #include "module/voices_scope.h"
 #include "parameters/accessor.h"
+#include "time/duration.h"
 
 #include <vector>
 
@@ -23,7 +24,8 @@ namespace Module::AYM
   class VoicesFeed
   {
   public:
-    VoicesFeed(Parameters::Accessor::Ptr params, uint_t chips);
+    //! @param frameDuration player interrupt period to display
+    VoicesFeed(Parameters::Accessor::Ptr params, uint_t chips, Time::Microseconds frameDuration);
 
     //! @param scope receiver or nullptr to disable
     void SetScope(VoicesScope::Ptr scope, Devices::AYM::ChannelsSource& chip);
@@ -37,6 +39,7 @@ namespace Module::AYM
   private:
     const Parameters::Accessor::Ptr Params;
     const uint_t Chips;
+    const Time::Microseconds FrameDuration;
     VoicesScope::Ptr Scope;
     bool Active = false;
     std::vector<Devices::AYM::ChannelState> Channels;

@@ -12,6 +12,7 @@ import app.zxtune.Log;
 import app.zxtune.Releaseable;
 import app.zxtune.TimeStamp;
 import app.zxtune.analytics.Analytics;
+import app.zxtune.core.ModuleAttributes;
 import app.zxtune.core.Properties;
 import app.zxtune.core.PropertiesContainer;
 import app.zxtune.device.sound.SoundOutputSamplesTarget;
@@ -296,7 +297,11 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
             this.source = src;
             this.visualizer =
                     new PlaybackVisualizer(
-                            player, () -> output.getPlaybackFrame(src), output::getStatistics);
+                            player,
+                            () -> output.getPlaybackFrame(src),
+                            output::getStatistics,
+                            item.getModule().getProperty(ModuleAttributes.TYPE, ""),
+                            item.getModule().getProperty(ModuleAttributes.PROGRAM, ""));
         }
 
         final void release() {

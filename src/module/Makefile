@@ -33,3 +33,10 @@ players/external/sid/songlengths_db.inc: players/external/sid/mksonglength.py $(
 endif
 
 players/external/sid/songlengths.cpp: players/external/sid/songlengths_db.inc
+
+ifdef tools.python
+players/external/sid/sidid_db.inc: players/external/sid/mksidid.py $(dirs.root)/3rdparty/sidid/sidid.cfg
+	$(tools.python) $^ > $@
+endif
+
+players/external/sid/playroutine.cpp: players/external/sid/sidid_db.inc

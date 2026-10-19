@@ -3,6 +3,9 @@
   <string name="about">About</string>
   <string name="about_credits">Credits</string>
   <string name="about_plugins">Plugins</string>
+  <string name="about_licenses" translatable="false">Open source</string>
+  <string name="about_coauthor" translatable="false">Co-author: <b>LHUNA</b></string>
+  <string name="about_engines" translatable="false">Sound engines: %1$s (C64), %2$s (SNES)</string>
   <!-- about-related -->
   <string name="about_author">
     Idea, code: <b>Vitamin/CAIG</b>\n

@@ -34,7 +34,7 @@ namespace Module
       : Iterator(std::move(iterator))
       , Device(std::move(device))
       , FrameDuration(frameDuration)
-      , Voices(std::move(params), 1)
+      , Voices(std::move(params), 1, frameDuration)
     {}
 
     bool SetVoicesScope(VoicesScope::Ptr scope) override
