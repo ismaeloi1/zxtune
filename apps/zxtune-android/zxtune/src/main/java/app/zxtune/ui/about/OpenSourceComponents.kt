@@ -36,7 +36,7 @@ object OpenSourceComponents {
     private fun reference(name: String, authors: String, license: String, url: String) = Component(name, authors, license, url, Category.REFERENCE)
 
     val ALL = listOf(
-        playback("ZXTune", "Vitamin/CAIG", "GPL-3.0", "https://github.com/vitamin-caig/zxtune"),
+        playback("ZXTune", "Vitamin/CAIG", "LGPL-3.0", "https://github.com/vitamin-caig/zxtune"),
         playback(
             "libsidplayfp, reSID, reSIDfp",
             "Leandro Nini, Antti Lankila, Dag Lem et al.",
