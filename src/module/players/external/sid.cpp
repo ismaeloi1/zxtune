@@ -12,6 +12,7 @@
 
 #include "module/players/duration.h"
 #include "module/players/external/sid/filters.h"
+#include "module/players/external/sid/playroutine.h"
 #include "module/players/external/sid/roms.h"
 #include "module/players/external/sid/songlengths.h"
 #include "module/players/platforms.h"
@@ -43,7 +44,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <cstring>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <thread>
 #include <vector>
@@ -68,6 +72,7 @@ namespace Module::Sid
       : SidTune(data.As<uint_least8_t>(), data.Size())
       , Index(selectSong(idx + 1))
       , MD5(GetMD5(data))
+      , CiaTimer(FindCiaTimer(data))
     {
       CheckSidplayError(getStatus());
     }
@@ -80,6 +85,17 @@ namespace Module::Sid
         Duration = GetDefaultDuration(params);
       }
       Dbg("Duration for {}/{} is {}ms", MD5, Index, Duration.Get());
+    }
+
+    const std::string& GetDigest() const
+    {
+      return MD5;
+    }
+
+    //! @return CIA1 timer A value set by init routine, 0 if unknown
+    uint_t GetCiaTimer() const
+    {
+      return CiaTimer;
     }
 
     Time::Milliseconds GetDuration() const
@@ -99,6 +115,7 @@ namespace Module::Sid
   private:
     const uint_t Index = 0;
     const std::string MD5;
+    const uint_t CiaTimer;
     Time::Milliseconds Duration;
   };
 
@@ -367,10 +384,11 @@ namespace Module::Sid
       RELOAD,
     };
 
-    void Load(SidTune& tune)
+    void Load(Model& tune)
     {
       CheckSidplayError(Player.load(&tune));
       Tune = &tune;
+      CiaTimer = tune.GetCiaTimer();
       // new chips are created, so voices are not muted
       MuteMask = 0;
       UpdateDescription();
@@ -650,6 +668,85 @@ namespace Module::Sid
       }
     }
 
+    SidConfig::c64_model_t GetC64Model() const
+    {
+      const auto& info = *Tune->getInfo();
+      if (Config.forceC64Model || info.clockSpeed() == SidTuneInfo::CLOCK_UNKNOWN
+          || info.clockSpeed() == SidTuneInfo::CLOCK_ANY)
+      {
+        return Config.defaultC64Model;
+      }
+      return info.clockSpeed() == SidTuneInfo::CLOCK_NTSC ? SidConfig::NTSC : SidConfig::PAL;
+    }
+
+    struct Clocks
+    {
+      double Cpu;
+      double Frame;
+    };
+
+    // Same values as in libsidplayfp c64 model tables: cpu = colorburst * 4 / divider, frame = cpu / (lines * cycles)
+    static Clocks GetClocks(SidConfig::c64_model_t model)
+    {
+      switch (model)
+      {
+      case SidConfig::NTSC:
+        return {1022727.14, 1022727.14 / (263 * 65)};
+      case SidConfig::OLD_NTSC:
+        return {1022727.14, 1022727.14 / (262 * 64)};
+      case SidConfig::DREAN:
+        return {1023444.64, 1023444.64 / (312 * 65)};
+      case SidConfig::PAL_M:
+        return {1021603.28, 1021603.28 / (263 * 65)};
+      default:
+        return {985248.61, 985248.61 / (312 * 63)};
+      }
+    }
+
+    static String FormatRate(double hz)
+    {
+      const auto tenths = static_cast<int>(std::lround(hz * 10));
+      return std::to_string(tenths / 10) + (tenths % 10 ? "." + std::to_string(tenths % 10) : String()) + " Hz";
+    }
+
+    // Play routine call rate relative to video frame, as tracked by multispeed tunes (2x, 4x, 8x)
+    static String FormatSpeed(double ratio)
+    {
+      const auto whole = std::lround(ratio);
+      if (whole >= 1 && std::abs(ratio - whole) < 0.05 * whole)
+      {
+        return std::to_string(whole) + "x";
+      }
+      const auto tenths = std::lround(ratio * 10);
+      return std::to_string(tenths / 10) + "." + std::to_string(tenths % 10) + "x";
+    }
+
+    String GetTiming(SidConfig::c64_model_t model)
+    {
+      const auto& info = *Tune->getInfo();
+      const auto clocks = GetClocks(model);
+      const String clock = GetClockName(model);
+      if (info.compatibility() == SidTuneInfo::COMPATIBILITY_R64
+          || info.compatibility() == SidTuneInfo::COMPATIBILITY_BASIC)
+      {
+        // real C64 tunes set up interrupts by themselves, CIA timer is not necessarily used
+        return "timing: RSID own IRQ (" + clock + ")";
+      }
+      if (info.songSpeed() == SidTuneInfo::SPEED_CIA_1A)
+      {
+        // without explicit timer setup default 60Hz rate of PSID driver is used
+        const auto timer = CiaTimer ? CiaTimer : (clocks.Frame > 55 ? 0x4295 : 0x4025);
+        const auto rate = clocks.Cpu / (double(timer) + 1);
+        return "timing: CIA " + FormatRate(rate) + " (" + clock + "), speed " + FormatSpeed(rate / clocks.Frame);
+      }
+      // VBI tunes are played at fixed 50/60Hz rate if clock differs from tune's one
+      const auto* speed = Player.info().speedString();
+      const bool fixed = speed && std::strstr(speed, "FIXED");
+      const auto rate = fixed ? (clocks.Frame > 55 ? 50.0 : 60.0) : clocks.Frame;
+      return "timing: VBI " + FormatRate(rate) + " (" + clock + (fixed ? " fixed" : "") + "), speed "
+             + FormatSpeed(rate / clocks.Frame);
+    }
+
     void UpdateDescription()
     {
       if (!Sink.Scope || !Tune)
@@ -657,16 +754,8 @@ namespace Module::Sid
         return;
       }
       const auto& info = *Tune->getInfo();
-      String clock;
-      if (Config.forceC64Model || info.clockSpeed() == SidTuneInfo::CLOCK_UNKNOWN
-          || info.clockSpeed() == SidTuneInfo::CLOCK_ANY)
-      {
-        clock = GetClockName(Config.defaultC64Model);
-      }
-      else
-      {
-        clock = info.clockSpeed() == SidTuneInfo::CLOCK_NTSC ? "NTSC" : "PAL";
-      }
+      const auto model = GetC64Model();
+      const String clock = GetClockName(model);
       const auto chips = std::max(info.sidChips(), 1);
       String models;
       for (int chip = 0; chip < chips; ++chip)
@@ -683,11 +772,10 @@ namespace Module::Sid
       const auto* sampling = Config.samplingMethod == SidConfig::RESAMPLE_INTERPOLATE
                                  ? "resample"
                                  : (Config.fastSampling ? "fast" : "interpolate");
-      String speed = Player.info().speedString() ? Player.info().speedString() : "";
+      // tune format line is replaced by original driver and engine lines at frontend
       Sink.Scope->SetDescription(clock + ", " + models + ", " + engine + ", " + sampling
-                                 + (UseFilter ? "" : ", no filter") + "\n" + info.formatString() + ", " + speed + ", "
-                                 + std::to_string(info.sidChips()) + " SID, song " + std::to_string(info.currentSong())
-                                 + "/" + std::to_string(info.songs()));
+                                 + (UseFilter ? "" : ", no filter") + "\n" + GetTiming(model) + ", song "
+                                 + std::to_string(info.currentSong()) + "/" + std::to_string(info.songs()));
     }
 
   private:
@@ -698,6 +786,8 @@ namespace Module::Sid
     VoicesSinkAdapter Sink;
     uint_t ChipsCount = 1;
     bool IsConfigured = false;
+    // CIA1 timer A value set by tune, 0 if unknown
+    uint_t CiaTimer = 0;
     const SidTune* Tune = nullptr;
 
     // cache filter flag
@@ -981,6 +1071,21 @@ namespace Module::Sid
     const Parameters::Accessor::Ptr Properties;
   };
 
+  // Identification scans the whole file for each subtune, so cache the last result
+  String GetPlayroutine(const Model& tune, Binary::View data)
+  {
+    static std::mutex guard;
+    static std::string lastDigest;
+    static String lastResult;
+    const std::scoped_lock lock(guard);
+    if (tune.GetDigest() != lastDigest)
+    {
+      lastResult = DetectPlayroutine(data);
+      lastDigest = tune.GetDigest();
+    }
+    return lastResult;
+  }
+
   class Factory : public MultitrackFactory
   {
   public:
@@ -1013,6 +1118,10 @@ namespace Module::Sid
         }
 
         props.SetPlatform(Platforms::COMMODORE_64);
+        if (const auto routine = GetPlayroutine(*tune, container); !routine.empty())
+        {
+          props.SetProgram(routine);
+        }
         props.SetChannels({"Voice 1"s, "Voice 2"s, "Voice 3"s}, tuneInfo.sidChips());
 
         tune->FillDuration(params);
