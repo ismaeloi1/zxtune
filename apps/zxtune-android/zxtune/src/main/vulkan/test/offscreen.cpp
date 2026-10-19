@@ -264,6 +264,31 @@ namespace VulkanScope
       }
     }
 
+    // Long window (e.g. 200ms of 48kHz) as delivered by Sound::Scope: minimum and maximum of each pair of points
+    static void DenseSamples(uint32_t frame, int16_t* target)
+    {
+      const uint32_t window = 9600;
+      for (uint32_t chan = 0; chan < CHANNELS; ++chan)
+      {
+        // high notes, several periods per pixel column
+        const double freq = 1500.0 * (chan + 1) / 48000;
+        for (uint32_t bin = 0; bin < POINTS / 2; ++bin)
+        {
+          double lo = 1;
+          double hi = -1;
+          for (uint32_t idx = window * bin / (POINTS / 2); idx < window * (bin + 1) / (POINTS / 2); ++idx)
+          {
+            const double phase = idx * freq + frame * 0.01;
+            const double val = phase - std::floor(phase) < 0.3 ? 0.8 : -0.8 + 0.2 * std::sin(phase * 7);
+            lo = std::min(lo, val);
+            hi = std::max(hi, val);
+          }
+          target[chan * POINTS + bin * 2] = static_cast<int16_t>(lo * 30000);
+          target[chan * POINTS + bin * 2 + 1] = static_cast<int16_t>(hi * 30000);
+        }
+      }
+    }
+
     static void Samples(uint32_t frame, int16_t* target)
     {
       for (uint32_t chan = 0; chan < CHANNELS; ++chan)
@@ -291,7 +316,8 @@ namespace VulkanScope
     }
   };
 
-  void Render(const Device& dev, VkExtent2D extent, Rotation rotation, const std::string& path, uint32_t frames)
+  void Render(const Device& dev, VkExtent2D extent, Rotation rotation, const std::string& path, uint32_t frames,
+              bool dense = false)
   {
     OffscreenTargets targets(dev, extent, 3);
     ScopeRenderer renderer(dev, OffscreenTargets::FORMAT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -307,7 +333,14 @@ namespace VulkanScope
     uint32_t last = 0;
     for (uint32_t frame = 0; frame < frames; ++frame)
     {
-      TestScene::Samples(frame, samples.data());
+      if (dense)
+      {
+        TestScene::DenseSamples(frame, samples.data());
+      }
+      else
+      {
+        TestScene::Samples(frame, samples.data());
+      }
       const auto image = frame % targets.Images.size();
       const auto start = Clock::now();
       Check(dev.Vk().vkWaitForFences(dev.Handle(), 1, &targets.Fences[image], VK_TRUE, UINT64_MAX), "wait");
@@ -347,6 +380,9 @@ int main(int argc, char** argv)
     // landscape view on portrait-oriented display: swapchain is not rotated, picture is
     VulkanScope::Render(dev, {720, 1280}, VulkanScope::Rotation::CW90, dir + "/vk-scope-rot90.png", 60);
     VulkanScope::Render(dev, {720, 1280}, VulkanScope::Rotation::CW270, dir + "/vk-scope-rot270.png", 60);
+    // fullscreen landscape phone, short and long windows: cost should not depend on window
+    VulkanScope::Render(dev, {2400, 1080}, VulkanScope::Rotation::NONE, dir + "/vk-scope-wide.png", 120);
+    VulkanScope::Render(dev, {2400, 1080}, VulkanScope::Rotation::NONE, dir + "/vk-scope-wide-dense.png", 120, true);
     return 0;
   }
   catch (const std::exception& e)
