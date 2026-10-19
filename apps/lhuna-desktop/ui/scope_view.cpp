@@ -23,7 +23,8 @@ namespace Lhuna
 {
   // as Android's ScopeDisplay label text size
   const float LABEL_TEXT_SIZE = 12;
-  const float LINE_WIDTH = 1.6f;
+  // cosmetic (1px) antialiased lines are drawn by fast path of raster engine, thicker ones are stroked
+  const float LINE_WIDTH = 1.f;
   const int STATUS_PERIOD_MS = 500;
 
   VisualFeed::VisualFeed(Engine& engine, Settings& settings, QObject* parent)

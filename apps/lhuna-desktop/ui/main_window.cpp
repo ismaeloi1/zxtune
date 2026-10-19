@@ -498,8 +498,8 @@ namespace Lhuna
       names << QString::fromStdString(name);
     }
     Panel->Setup(chips, names);
-    PlaceOverlay();
     Panel->show();
+    PlaceOverlay();
     Panel->raise();
     PanelButton->raise();
     Panel->setFocus();
