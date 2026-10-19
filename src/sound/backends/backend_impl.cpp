@@ -84,12 +84,14 @@ namespace Sound::BackendBase
   public:
     using Ptr = std::shared_ptr<RendererWrapper>;
 
-    RendererWrapper(Module::Renderer::Ptr delegate, BackendCallback::Ptr callback, uint_t samplerate)
+    // params are kept by scope, so trigger options changes are applied on the fly
+    RendererWrapper(Module::Renderer::Ptr delegate, BackendCallback::Ptr callback, uint_t samplerate,
+                    Parameters::Accessor::Ptr params)
       : Delegate(std::move(delegate))
       , Callback(std::move(callback))
       , SeekRequest(NO_SEEK)
       , Analyzer(FFTAnalyzer::Create())
-      , ScopeData(Scope::Create(samplerate))
+      , ScopeData(Scope::Create(samplerate, std::move(params)))
     {
       // separate voices are rendered by players only while scope data is requested
       if (auto* const voices = dynamic_cast<Module::VoicesScopeSource*>(Delegate.get()))
@@ -407,9 +409,10 @@ namespace Sound
                              BackendCallback::Ptr origCallback, BackendWorker::Ptr worker)
   {
     const auto samplerate = GetSoundFrequency(*globalParams);
-    auto origRenderer = Module::CreatePipelinedRenderer(*holder, samplerate, std::move(globalParams));
+    auto origRenderer = Module::CreatePipelinedRenderer(*holder, samplerate, globalParams);
     auto callback = BackendBase::CreateCallback(std::move(origCallback), worker);
-    auto renderer = MakePtr<BackendBase::RendererWrapper>(std::move(origRenderer), callback, samplerate);
+    auto renderer =
+        MakePtr<BackendBase::RendererWrapper>(std::move(origRenderer), callback, samplerate, std::move(globalParams));
     auto asyncWorker = MakePtr<BackendBase::AsyncWrapper>(std::move(callback), renderer, worker);
     auto job = Async::CreateJob(std::move(asyncWorker));
     return MakePtr<BackendBase::BackendInternal>(std::move(worker), std::move(renderer), std::move(job));
