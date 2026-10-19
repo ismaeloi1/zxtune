@@ -25,6 +25,13 @@
                     android:orientation="vertical">
 
                 <TextView
+                        android:id="@+id/about_coauthor"
+                        android:textAppearance="?textAppearanceLargePopupMenu"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:paddingBottom="@dimen/spacing_full" />
+
+                <TextView
                         android:textAppearance="?textAppearanceLargePopupMenu"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
@@ -35,6 +42,19 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content" />
             </LinearLayout>
+        </ScrollView>
+        <!-- open source components page -->
+        <ScrollView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:scrollbars="vertical"
+                android:tag="@string/about_licenses">
+
+            <TextView
+                    android:id="@+id/about_licenses"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textIsSelectable="false" />
         </ScrollView>
         <!-- plugins page -->
         <ExpandableListView
