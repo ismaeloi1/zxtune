@@ -42,8 +42,9 @@ namespace Sound
     // searches are spread among frames, so serial processing of not so many voices fits into frame, while waking of
     // other cores costs power and delays (e.g. if they are busy or slow)
     const uint_t MAX_SERIAL_TRIGGERS = 16;
-    // Searching at each frame is the most stable, but many voices (e.g. 3SID, OPL3) don't fit into high refresh rate
-    // frame then, so the rest of voices extrapolate phase and are searched at next frames
+    // Limited search rate (power saving) spreads searches among frames, the rest of voices extrapolate phase. Without
+    // limit each voice is searched at each frame as corrscope does: extrapolated phase drifts (period is not exact,
+    // vibrato) and is visible as jitter at frames between searches
     const uint_t MAX_SEARCHES_PER_FRAME = 4;
     const uint_t MIN_TRIGGER_MS = 5;
     const uint_t MAX_TRIGGER_MS = 200;
@@ -716,12 +717,15 @@ namespace Sound
           Silent[chan] = IsSilent(ring, pos + offset - range, pos + offset + range);
         }
         const auto rate = Settings.Trigger.MaxRate;
-        auto budget = std::min(
-            MAX_SEARCHES_PER_FRAME,
-            rate ? std::max<uint_t>(1, (channels * rate * samplesPerFrame + Samplerate - 1) / Samplerate) : channels);
+        auto budget =
+            rate ? std::min(MAX_SEARCHES_PER_FRAME,
+                            std::max<uint_t>(1, (channels * rate * samplesPerFrame + Samplerate - 1) / Samplerate))
+                 : channels;
+        // cursor is moved inside the loop, so voices are enumerated from its initial value to not skip some of them
+        const auto firstChan = SearchCursor;
         for (uint_t idx = 0; idx < channels; ++idx)
         {
-          const auto chan = (SearchCursor + idx) % channels;
+          const auto chan = (firstChan + idx) % channels;
           const bool can = budget && !Silent[chan] && Triggers[chan]->IsSearchDue(samplesPerFrame);
           CanSearch[chan] = can;
           budget -= can;

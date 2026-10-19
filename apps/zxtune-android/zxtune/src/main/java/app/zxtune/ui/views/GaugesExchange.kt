@@ -12,8 +12,7 @@ import app.zxtune.playback.VoicesLayout
 
 /**
  * Gauges are requested by [ScopeFeed] together with waveforms (see [app.zxtune.playback.Visualizer.getFrame]):
- * dashboard and oscilloscope display the same moment, single request per frame is made and dashboard is redrawn
- * exactly at frames with new data.
+ * dashboard and oscilloscope display the same moment and single request per frame is made.
  * Triple buffering: producer (feed thread) and consumer (UI thread) never wait each other and no arrays are allocated
  * per frame.
  */

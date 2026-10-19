@@ -10,9 +10,12 @@
 
 #include "sound/impl/correlation_trigger.h"
 
+#include "sound/scope.h"
+
 #include <chrono>
 #include <cmath>
 #include <iostream>
+#include <numeric>
 #include <stdexcept>
 #include <vector>
 
@@ -215,6 +218,96 @@ namespace Sound
     }
     std::cout << "Silence: ok" << std::endl;
   }
+
+  // Each voice of chip is triggered: frame to frame displacement of traces of voices with vibrato (extrapolated phase
+  // drifts) is the same as for the most stable one
+  void TestScopeVoices()
+  {
+    const uint_t voices = 3;
+    const auto scope = Scope::Create(SAMPLERATE);
+    scope->SetVoicesGroups({{"Chip", {"1", "2", "3"}}}, false);
+    const uint_t points = SAMPLERATE * 40 / 1000;
+    std::vector<int16_t> traces(voices * points);
+    std::vector<int16_t> prev;
+    // activate
+    scope->Get(voices, points, 0, 40, traces.data());
+    const uint_t chunk = SAMPLERATE / 50;
+    const double freqs[voices] = {261.6, 329.6, 392.0};
+    std::vector<int16_t> samples(chunk * voices);
+    Chunk master(chunk);
+    double phases[voices] = {};
+    uint64_t played = 0;
+    std::vector<double> shifts(voices);
+    uint_t pairs = 0;
+    const auto latency = SAMPLERATE / 5;
+    const double step = double(SAMPLERATE) / 120;
+    double frameTime = 0;
+    while (played < 5 * SAMPLERATE)
+    {
+      for (uint_t idx = 0; idx < chunk; ++idx)
+      {
+        const double t = double(played + idx) / SAMPLERATE;
+        for (uint_t voice = 0; voice < voices; ++voice)
+        {
+          // 6Hz vibrato of +-40 cents
+          const double freq = freqs[voice] * std::pow(2.0, 0.4 / 12 * std::sin(2 * 3.14159265 * 6 * t + voice));
+          phases[voice] += freq / SAMPLERATE;
+          // pulse with sharp edges, as chip voices
+          samples[idx * voices + voice] = std::fmod(phases[voice], 1.0) < 0.3 ? 12000 : -12000;
+        }
+      }
+      scope->Feed(0, voices, samples.data(), chunk);
+      scope->Commit(master);
+      scope->Played(played, chunk);
+      played += chunk;
+      while (frameTime + latency <= double(played))
+      {
+        const auto layout = scope->Get(voices, points, int64_t(frameTime), 40, traces.data());
+        frameTime += step;
+        if (layout.Channels != voices)
+        {
+          throw std::runtime_error("Invalid channels count");
+        }
+        if (prev.size() == traces.size() && frameTime > SAMPLERATE)
+        {
+          for (uint_t voice = 0; voice < voices; ++voice)
+          {
+            const auto* a = prev.data() + voice * points;
+            const auto* b = traces.data() + voice * points;
+            // best alignment of central parts within a quarter of period
+            int best = 0;
+            double bestErr = -1;
+            for (int lag = -40; lag <= 40; ++lag)
+            {
+              double err = 0;
+              for (uint_t idx = points / 4; idx < points * 3 / 4; ++idx)
+              {
+                const double d = double(b[idx]) - a[idx + lag];
+                err += d * d;
+              }
+              if (bestErr < 0 || err < bestErr)
+              {
+                bestErr = err;
+                best = lag;
+              }
+            }
+            shifts[voice] += std::abs(best);
+          }
+          ++pairs;
+        }
+        prev = traces;
+      }
+    }
+    for (uint_t voice = 0; voice < voices; ++voice)
+    {
+      const auto mean = shifts[voice] / pairs;
+      std::cout << "Scope voice " << voice << ": mean shift " << mean << " samples" << std::endl;
+      if (mean > 1.0)
+      {
+        throw std::runtime_error("Unstable scope voice");
+      }
+    }
+  }
 }  // namespace Sound
 
 int main()
@@ -234,6 +327,7 @@ int main()
     Sound::TestNoteChanges(false);
     Sound::TestNoteChanges(true);
     Sound::TestPostponedSearches();
+    Sound::TestScopeVoices();
     std::cout << "All tests passed" << std::endl;
     return 0;
   }

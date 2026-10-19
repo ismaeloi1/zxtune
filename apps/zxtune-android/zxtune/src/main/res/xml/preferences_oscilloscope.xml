@@ -63,7 +63,7 @@
                 android:title="@string/pref_oscilloscope_trigger_preset_title"
                 app:useSimpleSummaryProvider="true" />
         <SeekBarPreference
-                android:defaultValue="60"
+                android:defaultValue="40"
                 android:key="zxtune.sound.scope.trigger.width"
                 android:max="200"
                 android:summary="@string/pref_oscilloscope_trigger_width_summary"
@@ -72,7 +72,7 @@
                 app:seekBarIncrement="5"
                 app:showSeekBarValue="true" />
         <SeekBarPreference
-                android:defaultValue="50"
+                android:defaultValue="100"
                 android:key="zxtune.sound.scope.trigger.edge_strength"
                 android:max="300"
                 android:summary="@string/pref_oscilloscope_trigger_edge_summary"
@@ -97,7 +97,7 @@
                 app:seekBarIncrement="10"
                 app:showSeekBarValue="true" />
         <SeekBarPreference
-                android:defaultValue="100"
+                android:defaultValue="50"
                 android:key="zxtune.sound.scope.trigger.responsiveness"
                 android:max="100"
                 android:title="@string/pref_oscilloscope_trigger_responsiveness_title"
@@ -113,7 +113,7 @@
                 app:seekBarIncrement="5"
                 app:showSeekBarValue="true" />
         <SeekBarPreference
-                android:defaultValue="70"
+                android:defaultValue="30"
                 android:key="zxtune.sound.scope.trigger.reset_below"
                 android:max="100"
                 android:summary="@string/pref_oscilloscope_trigger_reset_summary"

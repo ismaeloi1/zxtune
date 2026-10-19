@@ -125,14 +125,14 @@ class ScopeSettingsDialogTest {
         val preset = page.findPreference<ListPreference>(TriggerPresets.PRESET_KEY)!!
         assertEquals(TriggerPresets.DEFAULT, preset.value)
         val width = page.findPreference<SeekBarPreference>(TriggerPresets.PREFIX + "width")!!
-        assertEquals(60, width.value)
+        assertEquals(40, width.value)
         preset.callChangeListener("bass")
         assertEquals(100, width.value)
         // manual change
         val edge = page.findPreference<SeekBarPreference>(TriggerPresets.PREFIX + "edge_strength")!!
         edge.callChangeListener(250)
         assertEquals(TriggerPresets.CUSTOM, preset.value)
-        edge.callChangeListener(50)
+        edge.callChangeListener(100)
         assertEquals("bass", preset.value)
     }
 

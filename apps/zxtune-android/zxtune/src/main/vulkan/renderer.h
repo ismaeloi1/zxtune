@@ -65,6 +65,8 @@ namespace VulkanScope
     }
 
   private:
+    static bool IsDense(const int16_t* data, uint32_t points);
+
     struct Frame
     {
       VkBuffer Buffer = VK_NULL_HANDLE;

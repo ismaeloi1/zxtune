@@ -33,7 +33,9 @@ namespace VulkanScope
   {
     VkDrawIndirectCommand Draw;
     uint32_t Points;
-    uint32_t Reserved[3];
+    // see trace.vert
+    uint32_t Dense;
+    uint32_t Reserved[2];
     float Traces[ScopeRenderer::MAX_CHANNELS * 4];
     float Gains[ScopeRenderer::MAX_CHANNELS];
   };
@@ -46,6 +48,8 @@ namespace VulkanScope
   // swapchains rarely have more images
   const uint32_t MAX_IMAGES = 8;
   const float LINE_WIDTH = 3.0f;
+  // see ScopeRenderer::IsDense
+  const uint32_t DENSE_REVERSALS_PART = 8;
 
   // Automatic gain follows peak level: immediate attack to avoid clipping,
   // slow release to avoid visible pumping. Limited to not amplify noise of silent voices
@@ -698,6 +702,24 @@ namespace VulkanScope
     }
   }
 
+  // Long windows are delivered as minimums and maximums (see Sound::Scope::Get), so direction of trace is changed at
+  // most of points. Smooth waves at short windows change it rarely.
+  bool ScopeRenderer::IsDense(const int16_t* data, uint32_t points)
+  {
+    uint32_t reversals = 0;
+    int prevDelta = 0;
+    for (uint32_t idx = 1; idx < points; ++idx)
+    {
+      const int delta = int(data[idx]) - data[idx - 1];
+      if (delta != 0)
+      {
+        reversals += (delta > 0) != (prevDelta > 0) && prevDelta != 0;
+        prevDelta = delta;
+      }
+    }
+    return reversals > points / DENSE_REVERSALS_PART;
+  }
+
   void ScopeRenderer::Write(uint32_t image, const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent)
   {
     auto& frame = Frames.at(image);
@@ -709,9 +731,14 @@ namespace VulkanScope
       channels = 0;
     }
     std::memcpy(header->Traces, Traces.data(), channels * 4 * sizeof(float));
+    uint32_t dense = 0;
     for (uint32_t chan = 0; chan < channels; ++chan)
     {
       const auto* data = samples + chan * points;
+      if (IsDense(data, points))
+      {
+        dense |= 1u << chan;
+      }
       float gain = gainPercent / 100.0f;
       if (gainPercent == AUTO_GAIN)
       {
@@ -729,6 +756,7 @@ namespace VulkanScope
     }
     std::memcpy(header + 1, samples, std::size_t(channels) * points * sizeof(int16_t));
     header->Points = points;
+    header->Dense = dense;
     header->Draw.vertexCount = points * 2;
     header->Draw.instanceCount = channels;
     header->Draw.firstVertex = 0;

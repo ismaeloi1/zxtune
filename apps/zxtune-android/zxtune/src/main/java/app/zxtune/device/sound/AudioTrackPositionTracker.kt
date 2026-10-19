@@ -46,6 +46,7 @@ internal class AudioTrackPositionTracker(
     private var latencyPollNanos = 0L
 
     private var lastResult = 0L
+    private var lastResultNanos = 0L
 
     /**
      * Statistics for debug purposes
@@ -72,6 +73,7 @@ internal class AudioTrackPositionTracker(
         headPollNanos = 0
         latencyPollNanos = 0
         lastResult = 0
+        lastResultNanos = 0
     }
 
     /**
@@ -83,9 +85,27 @@ internal class AudioTrackPositionTracker(
         val head = headFrames()
         val estimated = timestampPosition(nowNanos, head) ?: headPosition(nowNanos, head)
         // never go back or beyond written data
-        val result = estimated.coerceIn(lastResult, maxOf(written, lastResult))
+        val result = slew(estimated, nowNanos).coerceIn(lastResult, maxOf(written, lastResult))
         lastResult = result
+        lastResultNanos = nowNanos
         return result
+    }
+
+    // Estimation is corrected by each timestamp or head poll. Position stopped until backward correction is passed
+    // gives the same oscilloscope picture for several frames, so small corrections are applied gradually by changing
+    // speed of position (at most by MAX_SLEW_RATE), while big ones (e.g. underrun) are applied at once.
+    private fun slew(estimated: Long, nowNanos: Long): Long {
+        if (lastResultNanos == 0L) {
+            return estimated
+        }
+        val elapsed = (nowNanos - lastResultNanos) * sampleRate / 1_000_000_000L
+        val predicted = lastResult + elapsed
+        val error = estimated - predicted
+        if (abs(error) > sampleRate * MAX_SLEW_MS / 1000) {
+            return estimated
+        }
+        val limit = (elapsed * MAX_SLEW_RATE).toLong()
+        return predicted + error.coerceIn(-limit, limit)
     }
 
     private fun headFrames(): Long {
@@ -164,5 +184,7 @@ internal class AudioTrackPositionTracker(
         private const val HEAD_POLL_NS = 30_000_000L
         private const val LATENCY_POLL_NS = 500_000_000L
         private const val MAX_LATENCY_US = 5_000_000L
+        private const val MAX_SLEW_MS = 50
+        private const val MAX_SLEW_RATE = 0.25f
     }
 }
