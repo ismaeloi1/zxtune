@@ -1,0 +1,144 @@
+name: Lhuna desktop
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+    paths-ignore:
+      - 'apps/zxtune-android/**'
+      - 'apps/zxtune-qt/**'
+  workflow_dispatch:
+
+jobs:
+  linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+            # SSE4.2/POPCNT, supported by all x86_64 CPUs since ~2009
+            march: -march=x86-64-v2
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            march: -march=armv8-a
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            make g++ python3 file cmake ninja-build \
+            qt6-base-dev qt6-base-dev-tools libgl-dev libxkbcommon-dev \
+            libboost-dev libpulse-dev libasound2-dev \
+            pulseaudio fonts-dejavu-core
+
+      - name: Configure
+        run: |
+          cmake -S apps/lhuna-desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_CXX_FLAGS="${{ matrix.march }}" \
+            -DZXTUNE_MAKE_ARGS="jumbo.enabled=1 tools.python=python3 cxx_flags=${{ matrix.march }}"
+
+      - name: Build
+        run: cmake --build build
+
+      # Headless run with null sink, so oscilloscope and dashboard are really fed by playback
+      - name: Smoke test
+        run: |
+          pulseaudio --start --exit-idle-time=-1 || true
+          mkdir -p screenshots
+          for tune in samples/chiptunes/MOS6581/sid/Love_Is_a_Shield.sid samples/chiptunes/Multi/vgm/EarthwormJim.vgm; do
+            QT_QPA_PLATFORM=offscreen timeout 60 build/lhuna-desktop --size 1400x860 --delay 4000 --settings-panel \
+              --screenshot "screenshots/$(basename "$tune").png" "$tune"
+          done
+          ls -l screenshots
+
+      - name: Package
+        run: |
+          DIST=lhuna-desktop-linux-${{ matrix.arch }}
+          mkdir -p "dist/${DIST}"
+          cp build/lhuna-desktop "dist/${DIST}/"
+          strip "dist/${DIST}/lhuna-desktop"
+          cat > "dist/${DIST}/README.txt" <<EOF
+          Lhuna desktop for Linux ${{ matrix.arch }}, built on ${{ matrix.runner }}.
+          Requires system Qt6 (e.g. 'sudo apt install libqt6widgets6' on Debian/Ubuntu).
+          EOF
+          tar -C dist -czf "dist/${DIST}.tar.gz" "${DIST}"
+          file "dist/${DIST}/lhuna-desktop"
+          ldd "dist/${DIST}/lhuna-desktop"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lhuna-desktop-linux-${{ matrix.arch }}
+          path: |
+            dist/*.tar.gz
+            screenshots/*.png
+          if-no-files-found: error
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            zip
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
+            mingw-w64-x86_64-python
+            mingw-w64-x86_64-boost
+            mingw-w64-x86_64-qt6-base
+            mingw-w64-x86_64-qt6-tools
+
+      # msys make is used as core build relies on POSIX shell (host=linux)
+      - name: Configure
+        run: |
+          cmake -S apps/lhuna-desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DZXTUNE_PLATFORM=mingw \
+            -DZXTUNE_MAKE="$(cygpath -m /usr/bin/make)" \
+            -DZXTUNE_MAKE_ARGS="host=linux arch=x86_64 jumbo.enabled=1 tools.python=python3 cxx_flags=-march=x86-64-v2" \
+            -DCMAKE_CXX_FLAGS=-march=x86-64-v2
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Smoke test
+        run: |
+          mkdir -p screenshots
+          QT_QPA_PLATFORM=offscreen timeout 60 build/lhuna-desktop.exe --size 1400x860 --delay 4000 \
+            --screenshot screenshots/sid.png samples/chiptunes/MOS6581/sid/Love_Is_a_Shield.sid || true
+          ls -l screenshots
+
+      - name: Package
+        run: |
+          DIST=lhuna-desktop-windows-x86_64
+          mkdir -p "dist/${DIST}"
+          cp build/lhuna-desktop.exe "dist/${DIST}/"
+          windeployqt6 --release --no-translations --no-opengl-sw "dist/${DIST}/lhuna-desktop.exe"
+          # C++ runtime and Qt dependencies from MSYS2
+          ldd "dist/${DIST}/lhuna-desktop.exe" | grep -i mingw64 | awk '{print $3}' | xargs -r -I{} cp -n {} "dist/${DIST}/"
+          (cd dist && zip -9r "${DIST}.zip" "${DIST}")
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lhuna-desktop-windows-x86_64
+          path: |
+            dist/*.zip
+            screenshots/*.png
+          if-no-files-found: error
