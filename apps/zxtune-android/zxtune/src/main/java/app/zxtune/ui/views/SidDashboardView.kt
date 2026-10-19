@@ -841,8 +841,9 @@ class SidDashboardView @JvmOverloads constructor(
             // operators schemas need more space
             val schema = gauges.kind == VoiceGauges.Kind.OPN_FM || gauges.kind == VoiceGauges.Kind.OPL_2OP ||
                 gauges.kind == VoiceGauges.Kind.OPL_4OP
-            // operators schemas are readable only with most of space
-            val split = body.left + body.width() * (if (schema) 0.28f else 0.45f)
+            // operators schemas and S-DSP cells are readable only with most of space
+            val wideWidget = schema || gauges.kind == VoiceGauges.Kind.SPC_DSP
+            val split = body.left + body.width() * (if (wideWidget) 0.28f else 0.45f)
             history.set(body.left, body.top, split - pad * 2, body.bottom)
             widget.set(split + pad * 2, body.top, body.right, body.bottom)
         } else {
