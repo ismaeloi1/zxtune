@@ -270,7 +270,6 @@ namespace Visualization
       const auto caption = canvas.GetMetrics(CaptionFont);
       const auto cell = canvas.GetMetrics(CellFont);
       CellLineBase = caption.Descent - caption.Ascent + cell.Spacing;
-      MeasureCanvas = &canvas;
     }
 
     float CellLineHeight(float scale) const
@@ -540,8 +539,8 @@ namespace Visualization
         }
         return true;
       };
-      const auto titleSpacing = MeasureCanvas->GetMetrics(TitleFont).Spacing;
-      const auto valueSpacing = MeasureCanvas->GetMetrics(ValueFont).Spacing;
+      const auto titleSpacing = canvas.GetMetrics(TitleFont).Spacing;
+      const auto valueSpacing = canvas.GetMetrics(ValueFont).Spacing;
       bool secondLine = false;
       float valueScale = 0.f;
       if (fits(SHRINKED_TITLE, 1.f))
@@ -1017,7 +1016,6 @@ namespace Visualization
     TitleTemplates VoiceTemplates;
     TitleTemplates GlobalTemplates;
     bool Measured = false;
-    const Canvas* MeasureCanvas = nullptr;
     float CellLineBase = 0;
     float GridWidth = -1;
     float GridSpace = -1;
