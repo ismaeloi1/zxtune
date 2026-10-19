@@ -560,7 +560,7 @@ namespace Module::AYEMUL
       , Comp(std::move(comp))
       , Device(std::move(device))
       , FrameDuration(data.FrameDuration)
-      , Voices(std::move(params), 1)
+      , Voices(std::move(params), 1, data.FrameDuration)
     {}
 
     // beeper is not a separate voice, it's rarely used together with AY

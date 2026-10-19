@@ -19,12 +19,29 @@
 
 namespace Module::AYM
 {
-  VoicesFeed::VoicesFeed(Parameters::Accessor::Ptr params, uint_t chips)
+  VoicesFeed::VoicesFeed(Parameters::Accessor::Ptr params, uint_t chips, Time::Microseconds frameDuration)
     : Params(std::move(params))
     , Chips(chips)
+    , FrameDuration(frameDuration)
     , Channels(chips * Devices::AYM::SOUND_CHANNELS)
     , States(chips * Devices::AYM::SOUND_CHANNELS)
   {}
+
+  // player routine is called on each interrupt, so its rate is the tempo base
+  String FormatInterruptRate(Time::Microseconds frameDuration)
+  {
+    if (!frameDuration.Get())
+    {
+      return {};
+    }
+    const auto centiHz = (100ULL * Time::Microseconds::PER_SECOND + frameDuration.Get() / 2) / frameDuration.Get();
+    auto fraction = std::to_string(100 + centiHz % 100).substr(1);
+    while (!fraction.empty() && fraction.back() == '0')
+    {
+      fraction.pop_back();
+    }
+    return ", " + std::to_string(centiHz / 100) + (fraction.empty() ? String() : "." + fraction) + " Hz int";
+  }
 
   void VoicesFeed::SetScope(VoicesScope::Ptr scope, Devices::AYM::ChannelsSource& chip)
   {
@@ -49,7 +66,7 @@ namespace Module::AYM
     const auto tenthsKHz = (clock + 5000) / 10000;
     Scope->SetDescription((Chips > 1 ? std::to_string(Chips) + "x" : String()) + name + ' '
                           + std::to_string(tenthsKHz / 100) + '.' + std::to_string(tenthsKHz / 10 % 10)
-                          + std::to_string(tenthsKHz % 10) + "MHz");
+                          + std::to_string(tenthsKHz % 10) + "MHz" + FormatInterruptRate(FrameDuration));
   }
 
   void VoicesFeed::Prepare(Devices::AYM::ChannelsSource& chip)

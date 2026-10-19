@@ -200,7 +200,7 @@ namespace Module::TurboSound
       : Iterator(std::move(iterator))
       , Device(std::move(device))
       , FrameDuration(frameDuration)
-      , Voices(std::move(params), Devices::TurboSound::CHIPS)
+      , Voices(std::move(params), Devices::TurboSound::CHIPS, frameDuration)
     {}
 
     bool SetVoicesScope(VoicesScope::Ptr scope) override
