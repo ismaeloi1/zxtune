@@ -288,7 +288,17 @@ namespace
 
     String GetScopeStatus() const override
     {
-      return ScopeData->GetStatus();
+      auto status = ScopeData->GetStatus();
+      if (const auto track = Renderer->GetState().Track)
+      {
+        // live tracker state goes right after emulation description, before visualization statistics
+        const auto line = "tempo " + std::to_string(track->Tempo) + ", position " + std::to_string(track->Position + 1)
+                          + ", pattern " + std::to_string(track->Pattern) + ", row " + std::to_string(track->Line)
+                          + '\n';
+        const auto pos = status.starts_with("scope:") ? 0 : status.find("\nscope:");
+        status.insert(pos == String::npos ? status.size() : pos + (pos != 0), line);
+      }
+      return status;
     }
 
     String GetScopeLayout() const override
