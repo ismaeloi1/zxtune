@@ -12,6 +12,7 @@ import app.zxtune.Logger
 import app.zxtune.playback.FrameResult
 import app.zxtune.playback.Visualizer
 import app.zxtune.playback.VoicesLayout
+import kotlin.math.roundToInt
 
 private val LOG = Logger("ScopeFeed")
 
@@ -112,6 +113,7 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
                 return
             }
             choreographer.postFrameCallback(this)
+            stats.vsync()
             trackVsync(frameTimeNanos)
             if (isThrottled(frameTimeNanos)) {
                 return
@@ -308,6 +310,8 @@ internal class ScopeStats {
     private var drawNanos = 0L
     private var dataNanos = 0L
     private var dataCalls = 0
+    private var maxDataNanos = 0L
+    private var vsyncs = 0
     private var maxDrawNanos = 0L
     private var maxIntervalNanos = 0L
     private var lastFrameStart = 0L
@@ -319,7 +323,14 @@ internal class ScopeStats {
     @Synchronized
     fun data(nanos: Long) {
         dataNanos += nanos
+        maxDataNanos = maxOf(maxDataNanos, nanos)
         ++dataCalls
+    }
+
+    // callbacks of feed's thread, less than display refresh rate if it's busy or delayed
+    @Synchronized
+    fun vsync() {
+        ++vsyncs
     }
 
     @Synchronized
@@ -344,15 +355,17 @@ internal class ScopeStats {
             val fps = frames * 1e9 / period
             text = String.format(
                 java.util.Locale.US,
-                "%s: %.1f fps (%d same), frame %.2f ms (max %.1f), draw %.2f ms (max %.1f), data %.2f ms",
+                "%s: %.1f fps (%d same, %d vsync), frame %.2f ms (max %.1f), draw %.2f ms (max %.1f), data %.2f ms (max %.1f)",
                 backend,
                 fps,
                 skipped,
+                (vsyncs * 1e9 / period).roundToInt(),
                 1000 / fps,
                 maxIntervalNanos / 1e6,
                 drawNanos / 1e6 / frames,
                 maxDrawNanos / 1e6,
-                dataNanos / 1e6 / maxOf(dataCalls, 1)
+                dataNanos / 1e6 / maxOf(dataCalls, 1),
+                maxDataNanos / 1e6
             )
             frames = 0
             skipped = 0
@@ -360,6 +373,8 @@ internal class ScopeStats {
             drawNanos = 0
             dataNanos = 0
             dataCalls = 0
+            maxDataNanos = 0
+            vsyncs = 0
             maxDrawNanos = 0
             maxIntervalNanos = 0
         }

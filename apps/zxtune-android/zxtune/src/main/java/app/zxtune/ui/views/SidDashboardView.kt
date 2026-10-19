@@ -37,9 +37,9 @@ private val LOG = Logger("SidDashboard")
  * Other chips are displayed per voice as cards: title band with live summary, level and pitch history and
  * hardware specific state (see [ChipWidgets]).
  * And multiline status text below. Chips are displayed side by side.
- * Gauges are delivered by oscilloscope (see [attachTo]) with waveforms of the same moment, so view is redrawn at each
- * frame of oscilloscope. Static parts (frames, captions, separators) are cached in bitmap and only live values are
- * drawn at each frame.
+ * Gauges are delivered by oscilloscope (see [attachTo]) with waveforms of the same moment, view is redrawn with the
+ * latest of them at most at DASHBOARD_FPS. Static parts (frames, captions, separators) are cached in bitmap and only
+ * live values are drawn at each frame.
  */
 class SidDashboardView @JvmOverloads constructor(
     context: Context,
@@ -53,7 +53,28 @@ class SidDashboardView @JvmOverloads constructor(
      * Gauges data, filled by oscilloscope's data thread
      */
     val exchange = GaugesExchange().apply {
-        listener = { postInvalidateOnAnimation() }
+        listener = { requestRedraw() }
+    }
+
+    // Oscilloscope publishes gauges at display rate (up to 120-144Hz), while redrawing of the whole dashboard at such
+    // rate takes UI and render threads and GPU time from oscilloscope (it was 47fps instead of 120). So requests are
+    // collapsed and limited to DASHBOARD_FPS, each redraw takes the latest data (of the moment displayed by scope).
+    private val redrawPending = AtomicBoolean(false)
+
+    @Volatile
+    private var lastDrawNanos = 0L
+
+    private fun requestRedraw() {
+        if (!redrawPending.compareAndSet(false, true)) {
+            return
+        }
+        val wait = lastDrawNanos + MIN_REDRAW_INTERVAL_NS - System.nanoTime()
+        if (wait > 0) {
+            // not dropped, else the last data is not displayed if no more data is published (e.g. paused)
+            postInvalidateDelayed((wait + 999_999) / 1_000_000)
+        } else {
+            postInvalidateOnAnimation()
+        }
     }
 
     /**
@@ -94,8 +115,8 @@ class SidDashboardView @JvmOverloads constructor(
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.argb(230, 255, 255, 255)
         textSize = sp(TITLE_SIZE_SP)
-        // keeps titles readable over traces
-        setShadowLayer(density * 2, 0f, 0f, Color.BLACK)
+        // No shadow: titles are in own bands, while blurred shadows of texts changed at each frame are rasterized
+        // again on each frame by RenderThread
         tabularFigures()
     }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -190,6 +211,9 @@ class SidDashboardView @JvmOverloads constructor(
 
     // summary width is reserved by widest one to not shift title with each summary change
     private val summaryWidths = FloatArray(MAX_VOICES)
+
+    // card titles are the same at most frames, so they are not measured and cut again
+    private val cardFits = Array(MAX_VOICES) { CardFit() }
     private val summaryKinds = IntArray(MAX_VOICES) { -1 }
 
     init {
@@ -241,6 +265,13 @@ class SidDashboardView @JvmOverloads constructor(
         data.copyInto(target, 0, 0, minOf(data.size, target.size))
         exchange.publish(kind, chips, layout)
         status = statusText
+    }
+
+    // requests made while detached are not delivered
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        redrawPending.set(false)
+        invalidate()
     }
 
     override fun onDetachedFromWindow() {
@@ -301,8 +332,10 @@ class SidDashboardView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        val data = exchange.acquire()
         val now = System.nanoTime()
+        lastDrawNanos = now
+        redrawPending.set(false)
+        val data = exchange.acquire()
         if (source != null && now - lastStatusTime > STATUS_PERIOD_NS) {
             lastStatusTime = now
             requestStatus()
@@ -649,6 +682,29 @@ class SidDashboardView @JvmOverloads constructor(
         }
     }
 
+    private class MeasuredText {
+        private var source = ""
+        private var size = 0f
+        private var width = 0f
+
+        fun of(text: String, paint: Paint): Float {
+            if (text !== source || paint.textSize != size) {
+                source = text
+                size = paint.textSize
+                width = paint.measureText(text)
+            }
+            return width
+        }
+    }
+
+    private inner class CardFit {
+        val fullWidth = MeasuredText()
+        val titleWidth = MeasuredText()
+        val summaryWidth = MeasuredText()
+        val summary = FittedText()
+        val title = FittedText()
+    }
+
     // Caption and value of each cell are cut to cell's own width to never overlap neighbours, numbers are
     // right-aligned to keep digits in place
     private fun drawCells(canvas: Canvas, grid: CellGrid, texts: LiveTexts, fitted: Array<FittedText>, left: Float, top: Float) {
@@ -762,14 +818,15 @@ class SidDashboardView @JvmOverloads constructor(
             summaryKinds[voice] = gauges.kind
             summaryWidths[voice] = 0f
         }
-        summaryWidths[voice] = maxOf(summaryWidths[voice], summaryPaint.measureText(summary))
+        val fit = cardFits[voice]
+        summaryWidths[voice] = maxOf(summaryWidths[voice], fit.summaryWidth.of(summary, summaryPaint))
         val reserved = summaryWidths[voice]
         val keyOn = gauges.isKeyOn
         // group name is omitted if there's no space for it
         val full = cardTitle(voice, group, name, keyOn, true)
         val available = rect.width() - density * 9 - reserved
-        val title = if (titlePaint.measureText(full) <= available) full else cardTitle(voice, group, name, keyOn, false)
-        val band = drawTitleBand(canvas, rect, title, summary, reserved)
+        val title = if (fit.fullWidth.of(full, titlePaint) <= available) full else cardTitle(voice, group, name, keyOn, false)
+        val band = drawTitleBand(canvas, rect, title, summary, reserved, fit)
         body.set(rect.left + pad * 2, band + pad, rect.right - pad * 2, rect.bottom - pad * 2)
         if (body.height() < density * 18) {
             // no space for details, only current level
@@ -816,23 +873,23 @@ class SidDashboardView @JvmOverloads constructor(
     // Title has priority over summary: summary is shrunk and cut if both don't fit
     // @param reserved width of summary to keep title and summary size independent of the current summary
     // @return bottom of title band
-    private fun drawTitleBand(canvas: Canvas, card: RectF, title: String, summary: String, reserved: Float): Float {
+    private fun drawTitleBand(canvas: Canvas, card: RectF, title: String, summary: String, reserved: Float, fit: CardFit): Float {
         val pad = density * 3
         val baseline = card.top + pad - titlePaint.ascent()
         val baseSize = sp(TITLE_SIZE_SP)
         val minSize = sp(MIN_TITLE_SIZE_SP)
-        val titleWidth = titlePaint.measureText(title)
+        val titleWidth = fit.titleWidth.of(title, titlePaint)
         val inner = card.width() - pad * 3
         val valueBaseSize = summaryPaint.textSize
         val room = inner - minOf(titleWidth, titleWidth * minSize / baseSize) - titleGap()
         if (reserved > room) {
             summaryPaint.textSize *= maxOf(room / reserved, 0.8f)
         }
-        val value = ellipsize(summary, room, summaryPaint)
+        val value = fit.summary.get(summary, room, summaryPaint)
         // gap keeps title and summary regions apart
         val available = inner - minOf(reserved * summaryPaint.textSize / valueBaseSize, room) - titleGap()
         if (pass.isDynamic) {
-            drawCardTitle(canvas, title, card.left + pad, baseline, available, titleWidth)
+            drawCardTitle(canvas, title, card.left + pad, baseline, available, titleWidth, fit.title)
             if (value.length >= 4 || value == summary) {
                 canvas.drawText(value, card.right - pad, baseline, summaryPaint)
             }
@@ -977,11 +1034,11 @@ class SidDashboardView @JvmOverloads constructor(
     }
 
     // Shrinks title down to minimal size and then cuts it
-    private fun drawCardTitle(canvas: Canvas, title: String, x: Float, y: Float, available: Float, titleWidth: Float) {
+    private fun drawCardTitle(canvas: Canvas, title: String, x: Float, y: Float, available: Float, titleWidth: Float, fit: FittedText) {
         val baseSize = sp(TITLE_SIZE_SP)
         titlePaint.textSize =
             if (titleWidth > available) maxOf(baseSize * available / titleWidth, sp(MIN_TITLE_SIZE_SP)) else baseSize
-        canvas.drawText(ellipsize(title, available, titlePaint), x, y, titlePaint)
+        canvas.drawText(fit.get(title, available, titlePaint), x, y, titlePaint)
         titlePaint.textSize = baseSize
     }
 
@@ -1074,25 +1131,43 @@ class SidDashboardView @JvmOverloads constructor(
         }
         // minimal visible segment for flat parts
         val minHeight = tracePaint.strokeWidth
-        for (col in 0 until ChipGauges.COLUMNS) {
-            val x = plotLeft + columnWidth * (col + 0.5f) + shift
-            val yMax = plotTop + plotHeight * (1 - gauges.max(gauge, col) / 255f)
-            val yMin = plotTop + plotHeight * (1 - gauges.min(gauge, col) / 255f)
+        val lineWidth = maxOf(columnWidth, density)
+        // scrolled history is not merged, else content of groups is changed at each new column
+        val step = if (slow) 1 else mergedColumns(columnWidth, lineWidth)
+        var count = 0
+        for (group in 0 until groupsOf(step)) {
+            val last = ChipGauges.COLUMNS - 1 - group * step
+            val first = maxOf(last - step + 1, 0)
+            var max = 0
+            var min = 255
+            for (col in first..last) {
+                max = maxOf(max, gauges.max(gauge, col))
+                min = minOf(min, gauges.min(gauge, col))
+            }
+            val x = plotLeft + columnWidth * ((first + last) / 2f + 0.5f) + shift
+            val yMax = plotTop + plotHeight * (1 - max / 255f)
+            val yMin = plotTop + plotHeight * (1 - min / 255f)
             val center = (yMin + yMax) / 2
             val half = maxOf((yMin - yMax) / 2, minHeight / 2)
-            val idx = col * 4
-            lines[idx] = x
-            lines[idx + 1] = center - half
-            lines[idx + 2] = x
-            lines[idx + 3] = center + half
+            lines[count++] = x
+            lines[count++] = center - half
+            lines[count++] = x
+            lines[count++] = center + half
         }
-        tracePaint.strokeWidth = maxOf(columnWidth, density)
-        canvas.drawLines(lines, tracePaint)
+        tracePaint.strokeWidth = lineWidth
+        canvas.drawLines(lines, 0, count, tracePaint)
         tracePaint.strokeWidth = TRACE_WIDTH * density
         if (slow) {
             canvas.restore()
         }
     }
+
+    // Columns narrower than line are merged (minimum of minimums, maximum of maximums), so picture is the same while
+    // much less lines are drawn (e.g. 3 chips on phone: 256 columns in 120px wide gauge by 2.6px wide lines)
+    private fun mergedColumns(columnWidth: Float, lineWidth: Float) = maxOf(1, (lineWidth / columnWidth).toInt())
+
+    // groups are aligned by the latest column
+    private fun groupsOf(step: Int) = (ChipGauges.COLUMNS + step - 1) / step
 
     private fun padding() = density * 4
 
@@ -1141,6 +1216,10 @@ class SidDashboardView @JvmOverloads constructor(
         private const val MAX_VOICES = 64
 
         private const val STATUS_PERIOD_NS = 500_000_000L
+
+        // smooth enough for gauges, vsync timestamps jitter is allowed
+        private const val DASHBOARD_FPS = 60
+        private const val MIN_REDRAW_INTERVAL_NS = 1_000_000_000L / DASHBOARD_FPS - 2_000_000L
 
         // Waveform bits and flags: Sync, Ring modulation, Test, Filtered
         internal fun waveTitle(control: Int, filtered: Boolean) = buildString {
