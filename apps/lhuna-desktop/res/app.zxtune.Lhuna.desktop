@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Lhuna
+GenericName=Chiptunes player
+Comment=Chiptunes player with per-voice oscilloscope and chips dashboards
+Exec=lhuna-desktop %F
+Icon=app.zxtune.Lhuna
+Terminal=false
+Categories=AudioVideo;Audio;Player;Qt;
+Keywords=chiptune;music;player;sid;ay;ym;vgm;mod;tracker;oscilloscope;
+MimeType=audio/x-mod;audio/x-s3m;audio/x-xm;audio/x-it;audio/prs.sid;audio/x-sid;audio/x-vgm;audio/x-spc;audio/x-nsf;audio/x-gbs;audio/x-ym;audio/x-psf;audio/x-minipsf;audio/x-usf;audio/x-gsf;audio/x-2sf;application/xspf+xml;audio/x-mpegurl;
+StartupWMClass=app.zxtune.Lhuna
+SingleMainWindow=true

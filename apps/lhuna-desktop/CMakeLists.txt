@@ -115,4 +115,18 @@ target_link_libraries(lhuna-desktop PRIVATE
   ${ZXTUNE_SYSLIBS}
 )
 
-install(TARGETS lhuna-desktop RUNTIME DESTINATION bin)
+include(GNUInstallDirs)
+install(TARGETS lhuna-desktop RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(UNIX AND NOT APPLE)
+  # freedesktop integration: Wayland app_id, .desktop file and AppStream component share the same id
+  set(LHUNA_APP_ID app.zxtune.Lhuna)
+  install(FILES res/${LHUNA_APP_ID}.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+  install(FILES res/${LHUNA_APP_ID}.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+  install(FILES res/${LHUNA_APP_ID}.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+  install(FILES res/icon-256.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+          RENAME ${LHUNA_APP_ID}.png)
+  install(FILES res/icon-64.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps
+          RENAME ${LHUNA_APP_ID}.png)
+  install(FILES res/icon-32.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps
+          RENAME ${LHUNA_APP_ID}.png)
+endif()

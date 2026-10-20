@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>app.zxtune.Lhuna</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LGPL-3.0-or-later</project_license>
+  <name>Lhuna</name>
+  <summary>Chiptunes player with per-voice oscilloscope and chips dashboards</summary>
+  <developer id="app.zxtune">
+    <name>Vitamin/CAIG, LHUNA</name>
+  </developer>
+  <description>
+    <p>
+      Desktop player of chiptunes and tracker music based on ZXTune core: AY/YM, SID, SNES SPC, VGM,
+      NES, Game Boy, PSF and hundreds of other formats, including files inside archives.
+    </p>
+    <ul>
+      <li>Per-voice oscilloscope with correlation trigger and chips dashboards</li>
+      <li>Live emulation settings of the playing tune's chips, SID filter presets with cutoff curve</li>
+      <li>Spectrum analyzer</li>
+      <li>Playlists compatible with the Android app (XSPF, M3U8)</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">app.zxtune.Lhuna.desktop</launchable>
+  <url type="homepage">https://github.com/vitamin-caig/zxtune</url>
+  <url type="bugtracker">https://github.com/vitamin-caig/zxtune/issues</url>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>lhuna-desktop</binary>
+  </provides>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Audio</category>
+    <category>Player</category>
+  </categories>
+</component>
