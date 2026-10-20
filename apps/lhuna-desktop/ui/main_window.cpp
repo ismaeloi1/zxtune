@@ -189,13 +189,26 @@ namespace Lhuna
     StatusLine = new QLabel(this);
     statusBar()->addWidget(StatusLine, 1);
     statusBar()->setSizeGripEnabled(false);
+    // temporary messages are painted over normal widgets without hiding them
+    connect(statusBar(), &QStatusBar::messageChanged, StatusLine,
+            [this](const QString& message) { StatusLine->setVisible(message.isEmpty()); });
   }
 
   void MainWindow::BuildMenu()
   {
     const auto add = [this](QMenu* menu, const QString& text, const QList<QKeySequence>& keys, auto handler) {
       auto* action = menu->addAction(text);
-      action->setShortcuts(keys);
+      // standard keys (e.g. QKeySequence::Quit) may be the same as explicit ones or empty on some platforms, duplicates
+      // make shortcut ambiguous
+      QList<QKeySequence> unique;
+      for (const auto& key : keys)
+      {
+        if (!key.isEmpty() && !unique.contains(key))
+        {
+          unique << key;
+        }
+      }
+      action->setShortcuts(unique);
       // shortcuts work while menu bar is hidden (e.g. full screen) and over any child widget
       action->setShortcutContext(Qt::WindowShortcut);
       addAction(action);
@@ -1167,7 +1180,6 @@ namespace Lhuna
       const auto& track = Player.Current();
       status.Title = track.Title.empty() ? Filename(track.Path) : QString::fromStdString(track.Title);
       status.Artist = QString::fromStdString(track.Author);
-      status.Album = QString::fromStdString(track.Program);
       status.DurationMs = track.DurationMs;
       status.TrackId = TrackCounter;
     }
