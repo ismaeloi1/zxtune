@@ -203,6 +203,54 @@ namespace Visualization::SidFilterModel
     return FindPreset(Presets8580(), preset);
   }
 
+  const std::vector<std::string>& PresetNames6581()
+  {
+    static const std::vector<std::string> INSTANCE = {"Custom",
+                                                      "JSIDPlay2 reSID: Lightest",
+                                                      "JSIDPlay2 reSID: Lighter",
+                                                      "JSIDPlay2 reSID: Light",
+                                                      "JSIDPlay2 reSID: Average",
+                                                      "JSIDPlay2 reSID: Dark",
+                                                      "JSIDPlay2 reSID: Darker",
+                                                      "JSIDPlay2 reSID: Darkest",
+                                                      "VICE default (reSID bias +500 mV)",
+                                                      "ReSID 6581 (resid-fp fit)",
+                                                      "Alankila 6581R4AR 3789",
+                                                      "Alankila 6581R3 3984 #1",
+                                                      "Alankila 6581R3 3984 #2",
+                                                      "Lord Nightmare 6581R3 4285",
+                                                      "Lord Nightmare 6581R3 4485",
+                                                      "Lord Nightmare 6581R4 1986S",
+                                                      "ZrX 6581R3 0384",
+                                                      "ZrX 6581R3 1984",
+                                                      "ZrX 6581R3 3684",
+                                                      "ZrX 6581R3 3985",
+                                                      "ZrX 6581R4AR 2286",
+                                                      "Trurl 6581R3 0784",
+                                                      "Trurl 6581R3 0486S",
+                                                      "Trurl 6581R3 3384",
+                                                      "Trurl 6581R3 4885",
+                                                      "Trurl 6581R4AR 3789",
+                                                      "Trurl 6581R4AR 4486",
+                                                      "Nata 6581R3 2083",
+                                                      "Grue 6581R4AR 3488",
+                                                      "KruLLo",
+                                                      "Enigma 6581R3 4885",
+                                                      "Enigma 6581R3 1585"};
+    return INSTANCE;
+  }
+
+  const std::vector<std::string>& PresetNames8580()
+  {
+    static const std::vector<std::string> INSTANCE = {"Custom",
+                                                      "JSIDPlay2 reSID: Light",
+                                                      "JSIDPlay2 reSID: Average",
+                                                      "JSIDPlay2 reSID: Dark",
+                                                      "Trurl 8580R5 1489",
+                                                      "Trurl 8580R5 3691"};
+    return INSTANCE;
+  }
+
   // R-2R ladder of 6581 cutoff DAC with 2R/R=2.2 and missing termination
   const std::array<double, CUTOFF_BITS>& DacBits()
   {

@@ -11,6 +11,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <vector>
 
 namespace Visualization::SidFilterModel
@@ -36,6 +37,11 @@ namespace Visualization::SidFilterModel
   //! @return nullptr for custom filter
   Curve::Ptr Preset6581(int preset);
   Curve::Ptr Preset8580(int preset);
+
+  //! Displayed names of presets by id (index), the first one is custom filter. Ids are stored in settings and core
+  //! keeps only curves (see filters.cpp), so names are the same as Android's preferences use.
+  const std::vector<std::string>& PresetNames6581();
+  const std::vector<std::string>& PresetNames8580();
 
   //! Emulation settings affecting cutoff, see zxtune.core.sid.* options
   struct Settings
