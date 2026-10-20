@@ -837,6 +837,13 @@ class SidDashboardView @JvmOverloads constructor(
             return
         }
         val wide = body.width() > body.height() * 2.2f
+        if (gauges.kind == VoiceGauges.Kind.SPC_DSP) {
+            // channel strip is self-explanatory, level history only adds noise to 8 cards
+            if (pass.isDynamic) {
+                widgets.draw(canvas, body, gauges, smoothValues, widgetTexts[voice])
+            }
+            return
+        }
         if (wide) {
             // operators schemas need more space
             val schema = gauges.kind == VoiceGauges.Kind.OPN_FM || gauges.kind == VoiceGauges.Kind.OPL_2OP ||

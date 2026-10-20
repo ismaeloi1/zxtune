@@ -14,6 +14,7 @@ import android.graphics.Typeface
 import app.zxtune.playback.VoiceGauges
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.log10
 import kotlin.math.log2
 import kotlin.math.max
 import kotlin.math.min
@@ -83,6 +84,8 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     private val area = RectF()
     private val bar = RectF()
     private val glyph = RectF()
+    private val glyph2 = RectF()
+    private val box2 = RectF()
     private val levels2 = FloatArray(2)
     private val levels4 = FloatArray(4)
     private val waves2 = IntArray(2)
@@ -485,70 +488,85 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         else -> " -"
     }
 
-    // S-DSP: ENVX with envelope phase, ADSR or GAIN registers, sample source and rate
-    // S-DSP voice as cells of captions and values (as SID voice cells) over registers: sample, rate, envelope stage
-    // and level, ADSR shape with current stage, stereo volumes balance and echo/pitch modulation/noise switches
+    // S-DSP voice as a mixer channel strip, readable at a glance and the same in every card height:
+    // envelope level meter carrying note and sample, ADSR shape (or GAIN level) with current stage, stereo balance
+    // and echo/pitch modulation/noise lamps. Exact register values are in the title summary.
     private fun drawSpc(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
         val envx = ease(smooth, 0, g.field(0) / 127f)
         val mode = g.field(1)
         val adsr1 = g.field(2)
         val adsr2 = g.field(3)
-        val pitch = g.field(8) or (g.field(9) shl 8)
         val flags = g.field(10)
-        val barW = min(rect.width() * 0.08f, density * 12)
-        bar.set(rect.left, rect.top, rect.left + barW, rect.bottom)
-        drawVerticalBar(canvas, bar, envx)
-        val left = bar.right + density * 6
-        val width = rect.right - left
-        val rowH = rect.height() * 0.48f
-        val gap = density * 4
-        val captionSize = min(baseCaptionSize, rowH * 0.3f)
-        val valueSize = min(baseValueSize, rowH * 0.5f)
-        caption.textSize = captionSize
-        value.textSize = valueSize
-        // first row: values
-        var x = left
-        val y = rect.top
-        val sample = memo.get(0, g.field(5).toLong()) { "%02X".format(g.field(5)) }
-        x = drawCell(canvas, "Sample", sample, x, y, width * 0.2f - gap, rowH) + gap
-        val rate = memo.get(1, pitch.toLong()) { "%.1fk".format(pitch * 32f / 4096f) }
-        x = drawCell(canvas, "Rate", rate, x, y, width * 0.24f - gap, rowH) + gap
-        val stage = if (mode == 4) {
-            memo.get(2, g.field(4).toLong()) { "Gain %02X".format(g.field(4)) }
-        } else {
-            ENV_STAGES.getOrElse(mode) { "?" }
+        val gap = density * 6
+        val h = min(rect.height(), density * 34)
+        val top = rect.centerY() - h / 2
+        val bottom = top + h
+        val meterRight = rect.left + rect.width() * 0.34f
+        // level meter with note name and sample number inside
+        bar.set(rect.left, top, meterRight, bottom)
+        canvas.drawRect(bar, dimStroke)
+        fill.color = Color.argb(if (g.isKeyOn) 210 else 120, 255, 255, 255)
+        box.set(bar.left, bar.top, bar.left + bar.width() * envx.coerceIn(0f, 1f), bar.bottom)
+        canvas.drawRect(box, fill)
+        val hz = if (g.hasFrequency) g.frequency else 0f
+        val note = memo.get(0, (g.field(5).toLong() shl 32) or hz.toBits().toLong()) {
+            val name = noteName(hz)
+            if (name.isEmpty()) "#%02X".format(g.field(5)) else "$name  #%02X".format(g.field(5))
         }
-        x = drawCell(canvas, "Envelope", stage, x, y, width * 0.32f - gap, rowH) + gap
-        val level = memo.get(3, g.field(0).toLong()) { "${g.field(0) * 100 / 127}%" }
-        drawCell(canvas, "Level", level, x, y, rect.right - x, rowH)
-        // second row: graphics
-        val graphTop = rect.top + rowH + captionSize * 1.2f
-        val graphBottom = rect.bottom - density * 2
-        if (graphBottom - graphTop < density * 6) {
-            caption.textSize = baseCaptionSize
-            value.textSize = baseValueSize
-            return
-        }
-        x = left
-        val y2 = rect.top + rowH
-        if (mode == 4) {
-            drawCaption(canvas, "Gain", x, y2, width * 0.36f - gap)
-            glyph.set(x, graphTop, x + width * 0.36f - gap, graphBottom)
-            drawLevelBar(canvas, glyph, g.field(4) / 255f, 16)
-        } else {
-            drawCaption(canvas, "ADSR", x, y2, width * 0.36f - gap)
-            glyph.set(x, graphTop, x + width * 0.36f - gap, graphBottom)
-            drawAdsr(canvas, glyph, adsr1 and 15, (adsr1 shr 4) and 7, adsr2 shr 5, adsr2 and 31, mode)
-        }
-        x += width * 0.36f
-        drawCaption(canvas, "Volume L/R", x, y2, width * 0.26f - gap)
-        glyph.set(x, graphTop, x + width * 0.26f - gap, graphBottom)
-        drawBalance(canvas, glyph, g.signedField(6), g.signedField(7))
-        x += width * 0.26f
-        glyph.set(x, graphTop, rect.right, graphBottom)
-        drawSwitches(canvas, glyph, flags)
-        caption.textSize = baseCaptionSize
+        value.textSize = min(baseValueSize, h * 0.6f)
+        // text is drawn twice clipped by fill, so it's readable over both dark and filled parts
+        val baseline = bar.centerY() - (value.ascent() + value.descent()) / 2
+        val textX = bar.left + density * 6
+        canvas.save()
+        canvas.clipRect(box)
+        value.color = Color.BLACK
+        canvas.drawText(note, textX, baseline, value)
+        canvas.restore()
+        canvas.save()
+        canvas.clipRect(box.right, bar.top, bar.right, bar.bottom)
+        value.color = Color.WHITE
+        canvas.drawText(note, textX, baseline, value)
+        canvas.restore()
         value.textSize = baseValueSize
+        // envelope shape
+        var x = meterRight + gap
+        val envRight = x + rect.width() * 0.38f
+        glyph.set(x, rect.top, envRight, rect.bottom)
+        if (mode == 4) {
+            drawGain(canvas, glyph, g.field(4), envx)
+        } else {
+            drawAdsr(canvas, glyph, adsr1 and 15, (adsr1 shr 4) and 7, adsr2 shr 5, adsr2 and 31, mode, envx)
+        }
+        // stereo balance
+        x = envRight + gap
+        val balanceRight = x + rect.width() * 0.11f
+        glyph.set(x, top, balanceRight, bottom)
+        drawBalance(canvas, glyph, g.signedField(6), g.signedField(7))
+        // lamps
+        glyph.set(balanceRight + gap, top + h * 0.2f, rect.right, bottom - h * 0.2f)
+        drawLamps(canvas, glyph, flags)
+    }
+
+    // switches as small lamps with letters, lit when on
+    private fun drawLamps(canvas: Canvas, r: RectF, flags: Int) {
+        val cellW = r.width() / SPC_LAMPS.size
+        val radius = min(cellW, r.height()) * 0.42f
+        label.textSize = radius * 1.1f
+        for ((idx, name) in SPC_LAMPS.withIndex()) {
+            val on = flags and (1 shl idx) != 0
+            val cx = r.left + cellW * (idx + 0.5f)
+            val cy = r.centerY()
+            if (on) {
+                fill.color = Color.argb(220, 255, 255, 255)
+                canvas.drawCircle(cx, cy, radius, fill)
+            } else {
+                canvas.drawCircle(cx, cy, radius, dimStroke)
+            }
+            label.color = if (on) Color.BLACK else Color.argb(110, 255, 255, 255)
+            canvas.drawText(name, cx, cy - (label.ascent() + label.descent()) / 2, label)
+        }
+        label.color = Color.WHITE
+        label.textSize = baseLabelSize
     }
 
     private fun drawCaption(canvas: Canvas, title: String, x: Float, top: Float, w: Float) {
@@ -567,29 +585,100 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         return x + w
     }
 
-    // Stylized envelope: segments lengths follow rates (faster is shorter), current stage is bright
-    private fun drawAdsr(canvas: Canvas, r: RectF, attack: Int, decay: Int, sustain: Int, release: Int, mode: Int) {
-        val a = (16 - attack) / 16f
-        val d = (8 - decay) / 8f
-        val rl = (32 - release) / 32f
-        val total = a + d + 0.6f + rl
-        val unit = r.width() / total
-        val sustainY = r.bottom - r.height() * (sustain + 1) / 8f
-        val x1 = r.left + a * unit
-        val x2 = x1 + d * unit
-        val x3 = x2 + 0.6f * unit
-        val points = floatArrayOf(r.left, r.bottom, x1, r.top, x2, sustainY, x3, sustainY, r.right, r.bottom)
-        // stages order of ENV_STAGES: release, attack, decay, sustain
-        val current = when (mode) {
-            1 -> 0
-            2 -> 1
-            3 -> 2
-            0 -> 3
-            else -> -1
+    // Envelope as filled shape over time with the current stage bright and a dot at the current level, and the same in
+    // words below (times from S-DSP rate tables), so it's readable without knowing how to read envelope graphs.
+    // Segment widths follow log of times (2ms..38s span), so fast and slow envelopes are both visible.
+    private fun drawAdsr(
+        canvas: Canvas,
+        r: RectF,
+        attack: Int,
+        decay: Int,
+        sustain: Int,
+        release: Int,
+        mode: Int,
+        level: Float
+    ) {
+        val attackMs = SPC_ATTACK_MS[attack]
+        val decayMs = SPC_DECAY_MS[decay]
+        val releaseMs = SPC_RELEASE_MS[release]
+        val sustainLevel = (sustain + 1) / 8f
+        caption.textSize = min(baseCaptionSize, r.height() * 0.28f)
+        val textH = caption.fontSpacing
+        val graph = box2
+        graph.set(r.left, r.top + density * 2, r.right, r.bottom - textH - density * 2)
+        if (graph.height() > density * 6) {
+            fun span(ms: Int) = log10(1f + max(ms, 1) / 2f)
+            val a = span(attackMs)
+            val d = span(decayMs)
+            val sus = 1.2f
+            val rl = if (releaseMs == 0) 2f else span(releaseMs)
+            val unit = graph.width() / (a + d + sus + rl)
+            val sustainY = graph.bottom - graph.height() * sustainLevel
+            val xs = floatArrayOf(graph.left, graph.left + a * unit, graph.left + (a + d) * unit, graph.left + (a + d + sus) * unit, graph.right)
+            val ys = floatArrayOf(graph.bottom, graph.top, sustainY, sustainY, if (releaseMs == 0) sustainY else graph.bottom)
+            // stage index in segments: attack, decay, sustain (gradual decrease by SR), release (key off)
+            val current = when (mode) {
+                1 -> 0
+                2 -> 1
+                3 -> 2
+                0 -> 3
+                else -> -1
+            }
+            for (seg in 0 until 4) {
+                path.reset()
+                path.moveTo(xs[seg], graph.bottom)
+                path.lineTo(xs[seg], ys[seg])
+                path.lineTo(xs[seg + 1], ys[seg + 1])
+                path.lineTo(xs[seg + 1], graph.bottom)
+                path.close()
+                fill.color = Color.argb(if (seg == current) 150 else 45, 255, 255, 255)
+                canvas.drawPath(path, fill)
+                canvas.drawLine(xs[seg], ys[seg], xs[seg + 1], ys[seg + 1], if (seg == current) boldStroke else dimStroke)
+            }
+            if (current >= 0) {
+                // current level on the active segment
+                val y = graph.bottom - graph.height() * level.coerceIn(0f, 1f)
+                val x0 = xs[current]
+                val x1 = xs[current + 1]
+                val y0 = ys[current]
+                val y1 = ys[current + 1]
+                val x = if (abs(y1 - y0) < 1f) (x0 + x1) / 2 else (x0 + (x1 - x0) * ((y - y0) / (y1 - y0)).coerceIn(0f, 1f))
+                fill.color = Color.WHITE
+                canvas.drawCircle(x, y, density * 3, fill)
+            }
         }
-        for (seg in 0 until 4) {
-            canvas.drawLine(points[seg * 2], points[seg * 2 + 1], points[seg * 2 + 2], points[seg * 2 + 3], if (seg == current) boldStroke else dimStroke)
+        val words = memo.get(1, (attack.toLong() shl 16) or (decay.toLong() shl 12) or (sustain.toLong() shl 8) or release.toLong()) {
+            "A ${formatMs(attackMs)}  D ${formatMs(decayMs)}  S ${(sustainLevel * 100).roundToInt()}%  R ${if (releaseMs == 0) "∞" else formatMs(releaseMs)}"
         }
+        val count = caption.breakText(words, true, r.width(), null)
+        canvas.drawText(words, 0, count, r.left, r.bottom - caption.descent(), caption)
+        caption.textSize = baseCaptionSize
+    }
+
+    // GAIN mode: direct level or ramp, shown as level bar with the register meaning in words
+    private fun drawGain(canvas: Canvas, r: RectF, gain: Int, level: Float) {
+        caption.textSize = min(baseCaptionSize, r.height() * 0.28f)
+        val textH = caption.fontSpacing
+        glyph2.set(r.left, r.top + density * 4, r.right, r.bottom - textH - density * 4)
+        drawLevelBar(canvas, glyph2, level, 16)
+        val words = memo.get(1, gain.toLong() or 0x10000) {
+            if (gain and 0x80 == 0) {
+                "Gain: direct ${(gain and 0x7f) * 100 / 127}%"
+            } else {
+                val rate = SPC_RELEASE_MS[gain and 31]
+                val kind = GAIN_MODES[(gain shr 5) and 3]
+                "Gain: $kind ${if (rate == 0) "∞" else formatMs(rate)}"
+            }
+        }
+        val count = caption.breakText(words, true, r.width(), null)
+        canvas.drawText(words, 0, count, r.left, r.bottom - caption.descent(), caption)
+        caption.textSize = baseCaptionSize
+    }
+
+    private fun formatMs(ms: Int) = when {
+        ms >= 10000 -> "${ms / 1000}s"
+        ms >= 1000 -> "%.1fs".format(ms / 1000f)
+        else -> "${ms}ms"
     }
 
     // Left and right volumes from center, inverted phase (negative volume, used for surround) is dim
@@ -604,29 +693,6 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         fill.color = Color.argb(if (right < 0) 90 else 200, 255, 255, 255)
         box.set(cx, top, cx + r.width() / 2 * min(abs(right), 127) / 127f, top + h)
         canvas.drawRect(box, fill)
-    }
-
-    // switches as badges in a row, bright when on
-    private fun drawSwitches(canvas: Canvas, r: RectF, flags: Int) {
-        val cellW = r.width() / SPC_SWITCHES.size
-        label.textSize = min(baseLabelSize, r.height() * 0.7f)
-        while (label.textSize > 4 && label.measureText("NOISE") > cellW - density * 4) {
-            label.textSize *= 0.9f
-        }
-        for ((idx, name) in SPC_SWITCHES.withIndex()) {
-            val on = flags and (1 shl idx) != 0
-            box.set(r.left + cellW * idx + density, r.top, r.left + cellW * (idx + 1) - density, r.bottom)
-            if (on) {
-                fill.color = Color.argb(200, 255, 255, 255)
-                canvas.drawRect(box, fill)
-            } else {
-                canvas.drawRect(box, dimStroke)
-            }
-            label.color = if (on) Color.BLACK else Color.argb(110, 255, 255, 255)
-            canvas.drawText(name, box.centerX(), box.centerY() - (label.ascent() + label.descent()) / 2, label)
-        }
-        label.color = Color.WHITE
-        label.textSize = baseLabelSize
     }
 
     private fun drawMt32Part(canvas: Canvas, rect: RectF, g: VoiceGauges) {
@@ -942,7 +1008,18 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         private val RHYTHM_NAMES = arrayOf("Bass drum", "Snare", "Tom", "Cymbal", "Hi-hat")
         private val PARTIAL_STATES = arrayOf("-", "ATK", "SUS", "REL")
         private val ENV_STAGES = arrayOf("Release", "Attack", "Decay", "Sustain")
-        private val SPC_SWITCHES = arrayOf("ECHO", "PMOD", "NOISE")
+        private val SPC_LAMPS = arrayOf("E", "P", "N")
+
+        // S-DSP envelope times (full range) per rate register value, from fullsnes / Anomie's S-DSP doc
+        private val SPC_ATTACK_MS = intArrayOf(4100, 2600, 1500, 1000, 640, 380, 260, 160, 96, 64, 40, 24, 16, 10, 6, 0)
+        private val SPC_DECAY_MS = intArrayOf(1200, 740, 440, 290, 180, 110, 74, 37)
+
+        // 0 is infinite
+        private val SPC_RELEASE_MS = intArrayOf(
+            0, 38000, 28000, 24000, 19000, 14000, 12000, 9400, 7100, 5900, 4700, 3500, 2900, 2400, 1800, 1500,
+            1200, 880, 740, 590, 440, 370, 290, 220, 180, 150, 110, 92, 74, 55, 37, 18
+        )
+        private val GAIN_MODES = arrayOf("linear down", "exp down", "linear up", "bent up")
         private val NOISE_RATES = arrayOf("N/512", "N/1024", "N/2048", "T3")
         private val DUTIES = floatArrayOf(0.125f, 0.25f, 0.5f, 0.75f)
         private val DUTY_NAMES = arrayOf("12%", "25%", "50%", "75%")
@@ -970,10 +1047,22 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
 
         fun summaryOf(g: VoiceGauges) = when (g.kind) {
             VoiceGauges.Kind.MT32_PART -> g.text.ifEmpty { "-" }
+
             VoiceGauges.Kind.MT32_PARTIAL -> partialSummary(g)
+
             VoiceGauges.Kind.OPL_RHYTHM -> RHYTHM_NAMES.getOrElse(g.field(0)) { "" }
+
             VoiceGauges.Kind.OPN_DAC -> if (g.field(0) != 0) "PCM" else "off"
+
+            // S-DSP pitch is sample playback rate, the note depends on unknown sample tuning
+            VoiceGauges.Kind.SPC_DSP -> if (g.field(0) == 0 && !g.isKeyOn) "off" else spcRate(g)
+
             else -> noteSummary(g.summaryMode, g.frequency.roundToInt(), noteName(g.frequency), g.level.roundToInt())
+        }
+
+        private fun spcRate(g: VoiceGauges): String {
+            val pitch = g.field(8) or (g.field(9) shl 8)
+            return "%.1f kHz".format(pitch * 32f / 4096f)
         }
 
         private val VoiceGauges.summaryMode

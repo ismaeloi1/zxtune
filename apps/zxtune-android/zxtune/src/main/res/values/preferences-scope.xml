@@ -73,4 +73,19 @@
     </string-array>
     <string name="pref_oscilloscope_trigger_subsampling_default" translatable="false">0</string>
     <string name="scope_settings">Live settings</string>
+    <string name="pref_oscilloscope_max_periods_title">Max periods shown (zoom on high notes)</string>
+    <string-array name="pref_oscilloscope_max_periods_entries">
+        <item>Off (whole window)</item>
+        <item>4 periods</item>
+        <item>8 periods</item>
+        <item>16 periods</item>
+        <item>32 periods</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_max_periods_values" translatable="false">
+        <item>0</item>
+        <item>4</item>
+        <item>8</item>
+        <item>16</item>
+        <item>32</item>
+    </string-array>
 </resources>

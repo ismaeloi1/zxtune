@@ -110,6 +110,12 @@ namespace Sound
       return Searched;
     }
 
+    //! @return last estimated pitch period in samples, 0 if unknown
+    uint_t GetPeriodSamples() const
+    {
+      return HasPeriod ? CachedPeriod * Stride : 0;
+    }
+
     //! @brief Forget all the accumulated state (e.g. after seek)
     void Reset();
 

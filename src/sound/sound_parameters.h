@@ -90,6 +90,9 @@ namespace Parameters::ZXTune::Sound::Scope
   //! Correlation buffer width in ms (corrscope's trigger_ms)
   const IntType TRIGGER_WIDTH_DEFAULT = 40;
   const auto TRIGGER_WIDTH = TRIGGER_PREFIX + "width"_id;
+  //! Max displayed periods of detected pitch (render window is shrunk for high notes to stay readable), 0 to disable
+  const IntType MAX_PERIODS_DEFAULT = 8;
+  const auto MAX_PERIODS = PREFIX + "max_periods"_id;
 
   const IntType EDGE_STRENGTH_DEFAULT = 100;
   const auto EDGE_STRENGTH = TRIGGER_PREFIX + "edge_strength"_id;

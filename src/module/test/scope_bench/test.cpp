@@ -556,7 +556,8 @@ int main(int argc, char** argv)
   names.reserve(opts.Trigger.size());
   for (const auto& [key, value] : opts.Trigger)
   {
-    names.push_back("zxtune.sound.scope.trigger." + key);
+    // full names are passed as is (e.g. zxtune.sound.scope.max_periods), short ones are trigger parameters
+    names.push_back(key.rfind("zxtune.", 0) == 0 ? key : "zxtune.sound.scope.trigger." + key);
     global->SetValue(Parameters::Identifier(names.back()), value);
   }
   const auto service = ZXTune::Service::Create(global);

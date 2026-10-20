@@ -371,6 +371,7 @@ namespace Sound
       CorrelationTrigger::Config Trigger;
       uint_t WidthMs = Parameters::ZXTune::Sound::Scope::TRIGGER_WIDTH_DEFAULT;
       uint_t Subsampling = Parameters::ZXTune::Sound::Scope::SUBSAMPLING_DEFAULT;
+      uint_t MaxPeriods = Parameters::ZXTune::Sound::Scope::MAX_PERIODS_DEFAULT;
 
       TriggerSettings()
       {
@@ -409,6 +410,8 @@ namespace Sound
             std::clamp<Parameters::IntType>(get(TRIGGER_WIDTH, TRIGGER_WIDTH_DEFAULT), MIN_TRIGGER_MS, MAX_TRIGGER_MS));
         res.Subsampling =
             static_cast<uint_t>(std::clamp<Parameters::IntType>(get(SUBSAMPLING, SUBSAMPLING_DEFAULT), 0, 8));
+        res.MaxPeriods =
+            static_cast<uint_t>(std::clamp<Parameters::IntType>(get(MAX_PERIODS, MAX_PERIODS_DEFAULT), 0, 64));
         return res;
       }
     };
@@ -707,6 +710,7 @@ namespace Sound
         // Full searches are spread among frames to keep cost of each frame flat (e.g. 3 voices searched at 60 per
         // second on 120Hz display are 2+1 searches per frame instead of 3+0)
         Silent.resize(channels);
+        Windows.resize(channels);
         CanSearch.resize(channels);
         const auto range = std::max(renderSamples, triggerSamples);
         for (uint_t chan = 0; chan < channels; ++chan)
@@ -746,9 +750,10 @@ namespace Sound
           const auto trigger = silent ? pos
                                       : Triggers[chan]->GetTrigger(wave, pos, samplesPerFrame, CanSearch[chan] != 0);
           triggered += !silent;
-          const auto begin = trigger - renderSamples / 2 + offset;
+          const auto window = GetRenderWindow(chan, renderSamples, silent ? 0 : Triggers[chan]->GetPeriodSamples());
+          const auto begin = trigger - window / 2 + offset;
           auto* out = target + chan * points;
-          Resample(ring, begin, renderSamples, points, out);
+          Resample(ring, begin, window, points, out);
           // Some chips' voices are unipolar (e.g. AY/YM channels are DAC levels of 0..max) or have DC offset (e.g. idle
           // YM2612 DAC), so traces are centered by displayed range as Furnace's default DC offset correction does
           RemoveOffset(out, points);
@@ -763,6 +768,35 @@ namespace Sound
         result.Channels = channels;
         result.Id = LayoutId;
         return result;
+      }
+
+      // High notes in long window are tens of periods squeezed into few pixels, an unreadable band (corrscope and
+      // Furnace show it so). Window is shrunk to MaxPeriods of detected pitch. Window changes are smoothed and small
+      // ones ignored, so pitch estimation jitter (e.g. vibrato, octave errors on single frames) doesn't zoom picture.
+      int64_t GetRenderWindow(uint_t chan, int64_t renderSamples, uint_t period)
+      {
+        auto& current = Windows[chan];
+        if (!Settings.MaxPeriods)
+        {
+          return renderSamples;
+        }
+        const auto minSamples = int64_t(Samplerate) * MIN_WINDOW_MS / 1000;
+        if (current <= 0 || current > float(renderSamples))
+        {
+          current = float(renderSamples);
+        }
+        // unknown pitch (silence, noise, note change) keeps last zoom instead of flashing full window
+        if (!period)
+        {
+          return std::max<int64_t>(int64_t(current), minSamples);
+        }
+        const auto target =
+            float(std::clamp<int64_t>(int64_t(period) * Settings.MaxPeriods, minSamples, renderSamples));
+        if (std::abs(target - current) > current * 0.15f)
+        {
+          current += (target - current) * 0.25f;
+        }
+        return std::max<int64_t>(int64_t(current), minSamples);
       }
 
       uint_t GetGauges(uint_t maxChips, int64_t playing, uint_t waveWindowMs, uint8_t* target) override
@@ -1214,6 +1248,8 @@ namespace Sound
       uint_t TriggersStride = 0;
       // per channel flags of current request, read by workers
       std::vector<uint8_t> Silent;
+      // smoothed render window of each voice, see GetRenderWindow
+      std::vector<float> Windows;
       std::vector<uint8_t> CanSearch;
       uint_t SearchCursor = 0;
       int64_t LastPlayingHint = -1;
