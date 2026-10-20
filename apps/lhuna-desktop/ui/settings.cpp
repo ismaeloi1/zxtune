@@ -18,6 +18,19 @@ namespace Lhuna
   const std::vector<std::pair<QString, int>> INTERPOLATION = {
       {QObject::tr("None"), 0}, {QObject::tr("Performance"), 1}, {QObject::tr("Quality (high CPU usage)"), 2}};
 
+  std::vector<std::pair<QString, int>> GraphicsBackends()
+  {
+    using B = GraphicsBackend;
+    std::vector<std::pair<QString, int>> result = {{QObject::tr("Auto"), static_cast<int>(B::AUTO)},
+                                                   {"Vulkan", static_cast<int>(B::VULKAN)},
+                                                   {"OpenGL", static_cast<int>(B::OPENGL)}};
+#ifdef Q_OS_WIN
+    result.emplace_back("Direct3D 11", static_cast<int>(B::D3D11));
+#endif
+    result.emplace_back(QObject::tr("Software (CPU)"), static_cast<int>(B::SOFTWARE));
+    return result;
+  }
+
   std::vector<OptionsPage> MakePages()
   {
     using O = OptionDesc;
@@ -43,6 +56,9 @@ namespace Lhuna
               {{"30", 30}, {"60", 60}, {"120", 120}, {"144", 144}}},
              {Settings::GAUGE_WINDOW_MS, QObject::tr("SID gauges window"), O::SLIDER, 10, 1, 100, {}, "ms"},
              {Settings::LATENCY_MS, QObject::tr("Output latency compensation"), O::SLIDER, 100, 0, 500, {}, "ms"},
+             // top-level window composition is bound to graphics API when shown, so it can't be switched live
+             {Settings::GRAPHICS_BACKEND, QObject::tr("Graphics backend (on restart)"), O::CHOICE,
+              static_cast<int>(GraphicsBackend::AUTO), 0, 0, GraphicsBackends()},
          }});
     OptionsPage trigger{"trigger", QObject::tr("Trigger"), {}};
     for (const auto& param : Visualization::TriggerPresets::Params())

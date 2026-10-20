@@ -10,6 +10,42 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
+# GPU oscilloscope (ui/gpu_scope_view.cpp) uses QRhiWidget (Qt 6.7+), QRhi API (private Gui module headers, e.g.
+# qt6-base-private-dev package) and shaders baked by Qt Shader Tools (qt6-shadertools-dev); raster view is used otherwise
+option(LHUNA_GPU_SCOPE "GPU oscilloscope via Qt RHI (Vulkan, OpenGL, Direct3D 11)" ON)
+if(LHUNA_GPU_SCOPE AND APPLE)
+  # Metal backend is not implemented, OpenGL contexts of macOS are too old for shaders
+  message(STATUS "GPU oscilloscope is not supported on Apple platforms")
+  set(LHUNA_GPU_SCOPE OFF)
+endif()
+if(LHUNA_GPU_SCOPE AND Qt6_VERSION VERSION_LESS 6.7)
+  message(STATUS "GPU oscilloscope requires Qt 6.7+ (found ${Qt6_VERSION})")
+  set(LHUNA_GPU_SCOPE OFF)
+endif()
+if(LHUNA_GPU_SCOPE)
+  find_package(Qt6 QUIET COMPONENTS ShaderTools)
+  if(Qt6_VERSION VERSION_GREATER_EQUAL 6.9)
+    # private modules are separate packages since Qt 6.9
+    find_package(Qt6 QUIET COMPONENTS GuiPrivate)
+  endif()
+  if(TARGET Qt6::GuiPrivate)
+    # target may be defined while private headers are not installed (split -dev packages of Linux distributions)
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_LIBRARIES Qt6::GuiPrivate Qt6::Widgets)
+    check_cxx_source_compiles("#include <rhi/qrhi.h>\n#include <QtWidgets/QRhiWidget>\nint main() { return 0; }"
+      LHUNA_HAVE_QRHI)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+  endif()
+  if(NOT COMMAND qt_add_shaders)
+    message(STATUS "GPU oscilloscope requires Qt Shader Tools")
+    set(LHUNA_GPU_SCOPE OFF)
+  elseif(NOT LHUNA_HAVE_QRHI)
+    message(STATUS "GPU oscilloscope requires private headers of Qt Gui module")
+    set(LHUNA_GPU_SCOPE OFF)
+  endif()
+endif()
+message(STATUS "GPU oscilloscope: ${LHUNA_GPU_SCOPE}")
+
 set(ZXTUNE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." CACHE PATH "zxtune repository root")
 if(WIN32)
   set(ZXTUNE_DEFAULT_PLATFORM mingw)
@@ -71,6 +107,26 @@ add_executable(lhuna-desktop WIN32
 )
 if(LHUNA_BUILD_CORE)
   add_dependencies(lhuna-desktop zxtune_core)
+endif()
+
+if(LHUNA_GPU_SCOPE)
+  target_sources(lhuna-desktop PRIVATE ui/gpu_scope_view.cpp)
+  target_compile_definitions(lhuna-desktop PRIVATE LHUNA_GPU_SCOPE)
+  target_link_libraries(lhuna-desktop PRIVATE Qt6::GuiPrivate)
+  # SPIR-V for Vulkan, GLSL 330 (desktop OpenGL 3.3+, gl_VertexID and texelFetch are required) and 300 es,
+  # HLSL shader model 5.0 for Direct3D 11; served from resources as :/scope/<name>.qsb
+  qt_add_shaders(lhuna-desktop "lhuna_scope_shaders"
+    PREFIX "/scope"
+    BASE ui/shaders
+    GLSL "300 es,330"
+    HLSL 50
+    NOMSL
+    FILES
+      ui/shaders/background.vert
+      ui/shaders/background.frag
+      ui/shaders/trace.vert
+      ui/shaders/trace.frag
+  )
 endif()
 
 target_include_directories(lhuna-desktop PRIVATE "${ZXTUNE_ROOT}" "${ZXTUNE_ROOT}/include" "${ZXTUNE_ROOT}/src")

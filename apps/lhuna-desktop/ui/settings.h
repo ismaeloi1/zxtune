@@ -53,6 +53,16 @@ namespace Lhuna
     std::vector<OptionDesc> Options;
   };
 
+  //! Values of Settings::GRAPHICS_BACKEND
+  enum class GraphicsBackend
+  {
+    AUTO = 0,
+    VULKAN = 1,
+    OPENGL = 2,
+    D3D11 = 3,
+    SOFTWARE = 4,
+  };
+
   /**
    * Options are stored in QSettings and native ones are mirrored to engine options container, which is live, so
    * changes are applied to playing tune immediately.
@@ -78,6 +88,8 @@ namespace Lhuna
     static constexpr auto MAX_FPS = "ui.oscilloscope.max_fps";
     static constexpr auto GAUGE_WINDOW_MS = "ui.oscilloscope.gauge_window_ms";
     static constexpr auto LATENCY_MS = "ui.oscilloscope.latency_ms";
+    //! see GraphicsBackend, applied at start
+    static constexpr auto GRAPHICS_BACKEND = "ui.oscilloscope.graphics_backend";
     static constexpr auto SHUFFLE = "ui.playlist.shuffle";
     static constexpr auto REPEAT = "ui.playlist.repeat";
 
