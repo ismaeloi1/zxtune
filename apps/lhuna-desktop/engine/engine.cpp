@@ -118,6 +118,17 @@ namespace Lhuna
     return Subpath.empty() ? name : name + " > " + Subpath;
   }
 
+  // Error::ToString adds source locations, which are useless in status line
+  std::string Describe(const Error& e)
+  {
+    std::string result;
+    for (auto err = e; err; err = err.GetSuberror())
+    {
+      result += (result.empty() ? "" : " ") + err.GetText();
+    }
+    return result;
+  }
+
   std::string GetString(const Parameters::Accessor& props, StringView name)
   {
     return props.FindString(name).value_or(String());
@@ -259,7 +270,7 @@ namespace Lhuna
       {
         if (error)
         {
-          *error = e.ToString();
+          *error = Describe(e);
         }
       }
       return std::move(callback.Tracks);
@@ -289,7 +300,7 @@ namespace Lhuna
           }
           catch (const Error& e)
           {
-            errors += e.ToString();
+            errors += (errors.empty() ? "" : "; ") + Describe(e);
           }
         }
         if (!Backend)
@@ -309,7 +320,7 @@ namespace Lhuna
         Backend.reset();
         if (error)
         {
-          *error = e.ToString();
+          *error = Describe(e);
         }
         return false;
       }

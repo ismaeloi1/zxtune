@@ -16,6 +16,9 @@ rm -rf "$APPDIR"
 DESTDIR="$APPDIR" cmake --install "$BUILD" --prefix /usr --strip
 
 export QMAKE=${QMAKE:-qmake6}
+# installed binary has no build tree RPATH, so libraries of the Qt used for build (e.g. by aqtinstall) are found
+# this way, not the system ones
+export LD_LIBRARY_PATH="$("$QMAKE" -query QT_INSTALL_LIBS)${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 # Wayland platform is selected on Wayland sessions, xcb is the default and fallback one
 export EXTRA_PLATFORM_PLUGINS="libqwayland-egl.so;libqwayland-generic.so;libqxcb.so"
 # headless runs (e.g. CI screenshots) use offscreen platform

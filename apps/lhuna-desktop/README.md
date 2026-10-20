@@ -26,6 +26,10 @@ Qt6 desktop port of the Android player features (not based on `apps/zxtune-qt`).
 
 Requirements: GNU make, C++20 compiler, CMake 3.21+, Qt6 base (`qt6-base-dev` on Debian/Ubuntu), Boost headers,
 ALSA/PulseAudio headers on Linux. Optional: Qt6 DBus (MPRIS), `qt6-wayland` at runtime for native Wayland.
+GPU oscilloscope needs Qt >= 6.7 with shader tools and Gui private headers (older Qt, e.g. 6.4 of Ubuntu 24.04,
+gets QPainter one), CI uses official Qt 6.8 via aqtinstall:
+`aqt install-qt linux desktop 6.8.3 linux_gcc_64 --archives qtbase qtwayland qtsvg icu -m qtshadertools -O qt`
+and `-DCMAKE_PREFIX_PATH=$PWD/qt/6.8.3/gcc_64` (AppImage script needs `QMAKE=$PWD/qt/6.8.3/gcc_64/bin/qmake`).
 
 ```sh
 cmake -S apps/lhuna-desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
@@ -51,8 +55,8 @@ compiler, see `.github/workflows/lhuna-desktop.yml` for exact versions.
 
 ```sh
 pip install aqtinstall
-aqt install-qt linux desktop 6.8.3 linux_gcc_64 --archives qtbase -O qt
-aqt install-qt windows desktop 6.8.3 win64_llvm_mingw --archives qtbase -O qt
+aqt install-qt linux desktop 6.8.3 linux_gcc_64 --archives qtbase qtshadertools icu -m qtshadertools -O qt
+aqt install-qt windows desktop 6.8.3 win64_llvm_mingw --archives qtbase qtshadertools -m qtshadertools -O qt
 export LLVM_MINGW=/path/to/llvm-mingw-20231128-ucrt-ubuntu-20.04-x86_64
 mkdir -p prebuilt/boost-system/include && ln -s /usr/include/boost prebuilt/boost-system/include/boost
 cmake -S apps/lhuna-desktop -B build-win -G Ninja -DCMAKE_BUILD_TYPE=Release \
