@@ -7,8 +7,13 @@ project(lhuna-desktop LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
+# MPRIS media controls (desktop shells, media keys, KDE Connect etc.), optional
+if(UNIX AND NOT APPLE)
+  find_package(Qt6 COMPONENTS DBus)
+endif()
 
 # GPU oscilloscope (ui/gpu_scope_view.cpp) uses QRhiWidget (Qt 6.7+), QRhi API (private Gui module headers, e.g.
 # qt6-base-private-dev package) and shaders baked by Qt Shader Tools (qt6-shadertools-dev); raster view is used otherwise
@@ -95,16 +100,36 @@ if(LHUNA_BUILD_CORE)
     USES_TERMINAL)
 endif()
 
-add_executable(lhuna-desktop WIN32
+set(LHUNA_SOURCES
   main.cpp
   engine/engine.cpp
+  ui/about_dialog.cpp
+  ui/all_settings_dialog.cpp
+  ui/filter_curve_view.cpp
   ui/main_window.cpp
+  ui/open_source_components.cpp
+  ui/options_form.cpp
+  ui/playlist_io.cpp
   ui/qt_canvas.cpp
   ui/scope_view.cpp
   ui/settings.cpp
   ui/settings_panel.cpp
+  ui/spectrum_view.cpp
   ui/theme.cpp
+  res/lhuna.qrc
 )
+if(WIN32)
+  list(APPEND LHUNA_SOURCES ui/media_keys_win.cpp)
+  set(LHUNA_ICO "${CMAKE_CURRENT_SOURCE_DIR}/res/lhuna.ico")
+  configure_file(res/lhuna.rc.in "${CMAKE_CURRENT_BINARY_DIR}/lhuna.rc" @ONLY)
+  list(APPEND LHUNA_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/lhuna.rc")
+elseif(TARGET Qt6::DBus)
+  list(APPEND LHUNA_SOURCES ui/media_keys_mpris.cpp)
+else()
+  list(APPEND LHUNA_SOURCES ui/media_keys_stub.cpp)
+endif()
+
+add_executable(lhuna-desktop WIN32 ${LHUNA_SOURCES})
 if(LHUNA_BUILD_CORE)
   add_dependencies(lhuna-desktop zxtune_core)
 endif()
@@ -141,8 +166,23 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT APPLE)
 endif()
 target_link_libraries(lhuna-desktop PRIVATE
   Qt6::Widgets
+  $<$<TARGET_EXISTS:Qt6::DBus>:Qt6::DBus>
   ${LINK_GROUP_BEGIN} ${ZXTUNE_LIB_FILES} ${LINK_GROUP_END}
   ${ZXTUNE_SYSLIBS}
 )
 
-install(TARGETS lhuna-desktop RUNTIME DESTINATION bin)
+include(GNUInstallDirs)
+install(TARGETS lhuna-desktop RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+if(UNIX AND NOT APPLE)
+  # freedesktop integration: Wayland app_id, .desktop file and AppStream component share the same id
+  set(LHUNA_APP_ID app.zxtune.Lhuna)
+  install(FILES res/${LHUNA_APP_ID}.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+  install(FILES res/${LHUNA_APP_ID}.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)
+  install(FILES res/${LHUNA_APP_ID}.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps)
+  install(FILES res/icon-256.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps
+          RENAME ${LHUNA_APP_ID}.png)
+  install(FILES res/icon-64.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/64x64/apps
+          RENAME ${LHUNA_APP_ID}.png)
+  install(FILES res/icon-32.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/32x32/apps
+          RENAME ${LHUNA_APP_ID}.png)
+endif()

@@ -7,7 +7,23 @@ on:
     paths-ignore:
       - 'apps/zxtune-android/**'
       - 'apps/zxtune-qt/**'
+  pull_request:
+    paths:
+      - 'apps/lhuna-desktop/**'
+      - 'src/**'
+      - '.github/workflows/lhuna-desktop.yml'
   workflow_dispatch:
+
+env:
+  # Windows build: the same LLVM (17.0.6, UCRT) Qt's win64_llvm_mingw binaries are built with
+  QT_VERSION: '6.8.3'
+  LLVM_MINGW_VERSION: '20231128'
+  AQT_VERSION: '3.3.0'
+  LINUXDEPLOY_URL: https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous
+  LINUXDEPLOY_QT_URL: https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 1500M
+  CCACHE_COMPRESS: 'true'
 
 jobs:
   linux:
@@ -19,126 +35,268 @@ jobs:
             runner: ubuntu-24.04
             # SSE4.2/POPCNT, supported by all x86_64 CPUs since ~2009
             march: -march=x86-64-v2
+            qt_host: linux
+            qt_arch: linux_gcc_64
+            qt_dir: gcc_64
           - arch: arm64
             runner: ubuntu-24.04-arm
+            appimage_arch: aarch64
             march: -march=armv8-a
+            qt_host: linux_arm64
+            qt_arch: linux_gcc_arm64
+            qt_dir: gcc_arm64
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 120
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          # version string of core is made by git describe
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
           sudo apt-get update
+          # Qt itself is official build (see below), system provides its runtime dependencies and Vulkan headers
           sudo apt-get install -y --no-install-recommends \
-            make g++ python3 file cmake ninja-build \
-            qt6-base-dev qt6-base-dev-tools libgl-dev libxkbcommon-dev \
+            make g++ python3 python3-venv file cmake ninja-build ccache \
+            libvulkan-dev libgl-dev libegl1 libxkbcommon-dev libxkbcommon-x11-0 libfontconfig1 libdbus-1-3 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-shape0 \
+            libxcb-xinerama0 libxcb-xkb1 libwayland-cursor0 libwayland-egl1 \
             libboost-dev libpulse-dev libasound2-dev \
-            pulseaudio fonts-dejavu-core
+            pulseaudio fonts-dejavu-core xvfb xauth weston desktop-file-utils appstream
+
+      # GPU oscilloscope requires Qt >= 6.7 (QRhi API, shader tools, Gui private headers), distribution has 6.4
+      - uses: actions/cache@v4
+        id: qt
+        with:
+          path: qt
+          key: qt-${{ matrix.qt_arch }}-${{ env.QT_VERSION }}-aqt${{ env.AQT_VERSION }}
+
+      - name: Install Qt
+        if: steps.qt.outputs.cache-hit != 'true'
+        run: |
+          python3 -m venv aqt-venv
+          aqt-venv/bin/pip install "aqtinstall==$AQT_VERSION"
+          # qtsvg is required by adwaita decorations plugin of qtwayland
+          aqt-venv/bin/aqt install-qt ${{ matrix.qt_host }} desktop "$QT_VERSION" ${{ matrix.qt_arch }} \
+            --archives qtbase qtwayland qtsvg qtshadertools icu -m qtshadertools -O qt
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-linux-${{ matrix.arch }}-${{ github.sha }}
+          restore-keys: ccache-linux-${{ matrix.arch }}-
 
       - name: Configure
         run: |
-          cmake -S apps/lhuna-desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_CXX_FLAGS="${{ matrix.march }}" \
-            -DZXTUNE_MAKE_ARGS="jumbo.enabled=1 tools.python=python3 cxx_flags=${{ matrix.march }}"
+          cmake -S apps/lhuna-desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+            -DCMAKE_PREFIX_PATH="$PWD/qt/$QT_VERSION/${{ matrix.qt_dir }}" -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_FLAGS="${{ matrix.march }}" \
+            -DZXTUNE_MAKE_ARGS="jumbo.enabled=1 tools.python=python3 cxx_flags=${{ matrix.march }} tools.cxxwrapper=ccache tools.ccwrapper=ccache"
 
       - name: Build
-        run: cmake --build build
-
-      # Headless run with null sink, so oscilloscope and dashboard are really fed by playback
-      - name: Smoke test
         run: |
-          pulseaudio --start --exit-idle-time=-1 || true
+          cmake --build build
+          ccache --show-stats
+
+      - name: Validate desktop integration files
+        run: |
+          desktop-file-validate apps/lhuna-desktop/res/app.zxtune.Lhuna.desktop
+          appstreamcli validate --no-net apps/lhuna-desktop/res/app.zxtune.Lhuna.metainfo.xml
+
+      # Null sink of PulseAudio, so oscilloscope and dashboard are really fed by playback
+      - name: Start audio
+        run: pulseaudio --start --exit-idle-time=-1
+
+      - name: Smoke test (offscreen)
+        run: |
           mkdir -p screenshots
           for tune in samples/chiptunes/MOS6581/sid/Love_Is_a_Shield.sid samples/chiptunes/Multi/vgm/EarthwormJim.vgm; do
-            QT_QPA_PLATFORM=offscreen timeout 60 build/lhuna-desktop --size 1400x860 --delay 4000 --settings-panel \
-              --screenshot "screenshots/$(basename "$tune").png" "$tune"
+            QT_QPA_PLATFORM=offscreen timeout 60 build/lhuna-desktop --no-session --size 1400x860 --delay 4000 \
+              --settings-panel --screenshot "screenshots/offscreen-$(basename "$tune").png" "$tune"
           done
-          ls -l screenshots
+          QT_QPA_PLATFORM=offscreen timeout 60 build/lhuna-desktop --no-session --delay 2000 \
+            --export playlist.xspf samples/archived/rar/AY.RAR
+          grep -c '<track>' playlist.xspf
+          QT_QPA_PLATFORM=offscreen timeout 60 build/lhuna-desktop --no-session --size 1400x860 --delay 2000 \
+            --browse samples/archived/rar/AY.RAR --screenshot screenshots/offscreen-archive.png
+          QT_QPA_PLATFORM=offscreen timeout 60 build/lhuna-desktop --no-session --delay 3000 \
+            --dialog settings:sid --screenshot screenshots/offscreen-settings-sid.png \
+            samples/chiptunes/MOS6581/sid/Love_Is_a_Shield.sid
 
-      - name: Package
+      - name: Smoke test (X11)
         run: |
-          DIST=lhuna-desktop-linux-${{ matrix.arch }}
-          mkdir -p "dist/${DIST}"
-          cp build/lhuna-desktop "dist/${DIST}/"
-          strip "dist/${DIST}/lhuna-desktop"
-          cat > "dist/${DIST}/README.txt" <<EOF
-          Lhuna desktop for Linux ${{ matrix.arch }}, built on ${{ matrix.runner }}.
-          Requires system Qt6 (e.g. 'sudo apt install libqt6widgets6' on Debian/Ubuntu).
-          EOF
-          tar -C dist -czf "dist/${DIST}.tar.gz" "${DIST}"
-          file "dist/${DIST}/lhuna-desktop"
-          ldd "dist/${DIST}/lhuna-desktop"
+          XDG_SESSION_TYPE=x11 timeout 90 xvfb-run -a -s "-screen 0 1600x1000x24" build/lhuna-desktop --no-session \
+            --size 1400x860 --delay 4000 --spectrum --screenshot screenshots/x11.png \
+            samples/chiptunes/Multi/vgm/EarthwormJim.vgm
+          XDG_SESSION_TYPE=x11 timeout 60 xvfb-run -a build/lhuna-desktop --no-session --delay 1500 --dialog about \
+            --screenshot screenshots/x11-about.png
+
+      # Native Wayland is chosen automatically on Wayland sessions (see main.cpp)
+      - name: Smoke test (Wayland)
+        run: |
+          export XDG_RUNTIME_DIR=$(mktemp -d)
+          chmod 700 "$XDG_RUNTIME_DIR"
+          weston --backend=headless --socket=wayland-ci --width=1600 --height=1000 --idle-time=0 &
+          WESTON=$!
+          for i in $(seq 1 50); do [ -S "$XDG_RUNTIME_DIR/wayland-ci" ] && break; sleep 0.2; done
+          export WAYLAND_DISPLAY=wayland-ci XDG_SESSION_TYPE=wayland
+          unset DISPLAY
+          WAYLAND_DEBUG=1 timeout 90 build/lhuna-desktop --no-session --size 1400x860 --delay 4000 \
+            --screenshot screenshots/wayland.png samples/chiptunes/MOS6581/sid/Love_Is_a_Shield.sid 2> wayland.log
+          grep -q 'set_app_id("app.zxtune.Lhuna")' wayland.log
+          timeout 60 build/lhuna-desktop --no-session --delay 1500 --dialog about --screenshot screenshots/wayland-about.png
+          kill $WESTON || true
+
+      - name: Package AppImage
+        run: |
+          mkdir -p tools
+          ARCH=${{ matrix.appimage_arch || matrix.arch }}
+          curl -fsSLo tools/linuxdeploy "$LINUXDEPLOY_URL/linuxdeploy-$ARCH.AppImage"
+          curl -fsSLo tools/linuxdeploy-plugin-qt "$LINUXDEPLOY_QT_URL/linuxdeploy-plugin-qt-$ARCH.AppImage"
+          chmod +x tools/*
+          PATH="$PWD/tools:$PATH" LINUXDEPLOY="$PWD/tools/linuxdeploy" VERSION="$(git describe --tags --always)" \
+            QMAKE="$PWD/qt/$QT_VERSION/${{ matrix.qt_dir }}/bin/qmake" apps/lhuna-desktop/package/appimage.sh build dist
+          mv dist/*.AppImage "dist/lhuna-desktop-linux-${{ matrix.arch }}.AppImage"
+
+      - name: Smoke test (AppImage)
+        run: |
+          APPIMAGE_EXTRACT_AND_RUN=1 QT_QPA_PLATFORM=offscreen timeout 90 \
+            "dist/lhuna-desktop-linux-${{ matrix.arch }}.AppImage" --no-session --size 1400x860 --delay 4000 \
+            --screenshot screenshots/appimage.png samples/chiptunes/MOS6581/sid/Love_Is_a_Shield.sid
+          ls -l screenshots dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: lhuna-desktop-linux-${{ matrix.arch }}
           path: |
-            dist/*.tar.gz
+            dist/*.AppImage
             screenshots/*.png
           if-no-files-found: error
 
-  windows:
-    runs-on: windows-latest
-    timeout-minutes: 180
-    defaults:
-      run:
-        shell: msys2 {0}
+  # Core make system and Qt application are cross compiled by llvm-mingw, the same way as other zxtune Windows
+  # builds (make/docker/builds/Dockerfile.mingw), Qt is the official build of the same compiler.
+  windows-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - uses: msys2/setup-msys2@v2
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends make python3 python3-venv cmake ninja-build ccache libboost-dev \
+            libvulkan-dev zip
+
+      - uses: actions/cache@v4
+        id: toolchain
         with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            make
-            zip
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-ninja
-            mingw-w64-x86_64-python
-            mingw-w64-x86_64-boost
-            mingw-w64-x86_64-qt6-base
-            mingw-w64-x86_64-qt6-tools
+          path: toolchain
+          key: windows-toolchain-llvm${{ env.LLVM_MINGW_VERSION }}-qt${{ env.QT_VERSION }}-aqt${{ env.AQT_VERSION }}
 
-      # msys make is used as core build relies on POSIX shell (host=linux)
+      - name: Install toolchain and Qt
+        if: steps.toolchain.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p toolchain
+          # system Python is externally managed (PEP 668)
+          python3 -m venv aqt-venv
+          aqt-venv/bin/pip install "aqtinstall==$AQT_VERSION"
+          curl -fsSL "https://github.com/mstorsjo/llvm-mingw/releases/download/$LLVM_MINGW_VERSION/llvm-mingw-$LLVM_MINGW_VERSION-ucrt-ubuntu-20.04-x86_64.tar.xz" \
+            | tar -xJ -C toolchain
+          mv toolchain/llvm-mingw-* toolchain/llvm-mingw
+          # host Qt provides moc/rcc/qsb for cross build (they need its ICU), only base and shader tools are needed
+          aqt-venv/bin/aqt install-qt linux desktop "$QT_VERSION" linux_gcc_64 --archives qtbase qtshadertools icu -m qtshadertools -O toolchain/qt
+          aqt-venv/bin/aqt install-qt windows desktop "$QT_VERSION" win64_llvm_mingw --archives qtbase qtshadertools -m qtshadertools -O toolchain/qt
+          du -sh toolchain/*
+
+      - uses: actions/cache@v4
+        with:
+          path: .ccache
+          key: ccache-windows-x86_64-${{ github.sha }}
+          restore-keys: ccache-windows-x86_64-
+
       - name: Configure
         run: |
+          export LLVM_MINGW="$PWD/toolchain/llvm-mingw"
+          # boost is used header only
+          mkdir -p prebuilt/boost-system/include
+          ln -sfn /usr/include/boost prebuilt/boost-system/include/boost
+          # platform independent Vulkan headers for QRhi of Qt Gui, host include dir itself is not visible for target
+          mkdir -p prebuilt/vulkan/include
+          cp -r /usr/include/vulkan /usr/include/vk_video prebuilt/vulkan/include/
           cmake -S apps/lhuna-desktop -B build -G Ninja -DCMAKE_BUILD_TYPE=Release \
-            -DZXTUNE_PLATFORM=mingw \
-            -DZXTUNE_MAKE="$(cygpath -m /usr/bin/make)" \
-            -DZXTUNE_MAKE_ARGS="host=linux arch=x86_64 jumbo.enabled=1 tools.python=python3 cxx_flags=-march=x86-64-v2" \
-            -DCMAKE_CXX_FLAGS=-march=x86-64-v2
+            -DCMAKE_TOOLCHAIN_FILE="$PWD/apps/lhuna-desktop/package/llvm-mingw.cmake" \
+            -DCMAKE_PREFIX_PATH="$PWD/toolchain/qt/$QT_VERSION/llvm-mingw_64;$PWD/prebuilt/vulkan" \
+            -DQT_HOST_PATH="$PWD/toolchain/qt/$QT_VERSION/gcc_64" \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_FLAGS=-march=x86-64-v2 \
+            -DZXTUNE_MAKE_ARGS="arch=x86_64 host=linux compiler=clang execprefix=$LLVM_MINGW/bin/x86_64-w64-mingw32- jumbo.enabled=1 tools.python=python3 prebuilt.dir=$PWD/prebuilt boost.version=system cxx_flags=-march=x86-64-v2 tools.cxxwrapper=ccache tools.ccwrapper=ccache"
 
       - name: Build
-        run: cmake --build build
-
-      - name: Smoke test
         run: |
-          mkdir -p screenshots
-          QT_QPA_PLATFORM=offscreen timeout 60 build/lhuna-desktop.exe --size 1400x860 --delay 4000 \
-            --screenshot screenshots/sid.png samples/chiptunes/MOS6581/sid/Love_Is_a_Shield.sid || true
-          ls -l screenshots
+          export LLVM_MINGW="$PWD/toolchain/llvm-mingw"
+          cmake --build build
+          ccache --show-stats
 
       - name: Package
         run: |
           DIST=lhuna-desktop-windows-x86_64
-          mkdir -p "dist/${DIST}"
-          cp build/lhuna-desktop.exe "dist/${DIST}/"
-          windeployqt6 --release --no-translations --no-opengl-sw "dist/${DIST}/lhuna-desktop.exe"
-          # C++ runtime and Qt dependencies from MSYS2
-          ldd "dist/${DIST}/lhuna-desktop.exe" | grep -i mingw64 | awk '{print $3}' | xargs -r -I{} cp -n {} "dist/${DIST}/"
-          (cd dist && zip -9r "${DIST}.zip" "${DIST}")
+          python3 apps/lhuna-desktop/package/windows_deploy.py build/lhuna-desktop.exe "dist/$DIST" \
+            --qt "toolchain/qt/$QT_VERSION/llvm-mingw_64" --toolchain toolchain/llvm-mingw
+          toolchain/llvm-mingw/bin/x86_64-w64-mingw32-strip "dist/$DIST/lhuna-desktop.exe"
+          (cd dist && zip -9r "$DIST.zip" "$DIST")
+          ls -l dist
 
       - uses: actions/upload-artifact@v4
         with:
           name: lhuna-desktop-windows-x86_64
-          path: |
-            dist/*.zip
-            screenshots/*.png
+          path: dist/*.zip
           if-no-files-found: error
+
+  # Cross compiled package is checked on real Windows: all the DLLs are deployed, core detects and plays modules
+  windows-test:
+    needs: windows-build
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: samples
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: lhuna-desktop-windows-x86_64
+
+      - name: Smoke test
+        run: |
+          Expand-Archive lhuna-desktop-windows-x86_64.zip -DestinationPath .
+          $exe = Resolve-Path lhuna-desktop-windows-x86_64/lhuna-desktop.exe
+          New-Item -ItemType Directory -Force screenshots | Out-Null
+          function Run([string]$platform, [string[]]$arguments) {
+            $env:QT_QPA_PLATFORM = $platform
+            # GUI subsystem executable: wait for it explicitly
+            $p = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $PWD -PassThru -NoNewWindow
+            if (-not $p.WaitForExit(90000)) { $p.Kill(); throw "Timeout: $arguments" }
+            if ($p.ExitCode -ne 0) { throw "Exit code $($p.ExitCode): $arguments" }
+          }
+          $sid = "samples/chiptunes/MOS6581/sid/Love_Is_a_Shield.sid"
+          Run "offscreen" @("--no-session", "--size", "1400x860", "--delay", "4000", "--settings-panel", "--screenshot", "screenshots/offscreen-sid.png", $sid)
+          Run "offscreen" @("--no-session", "--delay", "2000", "--export", "playlist.xspf", "samples/archived/rar/AY.RAR")
+          if (-not (Select-String -Path playlist.xspf -Pattern "<track>" -Quiet)) { throw "No tracks detected" }
+          Run "offscreen" @("--no-session", "--delay", "1500", "--dialog", "about", "--screenshot", "screenshots/offscreen-about.png")
+          # native platform plugin, desktop session of runner
+          Run "windows" @("--no-session", "--size", "1400x860", "--delay", "3000", "--screenshot", "screenshots/windows-sid.png", $sid)
+          Get-ChildItem screenshots
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lhuna-desktop-windows-x86_64-screenshots
+          path: |
+            screenshots/*.png
+            playlist.xspf
+          if-no-files-found: warn

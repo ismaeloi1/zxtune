@@ -11,16 +11,21 @@
 #include "apps/lhuna-desktop/engine/engine.h"
 
 #include "module/properties/path.h"
+#include "sound/backends/alsa.h"
+#include "sound/backends/dsound.h"
+#include "sound/backends/win32.h"
 
 #include "core/additional_files_resolve.h"
 #include "core/data_location.h"
 #include "core/module_detect.h"
 #include "core/plugin.h"
+#include "core/plugin_attrs.h"
 #include "core/service.h"
 #include "io/api.h"
 #include "module/attributes.h"
 #include "parameters/merged_container.h"
 #include "sound/backend.h"
+#include "sound/backend_attrs.h"
 #include "sound/backends_parameters.h"
 #include "sound/service.h"
 #include "sound/sound_parameters.h"
@@ -30,6 +35,7 @@
 #include "make_ptr.h"
 
 #include <atomic>
+#include <map>
 #include <mutex>
 
 namespace Lhuna
@@ -110,6 +116,17 @@ namespace Lhuna
     const auto slash = Path.find_last_of("/\\");
     auto name = slash == std::string::npos ? Path : Path.substr(slash + 1);
     return Subpath.empty() ? name : name + " > " + Subpath;
+  }
+
+  // Error::ToString adds source locations, which are useless in status line
+  std::string Describe(const Error& e)
+  {
+    std::string result;
+    for (auto err = e; err; err = err.GetSuberror())
+    {
+      result += (result.empty() ? "" : " ") + err.GetText();
+    }
+    return result;
   }
 
   std::string GetString(const Parameters::Accessor& props, StringView name)
@@ -198,6 +215,19 @@ namespace Lhuna
     const std::string Path;
   };
 
+  // ALSA backend has explicit latency (PulseAudio simple API buffers up to 2s by default), so oscilloscope is
+  // synchronized with output exactly. Other systems' backends follow.
+  const std::string DEFAULT_BACKENDS_ORDER = "alsa;win32;dsound;sdl;paudio;openal;oss";
+  // Most of the players render by 20ms frames (50Hz), backends with buffers count queue such a chunks
+  const uint32_t TYPICAL_CHUNK_MS = 20;
+
+  uint32_t QueuedChunksLatency(const Parameters::Accessor& params, Parameters::Identifier name, Parameters::IntType def)
+  {
+    // the chunk being written is the one following played one (see Sound::Scope::Played), others are in queue
+    const auto buffers = Parameters::GetInteger(params, name, def);
+    return buffers > 1 ? static_cast<uint32_t>((buffers - 1) * TYPICAL_CHUNK_MS) : 0;
+  }
+
   class Engine::Impl : public Sound::BackendCallback
   {
   public:
@@ -205,10 +235,7 @@ namespace Lhuna
       : Params(MakePtr<SynchronizedContainer>())
       , Service(ZXTune::Service::Create(Params))
     {
-      // ALSA backend has explicit latency (PulseAudio simple API buffers up to 2s by default), so oscilloscope is
-      // synchronized with output exactly. Other systems' backends follow.
-      Params->SetValue(Parameters::ZXTune::Sound::Backends::ORDER,
-                       StringView("alsa;win32;dsound;sdl;paudio;openal;oss"));
+      Params->SetValue(Parameters::ZXTune::Sound::Backends::ORDER, StringView(DEFAULT_BACKENDS_ORDER));
       Params->SetValue(Parameters::ZXTune::Sound::LOOPED, Parameters::IntType(0));
       Sounds = Sound::CreateSystemService(Params);
     }
@@ -243,7 +270,7 @@ namespace Lhuna
       {
         if (error)
         {
-          *error = e.ToString();
+          *error = Describe(e);
         }
       }
       return std::move(callback.Tracks);
@@ -273,7 +300,7 @@ namespace Lhuna
           }
           catch (const Error& e)
           {
-            errors += e.ToString();
+            errors += (errors.empty() ? "" : "; ") + Describe(e);
           }
         }
         if (!Backend)
@@ -293,7 +320,7 @@ namespace Lhuna
         Backend.reset();
         if (error)
         {
-          *error = e.ToString();
+          *error = Describe(e);
         }
         return false;
       }
@@ -389,6 +416,106 @@ namespace Lhuna
       return Backend ? Backend->GetScope() : Sound::Scope::Ptr();
     }
 
+    Sound::Analyzer::Ptr GetAnalyzer() const
+    {
+      return Backend ? Backend->GetAnalyzer() : Sound::Analyzer::Ptr();
+    }
+
+    uint32_t EstimatedLatencyMs() const
+    {
+      using namespace Parameters::ZXTune::Sound::Backends;
+      auto id = BackendName.empty() ? PreferredBackend : BackendName;
+      if (id.empty())
+      {
+        const auto available = Sounds->GetAvailableBackends();
+        if (!available.empty())
+        {
+          id = String(available.front());
+        }
+      }
+      // device buffer is filled by blocking writes, so the heard sample is the whole buffer behind
+      if (id == Sound::Alsa::BACKEND_ID)
+      {
+        return static_cast<uint32_t>(Parameters::GetInteger(*Params, Alsa::LATENCY, Alsa::LATENCY_DEFAULT));
+      }
+      else if (id == Sound::DirectSound::BACKEND_ID)
+      {
+        return static_cast<uint32_t>(
+            Parameters::GetInteger(*Params, DirectSound::LATENCY, DirectSound::LATENCY_DEFAULT));
+      }
+      else if (id == Sound::Win32::BACKEND_ID)
+      {
+        return QueuedChunksLatency(*Params, Win32::BUFFERS, Win32::BUFFERS_DEFAULT);
+      }
+      else if (id == "sdl")
+      {
+        return QueuedChunksLatency(*Params, Sdl::BUFFERS, Sdl::BUFFERS_DEFAULT);
+      }
+      else if (id == "openal")
+      {
+        return QueuedChunksLatency(*Params, OpenAl::BUFFERS, OpenAl::BUFFERS_DEFAULT);
+      }
+      return 0;
+    }
+
+    std::vector<OutputBackend> Backends() const
+    {
+      std::vector<OutputBackend> result;
+      for (const auto& info : Sounds->EnumerateBackends())
+      {
+        if ((info->Capabilities() & Sound::CAP_TYPE_MASK) != Sound::CAP_TYPE_SYSTEM)
+        {
+          continue;
+        }
+        OutputBackend backend;
+        backend.Id = String(info->Id());
+        backend.Description = info->Description();
+        if (const auto status = info->Status())
+        {
+          backend.Status = status.GetText();
+        }
+        else
+        {
+          backend.Available = true;
+        }
+        result.push_back(std::move(backend));
+      }
+      return result;
+    }
+
+    void SetOutput(const std::string& backend, const std::string& device)
+    {
+      using namespace Parameters::ZXTune::Sound::Backends;
+      PreferredBackend = backend;
+      const auto order = backend.empty() ? DEFAULT_BACKENDS_ORDER : backend + ";" + DEFAULT_BACKENDS_ORDER;
+      Params->SetValue(ORDER, StringView(order));
+      // device of other backends is reset, so automatic fallback uses defaults
+      Params->RemoveValue(Alsa::DEVICE);
+      Params->RemoveValue(DirectSound::DEVICE);
+      Params->RemoveValue(Win32::DEVICE);
+      if (device.empty())
+      {
+        return;
+      }
+      if (backend == Sound::Alsa::BACKEND_ID)
+      {
+        Params->SetValue(Alsa::DEVICE, StringView(device));
+      }
+      else if (backend == Sound::DirectSound::BACKEND_ID)
+      {
+        Params->SetValue(DirectSound::DEVICE, StringView(device));
+      }
+      else if (backend == Sound::Win32::BACKEND_ID)
+      {
+        try
+        {
+          Params->SetValue(Win32::DEVICE, Parameters::IntType(std::stoi(device)));
+        }
+        catch (const std::exception&)
+        {}
+      }
+    }
+
     // Sound::BackendCallback, called from playback thread
     void OnStart() override {}
     void OnFrame(const Module::State& /*state*/) override {}
@@ -410,6 +537,7 @@ namespace Lhuna
     Sound::Service::Ptr Sounds;
     Sound::Backend::Ptr Backend;
     std::string BackendName;
+    std::string PreferredBackend;
     TrackInfo CurrentTrack;
     std::atomic<bool> Finished = false;
     uint32_t LatencyMs = 0;
@@ -492,5 +620,101 @@ namespace Lhuna
   Sound::Scope::Ptr Engine::Scope() const
   {
     return Delegate->GetScope();
+  }
+
+  Sound::Analyzer::Ptr Engine::Analyzer() const
+  {
+    return Delegate->GetAnalyzer();
+  }
+
+  uint32_t Engine::EstimatedLatencyMs() const
+  {
+    return Delegate->EstimatedLatencyMs();
+  }
+
+  std::vector<OutputBackend> Engine::Backends() const
+  {
+    return Delegate->Backends();
+  }
+
+  std::vector<OutputDevice> Engine::Devices(const std::string& backend)
+  {
+    std::vector<OutputDevice> result;
+    try
+    {
+      if (backend == Sound::Alsa::BACKEND_ID)
+      {
+        for (auto it = Sound::Alsa::EnumerateDevices(); it->IsValid(); it->Next())
+        {
+          const auto dev = it->Get();
+          result.push_back({dev->Id(), dev->CardName() + " - " + dev->Name()});
+        }
+      }
+      else if (backend == Sound::DirectSound::BACKEND_ID)
+      {
+        for (auto it = Sound::DirectSound::EnumerateDevices(); it->IsValid(); it->Next())
+        {
+          const auto dev = it->Get();
+          result.push_back({dev->Id(), dev->Name()});
+        }
+      }
+      else if (backend == Sound::Win32::BACKEND_ID)
+      {
+        for (auto it = Sound::Win32::EnumerateDevices(); it->IsValid(); it->Next())
+        {
+          const auto dev = it->Get();
+          result.push_back({std::to_string(dev->Id()), dev->Name()});
+        }
+      }
+    }
+    catch (const Error&)
+    {
+      // e.g. no system library, the default device only
+    }
+    return result;
+  }
+
+  void Engine::SetOutput(const std::string& backend, const std::string& device)
+  {
+    Delegate->SetOutput(backend, device);
+  }
+
+  std::vector<PluginInfo> Engine::Plugins()
+  {
+    class Collector : public ZXTune::PluginVisitor
+    {
+    public:
+      void Visit(const ZXTune::Plugin& plugin) override
+      {
+        const auto category = plugin.Capabilities() & ZXTune::Capabilities::Category::MASK;
+        Result.push_back(
+            {String(plugin.Id()), String(plugin.Description()), category == ZXTune::Capabilities::Category::CONTAINER});
+      }
+
+      std::vector<PluginInfo> Result;
+    };
+    static const auto INSTANCE = [] {
+      Collector collector;
+      ZXTune::EnumeratePlugins(collector);
+      return std::move(collector.Result);
+    }();
+    return INSTANCE;
+  }
+
+  std::string Engine::FormatName(const std::string& type)
+  {
+    static const auto INSTANCE = [] {
+      std::map<std::string, std::string> result;
+      for (const auto& plugin : Plugins())
+      {
+        if (!plugin.Container)
+        {
+          result.emplace(plugin.Id, plugin.Description);
+        }
+      }
+      return result;
+    }();
+    const auto it = INSTANCE.find(type);
+    return it != INSTANCE.end() ? it->second : std::string();
   }
 }  // namespace Lhuna

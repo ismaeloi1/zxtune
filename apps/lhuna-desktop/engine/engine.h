@@ -11,6 +11,7 @@
 #pragma once
 
 #include "parameters/container.h"
+#include "sound/analyzer.h"
 #include "sound/scope.h"
 
 #include <cstdint>
@@ -36,6 +37,31 @@ namespace Lhuna
 
     //! Title if any, else filename with subpath
     std::string DisplayName() const;
+  };
+
+  //! Sound output subsystem (core sound backend)
+  struct OutputBackend
+  {
+    std::string Id;
+    std::string Description;
+    //! false if system libraries are missing or failed to initialize
+    bool Available = false;
+    std::string Status;
+  };
+
+  //! Output device of backend, empty id is system default
+  struct OutputDevice
+  {
+    std::string Id;
+    std::string Name;
+  };
+
+  //! Core plugin (format or container support)
+  struct PluginInfo
+  {
+    std::string Id;
+    std::string Description;
+    bool Container = false;
   };
 
   enum class PlaybackState
@@ -78,9 +104,27 @@ namespace Lhuna
     std::string BackendId() const;
     //! Delay of output device buffers, compensated by oscilloscope
     void SetLatencyCompensation(uint32_t ms);
+    //! Output buffering delay estimated by current (or preferred if stopped) backend options, 0 if unknown (e.g.
+    //! PulseAudio simple API does not report its buffers)
+    uint32_t EstimatedLatencyMs() const;
+
+    //! Playback backends of the platform (stubs and file writers are not listed)
+    std::vector<OutputBackend> Backends() const;
+    //! @return devices supported by backend, empty if device can't be selected
+    static std::vector<OutputDevice> Devices(const std::string& backend);
+    //! Applied on next Play call
+    //! @param backend preferred backend id, empty for automatic choice
+    //! @param device device id of preferred backend, empty for default
+    void SetOutput(const std::string& backend, const std::string& device);
 
     //! Oscilloscope data of playing track, null if not playing
     Sound::Scope::Ptr Scope() const;
+    //! Spectrum of playing track, null if not playing
+    Sound::Analyzer::Ptr Analyzer() const;
+
+    static std::vector<PluginInfo> Plugins();
+    //! @return format description by module type (plugin id), e.g. "ProTracker v3.x"
+    static std::string FormatName(const std::string& type);
 
   private:
     class Impl;
