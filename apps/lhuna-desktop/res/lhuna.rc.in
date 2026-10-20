@@ -1,0 +1,2 @@
+// Executable icon shown by Explorer and taskbar, window icon is set by Qt from resources
+IDI_ICON1 ICON "@LHUNA_ICO@"

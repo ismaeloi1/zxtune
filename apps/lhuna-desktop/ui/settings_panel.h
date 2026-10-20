@@ -10,10 +10,9 @@
 
 #pragma once
 
-#include <QtWidgets/QWidget>
+#include "apps/lhuna-desktop/ui/filter_curve_view.h"
 
-#include <functional>
-#include <map>
+#include <QtWidgets/QWidget>
 
 class QButtonGroup;
 class QHBoxLayout;
@@ -33,7 +32,7 @@ namespace Lhuna
   {
     Q_OBJECT
   public:
-    SettingsPanel(Settings& settings, QWidget* parent);
+    SettingsPanel(Settings& settings, FilterCurveView::LiveSource live, QWidget* parent);
 
     //! @param chips ids of playing tune's chips (see Visualization::EmulationContext)
     //! @param names human readable names of chips
@@ -45,16 +44,12 @@ namespace Lhuna
 
   private:
     void AddPage(const QString& title, QWidget* content);
-    QWidget* MakePage(const OptionsPage& page);
-    QWidget* MakeTriggerPage(const OptionsPage& page);
-    void Refresh();
 
   private:
     Settings& Options;
+    const FilterCurveView::LiveSource Live;
     QHBoxLayout* Tabs = nullptr;
     QButtonGroup* TabsGroup = nullptr;
     QStackedWidget* Pages = nullptr;
-    //! updaters of controls by option key, to reflect changes made elsewhere (e.g. presets)
-    std::multimap<QString, std::function<void()>> Updaters;
   };
 }  // namespace Lhuna
