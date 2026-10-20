@@ -204,7 +204,7 @@ namespace Lhuna
     auto* visualLayout = new QVBoxLayout(Visualizer);
     visualLayout->setContentsMargins(0, 6, 0, 0);
     visualLayout->setSpacing(2);
-    visualLayout->addWidget(new ScopeView(*Feed, *Options, Visualizer), 5);
+    visualLayout->addWidget(CreateScopeView(*Feed, *Options, Visualizer), 5);
     visualLayout->addWidget(new DashboardView(*Feed, Visualizer), 4);
     layout->addWidget(Visualizer, 1);
     Panel = new SettingsPanel(*Options, Visualizer);
