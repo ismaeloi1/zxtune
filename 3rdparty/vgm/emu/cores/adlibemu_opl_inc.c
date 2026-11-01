@@ -2074,7 +2074,7 @@ static void fill_fm_fields(const OPL_DATA* OPL, DEV_VOICE_STATE* state, UINT32 c
 		state->fields[DEVVOICE_FM_EG + op] = level_field(opers[op]->op_state != OF_TYPE_OFF ? opers[op]->amp : 0.0);
 	}
 	state->fields[DEVVOICE_FM_FNUM] = (UINT8)(fnum & 0xff);
-	state->fields[DEVVOICE_FM_FNUM + 1] = (UINT8)(fnum >> 8);
+	state->fields[DEVVOICE_FM_FNUM + 1] = (UINT8)((fnum >> 8) | (((OPL->adlibreg[ARC_KON_BNUM + k] >> 2) & 7) << 4));
 #if defined(OPLTYPE_IS_OPL3)
 	if (OPL->adlibreg[0x105] & 1)
 		global |= 0x08;

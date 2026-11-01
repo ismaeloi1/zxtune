@@ -131,7 +131,7 @@ typedef void (*DEVFUNC_SET_VOICES_CB)(void* info, DEVCB_VOICES cb, void* param);
 #define DEVVOICE_FM_OPF_KSR		0x40	// OPL key scale rate
 // envelope generator output of operators (without TL), 0..255 as levels
 #define DEVVOICE_FM_EG			48
-#define DEVVOICE_FM_FNUM		52	// 2 bytes: OPN 11 bits, OPL 10 bits frequency number; OPM key code and key fraction
+#define DEVVOICE_FM_FNUM		52	// 2 bytes: OPN 11 bits, OPL 10 bits frequency number (block at bits 12..14); OPM key code and key fraction
 #define DEVVOICE_FM_GLOBAL		54	// OPN: LFO frequency 0..7 | LFO on 0x08 | CH3 mode (1 special, 2 CSM) << 4 | DAC on 0x40;
 									// OPL: rhythm 0x01 | AM depth 0x02 | VIB depth 0x04 | OPL3 0x08 | CSM 0x10 | NTS 0x20 | WSE 0x40
 									// OPM: LFO waveform 0..3 | noise on 0x04

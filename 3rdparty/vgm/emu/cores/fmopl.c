@@ -2509,7 +2509,7 @@ static void opl_fill_fm_fields(const FM_OPL *OPL, UINT32 ch, DEV_VOICE_STATE* st
 		state->fields[DEVVOICE_FM_EG + op] = opl_level_field(SLOT->state == EG_OFF ? MAX_ATT_INDEX : SLOT->volume);
 	}
 	state->fields[DEVVOICE_FM_FNUM] = regs[0xa0 + ch];
-	state->fields[DEVVOICE_FM_FNUM + 1] = regs[0xb0 + ch] & 3;
+	state->fields[DEVVOICE_FM_FNUM + 1] = (regs[0xb0 + ch] & 3) | (((regs[0xb0 + ch] >> 2) & 7) << 4);
 	state->fields[DEVVOICE_FM_GLOBAL] = ((regs[0xbd] & 0x20) ? 0x01 : 0) | ((regs[0xbd] & 0x80) ? 0x02 : 0)
 		| ((regs[0xbd] & 0x40) ? 0x04 : 0) | ((regs[0x08] & 0x80) ? 0x10 : 0) | ((regs[0x08] & 0x40) ? 0x20 : 0)
 		| ((OPL->type & OPL_TYPE_WAVESEL) && OPL->wavesel ? 0x40 : 0);

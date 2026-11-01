@@ -79,7 +79,8 @@ namespace Module
     //!   OPN/OPM SR (D2R) | KS << 5 or OPL KSL, SL | RR << 4, envelope stage (0 off, 1 attack, 2 decay, 3 sustain,
     //!   4 release) | FM_OPF_* flags, OPN detune | SSG-EG << 3 or OPM DT1 | DT2 << 3 or OPL waveform
     //! - FM_EG: 4 bytes of operators envelope output without TL (0..255 as levels)
-    //! - FM_FNUM: 2 bytes of frequency number (OPN 11 bits, OPL 10 bits) or OPM key code and key fraction
+    //! - FM_FNUM: 2 bytes of frequency number (OPN 11 bits, OPL 10 bits and block at bits 12..14) or OPM key code
+    //!   and key fraction
     //! - FM_GLOBAL: chip state, OPN: LFO frequency 0..7 | LFO on 0x08 | CH3 mode (1 special, 2 CSM) << 4 |
     //!   DAC on 0x40; OPL: rhythm 0x01 | AM depth 0x02 | VIB depth 0x04 | OPL3 0x08 | CSM 0x10 | NTS 0x20 |
     //!   WSE 0x40; OPM: LFO waveform 0..3 | noise on 0x04
