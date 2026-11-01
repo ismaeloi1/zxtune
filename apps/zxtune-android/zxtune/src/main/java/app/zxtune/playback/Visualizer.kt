@@ -258,9 +258,9 @@ class VoiceGauges(private val data: ByteArray, private val offset: Int) : Gauges
         // see Sound::Scope::VOICE_GAUGES_SIZE
         const val GAUGES = 3
         const val COLUMNS = 256
-        private const val FIELDS = 12
+        const val FIELDS = 64
         private const val TEXT = 16
-        const val SIZE = GAUGES * COLUMNS * 2 + 48
+        const val SIZE = GAUGES * COLUMNS * 2 + 96
 
         const val WAVE = 0
         const val LEVEL = 1

@@ -113,13 +113,52 @@ typedef void (*DEVFUNC_SET_VOICES_CB)(void* info, DEVCB_VOICES cb, void* param);
 #define DEVVOICE_KIND_OPL_4OP		0x06	// algorithm 0..3, feedback, op1..4 levels, op1..4 waveforms, key, pan
 #define DEVVOICE_KIND_OPL_RHYTHM	0x07	// instrument (0 BD, 1 SD, 2 TT, 3 CY, 4 HH), level, key, enabled
 
+// FM kinds (OPN_FM, OPL_2OP, OPL_4OP) extension of fields, all zero if not provided by core (see DEVVOICE_FM_CHIP)
+// operators parameters, 8 bytes per operator in the same order as levels fields (OP1..OP4)
+#define DEVVOICE_FM_OPS			16
+#define DEVVOICE_FM_OP_SIZE		8
+#define DEVVOICE_FM_OP_MUL		0	// multiplier 0..15
+#define DEVVOICE_FM_OP_TL		1	// total level (attenuation by 0.75dB), OPN/OPM 0..127, OPL 0..63
+#define DEVVOICE_FM_OP_AR		2	// attack rate, OPN/OPM 0..31, OPL 0..15
+#define DEVVOICE_FM_OP_DR		3	// decay rate (D1R), OPN/OPM 0..31, OPL 0..15
+#define DEVVOICE_FM_OP_SR		4	// OPN/OPM: sustain rate (D2R) 0..31 | key scale 0..3 << 5; OPL: KSL 0..3
+#define DEVVOICE_FM_OP_SLRR		5	// sustain level 0..15 | release rate 0..15 << 4
+#define DEVVOICE_FM_OP_FLAGS	6	// envelope stage 0..4 (off, attack, decay, sustain, release) | DEVVOICE_FM_OPF_*
+#define DEVVOICE_FM_OP_EXTRA	7	// OPN: detune 0..7 | SSG-EG 0..15 << 3; OPM: DT1 0..7 | DT2 0..3 << 3; OPL: waveform 0..7
+#define DEVVOICE_FM_OPF_AM		0x08	// LFO amplitude modulation (tremolo)
+#define DEVVOICE_FM_OPF_VIB		0x10	// OPL vibrato
+#define DEVVOICE_FM_OPF_EGT		0x20	// OPL sustained envelope (EG-TYP)
+#define DEVVOICE_FM_OPF_KSR		0x40	// OPL key scale rate
+// envelope generator output of operators (without TL), 0..255 as levels
+#define DEVVOICE_FM_EG			48
+#define DEVVOICE_FM_FNUM		52	// 2 bytes: OPN 11 bits, OPL 10 bits frequency number; OPM key code and key fraction
+#define DEVVOICE_FM_GLOBAL		54	// OPN: LFO frequency 0..7 | LFO on 0x08 | CH3 mode (1 special, 2 CSM) << 4 | DAC on 0x40;
+									// OPL: rhythm 0x01 | AM depth 0x02 | VIB depth 0x04 | OPL3 0x08 | CSM 0x10 | NTS 0x20 | WSE 0x40
+									// OPM: LFO waveform 0..3 | noise on 0x04
+#define DEVVOICE_FM_GLOBAL2		55	// OPM: LFO frequency; OPL3: 4 operators connections (0x104)
+#define DEVVOICE_FM_AMD			56	// OPM: AM depth 0..127
+#define DEVVOICE_FM_PMD			57	// OPM: PM depth 0..127
+#define DEVVOICE_FM_NOISE		58	// OPM: noise frequency 0..31
+#define DEVVOICE_FM_CHIP		59	// see DEVVOICE_FM_CHIP_*
+#define DEVVOICE_FM_EG_RATE		60	// 2 bytes: envelope generator clock in Hz
+#define DEVVOICE_FM_TIMER_A		62	// 2 bytes: timer A value (CSM key on rate)
+#define DEVVOICE_FM_CHIP_NONE	0
+#define DEVVOICE_FM_CHIP_OPN	1	// YM2203
+#define DEVVOICE_FM_CHIP_OPN2	2	// YM2612/YM3438
+#define DEVVOICE_FM_CHIP_OPNA	3	// YM2608
+#define DEVVOICE_FM_CHIP_OPNB	4	// YM2610/YM2610B
+#define DEVVOICE_FM_CHIP_OPM	5	// YM2151
+#define DEVVOICE_FM_CHIP_OPL	6	// YM3526/Y8950
+#define DEVVOICE_FM_CHIP_OPL2	7	// YM3812
+#define DEVVOICE_FM_CHIP_OPL3	8	// YMF262
+
 typedef struct _device_voice_state
 {
 	float freq;		// Hz
 	float level;	// dB relative to maximal channel volume (0 or negative)
 	UINT8 flags;	// see DEVVOICE_ constants
 	UINT8 kind;		// see DEVVOICE_KIND_ constants
-	UINT8 fields[12];	// operator levels are 0..255, 255 is maximal
+	UINT8 fields[64];	// operator levels are 0..255, 255 is maximal
 } DEV_VOICE_STATE;
 // fill state of up to count channels, returns channels count
 typedef UINT32 (*DEVFUNC_GET_VOICES_STATE)(void* info, UINT32 count, DEV_VOICE_STATE* states);

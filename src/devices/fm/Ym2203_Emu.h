@@ -1,3 +1,5 @@
+#include "devices/fm.h"
+
 #include "types.h"
 
 /* -------------------- YM2203(OPN) Interface -------------------- */
@@ -43,3 +45,8 @@ void YM2203SetClock(void *chip, uint64_t baseclock, int rate);
 void YM2203SetMuteMask(void *chip, uint_t mask);
 
 void YM2203GetState(void *chip, uint_t *attenuations, uint_t *periods);
+
+/*
+** operators parameters and envelopes of 3 channels for visualization
+*/
+void YM2203GetChannelsState(void *chip, Devices::FM::ChannelState* channels);

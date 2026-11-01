@@ -102,6 +102,7 @@ namespace Devices::TFM
         std::array<uint_t, FM::VOICES> attenuations = {};
         std::array<uint_t, FM::VOICES> periods = {};
         ::YM2203GetState(Chips[chip].get(), attenuations.data(), periods.data());
+        ::YM2203GetChannelsState(Chips[chip].get(), target + chip * FM::VOICES);
         for (uint_t chan = 0; chan < FM::VOICES; ++chan)
         {
           auto& out = target[chip * FM::VOICES + chan];

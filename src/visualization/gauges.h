@@ -205,7 +205,7 @@ namespace Visualization
     // see Sound::Scope::VOICE_GAUGES_SIZE
     static const int GAUGES = 3;
     static const int COLUMNS = 256;
-    static const int SIZE = GAUGES * COLUMNS * 2 + 48;
+    static const int SIZE = GAUGES * COLUMNS * 2 + 96;
 
     static const int WAVE = 0;
     static const int LEVEL = 1;
@@ -284,7 +284,7 @@ namespace Visualization
 
   private:
     static const int STATE = GAUGES * COLUMNS * 2;
-    static const int FIELDS = 12;
+    static const int FIELDS = 64;
     static const int TEXT = 16;
 
     int Flags() const

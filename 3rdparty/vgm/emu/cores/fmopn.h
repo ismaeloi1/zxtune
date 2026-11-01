@@ -166,6 +166,8 @@ void ym2608_write_pcmromb(void* chip, UINT32 offset, UINT32 length, const UINT8*
 
 void ym2608_set_mute_mask(void *chip, UINT32 MuteMask);
 void ym2608_set_log_cb(void* chip, DEVCB_LOG func, void* param);
+void ym2608_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+UINT32 ym2608_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 #endif /* BUILD_YM2608 */
 
 #if (BUILD_YM2610||BUILD_YM2610B)
@@ -191,6 +193,8 @@ void ym2610_write_pcmromb(void* chip, UINT32 offset, UINT32 length, const UINT8*
 
 void ym2610_set_mute_mask(void *chip, UINT32 MuteMask);
 void ym2610_set_log_cb(void* chip, DEVCB_LOG func, void* param);
+void ym2610_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+UINT32 ym2610_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 #endif /* (BUILD_YM2610||BUILD_YM2610B) */
 
 #if (BUILD_YM2612||BUILD_YM3438)

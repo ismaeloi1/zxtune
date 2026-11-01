@@ -2367,6 +2367,95 @@ static float fm_carriers_level(const FM_CH* CH, UINT8* keyOn)
 	return -(float)(minAtt * (96.0 / ENV_LEN));
 }
 
+/* DEVVOICE_FM_* fields of channel (chan is 0..2 in port) from registers of its port and chip-wide state from port 0 */
+static void fm_fill_voice_fields(DEV_VOICE_STATE* state, const FM_OPN* OPN, const FM_CH* CH, const UINT8* port,
+	const UINT8* port0, UINT8 chan, UINT8 chip)
+{
+	/* operators registers offsets in OP1..OP4 order (SLOT1 SLOT3 SLOT2 SLOT4 is registers order) */
+	static const UINT8 OP_REGS[4] = {0x00, 0x08, 0x04, 0x0c};
+	/* EG_OFF, EG_REL, EG_SUS, EG_DEC, EG_ATT to DEVVOICE stages */
+	static const UINT8 STAGES[5] = {0, 4, 3, 2, 1};
+	const UINT32 fnum = CH->block_fnum & 0x7ff;
+	const UINT32 egRate = (UINT32)(OPN->ST.rate * OPN->ST.freqbase / 3.0 + 0.5);
+	UINT8 op;
+
+	for (op = 0; op < 4; op ++)
+	{
+		const FM_SLOT* slot = &CH->SLOT[FM_SLOTS[op]];
+		const UINT8 r = chan + OP_REGS[op];
+		UINT8* out = &state->fields[DEVVOICE_FM_OPS + op * DEVVOICE_FM_OP_SIZE];
+		INT32 eg = slot->volume;
+
+		out[DEVVOICE_FM_OP_MUL] = port[0x30 + r] & 0x0f;
+		out[DEVVOICE_FM_OP_TL] = port[0x40 + r] & 0x7f;
+		out[DEVVOICE_FM_OP_AR] = port[0x50 + r] & 0x1f;
+		out[DEVVOICE_FM_OP_DR] = port[0x60 + r] & 0x1f;
+		out[DEVVOICE_FM_OP_SR] = (port[0x70 + r] & 0x1f) | ((port[0x50 + r] >> 6) << 5);
+		out[DEVVOICE_FM_OP_SLRR] = (port[0x80 + r] >> 4) | ((port[0x80 + r] & 0x0f) << 4);
+		out[DEVVOICE_FM_OP_FLAGS] = (slot->state <= EG_ATT ? STAGES[slot->state] : 0)
+			| ((port[0x60 + r] & 0x80) && (OPN->type & TYPE_LFOPAN) ? DEVVOICE_FM_OPF_AM : 0);
+		out[DEVVOICE_FM_OP_EXTRA] = ((port[0x30 + r] >> 4) & 7) | ((port[0x90 + r] & 0x0f) << 3);
+		if (eg < 0)
+			eg = 0;
+		if (eg > MAX_ATT_INDEX)
+			eg = MAX_ATT_INDEX;
+		state->fields[DEVVOICE_FM_EG + op] = (UINT8)(255 - eg * 255 / MAX_ATT_INDEX);
+	}
+	state->fields[DEVVOICE_FM_FNUM] = (UINT8)(fnum & 0xff);
+	state->fields[DEVVOICE_FM_FNUM + 1] = (UINT8)(fnum >> 8);
+	state->fields[DEVVOICE_FM_GLOBAL] = (UINT8)(((OPN->type & TYPE_LFOPAN) ? port0[0x22] & 0x0f : 0)
+		| ((OPN->ST.mode & 0xc0) == 0x40 ? 0x10 : 0) | ((OPN->ST.mode & 0xc0) == 0x80 ? 0x20 : 0));
+	state->fields[DEVVOICE_FM_CHIP] = chip;
+	state->fields[DEVVOICE_FM_EG_RATE] = (UINT8)(egRate & 0xff);
+	state->fields[DEVVOICE_FM_EG_RATE + 1] = (UINT8)(egRate >> 8);
+	state->fields[DEVVOICE_FM_TIMER_A] = (UINT8)(OPN->ST.TA & 0xff);
+	state->fields[DEVVOICE_FM_TIMER_A + 1] = (UINT8)((OPN->ST.TA >> 8) & 3);
+}
+
+/* state of OPN channel with registers at port (chan is 0..2 in port), common for all chips */
+static void fm_fill_voice_state(DEV_VOICE_STATE* state, const FM_OPN* OPN, const FM_CH* CH, const UINT8* port,
+	const UINT8* port0, UINT8 chan, UINT8 chip)
+{
+	/* fnote = fnum * rate * 2^(block-1) / 2^20, rate is FM sample rate as prescaler gives it */
+	const double rate = OPN->ST.freqbase * OPN->ST.rate;
+	const UINT32 fnum = CH->block_fnum & 0x7ff;
+	const UINT32 block = (CH->block_fnum >> 11) & 7;
+	const UINT8 algFb = port[0xb0 + chan];
+	const UINT8 panLfo = port[0xb4 + chan];
+	UINT8 keyOn;
+	UINT8 op;
+
+	state->level = fm_carriers_level(CH, &keyOn);
+	state->freq = (float)(fnum * rate * (1 << block) / (double)(1 << 21));
+	state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
+	state->kind = DEVVOICE_KIND_OPN_FM;
+	memset(state->fields, 0, sizeof(state->fields));
+	state->fields[0] = algFb & 7;
+	state->fields[1] = (algFb >> 3) & 7;
+	state->fields[6] = FM_CARRIERS[algFb & 7];
+	if (OPN->type & TYPE_LFOPAN)
+	{
+		state->fields[7] = panLfo >> 6;
+		state->fields[8] = (panLfo >> 4) & 3;
+		state->fields[9] = panLfo & 7;
+	}
+	else
+	{
+		/* mono chip */
+		state->fields[7] = 3;
+	}
+	for (op = 0; op < 4; op ++)
+	{
+		const FM_SLOT* slot = &CH->SLOT[FM_SLOTS[op]];
+		const UINT32 att = slot->vol_out < MAX_ATT_INDEX ? slot->vol_out : MAX_ATT_INDEX;
+		state->fields[2 + op] = (UINT8)(255 - att * 255 / MAX_ATT_INDEX);
+		if (slot->key)
+			state->fields[10] |= 1 << op;
+	}
+	state->fields[11] = (UINT8)block;
+	fm_fill_voice_fields(state, OPN, CH, port, port0, chan, chip);
+}
+
 
 #if BUILD_YM2203
 /*****************************************************************************/
@@ -2706,40 +2795,11 @@ void ym2203_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
 UINT32 ym2203_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
 {
 	YM2203* F2203 = (YM2203 *)chip;
-	/* sample rate as prescaler gives it, fnote = fnum * rate * 2^(block-1) / 2^20 */
-	const double rate = F2203->OPN.ST.freqbase * F2203->OPN.ST.rate;
 	UINT32 ch;
 
 	for (ch = 0; ch < 3 && ch < count; ch ++)
-	{
-		const FM_CH* CH = &F2203->CH[ch];
-		const UINT32 fnum = CH->block_fnum & 0x7ff;
-		const UINT32 block = (CH->block_fnum >> 11) & 7;
-		const UINT8 algFb = F2203->REGS[0xb0 + ch];
-		DEV_VOICE_STATE* state = &states[ch];
-		UINT8 keyOn;
-		UINT8 op;
-
-		state->level = fm_carriers_level(CH, &keyOn);
-		state->freq = (float)(fnum * rate * (1 << block) / (double)(1 << 21));
-		state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
-		state->kind = DEVVOICE_KIND_OPN_FM;
-		memset(state->fields, 0, sizeof(state->fields));
-		state->fields[0] = algFb & 7;
-		state->fields[1] = (algFb >> 3) & 7;
-		state->fields[6] = FM_CARRIERS[algFb & 7];
-		/* mono chip */
-		state->fields[7] = 3;
-		for (op = 0; op < 4; op ++)
-		{
-			const FM_SLOT* slot = &CH->SLOT[FM_SLOTS[op]];
-			const UINT32 att = slot->vol_out < MAX_ATT_INDEX ? slot->vol_out : MAX_ATT_INDEX;
-			state->fields[2 + op] = (UINT8)(255 - att * 255 / MAX_ATT_INDEX);
-			if (slot->key)
-				state->fields[10] |= 1 << op;
-		}
-		state->fields[11] = (UINT8)block;
-	}
+		fm_fill_voice_state(&states[ch], &F2203->OPN, &F2203->CH[ch], F2203->REGS, F2203->REGS, (UINT8)ch,
+			DEVVOICE_FM_CHIP_OPN);
 	return 3;
 }
 
@@ -2809,6 +2869,9 @@ typedef struct
 
 	UINT8       flagmask;           /* YM2608 only */
 	UINT8       irqmask;            /* YM2608 only */
+
+	DEVCB_VOICES voicesCb;
+	void*       voicesParam;
 } YM2610;
 
 /* here is the virtual YM2608 */
@@ -3041,6 +3104,61 @@ static void FM_ADPCMAWrite(YM2610 *F2610,int r,int v)
 	}
 }
 
+
+/* separate outputs of FM 1..6, ADPCM-A 1..6 and ADPCM-B (channels order of device) in output mixing proportions */
+static void ym2610_feed_voices(YM2610 *F2610, UINT8 fmMask)
+{
+	const FM_OPN *OPN = &F2610->OPN;
+	const YM_DELTAT *DELTAT = &F2610->deltaT;
+	INT32 voices[13];
+	UINT8 j;
+
+	for (j = 0; j < 6; j ++)
+	{
+		voices[j] = (fmMask & (1 << j)) ? OPN->out_fm[j] << 1 : 0;
+		voices[6 + j] = F2610->adpcm[j].flag ? F2610->adpcm[j].adpcm_out << 2 : 0;
+	}
+	voices[12] = (DELTAT->portstate & 0x80) && ! F2610->MuteDeltaT ? DELTAT->adpcml >> 7 : 0;
+	F2610->voicesCb(F2610->voicesParam, 13, voices);
+}
+
+void ym2610_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	YM2610 *F2610 = (YM2610 *)chip;
+	F2610->voicesCb = cb;
+	F2610->voicesParam = param;
+}
+
+/* FM channels states, ADPCM ones are audio only */
+static UINT32 ym2610_fill_voices_state(YM2610 *F2610, UINT32 count, DEV_VOICE_STATE* states, UINT8 chip)
+{
+	UINT32 ch;
+
+	for (ch = 0; ch < 13 && ch < count; ch ++)
+	{
+		if (ch < 6)
+		{
+			fm_fill_voice_state(&states[ch], &F2610->OPN, &F2610->CH[ch], F2610->REGS + (ch < 3 ? 0 : 0x100),
+				F2610->REGS, (UINT8)(ch % 3), chip);
+		}
+		else
+		{
+			memset(&states[ch], 0, sizeof(states[ch]));
+		}
+	}
+	return 13;
+}
+
+UINT32 ym2608_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	return ym2610_fill_voices_state((YM2610 *)chip, count, states, DEVVOICE_FM_CHIP_OPNA);
+}
+
+UINT32 ym2610_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	return ym2610_fill_voices_state((YM2610 *)chip, count, states, DEVVOICE_FM_CHIP_OPNB);
+}
+
 #endif /* (BUILD_YM2608||BUILD_YM2610||BUILD_YM2610B) */
 
 
@@ -3243,6 +3361,9 @@ void ym2608_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 			bufL[i] = lt;
 			bufR[i] = rt;
 		}
+
+		if (F2608->voicesCb)
+			ym2610_feed_voices(F2608, 0x3f);
 
 		/* CSM mode: if CSM Key ON has occured, CSM Key OFF need to be sent       */
 		/* only if Timer A does not overflow again (i.e CSM Key ON not set again) */
@@ -3833,6 +3954,9 @@ void ym2610_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 			bufR[i] = rt;
 		}
 
+		if (F2610->voicesCb)
+			ym2610_feed_voices(F2610, 0x36);
+
 		/* CSM mode: if CSM Key ON has occured, CSM Key OFF need to be sent       */
 		/* only if Timer A does not overflow again (i.e CSM Key ON not set again) */
 		OPN->SL3.key_csm <<= 1;
@@ -4010,6 +4134,9 @@ void ym2610b_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 			bufL[i] = lt;
 			bufR[i] = rt;
 		}
+
+		if (F2610->voicesCb)
+			ym2610_feed_voices(F2610, 0x3f);
 
 		/* CSM mode: if CSM Key ON has occured, CSM Key OFF need to be sent       */
 		/* only if Timer A does not overflow again (i.e CSM Key ON not set again) */
@@ -4898,43 +5025,16 @@ void ym2612_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
 UINT32 ym2612_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
 {
 	YM2612* F2612 = (YM2612 *)chip;
-	const double clock = F2612->OPN.ST.clock;
 	UINT32 ch;
 
 	for (ch = 0; ch < 6 && ch < count; ch ++)
 	{
-		const FM_CH* CH = &F2612->CH[ch];
-		const UINT32 fnum = CH->block_fnum & 0x7ff;
-		const UINT32 block = (CH->block_fnum >> 11) & 7;
 		DEV_VOICE_STATE* state = &states[ch];
-
-		/* raw registers, second half of channels is on port 1 */
-		const UINT8 algFb = F2612->REGS[(ch < 3 ? 0xb0 : 0x1b0 - 3) + ch];
-		const UINT8 panLfo = F2612->REGS[(ch < 3 ? 0xb4 : 0x1b4 - 3) + ch];
-		UINT8 keyOn;
-		UINT8 op;
-
-		state->level = fm_carriers_level(CH, &keyOn);
-		/* fnote = fnum * clock * 2^(block-1) / (144 * 2^20) */
-		state->freq = (float)(fnum * clock * (1 << block) / (144.0 * (1 << 21)));
-		state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
-		state->kind = DEVVOICE_KIND_OPN_FM;
-		memset(state->fields, 0, sizeof(state->fields));
-		state->fields[0] = algFb & 7;
-		state->fields[1] = (algFb >> 3) & 7;
-		state->fields[6] = FM_CARRIERS[algFb & 7];
-		state->fields[7] = panLfo >> 6;
-		state->fields[8] = (panLfo >> 4) & 3;
-		state->fields[9] = panLfo & 7;
-		for (op = 0; op < 4; op ++)
-		{
-			const FM_SLOT* slot = &CH->SLOT[FM_SLOTS[op]];
-			const UINT32 att = slot->vol_out < MAX_ATT_INDEX ? slot->vol_out : MAX_ATT_INDEX;
-			state->fields[2 + op] = (UINT8)(255 - att * 255 / MAX_ATT_INDEX);
-			if (slot->key)
-				state->fields[10] |= 1 << op;
-		}
-		state->fields[11] = (UINT8)block;
+		/* second half of channels is on port 1 */
+		fm_fill_voice_state(state, &F2612->OPN, &F2612->CH[ch], F2612->REGS + (ch < 3 ? 0 : 0x100), F2612->REGS,
+			(UINT8)(ch % 3), DEVVOICE_FM_CHIP_OPN2);
+		if (F2612->dacen)
+			state->fields[DEVVOICE_FM_GLOBAL] |= 0x40;
 		if (ch == 5 && F2612->dacen)
 		{
 			state->flags = 0;

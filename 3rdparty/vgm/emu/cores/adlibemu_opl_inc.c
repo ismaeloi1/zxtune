@@ -2031,6 +2031,65 @@ static UINT8 pan_field(const OPL_DATA* OPL, Bitu k)
 #endif
 }
 
+// registers offset of operator (0..3 in the same order as levels fields) of channel ch (0..NUM_CHANNELS-1)
+static Bitu op_regs(UINT32 ch, UINT8 op)
+{
+	const UINT32 base = ch + (op >> 1) * 3;	// 4 operators channels use the next channel's operators as OP3 and OP4
+	const UINT32 local = base % 9;
+	return (local % 3) + (local / 3) * 8 + ((op & 1) ? 3 : 0) + (base >= 9 ? ARC_SECONDSET : 0);
+}
+
+// DEVVOICE_FM_* fields, ops is operators count
+static void fill_fm_fields(const OPL_DATA* OPL, DEV_VOICE_STATE* state, UINT32 ch, const op_type* const* opers, UINT8 ops)
+{
+	// OF_TYPE_ATT, DEC, REL, SUS, SUS_NOKEEP (sustain with decay by RR), OFF to DEVVOICE stages
+	static const UINT8 STAGES[6] = {1, 2, 4, 3, 3, 0};
+	const Bitu k = ch < 9 ? ch : ch - 9 + ARC_SECONDSET;
+	const Bitu fnum = OPL->adlibreg[ARC_FREQ_NUM + k] | ((OPL->adlibreg[ARC_KON_BNUM + k] & 3) << 8);
+	const UINT8 perc = OPL->adlibreg[ARC_PERC_MODE];
+	const UINT32 egRate = (UINT32)(INTFREQU + 0.5);
+	UINT8 global = ((perc & 0x20) ? 0x01 : 0) | ((perc & 0x80) ? 0x02 : 0) | ((perc & 0x40) ? 0x04 : 0)
+		| ((OPL->adlibreg[0x08] & 0x80) ? 0x10 : 0) | ((OPL->adlibreg[0x08] & 0x40) ? 0x20 : 0);
+	UINT8 op;
+
+	for (op = 0; op < ops; op ++)
+	{
+		const Bitu r = op_regs(ch, op);
+		const UINT8 tvs = OPL->adlibreg[ARC_TVS_KSR_MUL + r];
+		const UINT8 ksl = OPL->adlibreg[ARC_KSL_OUTLEV + r];
+		const UINT8 ad = OPL->adlibreg[ARC_ATTR_DECR + r];
+		const UINT8 sr = OPL->adlibreg[ARC_SUSL_RELR + r];
+		UINT8* out = &state->fields[DEVVOICE_FM_OPS + op * DEVVOICE_FM_OP_SIZE];
+
+		out[DEVVOICE_FM_OP_MUL] = tvs & 0x0f;
+		out[DEVVOICE_FM_OP_TL] = ksl & 0x3f;
+		out[DEVVOICE_FM_OP_AR] = ad >> 4;
+		out[DEVVOICE_FM_OP_DR] = ad & 0x0f;
+		out[DEVVOICE_FM_OP_SR] = ksl >> 6;
+		out[DEVVOICE_FM_OP_SLRR] = (sr >> 4) | ((sr & 0x0f) << 4);
+		out[DEVVOICE_FM_OP_FLAGS] = (opers[op]->op_state <= OF_TYPE_OFF ? STAGES[opers[op]->op_state] : 0)
+			| ((tvs & 0x80) ? DEVVOICE_FM_OPF_AM : 0) | ((tvs & 0x40) ? DEVVOICE_FM_OPF_VIB : 0)
+			| ((tvs & 0x20) ? DEVVOICE_FM_OPF_EGT : 0) | ((tvs & 0x10) ? DEVVOICE_FM_OPF_KSR : 0);
+		out[DEVVOICE_FM_OP_EXTRA] = OPL->wave_sel[(r & 0xff) + ((r & ARC_SECONDSET) ? 22 : 0)] & 7;
+		state->fields[DEVVOICE_FM_EG + op] = level_field(opers[op]->op_state != OF_TYPE_OFF ? opers[op]->amp : 0.0);
+	}
+	state->fields[DEVVOICE_FM_FNUM] = (UINT8)(fnum & 0xff);
+	state->fields[DEVVOICE_FM_FNUM + 1] = (UINT8)(fnum >> 8);
+#if defined(OPLTYPE_IS_OPL3)
+	if (OPL->adlibreg[0x105] & 1)
+		global |= 0x08;
+	state->fields[DEVVOICE_FM_GLOBAL2] = OPL->adlibreg[0x104] & 0x3f;
+	state->fields[DEVVOICE_FM_CHIP] = DEVVOICE_FM_CHIP_OPL3;
+#else
+	if (OPL->adlibreg[0x01] & 0x20)
+		global |= 0x40;
+	state->fields[DEVVOICE_FM_CHIP] = DEVVOICE_FM_CHIP_OPL2;
+#endif
+	state->fields[DEVVOICE_FM_GLOBAL] = global;
+	state->fields[DEVVOICE_FM_EG_RATE] = (UINT8)(egRate & 0xff);
+	state->fields[DEVVOICE_FM_EG_RATE + 1] = (UINT8)(egRate >> 8);
+}
+
 UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* states)
 {
 	OPL_DATA* OPL = (OPL_DATA*)chip;
@@ -2091,6 +2150,10 @@ UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* sta
 			states[ch].fields[9] = wave_field(OPL, ch + 3, 1);
 			states[ch].fields[10] = keyOn;
 			states[ch].fields[11] = pan_field(OPL, k);
+			{
+				const op_type* opers[4] = {&cptr[0], &cptr[9], &cptr[3], &cptr[3+9]};
+				fill_fm_fields(OPL, &states[ch], ch, opers, 4);
+			}
 			continue;
 		}
 #endif
@@ -2108,6 +2171,10 @@ UINT32 ADLIBEMU(get_voices_state)(void *chip, UINT32 count, DEV_VOICE_STATE* sta
 		states[ch].fields[6] = keyOn;
 		states[ch].fields[7] = pan_field(OPL, k);
 		states[ch].fields[8] = (OPL->adlibreg[ARC_KON_BNUM + k] >> 2) & 7;
+		{
+			const op_type* opers[2] = {&cptr[0], &cptr[9]};
+			fill_fm_fields(OPL, &states[ch], ch, opers, 2);
+		}
 	}
 	if (count > NUM_CHANNELS)
 	{
