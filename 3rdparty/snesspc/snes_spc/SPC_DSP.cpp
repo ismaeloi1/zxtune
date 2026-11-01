@@ -693,6 +693,7 @@ void SPC_DSP::get_voice_state( int voice, voice_state_t* out ) const
 	out->gain = v_regs [v_gain];
 	out->echo = (m.regs [r_eon] >> voice) & 1;
 	out->pmod = (m.regs [r_pmon] >> voice) & 1;
+	out->brr_addr = v.brr_addr;
 }
 
 void SPC_DSP::mute_voices( int mask )

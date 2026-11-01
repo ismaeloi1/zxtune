@@ -72,8 +72,12 @@ public:
 		int adsr0, adsr1, gain;
 		int echo;     // voice is sent to echo
 		int pmod;     // pitch is modulated by previous voice
+		int brr_addr; // address of the current BRR block
 	};
 	void get_voice_state( int voice, voice_state_t* out ) const;
+
+	// 64K RAM shared with SMP, e.g. to inspect samples directory and BRR blocks
+	uint8_t const* ram() const { return m.ram; }
 
 // Emulation state copy (zxtune extension)
 

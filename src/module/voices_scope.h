@@ -59,6 +59,10 @@ namespace Module
       OPL_RHYTHM = 7,
       //! ENVX 0..127, envelope mode (0 release, 1 attack, 2 decay, 3 sustain, 4 gain), ADSR1, ADSR2, GAIN, SRCN,
       //! volume left, volume right (signed), pitch low, pitch high (14 bit), flags (1 echo, 2 pitch modulation, 4 noise)
+      //! Text is binary: sample flags (1 info valid, 2 loops, 4 end reached (ENDX), 8 position valid), sample length,
+      //! loop start and current position in 9-byte BRR blocks (16 bit LE each, loop is 0xffff if outside of sample),
+      //! reserved byte, then 8 bytes of global registers, voice N carries bytes N*8..N*8+7 of
+      //! MVOLL MVOLR EVOLL EVOLR EFB EDL FLG ESA, FIR0..FIR7, DIR NON EON PMON KON KOFF ENDX
       SPC_DSP = 8,
       //! active notes count, up to 8 keys (0 - none), partials used; Text is patch name
       MT32_PART = 9,

@@ -11,6 +11,7 @@
 #include "formats/chiptune/emulation/supernessoundformat.h"
 #include "module/players/platforms.h"
 #include "module/players/properties_helper.h"
+#include "module/players/spc_voices.h"
 #include "module/players/streaming.h"
 #include "module/players/xsf/all.h"
 #include "module/players/xsf/snsf_emu.h"
@@ -149,37 +150,7 @@ namespace Module::SNSF
         self->SinceState = 0;
         frame.StatesPos.push_back(static_cast<uint_t>(frame.Samples.size() / VOICES));
         auto& states = frame.States.emplace_back();
-        for (uint_t idx = 0; idx < VOICES; ++idx)
-        {
-          ::SPC_DSP::voice_state_t in;
-          self->Emu.GetSpc().get_dsp().get_voice_state(idx, &in);
-          auto& out = states[idx];
-          const auto vol = std::max(std::abs(in.vol_l), std::abs(in.vol_r));
-          const auto level = (in.env / 2047.0f) * (vol / 128.0f);
-          out.Level = level > 0.0000158f ? 20 * std::log10(level) : -96.0f;
-          out.Flags = VoiceState::HAS_LEVEL;
-          if (!in.released && in.env > 0)
-          {
-            out.Flags |= VoiceState::KEY_ON;
-          }
-          if (in.noise)
-          {
-            out.Flags |= VoiceState::NOISE;
-          }
-          out.Kind = VoiceState::SPC_DSP;
-          auto& f = out.Fields;
-          f[0] = static_cast<uint8_t>(in.env >> 4);
-          f[1] = static_cast<uint8_t>(!in.released && !(in.adsr0 & 0x80) ? 4 : in.env_mode);
-          f[2] = static_cast<uint8_t>(in.adsr0);
-          f[3] = static_cast<uint8_t>(in.adsr1);
-          f[4] = static_cast<uint8_t>(in.gain);
-          f[5] = static_cast<uint8_t>(in.srcn);
-          f[6] = static_cast<uint8_t>(in.vol_l);
-          f[7] = static_cast<uint8_t>(in.vol_r);
-          f[8] = static_cast<uint8_t>(in.pitch & 0xff);
-          f[9] = static_cast<uint8_t>(in.pitch >> 8);
-          f[10] = static_cast<uint8_t>(in.echo | (in.pmod << 1) | (in.noise << 2));
-        }
+        self->VoicesState.Fill(self->Emu.GetSpc().get_dsp(), states);
       }
     }
 
@@ -191,6 +162,7 @@ namespace Module::SNSF
     int Pending = 0;
     VoicesFrame* Voices = nullptr;
     uint_t SinceState = 0;
+    SpcVoicesState VoicesState;
   };
 
   const auto FRAME_DURATION = Time::Milliseconds(100);
