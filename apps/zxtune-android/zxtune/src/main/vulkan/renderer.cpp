@@ -33,8 +33,8 @@ namespace VulkanScope
   {
     VkDrawIndirectCommand Draw;
     uint32_t Points;
-    // see trace.vert
-    uint32_t Dense;
+    // index of the first word of segments' intensities (8 bits each) in samples area, see ScopeRenderer::Intensity
+    uint32_t Intensities;
     uint32_t Reserved[2];
     float Traces[ScopeRenderer::MAX_CHANNELS * 4];
     float Gains[ScopeRenderer::MAX_CHANNELS];
@@ -43,13 +43,21 @@ namespace VulkanScope
   static_assert(offsetof(FrameHeader, Traces) == 32, "Layout mismatch");
   static_assert(sizeof(FrameHeader) % 4 == 0, "Layout mismatch");
 
+  // samples, then intensities
   const VkDeviceSize FRAME_SIZE =
-      sizeof(FrameHeader) + ScopeRenderer::MAX_CHANNELS * ScopeRenderer::MAX_POINTS * sizeof(int16_t);
+      sizeof(FrameHeader) + ScopeRenderer::MAX_CHANNELS * ScopeRenderer::MAX_POINTS * (sizeof(int16_t) + 1);
   // swapchains rarely have more images
   const uint32_t MAX_IMAGES = 8;
-  const float LINE_WIDTH = 3.0f;
-  // see ScopeRenderer::IsDense
-  const uint32_t DENSE_REVERSALS_PART = 8;
+  // Thin line keeps steps, spikes and noise of waveform distinguishable (thick one merged them into blobs), antialiased
+  // edges keep it smooth on high density displays
+  const float LINE_WIDTH = 1.5f;
+  // see shaders/trace.vert
+  const uint32_t VERTICES_PER_SEGMENT = 6;
+  // Trace crossing its lane more often than once per few pixels fills it solid (e.g. noise, FM with rich spectrum,
+  // high notes in long window), see ScopeRenderer::Intensity
+  const float DENSITY_RADIUS_PX = 6.0f;
+  const float MAX_SOLID_CROSSINGS_PER_PX = 0.33f;
+  const float MIN_INTENSITY = 1.0f / 16;
 
   // Automatic gain follows peak level: immediate attack to avoid clipping,
   // slow release to avoid visible pumping. Limited to not amplify noise of silent voices
@@ -215,7 +223,7 @@ namespace VulkanScope
   void ScopeRenderer::CreatePipelines()
   {
     TracePipeline = CreatePipeline(Shaders::TRACE_VERT, sizeof(Shaders::TRACE_VERT), Shaders::TRACE_FRAG,
-                                   sizeof(Shaders::TRACE_FRAG), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, true);
+                                   sizeof(Shaders::TRACE_FRAG), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, true);
     BackgroundPipeline = CreatePipeline(Shaders::BACKGROUND_VERT, sizeof(Shaders::BACKGROUND_VERT),
                                         Shaders::BACKGROUND_FRAG, sizeof(Shaders::BACKGROUND_FRAG),
                                         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, false);
@@ -267,9 +275,10 @@ namespace VulkanScope
                                   | VK_COLOR_COMPONENT_A_BIT;
       if (blend)
       {
+        // white traces are lit additively as phosphor, see shaders/trace.frag
         attachment.blendEnable = VK_TRUE;
-        attachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-        attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
         attachment.colorBlendOp = VK_BLEND_OP_ADD;
         // surface is opaque
         attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -702,22 +711,48 @@ namespace VulkanScope
     }
   }
 
-  // Long windows are delivered as minimums and maximums (see Sound::Scope::Get), so direction of trace is changed at
-  // most of points. Smooth waves at short windows change it rarely.
-  bool ScopeRenderer::IsDense(const int16_t* data, uint32_t points)
+  // Beam's intensity of each segment by local density of trace, as phosphor of analog oscilloscope is lit by time
+  // spent by beam: segments are summed (see shaders/trace.frag), so dense oscillation is a shaded picture of where the
+  // wave dwells instead of solid white block, while sparse traces (the most of waves) are kept at full intensity.
+  // Density is lane's crossings per pixel around segment, so a single tall edge is not dimmed.
+  void ScopeRenderer::Intensity(const int16_t* data, uint32_t points, float gain, const float* trace, uint8_t* target)
   {
-    uint32_t reversals = 0;
-    int prevDelta = 0;
+    const float step = trace[1] / (points - 1);
+    const auto radius = std::max<int>(1, static_cast<int>(std::ceil(DENSITY_RADIUS_PX / std::max(step, 1e-3f))));
+    // samples are compared in their units with peaks limited as in shader
+    const int limit = static_cast<int>(std::min(32768.0f / std::max(gain, 1e-3f), 32768.0f));
+    // prefix sums of segments' vertical paths
+    auto& path = Paths;
+    path[0] = 0;
+    int prev = std::clamp<int>(data[0], -limit, limit);
     for (uint32_t idx = 1; idx < points; ++idx)
     {
-      const int delta = int(data[idx]) - data[idx - 1];
-      if (delta != 0)
-      {
-        reversals += (delta > 0) != (prevDelta > 0) && prevDelta != 0;
-        prevDelta = delta;
-      }
+      const int cur = std::clamp<int>(data[idx], -limit, limit);
+      path[idx] = path[idx - 1] + std::abs(cur - prev);
+      prev = cur;
     }
-    return reversals > points / DENSE_REVERSALS_PART;
+    const auto segments = static_cast<int>(points - 1);
+    // lane is [-limit, limit] of samples, so crossings per pixel are sum / (2 * limit) / ((to - from + 1) * step)
+    const float solidPathPerSegment = MAX_SOLID_CROSSINGS_PER_PX * 2 * limit * step;
+    const auto put = [&](int seg, int from, int to) {
+      const float solid = solidPathPerSegment * float(to - from + 1);
+      const auto sum = std::max(float(path[to + 1] - path[from]), solid);
+      target[seg] = static_cast<uint8_t>(std::max(solid / sum, MIN_INTENSITY) * 255 + 0.5f);
+    };
+    const auto inner = std::min(radius, segments);
+    for (int seg = 0; seg < inner; ++seg)
+    {
+      put(seg, 0, std::min(seg + radius, segments - 1));
+    }
+    for (int seg = inner; seg < segments - radius; ++seg)
+    {
+      put(seg, seg - radius, seg + radius);
+    }
+    for (int seg = std::max(segments - radius, inner); seg < segments; ++seg)
+    {
+      put(seg, seg - radius, segments - 1);
+    }
+    target[segments] = 255;
   }
 
   void ScopeRenderer::Write(uint32_t image, const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent)
@@ -731,14 +766,9 @@ namespace VulkanScope
       channels = 0;
     }
     std::memcpy(header->Traces, Traces.data(), channels * 4 * sizeof(float));
-    uint32_t dense = 0;
     for (uint32_t chan = 0; chan < channels; ++chan)
     {
       const auto* data = samples + chan * points;
-      if (IsDense(data, points))
-      {
-        dense |= 1u << chan;
-      }
       float gain = gainPercent / 100.0f;
       if (gainPercent == AUTO_GAIN)
       {
@@ -753,11 +783,17 @@ namespace VulkanScope
         gain = std::max(AUTO_GAIN_TARGET / std::max(smoothed, AUTO_GAIN_TARGET / AUTO_GAIN_MAX), 1.0f);
       }
       header->Gains[chan] = gain;
+      Intensity(data, points, gain, &Traces[chan * 4], &Intensities[chan * points]);
     }
-    std::memcpy(header + 1, samples, std::size_t(channels) * points * sizeof(int16_t));
+    const auto samplesCount = std::size_t(channels) * points;
+    auto* samplesArea = reinterpret_cast<uint8_t*>(header + 1);
+    std::memcpy(samplesArea, samples, samplesCount * sizeof(int16_t));
+    // word aligned
+    const auto intensities = static_cast<uint32_t>((samplesCount + 1) / 2);
+    std::memcpy(samplesArea + intensities * sizeof(uint32_t), Intensities.data(), samplesCount);
+    header->Intensities = intensities;
     header->Points = points;
-    header->Dense = dense;
-    header->Draw.vertexCount = points * 2;
+    header->Draw.vertexCount = points > 1 ? (points - 1) * VERTICES_PER_SEGMENT : 0;
     header->Draw.instanceCount = channels;
     header->Draw.firstVertex = 0;
     header->Draw.firstInstance = 0;

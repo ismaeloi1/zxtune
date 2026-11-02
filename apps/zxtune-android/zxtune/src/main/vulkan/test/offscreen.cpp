@@ -14,6 +14,9 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <functional>
 #include <iostream>
 #include <vector>
 
@@ -316,8 +319,145 @@ namespace VulkanScope
     }
   };
 
+  // Hard cases of SID voices as seen on phones, 40ms window of 48kHz delivered as Sound::Scope does: steps of combined
+  // waveforms, resonant filter ringing after edges, tens of periods of high notes, noise
+  struct SidScene
+  {
+    static const uint32_t RATE = 48000;
+    static const uint32_t WINDOW = RATE * 40 / 1000;
+
+    // Sound::Scope's resampling: interpolation of short windows, minimums and maximums of long ones
+    static void Resample(const std::vector<int16_t>& in, uint32_t points, int16_t* out)
+    {
+      const auto count = static_cast<uint32_t>(in.size());
+      if (count <= points)
+      {
+        for (uint32_t idx = 0; idx < points; ++idx)
+        {
+          const double pos = double(idx) * (count - 1) / (points - 1);
+          const auto lo = static_cast<uint32_t>(pos);
+          const auto hi = std::min(lo + 1, count - 1);
+          out[idx] = static_cast<int16_t>(in[lo] + std::lround((in[hi] - in[lo]) * (pos - lo)));
+        }
+        return;
+      }
+      for (uint32_t bin = 0; bin < points / 2; ++bin)
+      {
+        const auto from = in.begin() + uint64_t(count) * bin / (points / 2);
+        const auto to = in.begin() + uint64_t(count) * (bin + 1) / (points / 2);
+        const auto [lo, hi] = std::minmax_element(from, to);
+        out[bin * 2] = lo < hi ? *lo : *hi;
+        out[bin * 2 + 1] = lo < hi ? *hi : *lo;
+      }
+    }
+
+    static uint32_t Triangle(uint32_t acc, bool ring)
+    {
+      const auto msb = (acc >> 23) & 1;
+      return ((acc >> 11) ^ ((msb ^ ring) ? 0xfff : 0)) & 0xfff;
+    }
+
+    static int16_t ToSample(uint32_t level12)
+    {
+      return static_cast<int16_t>((int(level12) - 2048) * 14);
+    }
+
+    static void Samples(uint32_t channels, uint32_t points, uint32_t frame, int16_t* target)
+    {
+      std::vector<int16_t> wave(WINDOW);
+      const auto begin = uint64_t(frame) * RATE / 120;
+      for (uint32_t chan = 0; chan < channels; ++chan)
+      {
+        uint32_t noise = 0x7ffff8;
+        for (uint32_t idx = 0; idx < WINDOW; ++idx)
+        {
+          const auto t = begin + idx;
+          // 24-bit phase accumulators of note and of ring/sync modulator
+          const auto acc = static_cast<uint32_t>(t * ((1u << 24) * 63.0 / RATE)) & 0xffffff;
+          const auto mod = static_cast<uint32_t>(t * ((1u << 24) * 440.0 / RATE)) & 0xffffff;
+          uint32_t level = 0;
+          switch (chan % 3)
+          {
+          case 0:
+          {
+            // pulse+triangle with ring modulation: combined waveform keeps only some bits, staircase with spikes
+            const auto tri = Triangle(acc, (mod >> 23) & 1);
+            const bool pulse = (acc >> 12) >= 0x800;
+            level = pulse ? (tri & (tri << 1) & (tri << 2) & 0xfff) | ((tri >> 8) << 8) : 0;
+            break;
+          }
+          case 1:
+          {
+            // pulse through resonant band/high pass: decaying ringing after each edge
+            const double phase = std::fmod(double(t) * 62 / RATE, 1.0);
+            const double sinceEdge = (phase < 0.5 ? phase : phase - 0.5) * RATE / 62;
+            const double ring = std::exp(-sinceEdge / 30) * std::sin(sinceEdge * 2 * M_PI * 2000 / RATE);
+            level = static_cast<uint32_t>(2048 + (phase < 0.5 ? 900 : -900) + 1100 * ring);
+            break;
+          }
+          default:
+          {
+            // high note, ~79 periods in window
+            const auto fast = static_cast<uint32_t>(t * ((1u << 24) * 1976.0 / RATE)) & 0xffffff;
+            level = (fast >> 12) >= 0x570 ? 0xfff : 0;
+            if (chan >= 3)
+            {
+              // noise
+              noise = (noise << 1) | (((noise >> 22) ^ (noise >> 17)) & 1);
+              level = (noise >> 11) & 0xfff;
+            }
+            break;
+          }
+          }
+          wave[idx] = ToSample(std::min<uint32_t>(level, 0xfff));
+        }
+        Resample(wave, points, target + chan * points);
+      }
+    }
+  };
+
+  // Traces of each frame as int16 [frames][channels][points], e.g. dumped by module_test_scope_bench, scene's channels
+  // are taken starting from specified one
+  class DumpScene
+  {
+  public:
+    DumpScene(const std::string& path, uint32_t channels, uint32_t first, uint32_t points)
+      : Points(points)
+      , FrameSize(std::size_t(channels) * points)
+      , First(std::min(first, channels - 1))
+      , Count(std::min(channels - First, TestScene::CHANNELS))
+    {
+      std::ifstream in(path, std::ios::binary);
+      Data.resize(std::filesystem::file_size(path) / sizeof(int16_t));
+      in.read(reinterpret_cast<char*>(Data.data()), Data.size() * sizeof(int16_t));
+      Frames = static_cast<uint32_t>(Data.size() / FrameSize);
+    }
+
+    uint32_t Size() const
+    {
+      return Frames;
+    }
+
+    void Samples(uint32_t frame, int16_t* target) const
+    {
+      std::fill_n(target, TestScene::CHANNELS * Points, 0);
+      std::memcpy(target, Data.data() + (frame % Frames) * FrameSize + First * Points,
+                  std::size_t(Count) * Points * sizeof(int16_t));
+    }
+
+  private:
+    const uint32_t Points;
+    const std::size_t FrameSize;
+    const uint32_t First;
+    const uint32_t Count;
+    std::vector<int16_t> Data;
+    uint32_t Frames = 0;
+  };
+
+  using SamplesSource = std::function<void(uint32_t frame, int16_t* target)>;
+
   void Render(const Device& dev, VkExtent2D extent, Rotation rotation, const std::string& path, uint32_t frames,
-              bool dense = false)
+              const SamplesSource& source, uint32_t points = TestScene::POINTS)
   {
     OffscreenTargets targets(dev, extent, 3);
     ScopeRenderer renderer(dev, OffscreenTargets::FORMAT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
@@ -326,27 +466,23 @@ namespace VulkanScope
     TestScene scene(logical.width, logical.height);
     renderer.SetBackground(scene.Background.data(), logical.width, logical.height, logical.width);
     renderer.SetTraces(scene.Traces.data(), TestScene::CHANNELS, logical.width, logical.height);
-    std::vector<int16_t> samples(TestScene::CHANNELS * TestScene::POINTS);
+    std::vector<int16_t> samples(TestScene::CHANNELS * points);
     using Clock = std::chrono::steady_clock;
     Clock::duration cpu = {};
+    Clock::duration write = {};
     Clock::duration total = {};
     uint32_t last = 0;
     for (uint32_t frame = 0; frame < frames; ++frame)
     {
-      if (dense)
-      {
-        TestScene::DenseSamples(frame, samples.data());
-      }
-      else
-      {
-        TestScene::Samples(frame, samples.data());
-      }
+      source(frame, samples.data());
       const auto image = frame % targets.Images.size();
       const auto start = Clock::now();
       Check(dev.Vk().vkWaitForFences(dev.Handle(), 1, &targets.Fences[image], VK_TRUE, UINT64_MAX), "wait");
       const auto cpuStart = Clock::now();
       dev.Vk().vkResetFences(dev.Handle(), 1, &targets.Fences[image]);
-      renderer.Write(image, samples.data(), TestScene::CHANNELS, TestScene::POINTS, ScopeRenderer::AUTO_GAIN);
+      const auto writeStart = Clock::now();
+      renderer.Write(image, samples.data(), TestScene::CHANNELS, points, ScopeRenderer::AUTO_GAIN);
+      write += Clock::now() - writeStart;
       renderer.Submit(image, VK_NULL_HANDLE, VK_NULL_HANDLE, targets.Fences[image]);
       const auto end = Clock::now();
       cpu += end - cpuStart;
@@ -358,8 +494,9 @@ namespace VulkanScope
     PngWriter::Write(path, pixels.data(), extent.width, extent.height);
     using Us = std::chrono::duration<double, std::micro>;
     std::cout << path << ": " << extent.width << "x" << extent.height << ", " << frames
-              << " frames, CPU (write + submit) " << Us(cpu).count() / frames << "us/frame, with GPU wait "
-              << Us(total).count() / frames << "us/frame" << std::endl;
+              << " frames, CPU (write + submit) " << Us(cpu).count() / frames << "us/frame (write "
+              << Us(write).count() / frames << "us), with GPU wait " << Us(total).count() / frames << "us/frame"
+              << std::endl;
   }
 }  // namespace VulkanScope
 
@@ -368,7 +505,8 @@ int main(int argc, char** argv)
   try
   {
     const std::string dir = argc > 1 ? argv[1] : ".";
-    auto lib = argc > 2 ? VulkanScope::Library::Open(argv[2]) : VulkanScope::Library::OpenSystem();
+    auto lib = argc > 2 && std::strcmp(argv[2], "-") != 0 ? VulkanScope::Library::Open(argv[2])
+                                                          : VulkanScope::Library::OpenSystem();
     if (!lib)
     {
       std::cout << "No Vulkan library" << std::endl;
@@ -376,13 +514,37 @@ int main(int argc, char** argv)
     }
     const VulkanScope::Device dev(lib, {});
     std::cout << "Device: " << dev.GetDescription() << std::endl;
-    VulkanScope::Render(dev, {1280, 720}, VulkanScope::Rotation::NONE, dir + "/vk-scope.png", 600);
+    using namespace VulkanScope;
+    const SamplesSource smooth = &TestScene::Samples;
+    const SamplesSource dense = &TestScene::DenseSamples;
+    Render(dev, {1280, 720}, Rotation::NONE, dir + "/vk-scope.png", 600, smooth);
     // landscape view on portrait-oriented display: swapchain is not rotated, picture is
-    VulkanScope::Render(dev, {720, 1280}, VulkanScope::Rotation::CW90, dir + "/vk-scope-rot90.png", 60);
-    VulkanScope::Render(dev, {720, 1280}, VulkanScope::Rotation::CW270, dir + "/vk-scope-rot270.png", 60);
+    Render(dev, {720, 1280}, Rotation::CW90, dir + "/vk-scope-rot90.png", 60, smooth);
+    Render(dev, {720, 1280}, Rotation::CW270, dir + "/vk-scope-rot270.png", 60, smooth);
     // fullscreen landscape phone, short and long windows: cost should not depend on window
-    VulkanScope::Render(dev, {2400, 1080}, VulkanScope::Rotation::NONE, dir + "/vk-scope-wide.png", 120);
-    VulkanScope::Render(dev, {2400, 1080}, VulkanScope::Rotation::NONE, dir + "/vk-scope-wide-dense.png", 120, true);
+    Render(dev, {2400, 1080}, Rotation::NONE, dir + "/vk-scope-wide.png", 120, smooth);
+    Render(dev, {2400, 1080}, Rotation::NONE, dir + "/vk-scope-wide-dense.png", 120, dense);
+    // portrait phone: cells of 540px wide, so 1080 points as ScopeGrid requests
+    const uint32_t cellPoints = 1080;
+    Render(
+        dev, {1080, 1200}, Rotation::NONE, dir + "/vk-scope-sid.png", 120,
+        [cellPoints](uint32_t frame, int16_t* target) {
+          SidScene::Samples(TestScene::CHANNELS, cellPoints, frame, target);
+        },
+        cellPoints);
+    // <dir> <driver or -> <dump> <points> <channels> <first>: traces dumped by module_test_scope_bench
+    if (argc > 6)
+    {
+      const auto points = static_cast<uint32_t>(std::atoi(argv[4]));
+      const DumpScene dump(argv[3], static_cast<uint32_t>(std::atoi(argv[5])),
+                           static_cast<uint32_t>(std::atoi(argv[6])), points);
+      if (dump.Size())
+      {
+        Render(
+            dev, {1080, 1200}, Rotation::NONE, dir + "/vk-scope-dump.png", dump.Size(),
+            [&dump](uint32_t frame, int16_t* target) { dump.Samples(frame, target); }, points);
+      }
+    }
     return 0;
   }
   catch (const std::exception& e)

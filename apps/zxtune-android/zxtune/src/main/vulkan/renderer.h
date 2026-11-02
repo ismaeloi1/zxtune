@@ -65,7 +65,7 @@ namespace VulkanScope
     }
 
   private:
-    static bool IsDense(const int16_t* data, uint32_t points);
+    void Intensity(const int16_t* data, uint32_t points, float gain, const float* trace, uint8_t* target);
 
     struct Frame
     {
@@ -117,5 +117,8 @@ namespace VulkanScope
     std::array<float, MAX_CHANNELS* 4> Traces = {};
     uint32_t TracesCount = 0;
     std::array<float, MAX_CHANNELS> SmoothedPeaks = {};
+    // per frame temporary data, see Intensity
+    std::array<uint8_t, MAX_CHANNELS* MAX_POINTS> Intensities = {};
+    std::array<int32_t, MAX_POINTS> Paths = {};
   };
 }  // namespace VulkanScope
