@@ -116,6 +116,12 @@ namespace Sound
       return HasPeriod ? CachedPeriod * Stride : 0;
     }
 
+    //! @return last estimated fundamental period in samples for displayed window, 0 if unknown or not periodic
+    uint_t GetFundamentalSamples() const
+    {
+      return HasPeriod ? Fundamental * Stride : 0;
+    }
+
     //! @brief Forget all the accumulated state (e.g. after seek)
     void Reset();
 
@@ -129,6 +135,7 @@ namespace Sound
     using Buffer = std::vector<float>;
 
     uint_t GetPeriod(const Buffer& data);
+    uint_t GetFundamental(uint_t period) const;
     bool IsWindowInvalid(uint_t period) const;
     void CalcSlopeFinder(uint_t period);
     void CorrelateValid(const Buffer& data, const Buffer& kernel, Buffer& result);
@@ -159,6 +166,7 @@ namespace Sound
     float PrevMean = 0;
     int PrevPeriod = -1;  // undefined
     uint_t CachedPeriod = 0;
+    uint_t Fundamental = 0;
     uint_t PeriodAge = 0;
     bool HasPeriod = false;
     //! period estimations per second
@@ -182,6 +190,8 @@ namespace Sound
     Buffer PeriodData;
     Buffer CorrQuality;
     Buffer Corr;
+    // autocorrelation of the last GetPeriod call before edge compensation, see GetFundamental
+    Buffer RawCorr;
     Buffer Aligned;
     Buffer Rescaled;
     Buffer Around;

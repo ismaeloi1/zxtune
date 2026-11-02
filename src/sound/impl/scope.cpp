@@ -37,6 +37,8 @@ namespace Sound
     const uint_t RING_SIZE = 1 << 17;
     const uint_t MIN_WINDOW_MS = 1;
     const uint_t MAX_WINDOW_MS = 200;
+    // see ScopeImpl::GetRenderWindow
+    const uint_t MAX_ZOOM_POINTS = 4;
     const uint_t MAX_VOICES = 32;
     const uint_t MAX_FULL_RATE_TRIGGERS = 8;
     // searches are spread among frames, so serial processing of not so many voices fits into frame, while waking of
@@ -750,7 +752,8 @@ namespace Sound
           const auto trigger = silent ? pos
                                       : Triggers[chan]->GetTrigger(wave, pos, samplesPerFrame, CanSearch[chan] != 0);
           triggered += !silent;
-          const auto window = GetRenderWindow(chan, renderSamples, silent ? 0 : Triggers[chan]->GetPeriodSamples());
+          const auto window =
+              GetRenderWindow(chan, renderSamples, silent ? 0 : Triggers[chan]->GetFundamentalSamples(), points);
           const auto begin = trigger - window / 2 + offset;
           auto* out = target + chan * points;
           Resample(ring, begin, window, points, out);
@@ -773,14 +776,17 @@ namespace Sound
       // High notes in long window are tens of periods squeezed into few pixels, an unreadable band (corrscope and
       // Furnace show it so). Window is shrunk to MaxPeriods of detected pitch. Window changes are smoothed and small
       // ones ignored, so pitch estimation jitter (e.g. vibrato, octave errors on single frames) doesn't zoom picture.
-      int64_t GetRenderWindow(uint_t chan, int64_t renderSamples, uint_t period)
+      int64_t GetRenderWindow(uint_t chan, int64_t renderSamples, uint_t period, uint_t points)
       {
         auto& current = Windows[chan];
         if (!Settings.MaxPeriods)
         {
           return renderSamples;
         }
-        const auto minSamples = int64_t(Samplerate) * MIN_WINDOW_MS / 1000;
+        // Trigger is found with sample precision, so each sample stretched over several pixels makes its frame to frame
+        // jitter visible as jumps of picture (views request ~2 points per pixel, so at most ~2 pixels per sample)
+        const auto minSamples = std::min<int64_t>(
+            std::max<int64_t>(int64_t(Samplerate) * MIN_WINDOW_MS / 1000, points / MAX_ZOOM_POINTS), renderSamples);
         if (current <= 0 || current > float(renderSamples))
         {
           current = float(renderSamples);

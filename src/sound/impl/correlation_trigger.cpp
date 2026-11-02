@@ -24,6 +24,11 @@ namespace Sound
     const float MIN_AMPLITUDE = 0.01f;
     const float EDGE_COMPENSATION = 0.9f;
     const float MAX_AMPLIFICATION = 2.0f;
+    // see CorrelationTrigger::GetFundamental
+    const float FUNDAMENTAL_PEAK_PART = 0.85f;
+    const float MIN_PERIODICITY = 0.3f;
+    const uint_t MAX_FUNDAMENTAL_DIVISOR = 4;
+    const int FUNDAMENTAL_LAG_TOLERANCE = 1;
     const float PI = 3.14159265358979f;
     // see corrscope's sign_times_peak
     const float SIGN_AMPLIFICATION = 1000.0f;
@@ -278,6 +283,7 @@ namespace Sound
     PrevMean = 0;
     PrevPeriod = -1;
     HasPeriod = false;
+    Fundamental = 0;
     PeriodAge = 0;
     PrevTrigger = 0;
     HasPrevTrigger = false;
@@ -484,6 +490,7 @@ namespace Sound
     if (PeriodAge >= Samplerate / PERIOD_RATE || !HasPeriod)
     {
       CachedPeriod = GetPeriod(PeriodData);
+      Fundamental = CachedPeriod ? GetFundamental(CachedPeriod) : 0;
       HasPeriod = true;
       PeriodAge = 0;
     }
@@ -641,6 +648,7 @@ namespace Sound
     {
       Corr[idx] = (idx & 1) ? TmpA[idx / 2].imag() : TmpA[idx / 2].real();
     }
+    RawCorr = Corr;
 
     const auto minPeriod = static_cast<uint_t>(std::lround(float(Samplerate) / Stride / Cfg.MaxFreq));
     const auto zeroCrossing = std::find_if(Corr.begin(), Corr.end(), [](float v) { return v < 0; }) - Corr.begin();
@@ -663,6 +671,58 @@ namespace Sound
       peakX = calcPeak();
     }
     return peakX;
+  }
+
+  // Trigger's period is the highest (and edge compensated) autocorrelation peak, as corrscope does, which is often a
+  // multiple of period for rich spectrum (e.g. FM voices: lag of 2 or 3 periods correlates as well as 1), so window of
+  // N such periods shows 2N or 3N real ones and is zoomed in and out between estimations. Displayed window uses the
+  // shortest divisor of it with all the multiples correlating almost as well (raw autocorrelation of the last
+  // GetPeriod call is biased, so it favours shorter lags anyway). A single high peak at short lag is not enough:
+  // strong partials of FM correlate at their own periods too. Weakly periodic signal (noise, inharmonic FM) has no
+  // fundamental, so window is kept.
+  uint_t CorrelationTrigger::GetFundamental(uint_t period) const
+  {
+    const auto size = static_cast<uint_t>(RawCorr.size());
+    if (period < 2 || period + 2 >= size || RawCorr[0] <= 0)
+    {
+      return 0;
+    }
+    // subsampled lags of multiples are imprecise, so the nearby peak is taken
+    const auto peakAround = [this, size](float lag) {
+      const auto center = static_cast<int>(std::lround(lag));
+      float res = RawCorr[std::clamp<int>(center, 0, int(size) - 1)];
+      for (int delta = 1; delta <= FUNDAMENTAL_LAG_TOLERANCE; ++delta)
+      {
+        res = std::max({res, RawCorr[std::clamp<int>(center - delta, 0, int(size) - 1)],
+                        RawCorr[std::clamp<int>(center + delta, 0, int(size) - 1)]});
+      }
+      return res;
+    };
+    const auto reference = peakAround(float(period));
+    if (reference < RawCorr[0] * MIN_PERIODICITY)
+    {
+      return 0;
+    }
+    const auto minPeriod = float(Samplerate) / Stride / Cfg.MaxFreq;
+    const auto threshold = reference * FUNDAMENTAL_PEAK_PART;
+    for (uint_t divisor = MAX_FUNDAMENTAL_DIVISOR; divisor > 1; --divisor)
+    {
+      const auto lag = float(period) / divisor;
+      if (lag < std::max(minPeriod, float(FUNDAMENTAL_LAG_TOLERANCE * 2)))
+      {
+        continue;
+      }
+      bool all = true;
+      for (uint_t multiple = 1; multiple < divisor && all; ++multiple)
+      {
+        all = peakAround(lag * multiple) >= threshold;
+      }
+      if (all)
+      {
+        return static_cast<uint_t>(std::lround(lag));
+      }
+    }
+    return period;
   }
 
   bool CorrelationTrigger::IsWindowInvalid(uint_t period) const

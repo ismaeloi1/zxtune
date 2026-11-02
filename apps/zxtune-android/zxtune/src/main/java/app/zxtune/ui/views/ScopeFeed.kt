@@ -17,8 +17,9 @@ import kotlin.math.roundToInt
 private val LOG = Logger("ScopeFeed")
 
 /**
- * Requests waveforms on own thread paced by vsync (no binder calls on UI thread), limits frame rate and skips
- * frames with the same data (e.g. paused or silent playback), so the picture is kept without any GPU work.
+ * Requests waveforms on own thread paced by vsync (no binder calls on UI thread) and limits frame rate.
+ * Each vsync is presented: comparing frames for identical data saved nothing measurable (triggered waves of playing
+ * voices differ at each frame, and the feed is idle while paused anyway, see [ScopeActivity]).
  * Dashboard gauges of the same moment are requested by the same call, see [gauges].
  */
 internal class ScopeFeed(context: android.content.Context, private val sink: Sink) {
@@ -43,9 +44,6 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         var generation = 0
         var width = 1
         var height = 1
-
-        fun sameData(rh: Frame) = channels == rh.channels && points == rh.points && generation == rh.generation &&
-            samples.contentEquals(rh.samples, channels * points)
     }
 
     val stats = ScopeStats()
@@ -243,7 +241,6 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         frame.generation = current.generation
         frame.grid = current.grid
         if (channels == 0) {
-            stats.skip()
             return
         }
         if (src !== layoutSource || layout.id != layoutId) {
@@ -263,10 +260,6 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         if (frame.grid?.channels != channels || w != current.width || h != current.height || force) {
             frame.grid = frame.grid?.takeIf { it.channels == channels } ?: ScopeGrid.of(voicesLayout, channels)
             frame.generation = current.generation + 1
-        }
-        if (frame.sameData(current)) {
-            stats.skip()
-            return
         }
         if (sink.onFrame(frame)) {
             previous = current
@@ -288,15 +281,6 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         // 240Hz
         private const val MIN_VSYNC_NS = 4_000_000L
         private const val VSYNC_WINDOW = 32
-
-        private fun ShortArray.contentEquals(rh: ShortArray, size: Int): Boolean {
-            for (idx in 0 until size) {
-                if (this[idx] != rh[idx]) {
-                    return false
-                }
-            }
-            return true
-        }
     }
 }
 
@@ -305,7 +289,6 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
  */
 internal class ScopeStats {
     private var frames = 0
-    private var skipped = 0
     private var framesStart = 0L
     private var drawNanos = 0L
     private var dataNanos = 0L
@@ -334,11 +317,6 @@ internal class ScopeStats {
     }
 
     @Synchronized
-    fun skip() {
-        ++skipped
-    }
-
-    @Synchronized
     fun frame(backend: String, start: Long, end: Long) {
         if (lastFrameStart != 0L) {
             maxIntervalNanos = maxOf(maxIntervalNanos, start - lastFrameStart)
@@ -355,10 +333,9 @@ internal class ScopeStats {
             val fps = frames * 1e9 / period
             text = String.format(
                 java.util.Locale.US,
-                "%s: %.1f fps (%d same, %d vsync), frame %.2f ms (max %.1f), draw %.2f ms (max %.1f), data %.2f ms (max %.1f)",
+                "%s: %.1f fps (%d vsync), frame %.2f ms (max %.1f), draw %.2f ms (max %.1f), data %.2f ms (max %.1f)",
                 backend,
                 fps,
-                skipped,
                 (vsyncs * 1e9 / period).roundToInt(),
                 1000 / fps,
                 maxIntervalNanos / 1e6,
@@ -368,7 +345,6 @@ internal class ScopeStats {
                 maxDataNanos / 1e6
             )
             frames = 0
-            skipped = 0
             framesStart = 0
             drawNanos = 0
             dataNanos = 0

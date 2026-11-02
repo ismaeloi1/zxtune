@@ -120,7 +120,7 @@ class OscilloscopeView @JvmOverloads constructor(
         private val values = FloatArray(ScopeGrid.MAX_POINTS)
         private val gain = AutoGain()
         private val traces = FloatArray(ScopeFeed.MAX_CHANNELS * 4)
-        private val vertices: FloatBuffer = allocateFloats(ScopeGrid.MAX_POINTS * 2 * 2)
+        private val vertices: FloatBuffer = allocateFloats(ScopeGrid.MAX_POINTS * CORNERS.size * VERTEX_FLOATS)
         private val quadVertices: FloatBuffer = allocateFloats(4 * 4).apply {
             // x, y, u, v for fullscreen quad
             put(
@@ -135,10 +135,13 @@ class OscilloscopeView @JvmOverloads constructor(
         }
         private var lineProgram = 0
         private var linePosAttr = 0
+        private var lineLocalAttr = 0
+        private var lineHalfWidth = 0
         private var textureProgram = 0
         private var texturePosAttr = 0
         private var textureUvAttr = 0
         private var backgroundTexture = 0
+        private var isMaxBlending = false
         private var backgroundGeneration = -1
         private var width = 1
         private var height = 1
@@ -147,12 +150,18 @@ class OscilloscopeView @JvmOverloads constructor(
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
             lineProgram = createProgram(LINE_VERTEX_SHADER, LINE_FRAGMENT_SHADER)
             linePosAttr = GLES20.glGetAttribLocation(lineProgram, "aPos")
+            lineLocalAttr = GLES20.glGetAttribLocation(lineProgram, "aLocal")
+            lineHalfWidth = GLES20.glGetUniformLocation(lineProgram, "uHalfWidth")
             textureProgram = createProgram(TEXTURE_VERTEX_SHADER, TEXTURE_FRAGMENT_SHADER)
             texturePosAttr = GLES20.glGetAttribLocation(textureProgram, "aPos")
             textureUvAttr = GLES20.glGetAttribLocation(textureProgram, "aUv")
             backgroundTexture = IntArray(1).also { GLES20.glGenTextures(1, it, 0) }[0]
             backgroundGeneration = -1
-            GLES20.glBlendFunc(GLES20.GL_SRC_ALPHA, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+            // white traces over gray background: maximum is the same as alpha blending, but overlapped edges of
+            // neighbour segments are not accumulated into brighter dots at joints (EXT_blend_minmax is supported by
+            // almost all the devices, otherwise alpha blending is kept)
+            isMaxBlending = GLES20.glGetString(GLES20.GL_EXTENSIONS)?.contains("GL_EXT_blend_minmax") == true
+            GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
         }
 
         override fun onSurfaceChanged(gl: GL10?, w: Int, h: Int) {
@@ -223,23 +232,33 @@ class OscilloscopeView @JvmOverloads constructor(
             val channels = minOf(frame.channels, grid.channels)
             grid.traces(width, height, labelTextSize, traces)
             GLES20.glEnable(GLES20.GL_BLEND)
+            if (isMaxBlending) {
+                GLES20.glBlendEquation(GL_MAX_EXT)
+            }
             GLES20.glUseProgram(lineProgram)
+            GLES20.glUniform1f(lineHalfWidth, LINE_WIDTH_PX / 2f)
             GLES20.glEnableVertexAttribArray(linePosAttr)
+            GLES20.glEnableVertexAttribArray(lineLocalAttr)
             for (chan in 0 until channels) {
                 drawChannel(chan)
             }
             GLES20.glDisableVertexAttribArray(linePosAttr)
+            GLES20.glDisableVertexAttribArray(lineLocalAttr)
+            if (isMaxBlending) {
+                GLES20.glBlendEquation(GLES20.GL_FUNC_ADD)
+            }
             GLES20.glDisable(GLES20.GL_BLEND)
         }
 
-        // Builds thick line as triangle strip in pixels, then converts to normalized coordinates
+        // Each segment is a separate quad covering line's thickness and antialiased edge, fragment's coverage is
+        // computed by distance to segment: joined vertex normals of a strip pinch or fold at sharp turns (steps,
+        // minimums and maximums of long windows), which looked jagged and of uneven thickness
         private fun drawChannel(chan: Int) {
             val left = traces[chan * 4]
             val traceW = traces[chan * 4 + 1]
             val centerY = traces[chan * 4 + 2]
             val ampl = traces[chan * 4 + 3]
             val points = frame.points
-            val halfWidth = LINE_WIDTH_PX / 2f
             val offset = chan * points
             val gain = gain.of(chan, frame.samples, offset, points, gainPercent)
             for (idx in 0 until points) {
@@ -249,30 +268,51 @@ class OscilloscopeView @JvmOverloads constructor(
             val toX = 2f / width
             val toY = 2f / height
             val step = traceW / (points - 1)
+            val extent = LINE_WIDTH_PX / 2f + 0.5f
             vertices.clear()
-            for (idx in 0 until points) {
-                val x = left + step * idx
-                val y = centerY - ampl * values[idx]
-                val prev = maxOf(idx - 1, 0)
-                val next = minOf(idx + 1, points - 1)
-                val dx = step * (next - prev)
-                val dy = -ampl * (values[next] - values[prev])
-                val len = sqrt(dx * dx + dy * dy).coerceAtLeast(1e-3f)
-                val nx = -dy / len * halfWidth
-                val ny = dx / len * halfWidth
-                vertices.put((x + nx) * toX - 1).put(1 - (y + ny) * toY)
-                vertices.put((x - nx) * toX - 1).put(1 - (y - ny) * toY)
+            var x0 = left
+            var y0 = centerY - ampl * values[0]
+            for (idx in 1 until points) {
+                val x1 = left + step * idx
+                val y1 = centerY - ampl * values[idx]
+                val dx = x1 - x0
+                val dy = y1 - y0
+                val len = sqrt(dx * dx + dy * dy)
+                val ax = if (len > 1e-4f) dx / len else 1f
+                val ay = if (len > 1e-4f) dy / len else 0f
+                for (corner in CORNERS) {
+                    val along = if (corner < 2) -extent else len + extent
+                    val across = if (corner % 2 == 0) -extent else extent
+                    val x = x0 + ax * along - ay * across
+                    val y = y0 + ay * along + ax * across
+                    vertices.put(x * toX - 1).put(1 - y * toY).put(along).put(across).put(len)
+                }
+                x0 = x1
+                y0 = y1
             }
             vertices.flip()
-            GLES20.glVertexAttribPointer(linePosAttr, 2, GLES20.GL_FLOAT, false, 0, vertices)
-            GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, points * 2)
+            vertices.position(0)
+            GLES20.glVertexAttribPointer(linePosAttr, 2, GLES20.GL_FLOAT, false, VERTEX_SIZE, vertices)
+            vertices.position(2)
+            GLES20.glVertexAttribPointer(lineLocalAttr, 3, GLES20.GL_FLOAT, false, VERTEX_SIZE, vertices)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, (points - 1) * CORNERS.size)
         }
     }
 
     companion object {
         const val DEFAULT_WINDOW_MS = 40
         const val AUTO_GAIN = 0
-        private const val LINE_WIDTH_PX = 3f
+
+        // Thin line keeps steps, spikes and noise of waveform distinguishable, antialiased edges keep it smooth
+        private const val LINE_WIDTH_PX = 1.5f
+        private const val GL_MAX_EXT = 0x8008
+
+        // quad of segment as two triangles: corners 0, 1 at start, 2, 3 at end, even ones at the same side
+        private val CORNERS = intArrayOf(0, 2, 1, 1, 2, 3)
+
+        // position, then along, across and length of segment
+        private const val VERTEX_FLOATS = 5
+        private const val VERTEX_SIZE = VERTEX_FLOATS * 4
         private const val LABEL_TEXT_SIZE_SP = 12f
 
         /**
@@ -288,15 +328,23 @@ class OscilloscopeView @JvmOverloads constructor(
 
         private const val LINE_VERTEX_SHADER = """
             attribute vec2 aPos;
+            attribute vec3 aLocal;
+            varying vec3 vLocal;
             void main() {
+              vLocal = aLocal;
               gl_Position = vec4(aPos, 0.0, 1.0);
             }
         """
 
+        // Coverage by distance to segment, length is the same for all the vertices of segment
         private const val LINE_FRAGMENT_SHADER = """
-            precision mediump float;
+            precision highp float;
+            uniform float uHalfWidth;
+            varying vec3 vLocal;
             void main() {
-              gl_FragColor = vec4(1.0);
+              float distance = length(vec2(max(max(-vLocal.x, vLocal.x - vLocal.z), 0.0), vLocal.y));
+              // premultiplied white, so both maximum and alpha blending work
+              gl_FragColor = vec4(clamp(uHalfWidth + 0.5 - distance, 0.0, 1.0));
             }
         """
 

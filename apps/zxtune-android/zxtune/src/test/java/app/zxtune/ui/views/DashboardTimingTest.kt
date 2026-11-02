@@ -151,7 +151,7 @@ class DashboardTimingTest {
 
     private fun sid(chips: Int): Timing {
         val view = SidDashboardView(ApplicationProvider.getApplicationContext())
-        val stats = "vulkan: 47.5 fps (15 same), frame 21.03 ms (max 95.1), draw 0.62 ms (max 1.2), data 2.85 ms"
+        val stats = "vulkan: 47.5 fps (120 vsync), frame 21.03 ms (max 95.1), draw 0.62 ms (max 1.2), data 2.85 ms"
         view.setSource(null, { stats })
         return measure("${chips}sid", view) { frame ->
             view.setGaugesData(sidData(chips, frame), chips, sidStatus(chips))
