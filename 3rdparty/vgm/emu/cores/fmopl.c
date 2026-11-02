@@ -273,6 +273,11 @@ typedef struct fm_opl_f
 
 	signed int phase_modulation;    /* phase modulation input (SLOT 2) */
 	signed int output[1];
+	INT32 chan_out[9];              /* channels outputs of the last sample for separate voices output */
+	INT32 rhythm_out[5];            /* BD, SD, TT, CY, HH outputs of the last sample */
+	DEVCB_VOICES voicesCb;
+	void* voicesParam;
+	UINT8 regs[256];                /* last written values for visualization */
 #if BUILD_Y8950
 	INT32 output_deltat[4];     /* for Y8950 DELTA-T, chip is mono, that 4 here is just for safety */
 #endif
@@ -957,11 +962,46 @@ number   number    BLK/FNUM2 FNUM    Drum  Hat   Drum  Tom  Cymbal
 
 /* calculate rhythm */
 
+/* FM channels (6 of them in rhythm mode), outputs are stored for separate voices output */
+INLINE void OPL_CALC_FM( FM_OPL *OPL, UINT8 rhythm )
+{
+	const UINT8 count = rhythm ? 6 : 9;
+	UINT8 ch;
+
+	for (ch = 0; ch < count; ch ++)
+	{
+		const INT32 before = OPL->output[0];
+		OPL_CALC_CH(OPL, &OPL->P_CH[ch]);
+		OPL->chan_out[ch] = OPL->output[0] - before;
+	}
+	for (; ch < 9; ch ++)
+		OPL->chan_out[ch] = 0;
+}
+
+/* separate outputs: channels 1..9, rhythm instruments (BD, SD, TT, CY, HH) and DELTA-T of Y8950 */
+static void OPL_feed_voices( FM_OPL *OPL, UINT8 rhythm, INT32 deltat, UINT32 count )
+{
+	INT32 voices[15];
+	UINT8 idx;
+
+	for (idx = 0; idx < 9; idx ++)
+		voices[idx] = OPL->chan_out[idx] << 1;
+	for (idx = 0; idx < 5; idx ++)
+		voices[9 + idx] = rhythm ? OPL->rhythm_out[idx] << 1 : 0;
+	voices[14] = deltat << 1;
+	OPL->voicesCb(OPL->voicesParam, count, voices);
+}
+
+/* output of rhythm instrument (0 BD, 1 SD, 2 TT, 3 CY, 4 HH) is also stored for separate voices output */
+#define OPL_RHYTHM_OUT(idx, value) do { const INT32 out_ = (value); OPL->rhythm_out[idx] = out_; OPL->output[0] += out_; } while (0)
+
 INLINE void OPL_CALC_RH( FM_OPL *OPL, OPL_CH *CH, unsigned int noise )
 {
 	OPL_SLOT *SLOT;
 	signed int out;
 	unsigned int env;
+
+	OPL->rhythm_out[0] = OPL->rhythm_out[1] = OPL->rhythm_out[2] = OPL->rhythm_out[3] = OPL->rhythm_out[4] = 0;
 
 
 	/* Bass Drum (verified on real YM3812):
@@ -995,7 +1035,7 @@ INLINE void OPL_CALC_RH( FM_OPL *OPL, OPL_CH *CH, unsigned int noise )
 	SLOT++;
 	env = volume_calc(SLOT);
 	if( env < ENV_QUIET && ! OPL->MuteSpc[0] )
-		OPL->output[0] += op_calc(SLOT->Cnt, env, OPL->phase_modulation, SLOT->wavetable) * 2;
+		OPL_RHYTHM_OUT(0, op_calc(SLOT->Cnt, env, OPL->phase_modulation, SLOT->wavetable) * 2);
 
 
 	/* Phase generation is based on: */
@@ -1062,7 +1102,7 @@ INLINE void OPL_CALC_RH( FM_OPL *OPL, OPL_CH *CH, unsigned int noise )
 				phase = 0xd0>>2;
 		}
 
-		OPL->output[0] += op_calc(phase<<FREQ_SH, env, 0, SLOT7_1->wavetable) * 2;
+		OPL_RHYTHM_OUT(4, op_calc(phase<<FREQ_SH, env, 0, SLOT7_1->wavetable) * 2);
 	}
 
 	/* Snare Drum (verified on real YM3812) */
@@ -1083,13 +1123,13 @@ INLINE void OPL_CALC_RH( FM_OPL *OPL, OPL_CH *CH, unsigned int noise )
 		if (noise)
 			phase ^= 0x100;
 
-		OPL->output[0] += op_calc(phase<<FREQ_SH, env, 0, SLOT7_2->wavetable) * 2;
+		OPL_RHYTHM_OUT(1, op_calc(phase<<FREQ_SH, env, 0, SLOT7_2->wavetable) * 2);
 	}
 
 	/* Tom Tom (verified on real YM3812) */
 	env = volume_calc(SLOT8_1);
 	if( env < ENV_QUIET && ! OPL->MuteSpc[2] )
-		OPL->output[0] += op_calc(SLOT8_1->Cnt, env, 0, SLOT8_1->wavetable) * 2;
+		OPL_RHYTHM_OUT(2, op_calc(SLOT8_1->Cnt, env, 0, SLOT8_1->wavetable) * 2);
 
 	/* Top Cymbal (verified on real YM3812) */
 	env = volume_calc(SLOT8_2);
@@ -1116,7 +1156,7 @@ INLINE void OPL_CALC_RH( FM_OPL *OPL, OPL_CH *CH, unsigned int noise )
 		if (res2)
 			phase = 0x300;
 
-		OPL->output[0] += op_calc(phase<<FREQ_SH, env, 0, SLOT8_2->wavetable) * 2;
+		OPL_RHYTHM_OUT(3, op_calc(phase<<FREQ_SH, env, 0, SLOT8_2->wavetable) * 2);
 	}
 }
 
@@ -1427,6 +1467,8 @@ static void OPLWriteReg(FM_OPL *OPL, UINT8 r, UINT8 v)
 	OPL_CH *CH;
 	int slot;
 	int block_fnum;
+
+	OPL->regs[r] = v;
 
 
 	/* adjust bus to 8 bits */
@@ -2054,20 +2096,9 @@ void ym3812_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 		advance_lfo(OPL);
 
 		/* FM part */
-		OPL_CALC_CH(OPL, &OPL->P_CH[0]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[1]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[2]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[3]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[4]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[5]);
+		OPL_CALC_FM(OPL, rhythm);
 
-		if(!rhythm)
-		{
-			OPL_CALC_CH(OPL, &OPL->P_CH[6]);
-			OPL_CALC_CH(OPL, &OPL->P_CH[7]);
-			OPL_CALC_CH(OPL, &OPL->P_CH[8]);
-		}
-		else        /* Rhythm part */
+		if(rhythm)        /* Rhythm part */
 		{
 			OPL_CALC_RH(OPL, &OPL->P_CH[0], (OPL->noise_rng>>0)&1 );
 		}
@@ -2077,6 +2108,9 @@ void ym3812_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 		/* store to sound buffer */
 		bufL[i] = lt;
 		bufR[i] = lt;
+
+		if (OPL->voicesCb)
+			OPL_feed_voices(OPL, rhythm, 0, 14);
 
 		advance(OPL);
 	}
@@ -2189,20 +2223,9 @@ void ym3526_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 		advance_lfo(OPL);
 
 		/* FM part */
-		OPL_CALC_CH(OPL, &OPL->P_CH[0]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[1]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[2]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[3]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[4]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[5]);
+		OPL_CALC_FM(OPL, rhythm);
 
-		if(!rhythm)
-		{
-			OPL_CALC_CH(OPL, &OPL->P_CH[6]);
-			OPL_CALC_CH(OPL, &OPL->P_CH[7]);
-			OPL_CALC_CH(OPL, &OPL->P_CH[8]);
-		}
-		else        /* Rhythm part */
+		if(rhythm)        /* Rhythm part */
 		{
 			OPL_CALC_RH(OPL, &OPL->P_CH[0], (OPL->noise_rng>>0)&1 );
 		}
@@ -2212,6 +2235,9 @@ void ym3526_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 		/* store to sound buffer */
 		bufL[i] = lt;
 		bufR[i] = lt;
+
+		if (OPL->voicesCb)
+			OPL_feed_voices(OPL, rhythm, 0, 14);
 
 		advance(OPL);
 	}
@@ -2385,20 +2411,9 @@ void y8950_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 			YM_DELTAT_ADPCM_CALC(DELTAT);
 
 		/* FM part */
-		OPL_CALC_CH(OPL, &OPL->P_CH[0]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[1]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[2]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[3]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[4]);
-		OPL_CALC_CH(OPL, &OPL->P_CH[5]);
+		OPL_CALC_FM(OPL, rhythm);
 
-		if(!rhythm)
-		{
-			OPL_CALC_CH(OPL, &OPL->P_CH[6]);
-			OPL_CALC_CH(OPL, &OPL->P_CH[7]);
-			OPL_CALC_CH(OPL, &OPL->P_CH[8]);
-		}
-		else        /* Rhythm part */
+		if(rhythm)        /* Rhythm part */
 		{
 			OPL_CALC_RH(OPL, &OPL->P_CH[0], (OPL->noise_rng>>0)&1 );
 		}
@@ -2408,6 +2423,9 @@ void y8950_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 		/* store to sound buffer */
 		bufL[i] = lt;
 		bufR[i] = lt;
+
+		if (OPL->voicesCb)
+			OPL_feed_voices(OPL, rhythm, OPL->output_deltat[0]>>11, 15);
 
 		advance(OPL);
 	}
@@ -2431,6 +2449,148 @@ void y8950_set_keyboard_handler(void *chip,OPL_PORTHANDLER_W KeyboardHandler_w,O
 }
 
 #endif
+
+void opl_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	FM_OPL *OPL = (FM_OPL *)chip;
+	OPL->voicesCb = cb;
+	OPL->voicesParam = param;
+}
+
+/* operator level 0..255 over 96dB range from 9-bit attenuation (0.1875dB per step) */
+static UINT8 opl_level_field(INT32 att)
+{
+	if (att < 0)
+		att = 0;
+	if (att > MAX_ATT_INDEX)
+		att = MAX_ATT_INDEX;
+	return (UINT8)(255 - att * 255 / MAX_ATT_INDEX);
+}
+
+static INT32 opl_slot_att(const OPL_SLOT* SLOT)
+{
+	return SLOT->state == EG_OFF ? MAX_ATT_INDEX : SLOT->TLL + SLOT->volume;
+}
+
+static float opl_att_db(INT32 att)
+{
+	return att >= MAX_ATT_INDEX ? -96.0f : -(float)(att * 96.0 / (MAX_ATT_INDEX + 1));
+}
+
+/* DEVVOICE_FM_* fields of 2 operators channel */
+static void opl_fill_fm_fields(const FM_OPL *OPL, UINT32 ch, DEV_VOICE_STATE* state)
+{
+	/* EG_OFF, EG_REL, EG_SUS, EG_DEC, EG_ATT to DEVVOICE stages */
+	static const UINT8 STAGES[5] = {0, 4, 3, 2, 1};
+	const UINT8* regs = OPL->regs;
+	const UINT32 egRate = (UINT32)(OPL->rate * OPL->freqbase + 0.5);
+	UINT8 op;
+
+	for (op = 0; op < 2; op ++)
+	{
+		const OPL_SLOT* SLOT = &OPL->P_CH[ch].SLOT[op];
+		const UINT8 r = (UINT8)((ch % 3) + (ch / 3) * 8 + op * 3);
+		const UINT8 tvs = regs[0x20 + r];
+		const UINT8 ksl = regs[0x40 + r];
+		const UINT8 ad = regs[0x60 + r];
+		const UINT8 sr = regs[0x80 + r];
+		UINT8* out = &state->fields[DEVVOICE_FM_OPS + op * DEVVOICE_FM_OP_SIZE];
+
+		out[DEVVOICE_FM_OP_MUL] = tvs & 0x0f;
+		out[DEVVOICE_FM_OP_TL] = ksl & 0x3f;
+		out[DEVVOICE_FM_OP_AR] = ad >> 4;
+		out[DEVVOICE_FM_OP_DR] = ad & 0x0f;
+		out[DEVVOICE_FM_OP_SR] = ksl >> 6;
+		out[DEVVOICE_FM_OP_SLRR] = (sr >> 4) | ((sr & 0x0f) << 4);
+		out[DEVVOICE_FM_OP_FLAGS] = (SLOT->state <= EG_ATT ? STAGES[SLOT->state] : 0)
+			| ((tvs & 0x80) ? DEVVOICE_FM_OPF_AM : 0) | ((tvs & 0x40) ? DEVVOICE_FM_OPF_VIB : 0)
+			| ((tvs & 0x20) ? DEVVOICE_FM_OPF_EGT : 0) | ((tvs & 0x10) ? DEVVOICE_FM_OPF_KSR : 0);
+		out[DEVVOICE_FM_OP_EXTRA] = (OPL->type & OPL_TYPE_WAVESEL) && OPL->wavesel ? regs[0xe0 + r] & 3 : 0;
+		state->fields[DEVVOICE_FM_EG + op] = opl_level_field(SLOT->state == EG_OFF ? MAX_ATT_INDEX : SLOT->volume);
+	}
+	state->fields[DEVVOICE_FM_FNUM] = regs[0xa0 + ch];
+	state->fields[DEVVOICE_FM_FNUM + 1] = (regs[0xb0 + ch] & 3) | (((regs[0xb0 + ch] >> 2) & 7) << 4);
+	state->fields[DEVVOICE_FM_GLOBAL] = ((regs[0xbd] & 0x20) ? 0x01 : 0) | ((regs[0xbd] & 0x80) ? 0x02 : 0)
+		| ((regs[0xbd] & 0x40) ? 0x04 : 0) | ((regs[0x08] & 0x80) ? 0x10 : 0) | ((regs[0x08] & 0x40) ? 0x20 : 0)
+		| ((OPL->type & OPL_TYPE_WAVESEL) && OPL->wavesel ? 0x40 : 0);
+	state->fields[DEVVOICE_FM_CHIP] = (OPL->type & OPL_TYPE_WAVESEL) ? DEVVOICE_FM_CHIP_OPL2 : DEVVOICE_FM_CHIP_OPL;
+	state->fields[DEVVOICE_FM_EG_RATE] = (UINT8)(egRate & 0xff);
+	state->fields[DEVVOICE_FM_EG_RATE + 1] = (UINT8)(egRate >> 8);
+}
+
+UINT32 opl_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	/* slots of BD, SD, TT, CY, HH as channel * 2 + slot, and their key bits */
+	static const UINT8 RHYTHM_SLOTS[5] = {6 * 2 + 1, 7 * 2 + 1, 8 * 2, 8 * 2 + 1, 7 * 2};
+	static const UINT8 RHYTHM_KEYS[5] = {0x10, 0x08, 0x04, 0x02, 0x01};
+	FM_OPL *OPL = (FM_OPL *)chip;
+	const UINT8 rhythm = (OPL->regs[0xbd] & 0x20) != 0;
+	const double rate = OPL->rate * OPL->freqbase;
+	UINT32 ch;
+
+	for (ch = 0; ch < 9 + 5 && ch < count; ch ++)
+	{
+		DEV_VOICE_STATE* state = &states[ch];
+		memset(state, 0, sizeof(*state));
+		if (ch < 9)
+		{
+			const OPL_CH* CH = &OPL->P_CH[ch];
+			const UINT32 fnum = CH->block_fnum & 0x3ff;
+			const UINT32 block = (CH->block_fnum >> 10) & 7;
+			const UINT8 con = OPL->regs[0xc0 + ch] & 1;
+			const UINT8 keyOn = (OPL->regs[0xb0 + ch] & 0x20) != 0;
+			INT32 att = opl_slot_att(&CH->SLOT[SLOT2]);
+			if (rhythm && ch >= 6)
+				continue;
+			if (con && opl_slot_att(&CH->SLOT[SLOT1]) < att)
+				att = opl_slot_att(&CH->SLOT[SLOT1]);
+			/* f = fnum * fsam * 2^block / 2^20 */
+			state->freq = (float)(fnum * rate * (1 << block) / (double)(1 << 20));
+			state->level = opl_att_db(att);
+			state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
+			state->kind = DEVVOICE_KIND_OPL_2OP;
+			state->fields[0] = con;
+			state->fields[1] = (OPL->regs[0xc0 + ch] >> 1) & 7;
+			state->fields[2] = opl_level_field(opl_slot_att(&CH->SLOT[SLOT1]));
+			state->fields[3] = opl_level_field(opl_slot_att(&CH->SLOT[SLOT2]));
+			state->fields[6] = keyOn;
+			state->fields[7] = 3;
+			state->fields[8] = (UINT8)block;
+			opl_fill_fm_fields(OPL, ch, state);
+			state->fields[4] = state->fields[DEVVOICE_FM_OPS + DEVVOICE_FM_OP_EXTRA];
+			state->fields[5] = state->fields[DEVVOICE_FM_OPS + DEVVOICE_FM_OP_SIZE + DEVVOICE_FM_OP_EXTRA];
+		}
+		else
+		{
+			const UINT8 idx = (UINT8)(ch - 9);
+			const UINT8 slot = RHYTHM_SLOTS[idx];
+			const OPL_CH* CH = &OPL->P_CH[slot / 2];
+			const INT32 att = opl_slot_att(&CH->SLOT[slot % 2]);
+			const UINT8 keyOn = rhythm && (OPL->regs[0xbd] & RHYTHM_KEYS[idx]);
+			state->kind = DEVVOICE_KIND_OPL_RHYTHM;
+			state->fields[0] = idx;
+			if (rhythm)
+			{
+				state->level = opl_att_db(att);
+				state->flags = DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
+				if (idx == 0 || idx == 2)
+				{
+					state->freq = (float)((CH->block_fnum & 0x3ff) * rate * (1 << ((CH->block_fnum >> 10) & 7))
+						/ (double)(1 << 20));
+					state->flags |= DEVVOICE_FREQ;
+				}
+				else
+				{
+					state->flags |= DEVVOICE_NOISE;
+				}
+				state->fields[1] = opl_level_field(att);
+				state->fields[2] = keyOn;
+				state->fields[3] = 1;
+			}
+		}
+	}
+	return 9 + 5;
+}
 
 void opl_set_mute_mask(void *chip, UINT32 MuteMask)
 {

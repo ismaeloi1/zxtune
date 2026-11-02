@@ -440,16 +440,16 @@ internal class SpcEnvelope {
 }
 
 /**
- * Global registers of S-DSP, carried by binary text of the first voices (see Module::VoiceState::SPC_DSP)
+ * Global registers of S-DSP, the same in all voices (see Module::VoiceState::SPC_DSP)
  */
 internal class SpcGlobals {
     private val regs = IntArray(24)
     val fir = IntArray(8)
 
     fun update(data: ByteArray, voices: Int) {
+        val g = if (voices > 0) VoiceGauges(data, 0) else null
         for (idx in regs.indices) {
-            val voice = idx / 8
-            regs[idx] = if (voice < voices) VoiceGauges(data, voice * VoiceGauges.SIZE).textByte(8 + idx % 8) else 0
+            regs[idx] = g?.field(FIRST_FIELD + idx) ?: 0
         }
         for (idx in 0 until 8) {
             fir[idx] = regs[8 + idx].toByte().toInt()
@@ -476,25 +476,30 @@ internal class SpcGlobals {
     /** Gain of FIR at 0Hz, defines loudness of each echo repeat together with feedback */
     val firDcGain: Float
         get() = abs(fir.sum()) / 128f
+
+    private companion object {
+        const val FIRST_FIELD = 18
+    }
 }
 
 /**
- * Sample of voice: BRR blocks of 16 samples, see Module::VoiceState::SPC_DSP text
+ * Sample of voice: BRR blocks of 16 samples, see Module::VoiceState::SPC_DSP fields
  */
 internal object SpcSample {
+    private const val FLAGS = 11
     private const val INFO = 1
     private const val LOOP = 2
     private const val POSITION = 8
     const val BLOCK_SAMPLES = 16
 
-    fun hasInfo(g: VoiceGauges) = g.textByte(0) and INFO != 0
-    fun loops(g: VoiceGauges) = g.textByte(0) and LOOP != 0
-    fun hasPosition(g: VoiceGauges) = g.textByte(0) and POSITION != 0
-    fun blocks(g: VoiceGauges) = word(g, 1)
+    fun hasInfo(g: VoiceGauges) = g.field(FLAGS) and INFO != 0
+    fun loops(g: VoiceGauges) = g.field(FLAGS) and LOOP != 0
+    fun hasPosition(g: VoiceGauges) = g.field(FLAGS) and POSITION != 0
+    fun blocks(g: VoiceGauges) = word(g, 12)
 
     /** Loop start block or -1 if it's outside of sample */
-    fun loopBlock(g: VoiceGauges) = word(g, 3).let { if (it == 0xffff) -1 else it }
-    fun position(g: VoiceGauges) = word(g, 5)
+    fun loopBlock(g: VoiceGauges) = word(g, 14).let { if (it == 0xffff) -1 else it }
+    fun position(g: VoiceGauges) = word(g, 16)
 
-    private fun word(g: VoiceGauges, at: Int) = g.textByte(at) or (g.textByte(at + 1) shl 8)
+    private fun word(g: VoiceGauges, at: Int) = g.field(at) or (g.field(at + 1) shl 8)
 }

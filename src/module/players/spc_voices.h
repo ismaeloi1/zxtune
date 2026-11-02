@@ -12,7 +12,6 @@
 
 #include "module/voices_scope.h"
 
-#include "pointers.h"
 #include "types.h"
 
 #include "3rdparty/snesspc/snes_spc/SPC_DSP.h"
@@ -93,26 +92,21 @@ namespace Module
         {
           sample.Scan(ram, dir, start, loop);
         }
-        auto* const t = safe_ptr_cast<uint8_t*>(out.Text.data());
         uint8_t flags = endx & (1 << idx) ? SAMPLE_END : 0;
         if (sample.Blocks)
         {
           flags |= SAMPLE_INFO | (sample.Loops ? SAMPLE_LOOP : 0);
-          PutWord(t + 1, sample.Blocks);
-          PutWord(t + 3, sample.LoopBlock);
+          PutWord(&f[12], sample.Blocks);
+          PutWord(&f[14], sample.LoopBlock);
           const auto offset = (uint_t(in.brr_addr) - start) & 0xffff;
           if (offset % BLOCK_SIZE == 0 && offset / BLOCK_SIZE < sample.Blocks)
           {
             flags |= SAMPLE_POSITION;
-            PutWord(t + 5, offset / BLOCK_SIZE);
+            PutWord(&f[16], offset / BLOCK_SIZE);
           }
         }
-        t[0] = flags;
-        // global registers are distributed among voices to keep voice state size
-        for (uint_t g = 0; g < 8 && idx * 8 + g < GLOBALS; ++g)
-        {
-          t[8 + g] = globals[idx * 8 + g];
-        }
+        f[11] = flags;
+        std::copy(globals.begin(), globals.end(), f.begin() + 18);
       }
     }
 

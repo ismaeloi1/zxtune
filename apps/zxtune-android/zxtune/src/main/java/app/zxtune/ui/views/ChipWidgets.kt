@@ -12,18 +12,16 @@ import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
 import app.zxtune.playback.VoiceGauges
-import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.log10
 import kotlin.math.log2
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
-import kotlin.math.sin
 
 /**
  * Draws live state of a single voice according to its chip:
- * - FM (YM2612/OPN, OPL2/3): operators connection schema (as in chips datasheets) with envelope levels
+ * - FM (OPN, OPM, OPL): operators connection schema (as in chips datasheets) with envelope levels, see [FmWidgets]
  * - PSG (SN76489), NES 2A03: volume steps, duty/mode glyphs, periods
  * - MT-32: patch name, played keys, partials states
  * Values are smoothed between frames to avoid flicker of rapidly changing registers.
@@ -77,7 +75,6 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     private val baseLabelSize = textSizePx * 0.85f
     private val path = Path()
     private val box = RectF()
-    private val boxes = Array(4) { RectF() }
 
     // following are not allocated at each frame
     private val area = RectF()
@@ -85,10 +82,7 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     private val glyph = RectF()
     private val glyph2 = RectF()
     private val box2 = RectF()
-    private val levels2 = FloatArray(2)
-    private val levels4 = FloatArray(4)
-    private val waves2 = IntArray(2)
-    private val waves4 = IntArray(4)
+    private val fm = FmWidgets(density, textSizePx)
     private val pressed = BooleanArray(128)
     private var memo = TextMemo()
 
@@ -128,13 +122,11 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
     fun draw(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray, texts: TextMemo = TextMemo()): Boolean {
         memo = texts
         when (g.kind) {
-            VoiceGauges.Kind.OPN_FM -> drawOpnFm(canvas, rect, g, smooth)
+            VoiceGauges.Kind.OPN_FM, VoiceGauges.Kind.OPL_2OP, VoiceGauges.Kind.OPL_4OP -> drawFm(canvas, rect, g, smooth)
 
             VoiceGauges.Kind.OPN_DAC -> drawDac(canvas, rect, g, smooth)
 
             VoiceGauges.Kind.PSG_TONE, VoiceGauges.Kind.PSG_NOISE -> drawPsg(canvas, rect, g, smooth)
-
-            VoiceGauges.Kind.OPL_2OP, VoiceGauges.Kind.OPL_4OP -> drawOpl(canvas, rect, g, smooth)
 
             VoiceGauges.Kind.OPL_RHYTHM -> drawLevelBar(canvas, rect, ease(smooth, 0, g.field(1) / 255f), 24)
 
@@ -150,303 +142,8 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         return true
     }
 
-    // FM operators schema of OPN/OPM algorithms, see OP_NAMES for operators order
-    private fun drawOpnFm(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
-        val alg = g.field(0) and 7
-        val levels = levels4
-        for (op in 0 until 4) {
-            levels[op] = ease(smooth, op, g.field(2 + op) / 255f)
-        }
-        val keys = g.field(10)
-        val info = memo.get(0, alg.toLong() or (g.field(1).toLong() shl 8) or (g.field(7).toLong() shl 16)) {
-            "ALG$alg FB${g.field(1)}${panText(g.field(7))}"
-        }
-        val schema = OPN_ALGORITHMS[alg]
-        drawSchema(canvas, rect, schema, OPN_GRID, levels, keys, g.field(1), info, OP_NAMES, null)
-    }
-
-    // OPL2/OPL3 2 and 4 operators channels, FM or AM (additive) connections
-    private fun drawOpl(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
-        val is4op = g.kind == VoiceGauges.Kind.OPL_4OP
-        if (is4op) {
-            val alg = g.field(0) and 3
-            val levels = levels4
-            val waves = waves4
-            for (op in 0 until 4) {
-                levels[op] = ease(smooth, op, g.field(2 + op) / 255f)
-                waves[op] = g.field(6 + op)
-            }
-            val info = memo.get(0, alg.toLong() or (g.field(1).toLong() shl 8) or (g.field(11).toLong() shl 16)) {
-                "${OPL4_NAMES[alg]} FB${g.field(1)}${panText(g.field(11))}"
-            }
-            val schema = OPL4_ALGORITHMS[alg]
-            drawSchema(canvas, rect, schema, OPL4_GRID, levels, if (g.field(10) != 0) 0xf else 0, g.field(1), info,
-                OP_NAMES, waves)
-        } else {
-            val additive = g.field(0) and 1
-            val levels = levels2
-            val waves = waves2
-            for (op in 0 until 2) {
-                levels[op] = ease(smooth, op, g.field(2 + op) / 255f)
-                waves[op] = g.field(4 + op)
-            }
-            val info = memo.get(1, additive.toLong() or (g.field(1).toLong() shl 8) or (g.field(7).toLong() shl 16)) {
-                "${if (additive != 0) "AM" else "FM"} FB${g.field(1)}${panText(g.field(7))}"
-            }
-            val schema = OPL2_ALGORITHMS[additive]
-            drawSchema(canvas, rect, schema, OPL2_GRID, levels, if (g.field(6) != 0) 3 else 0, g.field(1), info,
-                OP_NAMES, waves)
-        }
-    }
-
-    private fun panText(pan: Int) = when (pan and 3) {
-        2 -> " L"
-        1 -> " R"
-        0 -> " -"
-        else -> ""
-    }
-
-    /**
-     * Yamaha datasheet like figure: operators as boxes filled by envelope level, modulation as arrows (chains run
-     * left to right, a modulator feeds operators of the row below from above), carriers are bright and connected to
-     * output, feedback loop on the first operator.
-     */
-    private fun drawSchema(
-        canvas: Canvas,
-        rect: RectF,
-        schema: Schema,
-        grid: Schema.Grid,
-        levels: FloatArray,
-        keys: Int,
-        feedback: Int,
-        info: String,
-        names: Array<String>,
-        waves: IntArray?
-    ) {
-        val ops = levels.size
-        val carriers = schema.carriers
-        // space for buses and feedback loop is reserved always to keep boxes of all algorithms at the same place
-        val area = drawSchemaInfo(canvas, rect, info)
-        // gaps are small part of short cards, operators boxes are the main content
-        val loopGap = min(density * 7, area.width() * 0.04f)
-        val topGap = min(density * 5, area.height() * 0.07f)
-        val busGap = min(density * 6, area.height() * 0.09f)
-        area.left += loopGap
-        area.top += topGap
-        area.right -= density * 10
-        area.bottom -= busGap
-        if (area.height() < density * 12 || area.width() < density * 24) {
-            return
-        }
-        // Box size depends only on the biggest layout of chip's algorithms, so live algorithm changes do not
-        // resize boxes. The rest of cell is for arrows, they should be visible at small cards too.
-        val boxH = area.height() / grid.rows * 0.72f
-        val boxW = min(area.width() / grid.cols * 0.62f, boxH * 2.2f)
-        val cellW = area.width() / schema.cols
-        // single row figures are centered vertically
-        val cellH = area.height() / grid.rows
-        val rowsTop = area.top + cellH * (grid.rows - schema.rows) / 2
-        for (op in 0 until ops) {
-            val cx = area.left + cellW * (schema.col[op] + 0.5f)
-            val cy = rowsTop + cellH * (schema.row[op] + 0.5f)
-            boxes[op].set(cx - boxW / 2, cy - boxH / 2, cx + boxW / 2, cy + boxH / 2)
-        }
-        val arrow = min(density * 3.5f, boxH / 4)
-        for (edge in schema.edges) {
-            val src = boxes[edge shr 4]
-            val dst = boxes[edge and 15]
-            path.reset()
-            if (dst.centerY() == src.centerY()) {
-                // chain in a row
-                path.moveTo(src.right, src.centerY())
-                path.lineTo(dst.left - arrow * 0.5f, dst.centerY())
-                canvas.drawPath(path, dimStroke)
-                drawArrowHead(canvas, dst.left, dst.centerY(), 1f, 0f, arrow)
-            } else {
-                // modulator above: leaves by side facing destination (or bottom if right above) and enters it from top
-                val x = dst.centerX()
-                when {
-                    x > src.right -> path.moveTo(src.right, src.centerY())
-                    x < src.left -> path.moveTo(src.left, src.centerY())
-                    else -> path.moveTo(x, src.bottom)
-                }
-                if (x > src.right || x < src.left) {
-                    path.lineTo(x, src.centerY())
-                }
-                path.lineTo(x, dst.top - arrow * 0.5f)
-                canvas.drawPath(path, dimStroke)
-                drawArrowHead(canvas, x, dst.top, 0f, 1f, arrow)
-            }
-        }
-        // Carriers which are the last in their rows go to the bus at right, else all carriers go down to the bus
-        // under the figure (layouts keep such carriers at the bottom row, so lines never cross operators)
-        val rightBus = (0 until ops).all { op ->
-            carriers and (1 shl op) == 0 || (0 until ops).none {
-                boxes[it].centerY() == boxes[op].centerY() && boxes[it].left > boxes[op].left
-            }
-        }
-        var outY = 0f
-        var outX = 0f
-        if (rightBus) {
-            val busX = area.right + density * 5
-            var busTop = Float.MAX_VALUE
-            var busBottom = -Float.MAX_VALUE
-            for (op in 0 until ops) {
-                if (carriers and (1 shl op) != 0) {
-                    val b = boxes[op]
-                    canvas.drawLine(b.right, b.centerY(), busX, b.centerY(), stroke)
-                    busTop = min(busTop, b.centerY())
-                    busBottom = max(busBottom, b.centerY())
-                }
-            }
-            canvas.drawLine(busX, busTop, busX, busBottom, stroke)
-            outX = busX
-            outY = (busTop + busBottom) / 2
-        } else {
-            var busLeft = Float.MAX_VALUE
-            var bottom = -Float.MAX_VALUE
-            for (op in 0 until ops) {
-                if (carriers and (1 shl op) != 0) {
-                    busLeft = min(busLeft, boxes[op].centerX())
-                    bottom = max(bottom, boxes[op].bottom)
-                }
-            }
-            outY = min(bottom + busGap, rect.bottom - stroke.strokeWidth)
-            for (op in 0 until ops) {
-                if (carriers and (1 shl op) != 0) {
-                    val b = boxes[op]
-                    canvas.drawLine(b.centerX(), b.bottom, b.centerX(), outY, stroke)
-                }
-            }
-            outX = busLeft
-        }
-        if (carriers != 0) {
-            canvas.drawLine(outX, outY, rect.right - arrow * 0.5f, outY, stroke)
-            drawArrowHead(canvas, rect.right, outY, 1f, 0f, arrow, stroke)
-        }
-        // Feedback loop from output (right) of the first operator back to its input (left) over the top.
-        // Connections from it start at right side or bottom below the loop, so they never cross it.
-        if (feedback != 0) {
-            val b = boxes[0]
-            val top = b.top - topGap * 0.6f
-            val left = b.left - loopGap * 0.6f
-            val right = b.right + min(loopGap * 0.6f, (cellW - boxW) / 3)
-            val y = b.centerY() - b.height() / 4
-            path.reset()
-            path.moveTo(b.right, y)
-            path.lineTo(right, y)
-            path.lineTo(right, top)
-            path.lineTo(left, top)
-            path.lineTo(left, y)
-            path.lineTo(b.left - arrow * 0.5f, y)
-            canvas.drawPath(path, dimStroke)
-            drawArrowHead(canvas, b.left, y, 1f, 0f, arrow)
-        }
-        for (op in 0 until ops) {
-            drawOperator(
-                canvas,
-                boxes[op],
-                levels[op],
-                carriers and (1 shl op) != 0,
-                keys and (1 shl op) != 0,
-                names[op],
-                waves?.getOrNull(op)
-            )
-        }
-    }
-
-    // filled triangle with tip at (x, y) pointing to (dx, dy) direction (unit axis vector)
-    private fun drawArrowHead(canvas: Canvas, x: Float, y: Float, dx: Float, dy: Float, size: Float, paint: Paint = dimStroke) {
-        path.reset()
-        path.moveTo(x, y)
-        path.lineTo(x - dx * size * 1.6f - dy * size, y - dy * size * 1.6f - dx * size)
-        path.lineTo(x - dx * size * 1.6f + dy * size, y - dy * size * 1.6f + dx * size)
-        path.close()
-        fill.color = paint.color
-        canvas.drawPath(path, fill)
-    }
-
-    /**
-     * Algorithm and feedback are placed at top or (if there's no vertical space to spare) at left in two lines
-     * @return area left for schema
-     */
-    private fun drawSchemaInfo(canvas: Canvas, rect: RectF, info: String): RectF {
-        val textHeight = text.fontSpacing
-        if (rect.width() < rect.height() * 3) {
-            drawFit(canvas, info, rect.left, rect.top - text.ascent(), rect.width())
-            area.set(rect.left, rect.top + textHeight, rect.right, rect.bottom)
-            return area
-        }
-        val scale = min(1f, rect.height() / 2 / textHeight)
-        text.textSize = baseTextSize * scale
-        val infoWidth = text.measureText(INFO_TEMPLATE) + density * 4
-        val split = info.indexOf(' ')
-        val lineHeight = textHeight * scale
-        val y = rect.centerY() - lineHeight - text.ascent()
-        canvas.drawText(info, 0, split, rect.left, y, text)
-        canvas.drawText(info, split + 1, info.length, rect.left, y + lineHeight, text)
-        text.textSize = baseTextSize
-        area.set(rect.left + infoWidth, rect.top, rect.right, rect.bottom)
-        return area
-    }
-
-    private fun drawOperator(
-        canvas: Canvas,
-        b: RectF,
-        level: Float,
-        carrier: Boolean,
-        key: Boolean,
-        name: String,
-        wave: Int?
-    ) {
-        // envelope level fill from bottom, carriers are brighter as they are heard directly
-        fill.color = Color.argb(if (carrier) 150 else 80, 255, 255, 255)
-        box.set(b.left, b.bottom - b.height() * level.coerceIn(0f, 1f), b.right, b.bottom)
-        canvas.drawRect(box, fill)
-        // pressed key makes operator outline bold
-        val outline = if (carrier) stroke else dimStroke
-        val width = outline.strokeWidth
-        if (key) {
-            outline.strokeWidth = width * 2
-        }
-        canvas.drawRect(b, outline)
-        outline.strokeWidth = width
-        val withWave = wave != null && b.height() > baseLabelSize * 2.2f
-        // number only (as in datasheets and Furnace algorithm figures) for small boxes, as big as possible
-        val small = b.height() < density * MIN_NAMED_BOX_DP
-        label.textSize = min(baseLabelSize * 1.3f, b.height() * (if (withWave) {
-            0.42f
-        } else if (small) {
-            0.75f
-        } else {
-            0.62f
-        }))
-        val shown = if (!small && label.measureText(name) <= b.width() - density * 4) name else name.substring(OP_PREFIX.length)
-        if (wave != null && withWave) {
-            drawOplWave(canvas, b, wave)
-            canvas.drawText(shown, b.centerX(), b.bottom - density * 3, label)
-        } else {
-            canvas.drawText(shown, b.centerX(), b.centerY() - (label.ascent() + label.descent()) / 2, label)
-        }
-        label.textSize = baseLabelSize
-    }
-
-    // OPL waveforms: sine, half sine, abs sine, quarter sine, and OPL3 extensions
-    private fun drawOplWave(canvas: Canvas, b: RectF, wave: Int) {
-        val w = b.width() * 0.7f
-        val h = b.height() * 0.22f
-        val left = b.centerX() - w / 2
-        val cy = b.top + b.height() * 0.32f
-        path.reset()
-        val steps = 24
-        for (step in 0..steps) {
-            val phase = step.toFloat() / steps
-            val y = oplWaveform(wave and 7, phase)
-            val x = left + w * phase
-            if (step == 0) path.moveTo(x, cy - y * h) else path.lineTo(x, cy - y * h)
-        }
-        canvas.drawPath(path, stroke)
-    }
+    // see FmWidgets
+    private fun drawFm(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) = fm.drawCard(canvas, rect, g, smooth, memo)
 
     private fun drawDac(canvas: Canvas, rect: RectF, g: VoiceGauges, smooth: FloatArray) {
         val value = (g.field(1) - 128) / 128f
@@ -703,97 +400,11 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         return value
     }
 
-    /**
-     * Operators placement on grid and modulation connections (source shl 4 or destination)
-     */
-    class Schema(
-        val col: FloatArray,
-        val row: FloatArray,
-        val edges: IntArray,
-        val carriers: Int
-    ) {
-        val cols = (col.maxOrNull() ?: 0f).toInt() + 1
-        val rows = ((row.maxOrNull() ?: 0f) + 1f).toInt().coerceAtLeast(1)
-
-        /**
-         * The biggest figure among chip's algorithms
-         */
-        class Grid(family: Array<Schema>) {
-            val cols = family.maxOf { it.cols }
-            val rows = family.maxOf { it.rows }
-        }
-    }
-
     companion object {
         const val SMOOTH_SIZE = 8
 
         // for ~30fps updates of dashboard
         private const val EASING = 0.8f
-
-        /*
-         * Operators are numbered as in Furnace tracker (OP1..OP4, src/gui/guiConst.cpp opOrder), Nuked-OPN2 and
-         * YM2151 datasheet (M1 C1 M2 C2): by connection order (OP1 > OP2 > OP3 > OP4 in ALG 0), not registers order.
-         * Registers order is OP1 OP3 OP2 OP4 (OPN, +0/+4/+8/+C) and M1 M2 C1 C2 (OPM), so emulation cores report
-         * levels and keys already reordered (FM_SLOTS in fmopn.c, OPS in ym2151.c). Yamaha's S1..S4 names are
-         * avoided, as documents disagree on S2/S3 order. OPL operators follow registers order (OPL3 datasheet).
-         */
-        private const val OP_PREFIX = "OP"
-        private val OP_NAMES = Array(4) { "$OP_PREFIX${it + 1}" }
-        private val OPL4_NAMES = arrayOf("FM-FM", "AM-FM", "FM-AM", "AM-AM")
-
-        // operator box height to fit name, smaller ones are labeled by number
-        private const val MIN_NAMED_BOX_DP = 20
-
-        // the widest line of algorithm and feedback info
-        private const val INFO_TEMPLATE = "FB7 -"
-
-        /*
-         * Hand placed figures after Yamaha datasheets (YM2612/YM2151 algorithm figures, OPL3 4 operators connections)
-         * and Furnace drawAlgorithm (src/gui/insEdit/insTabFM.cpp), connections are as in MAME fmopn.c
-         * setup_connection and Nuked-OPN2 fm_algorithm. Cards are wide and short, so at most two rows are used:
-         * the bottom row is the main chain or parallel carriers, modulators of other branches are above their
-         * destinations. Columns and rows are 0-based, operators are 0-based in edges.
-         */
-        private val OPN_ALGORITHMS = arrayOf(
-            // 1 > 2 > 3 > 4
-            Schema(floatArrayOf(0f, 1f, 2f, 3f), floatArrayOf(0f, 0f, 0f, 0f), intArrayOf(0x01, 0x12, 0x23), 8),
-            // (1 + 2) > 3 > 4
-            Schema(floatArrayOf(0f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x02, 0x12, 0x23), 8),
-            // 1 + (2 > 3) > 4
-            Schema(floatArrayOf(1f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x03, 0x12, 0x23), 8),
-            // (1 > 2) + 3 > 4
-            Schema(floatArrayOf(0f, 1f, 1f, 2f), floatArrayOf(0f, 0f, 1f, 1f), intArrayOf(0x01, 0x13, 0x23), 8),
-            // (1 > 2) + (3 > 4)
-            Schema(floatArrayOf(0f, 1f, 0f, 1f), floatArrayOf(0f, 0f, 1f, 1f), intArrayOf(0x01, 0x23), 10),
-            // 1 > (2 + 3 + 4)
-            Schema(floatArrayOf(1f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x01, 0x02, 0x03), 14),
-            // (1 > 2) + 3 + 4
-            Schema(floatArrayOf(0f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x01), 14),
-            // 1 + 2 + 3 + 4
-            Schema(floatArrayOf(0f, 1f, 2f, 3f), floatArrayOf(0f, 0f, 0f, 0f), intArrayOf(), 15),
-        )
-
-        // OPL 2 operators: FM (modulator -> carrier) or AM (both heard)
-        private val OPL2_ALGORITHMS = arrayOf(
-            Schema(floatArrayOf(0f, 1f), floatArrayOf(0f, 0f), intArrayOf(0x01), 2),
-            Schema(floatArrayOf(0f, 1f), floatArrayOf(0f, 0f), intArrayOf(), 3),
-        )
-
-        // OPL3 4 operators (CNT of the first and second pairs), see OPL3 datasheet and Furnace FM_ALGS_4OP_OPL
-        private val OPL4_ALGORITHMS = arrayOf(
-            // FM-FM: 1 > 2 > 3 > 4
-            Schema(floatArrayOf(0f, 1f, 2f, 3f), floatArrayOf(0f, 0f, 0f, 0f), intArrayOf(0x01, 0x12, 0x23), 8),
-            // AM-FM: 1 + (2 > 3 > 4)
-            Schema(floatArrayOf(0f, 0f, 1f, 2f), floatArrayOf(0f, 1f, 1f, 1f), intArrayOf(0x12, 0x23), 9),
-            // FM-AM: (1 > 2) + (3 > 4)
-            Schema(floatArrayOf(0f, 1f, 0f, 1f), floatArrayOf(0f, 0f, 1f, 1f), intArrayOf(0x01, 0x23), 10),
-            // AM-AM: 1 + (2 > 3) + 4
-            Schema(floatArrayOf(0f, 1f, 1f, 2f), floatArrayOf(1f, 0f, 1f, 1f), intArrayOf(0x12), 13),
-        )
-
-        private val OPN_GRID = Schema.Grid(OPN_ALGORITHMS)
-        private val OPL2_GRID = Schema.Grid(OPL2_ALGORITHMS)
-        private val OPL4_GRID = Schema.Grid(OPL4_ALGORITHMS)
 
         private val RHYTHM_NAMES = arrayOf("Bass drum", "Snare", "Tom", "Cymbal", "Hi-hat")
         private val PARTIAL_STATES = arrayOf("-", "ATK", "SUS", "REL")
@@ -875,21 +486,6 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
                 owner == 9 -> "$state rhythm"
                 g.hasFrequency -> "$state P$owner ${noteName(g.frequency)}"
                 else -> "$state P$owner"
-            }
-        }
-
-        // phase 0..1 of one period
-        fun oplWaveform(wave: Int, phase: Float): Float {
-            val s = sin(2 * PI * phase).toFloat()
-            return when (wave) {
-                0 -> s
-                1 -> max(s, 0f)
-                2 -> abs(s)
-                3 -> if ((phase * 4).toInt() % 2 == 0) abs(s) else 0f
-                4 -> if (phase < 0.5f) sin(4 * PI * phase).toFloat() else 0f
-                5 -> if (phase < 0.5f) abs(sin(4 * PI * phase).toFloat()) else 0f
-                6 -> if (phase < 0.5f) 1f else -1f
-                else -> if (phase < 0.5f) 1f - phase * 2 else -(phase - 0.5f) * 2
             }
         }
     }

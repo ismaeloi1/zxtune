@@ -59,10 +59,9 @@ namespace Module
       OPL_RHYTHM = 7,
       //! ENVX 0..127, envelope mode (0 release, 1 attack, 2 decay, 3 sustain, 4 gain), ADSR1, ADSR2, GAIN, SRCN,
       //! volume left, volume right (signed), pitch low, pitch high (14 bit), flags (1 echo, 2 pitch modulation, 4 noise)
-      //! Text is binary: sample flags (1 info valid, 2 loops, 4 end reached (ENDX), 8 position valid), sample length,
-      //! loop start and current position in 9-byte BRR blocks (16 bit LE each, loop is 0xffff if outside of sample),
-      //! reserved byte, then 8 bytes of global registers, voice N carries bytes N*8..N*8+7 of
-      //! MVOLL MVOLR EVOLL EVOLR EFB EDL FLG ESA, FIR0..FIR7, DIR NON EON PMON KON KOFF ENDX
+      //! sample flags (1 info valid, 2 loops, 4 end reached (ENDX), 8 position valid), sample length, loop start and
+      //! current position in 9-byte BRR blocks (16 bit LE each, loop is 0xffff if outside of sample), global registers
+      //! MVOLL MVOLR EVOLL EVOLR EFB EDL FLG ESA FIR0..FIR7 DIR NON EON PMON KON KOFF ENDX (same in all voices)
       SPC_DSP = 8,
       //! active notes count, up to 8 keys (0 - none), partials used; Text is patch name
       MT32_PART = 9,
@@ -78,7 +77,58 @@ namespace Module
       NES_DMC = 14,
     };
 
-    static const std::size_t FIELDS = 12;
+    //! FM kinds (OPN_FM, OPL_2OP, OPL_4OP) fields extension, zero if not provided (FM_CHIP is FM_CHIP_NONE):
+    //! - FM_OPS: 8 bytes per operator in levels order: multiplier, TL, AR, DR (D1R),
+    //!   OPN/OPM SR (D2R) | KS << 5 or OPL KSL, SL | RR << 4, envelope stage (0 off, 1 attack, 2 decay, 3 sustain,
+    //!   4 release) | FM_OPF_* flags, OPN detune | SSG-EG << 3 or OPM DT1 | DT2 << 3 or OPL waveform
+    //! - FM_EG: 4 bytes of operators envelope output without TL (0..255 as levels)
+    //! - FM_FNUM: 2 bytes of frequency number (OPN 11 bits, OPL 10 bits and block at bits 12..14) or OPM key code
+    //!   and key fraction
+    //! - FM_GLOBAL: chip state, OPN: LFO frequency 0..7 | LFO on 0x08 | CH3 mode (1 special, 2 CSM) << 4 |
+    //!   DAC on 0x40; OPL: rhythm 0x01 | AM depth 0x02 | VIB depth 0x04 | OPL3 0x08 | CSM 0x10 | NTS 0x20 |
+    //!   WSE 0x40; OPM: LFO waveform 0..3 | noise on 0x04
+    //! - FM_GLOBAL2: OPM LFO frequency, OPL3 4 operators connections (register 0x104)
+    //! - FM_AMD, FM_PMD, FM_NOISE: OPM LFO depths and noise frequency
+    //! - FM_CHIP: chip type, FM_EG_RATE: 16 bit envelope generator clock in Hz, FM_TIMER_A: 16 bit timer A value
+    //! Mirrors DEVVOICE_FM_* of libvgm
+    enum : uint8_t
+    {
+      FM_OPS = 16,
+      FM_OP_SIZE = 8,
+      FM_EG = 48,
+      FM_FNUM = 52,
+      FM_GLOBAL = 54,
+      FM_GLOBAL2 = 55,
+      FM_AMD = 56,
+      FM_PMD = 57,
+      FM_NOISE = 58,
+      FM_CHIP = 59,
+      FM_EG_RATE = 60,
+      FM_TIMER_A = 62,
+    };
+
+    enum : uint8_t
+    {
+      FM_OPF_AM = 0x08,
+      FM_OPF_VIB = 0x10,
+      FM_OPF_EGT = 0x20,
+      FM_OPF_KSR = 0x40,
+    };
+
+    enum FmChip : uint8_t
+    {
+      FM_CHIP_NONE = 0,
+      FM_CHIP_OPN = 1,
+      FM_CHIP_OPN2 = 2,
+      FM_CHIP_OPNA = 3,
+      FM_CHIP_OPNB = 4,
+      FM_CHIP_OPM = 5,
+      FM_CHIP_OPL = 6,
+      FM_CHIP_OPL2 = 7,
+      FM_CHIP_OPL3 = 8,
+    };
+
+    static const std::size_t FIELDS = 64;
     static const std::size_t TEXT = 16;
 
     //! Hz

@@ -80,6 +80,30 @@ namespace Devices::FM
     float Frequency = 0;
     //! dB of carriers' envelope attenuation, 0 is maximal level
     float Level = -96.0f;
+
+    //! Operators in connection order (OP1..OP4), not registers order
+    struct Operator
+    {
+      //! registers 0x30 (DT/MUL), 0x40 (TL), 0x50 (KS/AR), 0x60 (D1R), 0x70 (D2R), 0x80 (SL/RR), 0x90 (SSG-EG)
+      std::array<uint8_t, 7> Registers = {};
+      //! 0..255 (maximal) output level including TL
+      uint8_t Level = 0;
+      //! 0..255 (maximal) envelope generator output
+      uint8_t Envelope = 0;
+      //! 0 off, 1 attack, 2 decay, 3 sustain, 4 release
+      uint8_t Stage = 0;
+      bool Key = false;
+    };
+    std::array<Operator, 4> Operators;
+    //! register 0xb0
+    uint8_t AlgorithmFeedback = 0;
+    //! 3 bits of block and 11 bits of fnum
+    uint16_t BlockFnum = 0;
+    //! register 0x27 of chip
+    uint8_t Mode = 0;
+    uint16_t TimerA = 0;
+    //! Hz
+    uint16_t EnvelopeRate = 0;
   };
 
   //! @brief Separate channels output for visualization (e.g. oscilloscope)

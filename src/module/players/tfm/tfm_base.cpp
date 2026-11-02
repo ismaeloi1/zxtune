@@ -122,6 +122,7 @@ namespace Module
         out.Frequency = in.Frequency;
         out.Level = in.Level;
         out.Flags = VoiceState::HAS_LEVEL | (in.Frequency > 0 ? VoiceState::HAS_FREQUENCY | VoiceState::KEY_ON : 0);
+        FillFmFields(in, out);
       }
       const auto period = std::max<uint_t>(Scope->GetStatePeriod(), 1);
       for (uint_t done = 0; done < count;)
@@ -131,6 +132,50 @@ namespace Module
         done += part;
         Scope->FeedVoices(0, states.data(), voices);
       }
+    }
+
+    // Same layout as reported by libvgm cores for YM2203 (see Module::VoiceState::OPN_FM)
+    static void FillFmFields(const Devices::FM::ChannelState& in, VoiceState& out)
+    {
+      // carriers mask per algorithm in OP1..OP4 order
+      static const uint8_t CARRIERS[8] = {0x08, 0x08, 0x08, 0x08, 0x0a, 0x0e, 0x0e, 0x0f};
+      auto& fields = out.Fields;
+      const auto alg = in.AlgorithmFeedback & 7;
+      const uint_t fnum = in.BlockFnum & 0x7ff;
+      fields[0] = alg;
+      fields[1] = (in.AlgorithmFeedback >> 3) & 7;
+      fields[6] = CARRIERS[alg];
+      // mono chip
+      fields[7] = 3;
+      fields[11] = (in.BlockFnum >> 11) & 7;
+      for (uint_t idx = 0; idx < 4; ++idx)
+      {
+        const auto& op = in.Operators[idx];
+        const auto& regs = op.Registers;
+        auto* dst = fields.data() + VoiceState::FM_OPS + idx * VoiceState::FM_OP_SIZE;
+        fields[2 + idx] = op.Level;
+        fields[10] |= op.Key ? 1 << idx : 0;
+        fields[VoiceState::FM_EG + idx] = op.Envelope;
+        dst[0] = regs[0] & 0x0f;
+        dst[1] = regs[1] & 0x7f;
+        dst[2] = regs[2] & 0x1f;
+        dst[3] = regs[3] & 0x1f;
+        dst[4] = (regs[4] & 0x1f) | ((regs[2] >> 6) << 5);
+        dst[5] = (regs[5] >> 4) | ((regs[5] & 0x0f) << 4);
+        // YM2203 has no LFO, so no AM flag
+        dst[6] = op.Stage;
+        dst[7] = ((regs[0] >> 4) & 7) | ((regs[6] & 0x0f) << 3);
+      }
+      fields[VoiceState::FM_FNUM] = fnum & 0xff;
+      fields[VoiceState::FM_FNUM + 1] = fnum >> 8;
+      const auto ch3 = in.Mode & 0xc0;
+      fields[VoiceState::FM_GLOBAL] = ch3 == 0x40 ? 0x10 : (ch3 == 0x80 ? 0x20 : 0);
+      fields[VoiceState::FM_CHIP] = VoiceState::FM_CHIP_OPN;
+      fields[VoiceState::FM_EG_RATE] = in.EnvelopeRate & 0xff;
+      fields[VoiceState::FM_EG_RATE + 1] = in.EnvelopeRate >> 8;
+      fields[VoiceState::FM_TIMER_A] = in.TimerA & 0xff;
+      fields[VoiceState::FM_TIMER_A + 1] = in.TimerA >> 8;
+      out.Kind = VoiceState::OPN_FM;
     }
 
   private:

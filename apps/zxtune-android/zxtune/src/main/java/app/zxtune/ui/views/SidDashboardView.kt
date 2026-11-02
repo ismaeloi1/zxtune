@@ -17,7 +17,9 @@ import android.graphics.Typeface
 import android.os.Build
 import android.util.AttributeSet
 import android.util.TypedValue
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import app.zxtune.Logger
 import app.zxtune.playback.ChipGauges
 import app.zxtune.playback.ChipState
@@ -182,6 +184,7 @@ class SidDashboardView @JvmOverloads constructor(
     private val widget = RectF()
     private val lines = FloatArray(ChipGauges.COLUMNS * 4)
     private val widgets = ChipWidgets(density, sp(TEXT_SIZE_SP))
+    private val fmFocus = FmFocus(density, sp(1f))
     private val smooth = Array(MAX_VOICES) { FloatArray(ChipWidgets.SMOOTH_SIZE) }
     private val widgetTexts = Array(MAX_VOICES) { ChipWidgets.TextMemo() }
 
@@ -361,6 +364,7 @@ class SidDashboardView @JvmOverloads constructor(
         key = key * 31 + data.count
         key = key * 31 + System.identityHashCode(data.layout)
         key = key * 31 + lines
+        key = key * 31 + fmFocus.key
         if (data.kind == FrameResult.GAUGES_VOICES) {
             // cards layout depends on voice kind
             for (voice in 0 until minOf(data.count, data.bytes.size / VoiceGauges.SIZE)) {
@@ -837,6 +841,10 @@ class SidDashboardView @JvmOverloads constructor(
             columnsLayout = current
             cardTitles.forEach { it.fill(null) }
         }
+        // single FM channel inspector instead of cards
+        if (fmFocus.draw(canvas, pass.isDynamic, current, data, voices, width.toFloat(), areaHeight, smooth)) {
+            return
+        }
         val columns = columns
         val fullW = width.toFloat()
         var voice = 0
@@ -880,6 +888,7 @@ class SidDashboardView @JvmOverloads constructor(
         if (pass.isStatic) {
             canvas.drawRect(rect, framePaint)
         }
+        fmFocus.card(voice, rect, gauges.kind)
         // title band is separated from graphs to keep both readable
         val stable = summaries[voice]
         if (pass.isDynamic) {
@@ -1398,6 +1407,37 @@ class SidDashboardView @JvmOverloads constructor(
             canvas.drawText(SPC_FIR_ZERO, area.right - density * 2, zero - spcLabelPaint.descent() - density, spcLabelPaint)
             spcLabelPaint.textAlign = Paint.Align.LEFT
         }
+    }
+
+    @androidx.annotation.VisibleForTesting
+    internal fun openFmInspector(voice: Int, operator: Int = -1): Boolean {
+        val data = exchange.acquire()
+        return fmFocus.open(data.layout, data.bytes, minOf(data.count, data.bytes.size / VoiceGauges.SIZE), voice, operator)
+    }
+
+    private var downX = 0f
+    private var downY = 0f
+
+    // taps on FM cards open channel inspector (see [FmFocus]), other touches are just consumed
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = event.x
+                downY = event.y
+            }
+
+            MotionEvent.ACTION_UP -> {
+                val slop = ViewConfiguration.get(context).scaledTouchSlop
+                if (abs(event.x - downX) <= slop && abs(event.y - downY) <= slop) {
+                    val data = exchange.acquire()
+                    val voices = if (data.kind == FrameResult.GAUGES_VOICES) data.count else 0
+                    if (fmFocus.tap(event.x, event.y, data.bytes, voices)) {
+                        invalidate()
+                    }
+                }
+            }
+        }
+        return super.onTouchEvent(event)
     }
 
     private fun cardTitle(voice: Int, group: String, name: String, keyOn: Boolean, withGroup: Boolean): String {

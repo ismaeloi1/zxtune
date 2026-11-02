@@ -314,6 +314,16 @@ namespace Module::LibVGM
                     && VoiceState::OPL_RHYTHM == DEVVOICE_KIND_OPL_RHYTHM,
                 "Voice kinds mismatch");
   static_assert(VoiceState::FIELDS == sizeof(DEV_VOICE_STATE::fields), "Voice fields mismatch");
+  static_assert(VoiceState::FM_OPS == DEVVOICE_FM_OPS && VoiceState::FM_OP_SIZE == DEVVOICE_FM_OP_SIZE
+                    && VoiceState::FM_EG == DEVVOICE_FM_EG && VoiceState::FM_FNUM == DEVVOICE_FM_FNUM
+                    && VoiceState::FM_GLOBAL == DEVVOICE_FM_GLOBAL && VoiceState::FM_GLOBAL2 == DEVVOICE_FM_GLOBAL2
+                    && VoiceState::FM_AMD == DEVVOICE_FM_AMD && VoiceState::FM_PMD == DEVVOICE_FM_PMD
+                    && VoiceState::FM_NOISE == DEVVOICE_FM_NOISE && VoiceState::FM_CHIP == DEVVOICE_FM_CHIP
+                    && VoiceState::FM_EG_RATE == DEVVOICE_FM_EG_RATE && VoiceState::FM_TIMER_A == DEVVOICE_FM_TIMER_A
+                    && VoiceState::FM_OPF_AM == DEVVOICE_FM_OPF_AM && VoiceState::FM_OPF_VIB == DEVVOICE_FM_OPF_VIB
+                    && VoiceState::FM_OPF_EGT == DEVVOICE_FM_OPF_EGT && VoiceState::FM_OPF_KSR == DEVVOICE_FM_OPF_KSR
+                    && VoiceState::FM_CHIP_OPL3 == DEVVOICE_FM_CHIP_OPL3,
+                "FM voice fields mismatch");
 
   // Separate voices output for oscilloscope.
   // Chips with per-channel output support in emulation core (see RWF_VOICES) are tapped directly (as Furnace does).

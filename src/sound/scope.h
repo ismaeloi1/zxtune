@@ -88,10 +88,10 @@ namespace Sound
     //!   order: wave (covers requested window), level (dB down to -48dB), frequency (log scale, 7 octaves from A0)
     //!   level and frequency are 16384 C64 cycles per column, as for SID gauges (including alignment)
     //! - last voice state: frequency (float Hz), level (float dB), flags, kind (see Module::VoiceState),
-    //!   12 bytes of chip specific fields, 16 bytes of text, padded to VOICE_STATE_SIZE, little endian
+    //!   64 bytes of chip specific fields, 16 bytes of text, padded to VOICE_STATE_SIZE, little endian
     //! - progress of the last slow column (0..255) at VOICE_STATE_SIZE - 1
     static const uint_t VOICE_GAUGES_COUNT = 3;
-    static const uint_t VOICE_STATE_SIZE = 48;
+    static const uint_t VOICE_STATE_SIZE = 96;
     static const uint_t VOICE_GAUGES_SIZE = VOICE_GAUGES_COUNT * GAUGE_COLUMNS * 2 + VOICE_STATE_SIZE;
 
     //! @param maxVoices maximum voices count to get

@@ -33,8 +33,7 @@ class ChipDashboardRenderTest {
         val freq: Float = 0f,
         val level: Float = -12f,
         val flags: Int = 1 or 2 or 4,
-        val text: String = "",
-        val textBytes: IntArray = IntArray(0)
+        val text: String = ""
     )
 
     private fun makeData(voices: List<Voice>): ByteArray {
@@ -58,8 +57,7 @@ class ChipDashboardRenderTest {
             data[state + 8] = voice.flags.toByte()
             data[state + 9] = voice.kind.toByte()
             voice.fields.forEachIndexed { f, value -> data[state + 10 + f] = value.toByte() }
-            voice.text.toByteArray().forEachIndexed { c, b -> data[state + 22 + c] = b }
-            voice.textBytes.forEachIndexed { c, b -> data[state + 22 + c] = b.toByte() }
+            voice.text.toByteArray().forEachIndexed { c, b -> data[state + 10 + VoiceGauges.FIELDS + c] = b }
         }
         return data
     }
@@ -171,23 +169,15 @@ class ChipDashboardRenderTest {
         return regs.indices.map { idx ->
             val r = regs[idx]
             val s = samples[idx]
-            val text = IntArray(16)
-            text[0] = s[0]
-            for ((at, value) in listOf(1 to s[1], 3 to s[2], 5 to s[3])) {
-                text[at] = value and 0xff
-                text[at + 1] = value shr 8
+            val fields = IntArray(18 + globals.size)
+            intArrayOf(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8] and 0xff, r[8] shr 8, r[9]).copyInto(fields)
+            fields[11] = s[0]
+            for ((at, value) in listOf(12 to s[1], 14 to s[2], 16 to s[3])) {
+                fields[at] = value and 0xff
+                fields[at + 1] = value shr 8
             }
-            for (g in 0 until 8) {
-                text[8 + g] = globals.getOrElse(idx * 8 + g) { 0 }
-            }
-            Voice(
-                VoiceGauges.Kind.SPC_DSP,
-                intArrayOf(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8] and 0xff, r[8] shr 8, r[9]),
-                0f,
-                if (r[0] == 0) -96f else -12f,
-                r[10],
-                textBytes = text
-            )
+            globals.copyInto(fields, 18)
+            Voice(VoiceGauges.Kind.SPC_DSP, fields, 0f, if (r[0] == 0) -96f else -12f, r[10])
         }
     }
 
