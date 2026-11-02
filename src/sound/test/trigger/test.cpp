@@ -219,6 +219,55 @@ namespace Sound
     std::cout << "Silence: ok" << std::endl;
   }
 
+  // Displayed window is sized by fundamental period: rich spectrum (FM with high index and weak subharmonic
+  // modulation) correlates at multiples of period nearly as well and trigger's period is 4 times longer, white noise
+  // has no period at all
+  void TestFundamental()
+  {
+    const double freq = 330;
+    VectorWave wave;
+    wave.Data.resize(SAMPLERATE);
+    for (std::size_t idx = 0; idx < wave.Data.size(); ++idx)
+    {
+      const double phase = 2 * 3.14159265 * freq * idx / SAMPLERATE;
+      wave.Data[idx] =
+          0.8f * std::sin(phase + 4 * std::sin(phase * 3) + 2 * std::sin(phase) + 0.3 * std::sin(phase / 2));
+    }
+    CorrelationTrigger trigger(KERNEL, STRIDE, SAMPLERATE);
+    uint_t wrong = 0;
+    uint_t frames = 0;
+    for (uint_t frame = 30; frame < 100; ++frame, ++frames)
+    {
+      trigger.GetTrigger(wave, int64_t(frame) * FRAME, FRAME);
+      const auto period = trigger.GetFundamentalSamples();
+      wrong += std::abs(double(period) - SAMPLERATE / freq) > STRIDE * 2;
+    }
+    std::cout << "Fundamental of FM: wrong in " << wrong << "/" << frames << " frames (period "
+              << trigger.GetFundamentalSamples() << ", trigger's " << trigger.GetPeriodSamples() << ")" << std::endl;
+    if (wrong)
+    {
+      throw std::runtime_error("Wrong fundamental period");
+    }
+    uint32_t seed = 12345;
+    for (auto& smp : wave.Data)
+    {
+      seed = seed * 1664525 + 1013904223;
+      smp = float(int32_t(seed) >> 8) / (1 << 23) * 0.8f;
+    }
+    CorrelationTrigger noise(KERNEL, STRIDE, SAMPLERATE);
+    uint_t periodic = 0;
+    for (uint_t frame = 30; frame < 100; ++frame)
+    {
+      noise.GetTrigger(wave, int64_t(frame) * FRAME, FRAME);
+      periodic += noise.GetFundamentalSamples() != 0;
+    }
+    std::cout << "Fundamental of noise: found in " << periodic << "/" << frames << " frames" << std::endl;
+    if (periodic > frames / 10)
+    {
+      throw std::runtime_error("Noise has fundamental period");
+    }
+  }
+
   // Each voice of chip is triggered: frame to frame displacement of traces of voices with vibrato (extrapolated phase
   // drifts) is the same as for the most stable one
   void TestScopeVoices()
@@ -328,6 +377,7 @@ int main()
     Sound::TestNoteChanges(true);
     Sound::TestPostponedSearches();
     Sound::TestScopeVoices();
+    Sound::TestFundamental();
     std::cout << "All tests passed" << std::endl;
     return 0;
   }
