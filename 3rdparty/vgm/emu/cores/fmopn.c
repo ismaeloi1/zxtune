@@ -3473,6 +3473,13 @@ void ym2608_link_ssg(void *chip, const ssg_callbacks *ssg, void *ssg_param)
 }
 
 /* set sample rate change callback */
+void ym2608_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	YM2608 *F2608 = (YM2608 *)chip;
+	F2608->voicesCb = cb;
+	F2608->voicesParam = param;
+}
+
 void ym2608_set_srchg_cb(void *chip, DEVCB_SRATE_CHG cbFunc, void* dataPtr)
 {
 	YM2608 *F2608 = (YM2608 *)chip;
