@@ -3,6 +3,7 @@
 
 #include "../../stdtype.h"
 #include "../snddef.h"
+#include "../EmuStructs.h"
 
 /* --- select emulation chips --- */
 #ifdef SNDDEV_YM3812
@@ -102,6 +103,8 @@ void y8950_set_update_handler(void *chip, OPL_UPDATEHANDLER UpdateHandler, void 
 #endif // BUILD_Y8950
 
 void opl_set_mute_mask(void *chip, UINT32 MuteMask);
+void opl_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+UINT32 opl_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 void opl_set_log_cb(void* chip, DEVCB_LOG func, void* param);
 
 #endif	// __FMOPL_H__

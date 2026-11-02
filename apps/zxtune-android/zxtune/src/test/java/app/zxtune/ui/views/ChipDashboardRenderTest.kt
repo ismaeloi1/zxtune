@@ -57,7 +57,7 @@ class ChipDashboardRenderTest {
             data[state + 8] = voice.flags.toByte()
             data[state + 9] = voice.kind.toByte()
             voice.fields.forEachIndexed { f, value -> data[state + 10 + f] = value.toByte() }
-            voice.text.toByteArray().forEachIndexed { c, b -> data[state + 22 + c] = b }
+            voice.text.toByteArray().forEachIndexed { c, b -> data[state + 10 + VoiceGauges.FIELDS + c] = b }
         }
         return data
     }

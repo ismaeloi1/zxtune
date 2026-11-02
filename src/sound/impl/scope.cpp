@@ -1109,6 +1109,8 @@ namespace Sound
           store(1, col, level);
           store(2, col, freq);
         }
+        static_assert(10 + Module::VoiceState::FIELDS + Module::VoiceState::TEXT < VOICE_STATE_SIZE,
+                      "No space for column phase");
         auto* state = target + VOICE_GAUGES_COUNT * GAUGE_COLUMNS * 2;
         std::memset(state, 0, VOICE_STATE_SIZE);
         // state of currently heard moment

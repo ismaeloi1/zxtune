@@ -1452,3 +1452,40 @@ void YM2203GetState(void *chip, uint_t *attenuations, uint_t *periods)
 		}
 	}
 }
+
+void YM2203GetChannelsState(void *chip, Devices::FM::ChannelState* channels)
+{
+  /* operators registers offsets and slots in OP1..OP4 order (registers order is OP1 OP3 OP2 OP4) */
+  static const uint_t opRegs[4] = {0x00, 0x08, 0x04, 0x0c};
+  static const uint_t slots[4] = {SLOT1, SLOT2, SLOT3, SLOT4};
+  /* EG_OFF, EG_REL, EG_SUS, EG_DEC, EG_ATT to visualization stages */
+  static const uint8_t stages[5] = {0, 4, 3, 2, 1};
+  const auto* F2203 = static_cast<const YM2203*>(chip);
+  const auto& OPN = F2203->OPN;
+  const auto toLevel = [](int32_t att) {
+    return static_cast<uint8_t>(255 - std::clamp<int32_t>(att, 0, MAX_ATT_INDEX) * 255 / MAX_ATT_INDEX);
+  };
+  for (uint_t c = 0; c < 3; ++c)
+  {
+    auto& out = channels[c];
+    const auto& ch = F2203->CH[c];
+    for (uint_t op = 0; op < 4; ++op)
+    {
+      const auto& slot = ch.SLOT[slots[op]];
+      auto& dst = out.Operators[op];
+      for (uint_t reg = 0; reg < 7; ++reg)
+      {
+        dst.Registers[reg] = F2203->REGS[0x30 + reg * 0x10 + opRegs[op] + c];
+      }
+      dst.Level = toLevel(static_cast<int32_t>(slot.vol_out));
+      dst.Envelope = toLevel(slot.volume);
+      dst.Stage = slot.state <= EG_ATT ? stages[slot.state] : 0;
+      dst.Key = slot.key != 0;
+    }
+    out.AlgorithmFeedback = F2203->REGS[0xb0 + c];
+    out.BlockFnum = static_cast<uint16_t>(((F2203->REGS[0xa4 + c] & 0x3f) << 8) | F2203->REGS[0xa0 + c]);
+    out.Mode = F2203->REGS[0x27];
+    out.TimerA = static_cast<uint16_t>((F2203->REGS[0x24] << 2) | (F2203->REGS[0x25] & 3));
+    out.EnvelopeRate = static_cast<uint16_t>(OPN.ST.rate * OPN.ST.freqbase / 3 + 0.5);
+  }
+}
