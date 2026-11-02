@@ -50,8 +50,15 @@ internal class LiveTexts(size: Int) {
  * @param templates widest typical values, to reserve space regardless of the current one; rarer longer values are cut
  * @param numeric numbers are right-aligned to keep digits in place (as in trackers), words are left-aligned
  * @param priority cells with greater values are dropped first if there's not enough space
+ * @param dynamicCaption caption depends on values (then [caption] is the widest one), see [SidDashboardView] drawCells
  */
-internal class CellSpec(val caption: String, val templates: Array<String>, val numeric: Boolean, val priority: Int)
+internal class CellSpec(
+    val caption: String,
+    val templates: Array<String>,
+    val numeric: Boolean,
+    val priority: Int,
+    val dynamicCaption: Boolean = false
+)
 
 internal object SidCells {
     const val WAVE = 0

@@ -11,6 +11,7 @@ import app.zxtune.playback.VoicesLayout
 import java.io.File
 import kotlin.math.sin
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -136,20 +137,133 @@ class ChipDashboardRenderTest {
         }
     )
 
-    @Test
-    fun snes() = render(
-        "snes",
-        "audio\nS-DSP\tVoice 1\tVoice 2\tVoice 3\tVoice 4\tVoice 5\tVoice 6\tVoice 7\tVoice 8",
-        (0 until 8).map {
-            Voice(
-                VoiceGauges.Kind.SPC_DSP,
-                intArrayOf(100 - it * 10, it % 5, 0x8f, 0xe3, 0, it * 3, 100, -60, 0x00, 0x10, it % 8),
-                0f,
-                -12f,
-                1 or 4
-            )
+    // S-DSP voices in every envelope mode: ADSR stages, release, GAIN direct/exponential/bent, silent voice
+    private fun spcVoices(): List<Voice> {
+        // MVOL EVOL EFB EDL FLG ESA, FIR (low pass), DIR NON EON PMON KON KOFF ENDX
+        val globals = intArrayOf(
+            0x7f, 0x7f, 0x30, 0xd0, 0x40, 5, 0x1a, 0xc0,
+            0x0c, 0x21, 0x2b, 0x2b, 0x13, 0xfe, 0xf3, 0xf9,
+            0x3c, 0x20, 0x0f, 0x40, 0, 0, 0x88, 0
+        )
+        // envx, mode, adsr1, adsr2, gain, srcn, vol L, vol R, pitch, flags (echo, pmod, noise), voice flags
+        val regs = arrayOf(
+            intArrayOf(90, 3, 0xff, 0xea, 0, 0x12, 100, 90, 0x1000, 1, 1 or 4),
+            intArrayOf(70, 2, 0x8a, 0x54, 0, 0x03, 64, -64, 0x0b50, 1, 1 or 4),
+            intArrayOf(50, 1, 0x84, 0xa0, 0, 0x07, 127, 30, 0x2000, 1, 1 or 4),
+            intArrayOf(30, 0, 0x8f, 0xe5, 0, 0x0a, 80, 80, 0x0800, 0, 4),
+            intArrayOf(80, 4, 0x00, 0, 0x50, 0x21, 50, 50, 0x0fa0, 0, 1 or 4),
+            intArrayOf(60, 4, 0x00, 0, 0xb2, 0x30, 40, 40, 0x1200, 4, 1 or 4 or 8),
+            intArrayOf(100, 4, 0x00, 0, 0xef, 0x31, 90, 20, 0x0c00, 2, 1 or 4),
+            intArrayOf(0, 0, 0x8f, 0xe0, 0, 0, 0, 0, 0, 0, 4),
+        )
+        // sample flags (info, loop, end, position), length, loop and position blocks
+        val samples = arrayOf(
+            intArrayOf(1 or 2 or 8, 154, 120, 130),
+            intArrayOf(1 or 8, 250, 0xffff, 40),
+            intArrayOf(1 or 2 or 8, 2, 1, 1),
+            intArrayOf(1 or 2 or 4 or 8, 127, 124, 125),
+            intArrayOf(1 or 2 or 8, 60, 20, 33),
+            intArrayOf(1 or 2 or 8, 30, 0, 5),
+            intArrayOf(1 or 2 or 8, 900, 300, 600),
+            intArrayOf(0, 0, 0, 0),
+        )
+        return regs.indices.map { idx ->
+            val r = regs[idx]
+            val s = samples[idx]
+            val fields = IntArray(18 + globals.size)
+            intArrayOf(r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8] and 0xff, r[8] shr 8, r[9]).copyInto(fields)
+            fields[11] = s[0]
+            for ((at, value) in listOf(12 to s[1], 14 to s[2], 16 to s[3])) {
+                fields[at] = value and 0xff
+                fields[at + 1] = value shr 8
+            }
+            globals.copyInto(fields, 18)
+            Voice(VoiceGauges.Kind.SPC_DSP, fields, 0f, if (r[0] == 0) -96f else -12f, r[10])
         }
-    )
+    }
+
+    private val spcLayout = "audio\nS-DSP\tVoice 1\tVoice 2\tVoice 3\tVoice 4\tVoice 5\tVoice 6\tVoice 7\tVoice 8"
+
+    private fun renderSpc(name: String, width: Int, height: Int, inspect: Int = -1): SidDashboardView {
+        val view = SidDashboardView(ApplicationProvider.getApplicationContext())
+        view.setVoicesData(VoicesLayout.parse(spcLayout), makeData(spcVoices()), 8, "S-DSP 32kHz, snes_spc\nscope: 8/8 ch")
+        view.openSpcInspector(inspect)
+        render(name, view, width, height)
+        if (inspect < 0) {
+            val colW = width.toFloat() / view.spcColumns
+            checkGrid(if (view.spcCompact) view.spcCompactGrid else view.spcVoiceGrid, colW)
+            checkGrid(view.spcGlobalGrid, width.toFloat())
+        }
+        return view
+    }
+
+    // rows are too low for plots, so they're text only
+    @Test
+    fun snes() {
+        val view = renderSpc("snes", 1080, 1700)
+        assertEquals(1, view.spcColumns)
+        assertTrue(view.spcCompact)
+        val captions = visibleCaptions(view.spcCompactGrid)
+        assertTrue(captions.toString(), captions.size >= 10)
+    }
+
+    @Test
+    fun snesInspector() {
+        renderSpc("snes-inspector", 1080, 1700, 1)
+    }
+
+    @Test
+    @Config(qualifiers = "w675dp-h1507dp-256dpi")
+    fun snesInspectorDevice() {
+        renderSpc("snes-inspector-device", 1080, 1330, 5)
+    }
+
+    // tap on voice opens inspector, the next tap returns to all voices
+    @Test
+    @Config(qualifiers = "w675dp-h1507dp-256dpi")
+    fun snesTap() {
+        val view = renderSpc("snes-tap", 1080, 1330)
+        fun tap(x: Float, y: Float) {
+            for (action in intArrayOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
+                val event = android.view.MotionEvent.obtain(0L, 0L, action, x, y, 0)
+                view.onTouchEvent(event)
+                event.recycle()
+            }
+        }
+        tap(500f, view.spcRowHeight * 2.5f)
+        assertEquals(2, view.spcFocus)
+        tap(500f, 100f)
+        assertEquals(-1, view.spcFocus)
+    }
+
+    // the same geometry as user's phone, see sid2Device
+    @Test
+    @Config(qualifiers = "w675dp-h1507dp-256dpi")
+    fun snesDevice() {
+        val view = renderSpc("snes-device", 1080, 1330)
+        assertEquals(1, view.spcColumns)
+        assertFalse(view.spcCompact)
+        val captions = visibleCaptions(view.spcVoiceGrid)
+        assertTrue(captions.toString(), captions.containsAll(listOf("Sample", "Level", "Stage", "Note", "Vol L", "Vol R")))
+    }
+
+    @Test
+    @Config(qualifiers = "w914dp-h411dp-xxhdpi")
+    fun snesLandscape() {
+        val view = renderSpc("snes-landscape", 2400, 1000)
+        assertEquals(2, view.spcColumns)
+        // rows are short, so cells are aside of panels
+        assertTrue(view.spcCellsAside)
+        val captions = visibleCaptions(view.spcVoiceGrid)
+        assertTrue(captions.toString(), captions.containsAll(listOf("Sample", "Level", "Stage", "Note", "Rate")))
+    }
+
+    @Test
+    fun snesFullscreen() {
+        val view = renderSpc("snes-fullscreen", 1080, 2300)
+        val captions = visibleCaptions(view.spcVoiceGrid)
+        assertTrue(captions.toString(), captions.containsAll(listOf("Sample", "Level", "Stage", "Note", "Rate", "Vol L", "Vol R")))
+    }
 
     @Test
     fun mt32Parts() = render(
