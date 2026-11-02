@@ -218,6 +218,9 @@ class VoiceGauges(private val data: ByteArray, private val offset: Int) : Gauges
     /** Signed chip specific field */
     fun signedField(idx: Int) = data[stateOffset + 10 + idx].toInt()
 
+    /** Byte of text area, for kinds where it's binary (e.g. [Kind.SPC_DSP]) */
+    fun textByte(idx: Int) = data[stateOffset + 10 + FIELDS + idx].toInt() and 0xff
+
     /** Progress (0..1) of the last level and frequency column, see [ChipGauges.phase] */
     val phase
         get() = (data[offset + SIZE - 1].toInt() and 0xff) / 256f

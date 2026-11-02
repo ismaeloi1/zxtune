@@ -120,12 +120,13 @@ class DashboardFrameTest {
         assertTrue("middle is between", diff(middle, next) in (continuous + 1) until diff(start, next))
     }
 
-    // brightness of history graph area of the first card
+    // brightness of level and pitch history graph of the first voice (the right panel of the first S-DSP row)
     private fun rowOf(bitmap: Bitmap): IntArray {
-        val top = (height * 0.06f).toInt()
-        val rows = (height * 0.05f).toInt()
-        val cols = width / 2
-        return IntArray(cols * rows) { bitmap.getPixel(it % cols, top + it / cols) and 0xff }
+        val top = (height * 0.05f).toInt()
+        val rows = (height * 0.025f).toInt()
+        val left = (width * 0.72f).toInt()
+        val cols = (width * 0.26f).toInt()
+        return IntArray(cols * rows) { bitmap.getPixel(left + it % cols, top + it / cols) and 0xff }
     }
 
     private fun diff(a: IntArray, b: IntArray) = a.indices.sumOf { ((a[it] - b[it]) * (a[it] - b[it])).toLong() }
