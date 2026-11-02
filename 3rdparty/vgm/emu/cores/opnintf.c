@@ -121,6 +121,8 @@ static DEVDEF_RWFUNC devFunc_MAME_2608[] =
 	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 'B', ym2608_write_pcmromb},
 	{RWF_MEMORY | RWF_WRITE, DEVRW_MEMSIZE, 'B', ym2608_alloc_pcmromb},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, ym2608_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, ym2608_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, ym2608_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef_MAME_2608 =
@@ -188,6 +190,8 @@ static DEVDEF_RWFUNC devFunc_MAME_2610[] =
 	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 'B', ym2610_write_pcmromb},
 	{RWF_MEMORY | RWF_WRITE, DEVRW_MEMSIZE, 'B', ym2610_alloc_pcmromb},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, ym2610_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, ym2610_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, ym2610_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef_MAME_2610 =

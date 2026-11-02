@@ -40,6 +40,8 @@ static DEVDEF_RWFUNC devFunc3812_MAME[] =
 	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, ym3812_write},
 	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, ym3812_read},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, opl_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, opl_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, opl_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef3812_MAME =
@@ -176,6 +178,8 @@ static DEVDEF_RWFUNC devFunc3526_MAME[] =
 	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, ym3526_write},
 	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, ym3526_read},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, opl_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, opl_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, opl_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef3526_MAME =
@@ -225,6 +229,8 @@ static DEVDEF_RWFUNC devFunc8950_MAME[] =
 	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, y8950_write_pcmrom},
 	{RWF_MEMORY | RWF_WRITE, DEVRW_MEMSIZE, 0, y8950_alloc_pcmrom},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, opl_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, opl_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, opl_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef8950_MAME =

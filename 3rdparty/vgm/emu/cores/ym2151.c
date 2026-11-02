@@ -237,6 +237,7 @@ typedef struct
 
 	DEVCB_VOICES voicesCb;
 	void*       voicesParam;
+	UINT8       regs[256];              /* last written values, operators parameters for visualization */
 } YM2151;
 
 
@@ -934,6 +935,8 @@ static void ym2151_write_reg(void *_chip, UINT8 r, UINT8 v)
 {
 	YM2151 *chip = (YM2151 *)_chip;
 	YM2151Operator *op = &chip->oper[ (r&0x07)*4+((r&0x18)>>3) ];
+
+	chip->regs[r] = v;
 
 	/* adjust bus to 8 bits */
 	//r &= 0xff;
@@ -2045,6 +2048,54 @@ static void ym2151_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
 	PSG->voicesParam = param;
 }
 
+/* DEVVOICE_FM_* fields of channel from registers */
+static void ym2151_fill_voice_fields(const YM2151 *PSG, UINT32 ch, DEV_VOICE_STATE* state)
+{
+	/* operators indices in OPN order (M1, C1, M2, C2), registers are at index * 8 */
+	static const UINT8 OPS[4] = {0, 2, 1, 3};
+	/* EG off, release, sustain, decay, attack to DEVVOICE stages */
+	static const UINT8 STAGES[5] = {0, 4, 3, 2, 1};
+	const UINT8* regs = PSG->regs;
+	const UINT32 egRate = (PSG->clock + 96) / 192;
+	const UINT32 timerA = ((UINT32)regs[0x10] << 2) | (regs[0x11] & 3);
+	UINT8 idx;
+
+	for (idx = 0; idx < 4; idx ++)
+	{
+		const YM2151Operator* slot = &PSG->oper[ch * 4 + OPS[idx]];
+		const UINT8 r = (UINT8)(ch + OPS[idx] * 8);
+		UINT8* out = &state->fields[DEVVOICE_FM_OPS + idx * DEVVOICE_FM_OP_SIZE];
+		INT32 eg = slot->volume;
+
+		out[DEVVOICE_FM_OP_MUL] = regs[0x40 + r] & 0x0f;
+		out[DEVVOICE_FM_OP_TL] = regs[0x60 + r] & 0x7f;
+		out[DEVVOICE_FM_OP_AR] = regs[0x80 + r] & 0x1f;
+		out[DEVVOICE_FM_OP_DR] = regs[0xa0 + r] & 0x1f;
+		out[DEVVOICE_FM_OP_SR] = (regs[0xc0 + r] & 0x1f) | ((regs[0x80 + r] >> 6) << 5);
+		out[DEVVOICE_FM_OP_SLRR] = (regs[0xe0 + r] >> 4) | ((regs[0xe0 + r] & 0x0f) << 4);
+		out[DEVVOICE_FM_OP_FLAGS] = (slot->state <= EG_ATT ? STAGES[slot->state] : 0)
+			| ((regs[0xa0 + r] & 0x80) ? DEVVOICE_FM_OPF_AM : 0);
+		out[DEVVOICE_FM_OP_EXTRA] = ((regs[0x40 + r] >> 4) & 7) | ((regs[0xc0 + r] >> 6) << 3);
+		if (eg < 0)
+			eg = 0;
+		if (eg > MAX_ATT_INDEX)
+			eg = MAX_ATT_INDEX;
+		state->fields[DEVVOICE_FM_EG + idx] = (UINT8)(255 - eg * 255 / MAX_ATT_INDEX);
+	}
+	state->fields[DEVVOICE_FM_FNUM] = regs[0x28 + ch] & 0x7f;
+	state->fields[DEVVOICE_FM_FNUM + 1] = regs[0x30 + ch] >> 2;
+	state->fields[DEVVOICE_FM_GLOBAL] = (PSG->lfo_wsel & 3) | ((PSG->noise & 0x80) ? 0x04 : 0);
+	state->fields[DEVVOICE_FM_GLOBAL2] = regs[0x18];
+	state->fields[DEVVOICE_FM_AMD] = PSG->amd & 0x7f;
+	state->fields[DEVVOICE_FM_PMD] = (UINT8)(PSG->pmd & 0x7f);
+	state->fields[DEVVOICE_FM_NOISE] = (UINT8)(PSG->noise & 0x1f);
+	state->fields[DEVVOICE_FM_CHIP] = DEVVOICE_FM_CHIP_OPM;
+	state->fields[DEVVOICE_FM_EG_RATE] = (UINT8)(egRate & 0xff);
+	state->fields[DEVVOICE_FM_EG_RATE + 1] = (UINT8)(egRate >> 8);
+	state->fields[DEVVOICE_FM_TIMER_A] = (UINT8)(timerA & 0xff);
+	state->fields[DEVVOICE_FM_TIMER_A + 1] = (UINT8)(timerA >> 8);
+}
+
 static UINT32 ym2151_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
 {
 	/* carriers per algorithm in OPN operators order (M1, C1, M2, C2), as OPN_FM voice kind requires */
@@ -2093,6 +2144,7 @@ static UINT32 ym2151_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE*
 		state->fields[8] = (UINT8)op->ams;
 		state->fields[9] = (UINT8)op->pms;
 		state->fields[11] = (UINT8)((op->kc >> 4) & 7);
+		ym2151_fill_voice_fields(PSG, ch, state);
 	}
 	return 8;
 }
