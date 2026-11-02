@@ -1,6 +1,6 @@
 /**
  * @file
- * @brief Preference displaying SID filter curve of current settings with live cutoff of playing tune
+ * @brief Preference displaying SID filter response of playing tune and cutoff curve of current settings
  * @author vitamin.caig@gmail.com
  */
 package app.zxtune.ui
@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.os.Handler
 import android.os.Looper
+import android.support.v4.media.session.PlaybackStateCompat
 import android.util.AttributeSet
 import android.view.View
 import androidx.core.view.ViewCompat
@@ -19,22 +20,17 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.Preference
 import androidx.preference.PreferenceViewHolder
-import app.zxtune.Logger
 import app.zxtune.R
 import app.zxtune.device.media.MediaModel
-import app.zxtune.playback.ChipGauges
-import app.zxtune.playback.Visualizer
 import app.zxtune.ui.views.FilterCurveView
 import app.zxtune.ui.views.SidFilterModel
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 /**
  * Placed right under filter presets, so the effect of any SID filter setting is visible immediately.
- * Settings are polled from preferences data store (cheap, cached) together with live chips state, so no
- * change listeners are required for all the related preferences.
+ * Settings are polled from preferences data store (cheap, cached), so no change listeners are required for all the
+ * related preferences. Live chips state is delivered at display rate by [FilterCurveFeed].
  */
 class FilterCurvePreference @JvmOverloads constructor(
     context: Context,
@@ -47,20 +43,14 @@ class FilterCurvePreference @JvmOverloads constructor(
     }
 
     private var view: FilterCurveView? = null
-
-    @Volatile
-    private var visualizer: Visualizer? = null
+    private var feed: FilterCurveFeed? = null
     private var liveJob: Job? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val pending = AtomicBoolean(false)
-    private var gaugesBuffer = ByteArray(0)
-    private var status = ""
-    private var lastStatusTime = 0L
 
     private val tick = object : Runnable {
         override fun run() {
             update()
-            handler.postDelayed(this, UPDATE_PERIOD_MS)
+            handler.postDelayed(this, SETTINGS_PERIOD_MS)
         }
     }
 
@@ -68,7 +58,9 @@ class FilterCurvePreference @JvmOverloads constructor(
         super.onBindViewHolder(holder)
         val curve = holder.findViewById(R.id.filter_curve) as FilterCurveView
         if (view !== curve) {
+            stop()
             view = curve
+            feed = FilterCurveFeed(curve)
             curve.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
                 override fun onViewAttachedToWindow(v: View) = start(v)
                 override fun onViewDetachedFromWindow(v: View) = stop()
@@ -84,10 +76,12 @@ class FilterCurvePreference @JvmOverloads constructor(
     override fun onDetached() {
         stop()
         view = null
+        feed = null
         super.onDetached()
     }
 
     private fun start(attached: View) {
+        feed?.isAttached = true
         connectLive(attached)
         handler.removeCallbacks(tick)
         handler.post(tick)
@@ -97,7 +91,10 @@ class FilterCurvePreference @JvmOverloads constructor(
         handler.removeCallbacks(tick)
         liveJob?.cancel()
         liveJob = null
-        visualizer = null
+        feed?.run {
+            isAttached = false
+            source = null
+        }
     }
 
     // Bound to hosting fragment's view lifecycle (view tree owner), not to activity: activity scope retained the
@@ -109,12 +106,16 @@ class FilterCurvePreference @JvmOverloads constructor(
         val owner = attached.findViewTreeLifecycleOwner() ?: return
         val activity = findActivity(context) ?: return
         val model = MediaModel.of(activity)
+        val target = feed ?: return
         liveJob = owner.lifecycleScope.launch {
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    model.playbackState.collect { target.isPlaying = it?.state == PlaybackStateCompat.STATE_PLAYING }
+                }
                 try {
-                    model.visualizer.collect { visualizer = it }
+                    model.visualizer.collect { target.source = it }
                 } finally {
-                    visualizer = null
+                    target.source = null
                 }
             }
         }
@@ -123,56 +124,18 @@ class FilterCurvePreference @JvmOverloads constructor(
     private fun update() {
         val curve = view ?: return
         val settings = readSettings()
-        val names6581 = context.resources.getStringArray(R.array.pref_zxtune_sid_filter_6581_preset_entries)
-        val names8580 = context.resources.getStringArray(R.array.pref_zxtune_sid_filter_8580_preset_entries)
-        val live = liveStates
+        val status = feed?.status ?: ""
         val is8580 = if (status.isNotEmpty()) status.contains("8580") else readInt(MODEL_KEY, 0) == 1
         val preset = if (is8580) settings.preset8580 else settings.preset6581
-        val names = if (is8580) names8580 else names6581
+        val names = context.resources.getStringArray(
+            if (is8580) R.array.pref_zxtune_sid_filter_8580_preset_entries else R.array.pref_zxtune_sid_filter_6581_preset_entries
+        )
         curve.state = FilterCurveView.State(
             settings = settings,
             is8580 = is8580,
             presetName = names.getOrNull(preset)?.takeIf { preset != 0 } ?: "",
-            live = live,
             hint = context.getString(R.string.pref_zxtune_sid_filter_curve_idle),
         )
-        requestLive()
-    }
-
-    @Volatile
-    private var liveStates: List<FilterCurveView.LiveState> = emptyList()
-
-    // Binder calls are made out of main thread, results are picked by next tick
-    private fun requestLive() {
-        val src = visualizer ?: run {
-            liveStates = emptyList()
-            status = ""
-            return
-        }
-        if (!pending.compareAndSet(false, true)) {
-            return
-        }
-        executor.execute {
-            try {
-                val now = System.currentTimeMillis()
-                if (now - lastStatusTime > STATUS_PERIOD_MS) {
-                    lastStatusTime = now
-                    status = runCatching { src.getStatus() }.getOrDefault("").takeIf { it.contains("MOS") } ?: ""
-                }
-                if (gaugesBuffer.size != MAX_CHIPS * ChipGauges.SIZE) {
-                    gaugesBuffer = ByteArray(MAX_CHIPS * ChipGauges.SIZE)
-                }
-                val chips = if (status.isEmpty()) 0 else runCatching { src.getGauges(gaugesBuffer, 10) }.getOrDefault(0)
-                liveStates = (0 until chips.coerceAtMost(MAX_CHIPS)).map { chip ->
-                    val state = ChipGauges(gaugesBuffer, chip * ChipGauges.SIZE).state
-                    FilterCurveView.LiveState(state.cutoff, state.mode, state.resonance, state.routing)
-                }
-            } catch (e: Exception) {
-                LOG.w(e) { "Failed to get live state" }
-            } finally {
-                pending.set(false)
-            }
-        }
     }
 
     private fun readSettings() = SidFilterModel.Settings(
@@ -199,13 +162,10 @@ class FilterCurvePreference @JvmOverloads constructor(
     }
 
     companion object {
-        private val LOG = Logger(FilterCurvePreference::class.java.name)
-        private const val UPDATE_PERIOD_MS = 100L
-        private const val STATUS_PERIOD_MS = 1000L
-        private const val MAX_CHIPS = 3
+        // settings are changed by user, so it's enough to follow seek bars, live state has own pace
+        private const val SETTINGS_PERIOD_MS = 250L
         private const val ENGINE_KEY = "zxtune.core.sid.engine"
         private const val MODEL_KEY = "zxtune.core.sid.model"
-        private val executor = Executors.newSingleThreadExecutor()
 
         private tailrec fun findActivity(ctx: Context?): FragmentActivity? = when (ctx) {
             is FragmentActivity -> ctx

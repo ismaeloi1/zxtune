@@ -395,10 +395,37 @@
         <item>5</item>
     </string-array>
     <string name="pref_zxtune_sid_filter_preset_default" translatable="false">0</string>
-    <string name="pref_zxtune_sid_filter_curve_title">Filter cutoff curve</string>
+    <string name="pref_zxtune_sid_filter_curve_title">Filter response</string>
     <string name="pref_zxtune_sid_filter_curve_legend_emulated">emulated</string>
     <string name="pref_zxtune_sid_filter_curve_legend_reference">preset reference</string>
-    <string name="pref_zxtune_sid_filter_curve_idle">Cutoff register \u2192 frequency. Play a SID tune to see live cutoff</string>
+    <string name="pref_zxtune_sid_filter_curve_idle">Play a SID tune to see how the filter changes each voice</string>
+    <string name="pref_zxtune_sid_filter_curve_custom">Custom</string>
+    <string name="pref_zxtune_sid_filter_curve_panel">Cutoff curve: register value \u2192 frequency</string>
+    <!-- filter outputs combination by mode bits: none, LP, BP, LP+BP, HP, LP+HP, BP+HP, all -->
+    <string-array name="pref_zxtune_sid_filter_response_modes">
+        <item>Filter outputs off</item>
+        <item>Low-pass</item>
+        <item>Band-pass</item>
+        <item>Low-pass + band-pass</item>
+        <item>High-pass</item>
+        <item>Band-reject (notch)</item>
+        <item>Band-pass + high-pass</item>
+        <item>All outputs</item>
+    </string-array>
+    <!-- mode, cutoff frequency, resonance percent -->
+    <string name="pref_zxtune_sid_filter_response_summary">%1$s · cutoff %2$s · resonance %3$d%%</string>
+    <string name="pref_zxtune_sid_filter_response_no_voices">no voice filtered</string>
+    <string name="pref_zxtune_sid_filter_response_chip">SID %1$d of %2$d, tap to switch</string>
+    <string name="pref_zxtune_sid_filter_voice_cut">filtered, attenuated by %d dB</string>
+    <string name="pref_zxtune_sid_filter_voice_boost">filtered, boosted by %d dB</string>
+    <string name="pref_zxtune_sid_filter_voice_unchanged">filtered, unchanged</string>
+    <string name="pref_zxtune_sid_filter_voice_removed">filtered, removed</string>
+    <string name="pref_zxtune_sid_filter_voice_bypass">not filtered</string>
+    <string name="pref_zxtune_sid_filter_voice_off">silent</string>
+    <string name="pref_zxtune_sid_filter_voice_muted">muted</string>
+    <string name="pref_zxtune_sid_filter_voice_ext">External input</string>
+    <string name="pref_zxtune_sid_filter_voice_ext_filtered">filtered</string>
+    <string name="pref_zxtune_sid_filter_voice_noise">Noise</string>
     <!-- zxtune.core.sid.combined_waveforms -->
     <string name="pref_zxtune_sid_combined_waveforms_title">reSIDfp: combined waveforms</string>
     <string-array name="pref_zxtune_sid_combined_waveforms_entries">

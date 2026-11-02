@@ -69,4 +69,51 @@ class SidFilterModelTest {
             }
         }
     }
+
+    // 1/Q tables of reSID filter.cc set_Q and reSIDfp FilterModelConfig8580 resGain
+    @Test
+    fun `resonance to inverse Q`() {
+        assertEquals(15 / 8.0, SidFilterModel.inverseQ(0, false, true), 1e-9)
+        assertEquals(11 / 8.0, SidFilterModel.inverseQ(4, false, false), 1e-9)
+        assertEquals(1 / 8.0, SidFilterModel.inverseQ(14, false, true), 1e-9)
+        assertEquals(1 / 16.0, SidFilterModel.inverseQ(15, false, true), 1e-9)
+        assertEquals(1448 / 1024.0, SidFilterModel.inverseQ(0, true, false), 1e-3)
+        assertEquals(1.0, SidFilterModel.inverseQ(4, true, false), 1e-9)
+        assertEquals(395 / 1024.0, SidFilterModel.inverseQ(15, true, false), 1e-3)
+        assertEquals(1.4, SidFilterModel.inverseQ(0, true, true), 1e-9)
+        assertEquals(0.770492, SidFilterModel.inverseQ(7, true, true), 1e-6)
+        assertEquals(1.07869 / 2.8, SidFilterModel.inverseQ(15, true, true), 1e-5)
+    }
+
+    @Test
+    fun `state variable filter response`() {
+        val fc = 1000.0
+        val invQ = 0.5
+        fun db(mode: Int, hz: Double) = SidFilterModel.responseDb(mode, hz, fc, invQ)
+        val lp = SidFilterModel.MODE_LOWPASS
+        val bp = SidFilterModel.MODE_BANDPASS
+        val hp = SidFilterModel.MODE_HIGHPASS
+        // passband is unity, peak at cutoff is Q, two poles slope is 12dB per octave
+        assertEquals(0.0, db(lp, 10.0), 0.01)
+        assertEquals(6.02, db(lp, fc), 0.01)
+        assertEquals(-12.0, db(lp, 16000.0) - db(lp, 8000.0), 0.2)
+        assertEquals(0.0, db(hp, 100000.0), 0.01)
+        assertEquals(6.02, db(hp, fc), 0.01)
+        assertEquals(6.02, db(bp, fc), 0.01)
+        assertEquals(-20.0, db(bp, 10.0) - db(bp, 100.0), 0.1)
+        // LP and HP have the same sign
+        assertEquals(SidFilterModel.MIN_DB, db(lp or hp, fc), 0.01)
+        assertEquals(0.0, db(lp or hp, 10.0), 0.01)
+        // all outputs with Q=1 is allpass
+        for (hz in doubleArrayOf(20.0, 500.0, 1000.0, 3000.0, 20000.0)) {
+            assertEquals(0.0, SidFilterModel.responseDb(lp or bp or hp, hz, fc, 1.0), 1e-9)
+        }
+        assertEquals(SidFilterModel.MIN_DB, db(0, fc), 0.01)
+    }
+
+    @Test
+    fun `oscillator frequency`() {
+        // A4 on PAL machine
+        assertEquals(440.0, SidFilterModel.oscillatorHz(7493, 985248), 0.1)
+    }
 }

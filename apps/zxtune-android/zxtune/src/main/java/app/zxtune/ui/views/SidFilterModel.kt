@@ -10,6 +10,7 @@ import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.ln
 import kotlin.math.ln1p
+import kotlin.math.log10
 import kotlin.math.pow
 import kotlin.math.sqrt
 
@@ -336,4 +337,66 @@ object SidFilterModel {
     } else {
         fit(curve, -2.0, 2.0) { fc, bias -> cutoff6581(false, residDacVoltage(fc, bias), RESID_UCOX) }
     }
+
+    /**
+     * Inverse of state variable filter quality factor by RES register as emulated:
+     * - 6581 (reSID filter.cc set_Q, reSIDfp FilterModelConfig6581): 1/Q = ~res/8
+     * - 8580 reSID: 1/Q = 2^((4 - res)/8)
+     * - 8580 reSIDfp (FilterModelConfig8580 resGain): feedback to input "resistors" ratio
+     */
+    fun inverseQ(resonance: Int, is8580: Boolean, residFp: Boolean): Double {
+        val res = resonance and 0x0f
+        return when {
+            !is8580 -> maxOf((res.inv() and 0x0f) / 8.0, MIN_INVERSE_Q)
+            residFp -> RES_FEEDBACK_8580[res and 3] / RES_INPUT_8580[res shr 2]
+            else -> 2.0.pow((4 - res) / 8.0)
+        }
+    }
+
+    // Q is theoretically unlimited for 6581 RES=15, really limited by op-amps gain; keeps peak inside of plot
+    private const val MIN_INVERSE_Q = 1.0 / 16
+
+    private const val RF_8580 = 1.4
+    private val RES_FEEDBACK_8580 = doubleArrayOf(
+        RF_8580,
+        parallel(RF_8580, 15.3),
+        parallel(RF_8580, 7.3),
+        parallel(RF_8580, 4.7)
+    )
+    private val RES_INPUT_8580 = doubleArrayOf(1.0, 1.4, 2.0, 2.8)
+
+    private fun parallel(a: Double, b: Double) = a * b / (a + b)
+
+    const val MODE_LOWPASS = 1
+    const val MODE_BANDPASS = 2
+    const val MODE_HIGHPASS = 4
+
+    /**
+     * Linear gain of filter outputs selected by [mode] (see MODE_* bits) for sine of [hz].
+     * Summer output is Vhp = Vbp/Q - Vlp - Vi with inverting integrators (see reSID filter.h clock), so
+     * HP = -s²/D, BP = w0*s/D, LP = -w0²/D, D = s² + w0*s/Q + w0²: LP and HP have the same sign and
+     * LP+HP is notch, while BP is summed with opposite sign.
+     */
+    fun responseGain(mode: Int, hz: Double, cutoffHz: Double, inverseQ: Double): Double {
+        val x = hz / cutoffHz
+        val x2 = x * x
+        var re = 0.0
+        var im = 0.0
+        if (mode and MODE_LOWPASS != 0) re -= 1.0
+        if (mode and MODE_HIGHPASS != 0) re += x2
+        if (mode and MODE_BANDPASS != 0) im += x
+        val dRe = 1 - x2
+        val dIm = x * inverseQ
+        return sqrt((re * re + im * im) / (dRe * dRe + dIm * dIm))
+    }
+
+    /** Gain in dB, limited by [MIN_DB] for zeros of notch and muted outputs */
+    fun responseDb(mode: Int, hz: Double, cutoffHz: Double, inverseQ: Double) = toDb(responseGain(mode, hz, cutoffHz, inverseQ))
+
+    const val MIN_DB = -120.0
+
+    fun toDb(gain: Double) = if (gain > 0) maxOf(20 * log10(gain), MIN_DB) else MIN_DB
+
+    /** Voice oscillator frequency by its 16-bit register and chip clock */
+    fun oscillatorHz(reg: Int, clock: Int) = reg.toDouble() * clock / (1 shl 24)
 }
