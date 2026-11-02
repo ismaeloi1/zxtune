@@ -107,6 +107,8 @@ class DashboardFrameTest {
     @Test
     fun `history is scrolled smoothly`() {
         val view = createView()
+        // rows are text only at this height, history is in inspector
+        view.openSpcInspector(0)
         fun frame(phase: Int, column: Int): IntArray {
             view.setVoicesData(spcLayout, spcData(8, phase, column), 8, "")
             return rowOf(draw(view))
@@ -120,10 +122,10 @@ class DashboardFrameTest {
         assertTrue("middle is between", diff(middle, next) in (continuous + 1) until diff(start, next))
     }
 
-    // brightness of level and pitch history graph of the first voice (the right panel of the first S-DSP row)
+    // brightness of level and pitch history graph of inspected voice (the right panel)
     private fun rowOf(bitmap: Bitmap): IntArray {
-        val top = (height * 0.05f).toInt()
-        val rows = (height * 0.025f).toInt()
+        val top = (height * 0.2f).toInt()
+        val rows = (height * 0.05f).toInt()
         val left = (width * 0.72f).toInt()
         val cols = (width * 0.26f).toInt()
         return IntArray(cols * rows) { bitmap.getPixel(left + it % cols, top + it / cols) and 0xff }

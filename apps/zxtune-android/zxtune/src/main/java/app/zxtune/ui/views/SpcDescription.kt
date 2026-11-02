@@ -185,6 +185,8 @@ internal object SpcDescription {
         const val NOISE_CLOCK = "Noise clock"
         const val OUTPUT = "Output"
         const val FIR = "FIR"
+        const val VOLUME = "Volume"
+        const val ECHO_FILTER = "Echo filter"
         const val ECHO_RAM = "Echo RAM"
         const val DIR = "Samples dir"
 

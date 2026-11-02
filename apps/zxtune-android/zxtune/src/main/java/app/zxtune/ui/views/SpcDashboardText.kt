@@ -110,10 +110,6 @@ internal class SpcVoiceText : SidRowText(SpcCells.VOICE.size) {
         val noteText = if (note == NONE) "" else Words.ESTIMATED + ChipWidgets.noteName(note)
         val rate = SpcDescription.rateHz(pitch).roundToInt()
 
-        // titles: raw registers and their meaning
-        if (titles.changed(title(0), (voice shl 8) or srcn)) {
-            titles[title(0)] = "V${voice + 1} SRCN ${SpcDescription.hex2(srcn)}"
-        }
         val sampleKind = if (!hasSample) {
             0
         } else if (loops) {
@@ -121,48 +117,19 @@ internal class SpcVoiceText : SidRowText(SpcCells.VOICE.size) {
         } else {
             2
         }
-        if (titles.changed(main(0), sampleKind)) {
-            titles[main(0)] = when (sampleKind) {
-                1 -> Words.LOOP
-                2 -> Words.ONCE
-                else -> ""
-            }
-        }
-        if (titles.changed(tail(0), if (g.isKeyOn) 1 else 0)) {
-            titles[tail(0)] = if (g.isKeyOn) SidDescription.GATE_MARK else ""
-        }
-        val envRegs = if (adsr) (1 shl 16) or (adsr1 shl 8) or adsr2 else gain
-        if (titles.changed(title(1), envRegs)) {
-            titles[title(1)] = if (adsr) {
-                "ADSR ${SpcDescription.hex2(adsr1)} ${SpcDescription.hex2(adsr2)}"
-            } else {
-                "GAIN ${SpcDescription.hex2(gain)}"
-            }
-        }
-        if (titles.changed(main(1), level)) {
-            titles[main(1)] = SidDescription.percent(level)
+        val sampleWord = when (sampleKind) {
+            1 -> " ${Words.LOOP}"
+            2 -> " ${Words.ONCE}"
+            else -> ""
         }
         // released voice at zero level is silent
         val silent = mode == SpcDescription.MODE_RELEASE && envx == 0
-        if (titles.changed(tail(1), if (silent) -1 else mode)) {
-            titles[tail(1)] = if (silent) Words.OFF else stage.short
-        }
-        if (titles.changed(title(2), pitch)) {
-            titles[title(2)] = "Pitch ${SpcDescription.hex2(pitch shr 8)}${SpcDescription.hex2(pitch)}"
-        }
-        if (titles.changed(main(2), note)) {
-            titles[main(2)] = noteText
-        }
-        if (titles.changed(tail(2), rate)) {
-            titles[tail(2)] = if (rate == 0) Words.OFF else "%.1fkHz".format(java.util.Locale.US, rate / 1000f)
-        }
 
-        // cells
-        if (cells.changed(SpcCells.SAMPLE, (srcn shl 2) or sampleKind)) {
-            cells[SpcCells.SAMPLE] = "#$srcn" + titles[main(0)].let { if (it.isEmpty()) "" else " $it" }
-        }
-        if (cells.changed(SpcCells.LEVEL, level)) {
-            cells[SpcCells.LEVEL] = SidDescription.percent(level)
+        // titles: meaning in words, raw registers are secondary
+        val keyOn = if (g.isKeyOn) 1 else 0
+        if (titles.changed(title(0), (voice shl 12) or (srcn shl 4) or (sampleKind shl 1) or keyOn)) {
+            titles[title(0)] = "V${voice + 1} #$srcn$sampleWord" + if (keyOn != 0) " ${SidDescription.GATE_MARK}" else ""
+            titles[tail(0)] = "SRCN ${SpcDescription.hex2(srcn)}"
         }
         val stageKey = if (mode == SpcDescription.MODE_GAIN) {
             0x100 or gain
@@ -171,12 +138,35 @@ internal class SpcVoiceText : SidRowText(SpcCells.VOICE.size) {
         } else {
             mode
         }
-        if (cells.changed(SpcCells.STAGE, stageKey)) {
-            cells[SpcCells.STAGE] = when {
+        if (titles.changed(title(1), (stageKey.toLong() shl 8) or level.toLong())) {
+            val word = when {
                 mode == SpcDescription.MODE_GAIN -> SpcDescription.gainWord(gain)
                 silent -> Words.OFF
                 else -> stage.word
             }
+            titles[title(1)] = "$word ${SidDescription.percent(level)}"
+            cells[SpcCells.STAGE] = word
+            cells[SpcCells.LEVEL] = SidDescription.percent(level)
+        }
+        val envRegs = if (adsr) (1 shl 16) or (adsr1 shl 8) or adsr2 else gain
+        if (titles.changed(tail(1), envRegs)) {
+            titles[tail(1)] = if (adsr) {
+                "ADSR ${SpcDescription.hex2(adsr1)} ${SpcDescription.hex2(adsr2)}"
+            } else {
+                "GAIN ${SpcDescription.hex2(gain)}"
+            }
+        }
+        if (titles.changed(title(2), (note.toLong() shl 32) or rate.toLong())) {
+            val rateText = if (rate == 0) Words.OFF else "%.1f kHz".format(java.util.Locale.US, rate / 1000f)
+            titles[title(2)] = if (noteText.isEmpty()) rateText else "$noteText $rateText"
+        }
+        if (titles.changed(tail(2), pitch)) {
+            titles[tail(2)] = "Pitch ${SpcDescription.hex2(pitch shr 8)}${SpcDescription.hex2(pitch)}"
+        }
+
+        // cells
+        if (cells.changed(SpcCells.SAMPLE, (srcn shl 2) or sampleKind)) {
+            cells[SpcCells.SAMPLE] = "#$srcn$sampleWord"
         }
         if (cells.changed(SpcCells.NOTE, note)) {
             cells[SpcCells.NOTE] = noteText.ifEmpty { Words.DASH }
@@ -278,28 +268,27 @@ internal class SpcGlobalText : SidRowText(SpcCells.GLOBAL.size) {
         val mainR = gl.mainRight
         val echoL = gl.echoLeft
         val echoR = gl.echoRight
-        if (titles.changed(title(0), ((mainL and 0xff) shl 8) or (mainR and 0xff))) {
-            titles[title(0)] = "MVOL ${SpcDescription.hex2(mainL)} ${SpcDescription.hex2(mainR)}"
+        if (titles.changed(title(0), 0)) {
+            titles[title(0)] = Words.VOLUME
         }
-        if (titles.changed(tail(0), ((echoL and 0xff) shl 8) or (echoR and 0xff))) {
-            titles[tail(0)] = "EVOL ${SpcDescription.hex2(echoL)} ${SpcDescription.hex2(echoR)}"
+        if (titles.changed(tail(0), ((mainL and 0xff) shl 8) or (mainR and 0xff))) {
+            titles[tail(0)] = "MVOL ${SpcDescription.hex2(mainL)} ${SpcDescription.hex2(mainR)}"
         }
         val delay = gl.delay
         val feedback = gl.feedback
         if (titles.changed(title(1), (delay shl 8) or (feedback and 0xff))) {
-            titles[title(1)] = "EDL $delay EFB ${SpcDescription.hex2(feedback)}"
-            titles[main(1)] = delayWord(delay)
-            titles[tail(1)] = SpcDescription.signedPercent(SpcDescription.volumePercent(feedback))
-            cells[SpcCells.DELAY] = titles[main(1)]
-            cells[SpcCells.FEEDBACK] = titles[tail(1)]
+            cells[SpcCells.DELAY] = delayWord(delay)
+            cells[SpcCells.FEEDBACK] = SpcDescription.signedPercent(SpcDescription.volumePercent(feedback))
+            titles[title(1)] = "${Words.ECHO} ${cells[SpcCells.DELAY]} ${cells[SpcCells.FEEDBACK]}"
+            titles[tail(1)] = "EDL $delay EFB ${SpcDescription.hex2(feedback)}"
         }
         var firKey = 0L
         for (c in gl.fir) {
             firKey = (firKey shl 8) or (c.toLong() and 0xff)
         }
         if (titles.changed(title(2), firKey)) {
-            titles[title(2)] = Words.FIR
-            titles[tail(2)] = "DC " + SpcDescription.dbWord(SpcDescription.db(gl.firDcGain)).replace(" ", "")
+            titles[title(2)] = Words.ECHO_FILTER
+            titles[tail(2)] = Words.FIR
             cells[SpcCells.FIR] = gl.fir.joinToString(" ") { SpcDescription.hex2(it) }
         }
         if (cells.changed(SpcCells.MAIN_L, mainL)) {

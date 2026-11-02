@@ -238,6 +238,25 @@ class SidDashboardView @JvmOverloads constructor(
 
     @androidx.annotation.VisibleForTesting
     internal var spcCellsAside = false
+
+    /** Rows are too low for readable plots, so they're text only and plots are in inspector */
+    @androidx.annotation.VisibleForTesting
+    internal var spcCompact = false
+
+    /** Voice displayed in inspector or -1 */
+    @androidx.annotation.VisibleForTesting
+    internal var spcFocus = -1
+    private var spcShown = false
+    private var spcTapColumnW = 0f
+    private var spcTapRowH = 0f
+    private var spcTapRows = 0
+
+    @androidx.annotation.VisibleForTesting
+    internal val spcCompactGrid = CellGrid(SpcCells.VOICE)
+    private val spcCompactGlobalGrid = CellGrid(SpcCells.GLOBAL)
+    private val spcInspectorGrid = CellGrid(SpcCells.VOICE)
+    private val spcInspectorGlobalGrid = CellGrid(SpcCells.GLOBAL)
+    private var spcInspectorKey = -1f
     private val spcPath = Path()
     private val spcPlot = RectF()
     private val spcFir = FloatArray(SPC_FIR_POINTS)
@@ -365,6 +384,7 @@ class SidDashboardView @JvmOverloads constructor(
         key = key * 31 + System.identityHashCode(data.layout)
         key = key * 31 + lines
         key = key * 31 + fmFocus.key
+        key = key * 31 + spcFocus
         if (data.kind == FrameResult.GAUGES_VOICES) {
             // cards layout depends on voice kind
             for (voice in 0 until minOf(data.count, data.bytes.size / VoiceGauges.SIZE)) {
@@ -832,7 +852,8 @@ class SidDashboardView @JvmOverloads constructor(
             return
         }
         // S-DSP has much more state than a generic card shows
-        if (voices >= SpcDescription.VOICES && VoiceGauges(data, 0).kind == VoiceGauges.Kind.SPC_DSP) {
+        spcShown = voices >= SpcDescription.VOICES && VoiceGauges(data, 0).kind == VoiceGauges.Kind.SPC_DSP
+        if (spcShown) {
             drawSpc(canvas, data, voices, areaHeight)
             return
         }
@@ -941,6 +962,13 @@ class SidDashboardView @JvmOverloads constructor(
     // cells of values below, and global row (volumes, echo repeats, FIR response). Voices are in one column on phones
     // and in two columns on wide screens, global row takes the whole width.
     private fun drawSpc(canvas: Canvas, data: ByteArray, voices: Int, areaHeight: Float) {
+        if (pass.isDynamic) {
+            spcGlobals.update(data, voices)
+        }
+        if (spcFocus in 0 until SpcDescription.VOICES) {
+            drawSpcInspector(canvas, data, spcFocus, areaHeight)
+            return
+        }
         val fullW = width.toFloat()
         val columns = if (fullW >= density * SPC_TWO_COLUMNS_DP) 2 else 1
         val voiceRows = SpcDescription.VOICES / columns
@@ -957,8 +985,16 @@ class SidDashboardView @JvmOverloads constructor(
         spcRowHeight = rowH
         spcPanelHeight = panelH
         spcColumns = columns
-        if (pass.isDynamic) {
-            spcGlobals.update(data, voices)
+        spcTapColumnW = colW
+        spcTapRowH = rowH
+        spcTapRows = voiceRows
+        // title band and paddings, see drawSpcPanels
+        val plotH = panelH - (titlePaint.fontSpacing + density * 6) - density * 6
+        // values in words are needed by anyone, plots without them are only half of information
+        spcCompact = plotH < density * MIN_SPC_PLOT_DP || spcVoiceGrid.lines == 0
+        if (spcCompact) {
+            drawSpcCompact(canvas, data, colW, rowH, voiceRows)
+            return
         }
         for (voice in 0 until SpcDescription.VOICES) {
             val g = VoiceGauges(data, voice * VoiceGauges.SIZE)
@@ -985,6 +1021,140 @@ class SidDashboardView @JvmOverloads constructor(
             }
             canvas.drawLine(0f, globalTop, fullW, globalTop, separatorPaint)
         }
+    }
+
+    // Text only rows with level meter, plots are in inspector opened by tap
+    private fun drawSpcCompact(canvas: Canvas, data: ByteArray, colW: Float, rowH: Float, voiceRows: Int) {
+        val fullW = width.toFloat()
+        val labelW = density * SPC_LABEL_DP
+        val pad = cellsPadding() * 2
+        val key = colW * 10000 + rowH
+        if (key != spcCompactKey) {
+            spcCompactKey = key
+            spcCompactGrid.update(colW - labelW - pad, rowH - density * 4, CELL_SCALES)
+            spcCompactGlobalGrid.update(fullW - labelW - pad, rowH - density * 4, floatArrayOf(spcCompactGrid.scale))
+        }
+        val lines = maxOf(spcCompactGrid.lines, spcCompactGlobalGrid.lines)
+        val gridH = if (lines == 0) 0f else cellLineHeight(spcCompactGrid.scale) * lines
+        for (voice in 0 until SpcDescription.VOICES) {
+            val g = VoiceGauges(data, voice * VoiceGauges.SIZE)
+            val left = colW * (voice / voiceRows)
+            val top = rowH * (voice % voiceRows)
+            val texts = spcVoiceTexts[voice]
+            if (pass.isDynamic) {
+                spcEnvelopes[voice].update(g.field(2), g.field(3), g.field(4), g.field(0) * 16)
+                texts.update(g, voice, spcEnvelopes[voice])
+            }
+            drawSpcLabel(canvas, SPC_VOICE_LABELS[voice], left, top, labelW, rowH, g.field(0) / 127f, g.isKeyOn)
+            drawCells(canvas, spcCompactGrid, texts.cells, spcVoiceFitted[voice], left + labelW, top + (rowH - gridH) / 2, texts.captions, spcCaptionFitted[voice])
+            if (pass.isStatic) {
+                canvas.drawLine(left, top + rowH, left + colW, top + rowH, cellFramePaint)
+            }
+        }
+        val globalTop = rowH * voiceRows
+        if (pass.isDynamic) {
+            spcGlobalText.update(spcGlobals)
+        }
+        drawSpcLabel(canvas, SPC_GLOBAL_LABEL, 0f, globalTop, labelW, rowH, -1f, false)
+        drawCells(canvas, spcCompactGlobalGrid, spcGlobalText.cells, spcGlobalFitted, labelW, globalTop + (rowH - gridH) / 2)
+        if (pass.isStatic) {
+            if (colW < fullW) {
+                canvas.drawLine(colW, 0f, colW, globalTop, separatorPaint)
+            }
+            canvas.drawLine(0f, globalTop, fullW, globalTop, separatorPaint)
+            // under the label, cells take the rest of row
+            val size = spcLabelPaint.textSize
+            spcLabelPaint.textSize = minOf(size, size * (labelW - density * 6) / spcLabelPaint.measureText(SPC_HINT_TAP))
+            canvas.drawText(SPC_HINT_TAP, density * 4, globalTop + rowH - spcLabelPaint.descent() - density * 3, spcLabelPaint)
+            spcLabelPaint.textSize = size
+        }
+    }
+
+    private var spcCompactKey = -1f
+
+    // Row label with level meter (0..1, negative for none) and key mark
+    private fun drawSpcLabel(canvas: Canvas, label: String, left: Float, top: Float, w: Float, h: Float, level: Float, keyOn: Boolean) {
+        val x = left + density * 4
+        val baseline = top + h / 2 - density * 2
+        if (pass.isStatic) {
+            canvas.drawText(label, x, baseline, titlePaint)
+        }
+        if (!pass.isDynamic || level < 0f) {
+            return
+        }
+        val barTop = baseline + density * 4
+        val barW = w - density * 10
+        spcFillPaint.color = Color.argb(60, 255, 255, 255)
+        canvas.drawRect(x, barTop, x + barW, barTop + density * 4, spcFillPaint)
+        spcFillPaint.color = Color.WHITE
+        canvas.drawRect(x, barTop, x + barW * level.coerceIn(0f, 1f), barTop + density * 4, spcFillPaint)
+        if (keyOn) {
+            canvas.drawCircle(left + w - density * 6, baseline - density * 5, density * 3, spcFillPaint)
+        }
+    }
+
+    // How to get back from inspector, at the bottom right of dashboard area
+    private fun drawSpcHint(canvas: Canvas, w: Float, bottom: Float) {
+        spcLabelPaint.textAlign = Paint.Align.RIGHT
+        canvas.drawText(SPC_HINT_CLOSE, w - density * 4, bottom - spcLabelPaint.descent() - density, spcLabelPaint)
+        spcLabelPaint.textAlign = Paint.Align.LEFT
+    }
+
+    // Single voice with tall plots and all its values, and global state below
+    private fun drawSpcInspector(canvas: Canvas, data: ByteArray, voice: Int, areaHeight: Float) {
+        val fullW = width.toFloat()
+        val pad = cellsPadding() * 2
+        val key = fullW * 10000 + areaHeight
+        if (key != spcInspectorKey) {
+            spcInspectorKey = key
+            spcInspectorGrid.update(fullW - pad, areaHeight / 4, CELL_SCALES)
+            spcInspectorGlobalGrid.update(fullW - pad, areaHeight / 4, floatArrayOf(spcInspectorGrid.scale))
+        }
+        val voiceH = areaHeight * 0.6f
+        val g = VoiceGauges(data, voice * VoiceGauges.SIZE)
+        val texts = spcVoiceTexts[voice]
+        if (pass.isDynamic) {
+            spcEnvelopes[voice].update(g.field(2), g.field(3), g.field(4), g.field(0) * 16)
+            texts.update(g, voice, spcEnvelopes[voice])
+            spcGlobalText.update(spcGlobals)
+        }
+        val voiceGridH = cellLineHeight(spcInspectorGrid.scale) * spcInspectorGrid.lines + density * 2
+        drawSpcPanels(canvas, texts.titles, spcVoiceTemplates, 0f, 0f, fullW, voiceH - voiceGridH, voice, g)
+        drawCells(canvas, spcInspectorGrid, texts.cells, spcVoiceFitted[voice], 0f, voiceH - voiceGridH, texts.captions, spcCaptionFitted[voice])
+        val globalGridH = cellLineHeight(spcInspectorGrid.scale) * spcInspectorGlobalGrid.lines + density * 2
+        val hintH = spcLabelPaint.fontSpacing
+        drawSpcPanels(canvas, spcGlobalText.titles, spcGlobalTemplates, 0f, voiceH, fullW, areaHeight - voiceH - globalGridH - hintH, SpcDescription.VOICES, null)
+        drawCells(canvas, spcInspectorGlobalGrid, spcGlobalText.cells, spcGlobalFitted, 0f, areaHeight - globalGridH - hintH)
+        if (pass.isStatic) {
+            canvas.drawLine(0f, voiceH, fullW, voiceH, separatorPaint)
+            drawSpcHint(canvas, fullW, areaHeight)
+        }
+    }
+
+    /**
+     * Opens inspector of S-DSP voice, or closes it for -1
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun openSpcInspector(voice: Int) {
+        spcFocus = voice
+        invalidate()
+    }
+
+    // @return true if tap is handled by S-DSP dashboard
+    private fun spcTap(x: Float, y: Float): Boolean {
+        if (!spcShown) {
+            return false
+        }
+        if (spcFocus >= 0) {
+            spcFocus = -1
+        } else if (spcTapRowH > 0f && spcTapColumnW > 0f) {
+            val row = (y / spcTapRowH).toInt()
+            val col = (x / spcTapColumnW).toInt()
+            if (row in 0 until spcTapRows) {
+                spcFocus = (col * spcTapRows + row).coerceIn(0, SpcDescription.VOICES - 1)
+            }
+        }
+        return true
     }
 
     // Cells are below panels if they fit there, else (short rows of landscape or small screens) aside of panels:
@@ -1399,6 +1569,14 @@ class SidDashboardView @JvmOverloads constructor(
         if (withLabels) {
             val baseline = area.bottom - spcLabelPaint.descent()
             canvas.drawText(SPC_FIR_LOW, area.left, baseline, spcLabelPaint)
+            spcLabelPaint.textAlign = Paint.Align.CENTER
+            canvas.drawText(SPC_FIR_MID, (area.left + area.right) / 2, baseline, spcLabelPaint)
+            spcLabelPaint.textAlign = Paint.Align.LEFT
+            if (h > density * 44) {
+                // dB range of the plot
+                canvas.drawText(SPC_FIR_TOP, area.left + density * 2, area.top - spcLabelPaint.ascent(), spcLabelPaint)
+                canvas.drawText(SPC_FIR_BOTTOM, area.left + density * 2, bottom - spcLabelPaint.descent() - density, spcLabelPaint)
+            }
             spcLabelPaint.textAlign = Paint.Align.RIGHT
             canvas.drawText(SPC_FIR_HIGH, area.right, baseline, spcLabelPaint)
             spcLabelPaint.textAlign = Paint.Align.LEFT
@@ -1431,7 +1609,7 @@ class SidDashboardView @JvmOverloads constructor(
                 if (abs(event.x - downX) <= slop && abs(event.y - downY) <= slop) {
                     val data = exchange.acquire()
                     val voices = if (data.kind == FrameResult.GAUGES_VOICES) data.count else 0
-                    if (fmFocus.tap(event.x, event.y, data.bytes, voices)) {
+                    if (spcTap(event.x, event.y) || fmFocus.tap(event.x, event.y, data.bytes, voices)) {
                         invalidate()
                     }
                 }
@@ -1791,16 +1969,27 @@ class SidDashboardView @JvmOverloads constructor(
 
         // S-DSP panels: sample with output wave, envelope, level and pitch history
         private val SPC_PANELS = floatArrayOf(0.27f, 0.41f, 0.32f)
+
+        // titles are in words, raw registers are secondary (greyed value part)
         private val SPC_VOICE_TEMPLATE = arrayOf(
-            TitleTemplate("V8 SRCN FF", "once", arrayOf(SidDescription.GATE_MARK)),
-            TitleTemplate("ADSR FF FF", "100%", SpcDescription.Stage.values().map { it.short }.toTypedArray(), Paint.Align.LEFT),
-            TitleTemplate("Pitch 3FFF", "\u2248C#5", arrayOf("128kHz", "32.0kHz"))
+            TitleTemplate("V8 #255 once \u25CF", "", arrayOf("SRCN FF")),
+            TitleTemplate("Release 100%", "", arrayOf("ADSR FF FF")),
+            TitleTemplate("\u2248C#5 128.0 kHz", "", arrayOf("Pitch 3FFF"))
         )
         private val SPC_GLOBAL_TEMPLATE = arrayOf(
-            TitleTemplate("MVOL 7F 81", "", arrayOf("EVOL 3C 3C")),
-            TitleTemplate("EDL 15 EFB 7F", "240 ms", arrayOf("\u2212100%")),
-            TitleTemplate("FIR", "", arrayOf("DC \u221212.0dB"))
+            TitleTemplate("Volume", "", arrayOf("MVOL 7F 81")),
+            TitleTemplate("Echo 240 ms \u2212100%", "", arrayOf("EDL 15 EFB 7F")),
+            TitleTemplate("Echo filter", "", arrayOf("FIR"))
         )
+        private const val MIN_SPC_PLOT_DP = 32
+        private const val SPC_LABEL_DP = 44
+        private val SPC_VOICE_LABELS = Array(SpcDescription.VOICES) { "V${it + 1}" }
+        private const val SPC_GLOBAL_LABEL = "DSP"
+        private const val SPC_HINT_TAP = "tap a voice"
+        private const val SPC_HINT_CLOSE = "Tap to return"
+        private const val SPC_FIR_MID = "8 kHz"
+        private const val SPC_FIR_TOP = "+12 dB"
+        private const val SPC_FIR_BOTTOM = "\u221224 dB"
 
         // rows are taller with voices in two columns
         private const val SPC_TWO_COLUMNS_DP = 760

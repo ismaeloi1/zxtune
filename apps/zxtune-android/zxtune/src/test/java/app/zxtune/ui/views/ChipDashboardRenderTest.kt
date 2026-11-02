@@ -11,6 +11,7 @@ import app.zxtune.playback.VoicesLayout
 import java.io.File
 import kotlin.math.sin
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -183,21 +184,56 @@ class ChipDashboardRenderTest {
 
     private val spcLayout = "audio\nS-DSP\tVoice 1\tVoice 2\tVoice 3\tVoice 4\tVoice 5\tVoice 6\tVoice 7\tVoice 8"
 
-    private fun renderSpc(name: String, width: Int, height: Int): SidDashboardView {
+    private fun renderSpc(name: String, width: Int, height: Int, inspect: Int = -1): SidDashboardView {
         val view = SidDashboardView(ApplicationProvider.getApplicationContext())
         view.setVoicesData(VoicesLayout.parse(spcLayout), makeData(spcVoices()), 8, "S-DSP 32kHz, snes_spc\nscope: 8/8 ch")
+        view.openSpcInspector(inspect)
         render(name, view, width, height)
-        val colW = width.toFloat() / view.spcColumns
-        checkGrid(view.spcVoiceGrid, colW)
-        checkGrid(view.spcGlobalGrid, width.toFloat())
+        if (inspect < 0) {
+            val colW = width.toFloat() / view.spcColumns
+            checkGrid(if (view.spcCompact) view.spcCompactGrid else view.spcVoiceGrid, colW)
+            checkGrid(view.spcGlobalGrid, width.toFloat())
+        }
         return view
     }
 
+    // rows are too low for plots, so they're text only
     @Test
     fun snes() {
         val view = renderSpc("snes", 1080, 1700)
         assertEquals(1, view.spcColumns)
-        assertTrue(view.spcPanelHeight > 0f)
+        assertTrue(view.spcCompact)
+        val captions = visibleCaptions(view.spcCompactGrid)
+        assertTrue(captions.toString(), captions.size >= 10)
+    }
+
+    @Test
+    fun snesInspector() {
+        renderSpc("snes-inspector", 1080, 1700, 1)
+    }
+
+    @Test
+    @Config(qualifiers = "w675dp-h1507dp-256dpi")
+    fun snesInspectorDevice() {
+        renderSpc("snes-inspector-device", 1080, 1330, 5)
+    }
+
+    // tap on voice opens inspector, the next tap returns to all voices
+    @Test
+    @Config(qualifiers = "w675dp-h1507dp-256dpi")
+    fun snesTap() {
+        val view = renderSpc("snes-tap", 1080, 1330)
+        fun tap(x: Float, y: Float) {
+            for (action in intArrayOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_UP)) {
+                val event = android.view.MotionEvent.obtain(0L, 0L, action, x, y, 0)
+                view.onTouchEvent(event)
+                event.recycle()
+            }
+        }
+        tap(500f, view.spcRowHeight * 2.5f)
+        assertEquals(2, view.spcFocus)
+        tap(500f, 100f)
+        assertEquals(-1, view.spcFocus)
     }
 
     // the same geometry as user's phone, see sid2Device
@@ -206,6 +242,7 @@ class ChipDashboardRenderTest {
     fun snesDevice() {
         val view = renderSpc("snes-device", 1080, 1330)
         assertEquals(1, view.spcColumns)
+        assertFalse(view.spcCompact)
         val captions = visibleCaptions(view.spcVoiceGrid)
         assertTrue(captions.toString(), captions.containsAll(listOf("Sample", "Level", "Stage", "Note", "Vol L", "Vol R")))
     }
