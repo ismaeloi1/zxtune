@@ -186,6 +186,8 @@ namespace Module::Wav
 
   Model::Ptr CreateFloatPcmModel(Properties props)
   {
+    // only 32-bit float is supported, other sizes would be misread
+    Require(props.Bits == 32 && props.BlockSize == props.Channels * 4);
     const auto func = props.Channels == 1 ? &Pcm::ConvertChunk<float, 1> : &Pcm::ConvertChunk<float, 2>;
     Require(func);
     return MakePtr<PcmModel>(std::move(props), func);

@@ -175,7 +175,18 @@ namespace Module::Wav
     {
       Require(FormatCode == Formats::Chiptune::Wav::Format::EXTENDED);
       Require(FormatId != Formats::Chiptune::Wav::Guid());
-      if (FormatId == Formats::Chiptune::Wav::ATRAC3PLUS)
+      if (FormatId == Formats::Chiptune::Wav::EXTENSIBLE_PCM)
+      {
+        // field is wValidBitsPerSample here, not samples per block; samples are left-justified in container bits
+        WavProperties.BlockSizeSamples = 1;
+        return CreatePcmModel(WavProperties);
+      }
+      else if (FormatId == Formats::Chiptune::Wav::EXTENSIBLE_IEEE_FLOAT)
+      {
+        WavProperties.BlockSizeSamples = 1;
+        return CreateFloatPcmModel(WavProperties);
+      }
+      else if (FormatId == Formats::Chiptune::Wav::ATRAC3PLUS)
       {
         return CreateAtrac3PlusModel(WavProperties);
       }

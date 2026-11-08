@@ -155,7 +155,8 @@ namespace Formats::Chiptune
           const uint_t bitsOrBlockSize = stream.Read<le_uint16_t>();
           const uint_t channelsMask = stream.Read<le_uint32_t>();
           const auto formatId = stream.Read<Guid>();
-          const auto rest = stream.ReadRestData();
+          // PCM and float subtypes have nothing after GUID, unlike ATRAC
+          const auto rest = stream.GetRestSize() != 0 ? stream.ReadRestData() : Binary::View(nullptr, 0);
           Target.SetExtendedProperties(bitsOrBlockSize, channelsMask, formatId, rest);
         }
         else if (stream.GetRestSize() > 2)
