@@ -4,7 +4,7 @@
     <string name="close">閉じる</string>
     <string name="about_section_engines">サウンドエンジン</string>
     <string name="about_engine_running_on">動作エンジン</string>
-    <string name="about_engine_driver">オリジナルドライバ: %s</string>
+    <string name="about_engine_core">エミュレーション: %s</string>
     <string name="about_idea">アイデア, プログラム</string>
     <string name="about_coauthor_label">共著者</string>
     <string name="about_design">デザイン</string>

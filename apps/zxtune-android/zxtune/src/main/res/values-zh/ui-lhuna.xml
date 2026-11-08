@@ -4,7 +4,7 @@
     <string name="close">关闭</string>
     <string name="about_section_engines">声音引擎</string>
     <string name="about_engine_running_on">运行于</string>
-    <string name="about_engine_driver">原始驱动：%s</string>
+    <string name="about_engine_core">模拟：%s</string>
     <string name="about_idea">想法，代码</string>
     <string name="about_coauthor_label">合著者</string>
     <string name="about_design">设计</string>

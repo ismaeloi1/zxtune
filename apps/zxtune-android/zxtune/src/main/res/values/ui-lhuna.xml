@@ -5,7 +5,7 @@
     <string name="close">Close</string>
     <string name="about_section_engines">Sound engines</string>
     <string name="about_engine_running_on">Running on</string>
-    <string name="about_engine_driver">Original driver: %s</string>
+    <string name="about_engine_core">Emulation: %s</string>
     <string name="about_idea">Idea, code</string>
     <string name="about_coauthor_label">Co-author</string>
     <string name="about_design">Design</string>

@@ -4,7 +4,7 @@
     <string name="close">Cerrar</string>
     <string name="about_section_engines">Motores de sonido</string>
     <string name="about_engine_running_on">Funciona con</string>
-    <string name="about_engine_driver">Controlador original: %s</string>
+    <string name="about_engine_core">Emulación: %s</string>
     <string name="about_idea">Idea, programación</string>
     <string name="about_coauthor_label">Coautor</string>
     <string name="about_design">Diseño</string>

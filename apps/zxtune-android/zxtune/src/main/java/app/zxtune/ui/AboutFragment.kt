@@ -56,11 +56,12 @@ class AboutFragment : DialogFragment(R.layout.about) {
         // the rest is summarized by a counter chip leading to licenses
         private const val LIBRARIES_CHIPS = 8
 
-        private class Engine(val system: String, val chips: String, val driver: String, @ColorRes val color: Int)
+        private class Engine(val system: String, val chips: String, val core: String, @ColorRes val color: Int)
 
-        // systems emulated by own engines, see EngineBrands
+        // systems emulated by own engines (see EngineBrands) and emulation cores they are built on.
+        // Not "original driver": that is the tune's own playroutine shown in playback status.
         private val ENGINES = listOf(
-            Engine("C64", "C64 · SID 6581/8580", "libsidplayfp", R.color.lhuna_voice_1),
+            Engine("C64", "C64 · SID 6581/8580", "libsidplayfp (reSID/reSIDfp)", R.color.lhuna_voice_1),
             Engine("SNES", "SNES · S-DSP", "snes_spc", R.color.lhuna_voice_3),
         )
 
@@ -109,7 +110,7 @@ class AboutFragment : DialogFragment(R.layout.about) {
                 )
                 card.findViewById<TextView>(R.id.engine_brand).text = EngineBrands.BRANDS.getValue(engine.system)
                 card.findViewById<TextView>(R.id.engine_system).text = engine.chips
-                card.findViewById<TextView>(R.id.engine_driver).text = ctx.getString(R.string.about_engine_driver, engine.driver)
+                card.findViewById<TextView>(R.id.engine_core).text = ctx.getString(R.string.about_engine_core, engine.core)
                 if (idx != 0) {
                     (card.layoutParams as LinearLayout.LayoutParams).leftMargin = gap
                 }

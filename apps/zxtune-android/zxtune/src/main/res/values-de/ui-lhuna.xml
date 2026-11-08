@@ -4,7 +4,7 @@
     <string name="close">Schließen</string>
     <string name="about_section_engines">Sound-Engines</string>
     <string name="about_engine_running_on">Läuft auf</string>
-    <string name="about_engine_driver">Originaltreiber: %s</string>
+    <string name="about_engine_core">Emulation: %s</string>
     <string name="about_idea">Idee, Code</string>
     <string name="about_coauthor_label">Mitautor</string>
     <string name="about_design">Design</string>

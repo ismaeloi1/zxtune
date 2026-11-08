@@ -4,7 +4,7 @@
     <string name="close">Fermer</string>
     <string name="about_section_engines">Moteurs sonores</string>
     <string name="about_engine_running_on">Tourne sur</string>
-    <string name="about_engine_driver">Pilote d\'origine : %s</string>
+    <string name="about_engine_core">Émulation : %s</string>
     <string name="about_idea">Idée, code</string>
     <string name="about_coauthor_label">Co-auteur</string>
     <string name="about_design">Design</string>

@@ -206,7 +206,7 @@
                 android:entryValues="@array/pref_zxtune_sid_model_values"
                 android:key="zxtune.core.sid.model"
                 android:title="@string/pref_zxtune_sid_model_title"
-                android:summary="@string/pref_zxtune_sid_default_summary" />
+                android:summary="@string/pref_zxtune_sid_model_summary" />
         <SwitchPreferenceCompat
                 android:defaultValue="@integer/pref_zxtune_sid_model_force_default"
                 android:key="zxtune.core.sid.model_force"

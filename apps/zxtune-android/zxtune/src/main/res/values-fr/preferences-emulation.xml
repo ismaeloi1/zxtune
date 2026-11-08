@@ -21,4 +21,5 @@
     <string name="pref_zxtune_sid_filter_dac_curve">Courbe du DAC</string>
     <string name="pref_zxtune_sid_filter_voice_direct">direct</string>
     <string name="pref_zxtune_sid_filter_voice_noise">Bruit</string>
+    <string name="pref_zxtune_sid_model_summary">Utilisé si le morceau ne le précise pas</string>
 </resources>

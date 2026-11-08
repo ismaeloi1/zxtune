@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Engine card of About: decorative waveform in voice color, brand, emulated system, original driver -->
+<!-- Engine card of About: decorative waveform in voice color, brand, emulated system, emulation core -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="0dp"
@@ -44,7 +44,7 @@
             android:textSize="13sp" />
 
     <TextView
-            android:id="@+id/engine_driver"
+            android:id="@+id/engine_core"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/spacing_half"

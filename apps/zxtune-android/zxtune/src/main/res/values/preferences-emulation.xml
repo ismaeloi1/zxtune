@@ -270,6 +270,7 @@
     <integer name="pref_zxtune_sid_model_force_default">0</integer>
     <string name="pref_zxtune_sid_force_summary">Ignore value specified in tune</string>
     <string name="pref_zxtune_sid_default_summary">%s (used if tune does not specify it)</string>
+    <string name="pref_zxtune_sid_model_summary">Used if tune does not specify it</string>
     <!-- zxtune.core.sid.clock -->
     <string name="pref_zxtune_sid_clock_title">Default C64 model</string>
     <string-array name="pref_zxtune_sid_clock_entries" translatable="false">

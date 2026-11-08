@@ -4,7 +4,7 @@
     <string name="close">Zavřít</string>
     <string name="about_section_engines">Zvuková jádra</string>
     <string name="about_engine_running_on">Běží na</string>
-    <string name="about_engine_driver">Původní ovladač: %s</string>
+    <string name="about_engine_core">Emulace: %s</string>
     <string name="about_idea">Myšlenka, kód</string>
     <string name="about_coauthor_label">Spoluautor</string>
     <string name="about_design">Návrh</string>
