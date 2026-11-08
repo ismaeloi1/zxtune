@@ -318,12 +318,14 @@ namespace Module::VGMStream
     Holder(Vfs::Ptr model, VGMStreamPtr stream, Parameters::Accessor::Ptr props)
       : Model(std::move(model))
       , Stream(std::move(stream))
+      // stream is handed over to the first renderer, so information can't be taken from it later
+      , Info(MakeInformation(*Stream))
       , Properties(std::move(props))
     {}
 
     Information GetModuleInformation() const override
     {
-      return MakeInformation(*Stream);
+      return Info;
     }
 
     Parameters::Accessor::Ptr GetModuleProperties() const override
@@ -356,6 +358,7 @@ namespace Module::VGMStream
   private:
     const Vfs::Ptr Model;
     mutable VGMStreamPtr Stream;
+    const Information Info;
     const Parameters::Accessor::Ptr Properties;
   };
 
