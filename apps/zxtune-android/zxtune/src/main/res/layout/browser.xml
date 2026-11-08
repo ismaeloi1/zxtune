@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Root is focusable to take the focus away from the search field when it is cleared -->
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
         tools:ignore="RtlHardcoded">
 
+    <!-- Single child is replaced by selection actions -->
     <FrameLayout
             android:id="@+id/browser_top_panel"
             android:layout_width="match_parent"
@@ -14,31 +18,51 @@
 
         <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="?android:actionBarSize"
-                android:orientation="horizontal">
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-            <SearchView
+            <!-- Always visible: typing filters the listing, submit searches deep inside the current location -->
+            <androidx.appcompat.widget.SearchView
                     android:id="@+id/browser_search"
-                    android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
-                    android:iconifiedByDefault="true"
-                    android:imeOptions="actionSearch|flagNoExtractUi"
-                    android:queryHint="@string/browser_search_hint" />
-
-            <Button
-                    android:id="@+id/browser_roots"
-                    style="@style/Button.Breadcrumbs"
-                    android:layout_width="wrap_content"
-                    android:drawableLeft="@drawable/ic_browser_folder" />
-
-            <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/browser_breadcrumb"
+                    style="@style/Lhuna.SearchPill"
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
+                    android:layout_marginLeft="@dimen/lhuna_space_l"
+                    android:layout_marginTop="@dimen/spacing_full"
+                    android:layout_marginRight="@dimen/lhuna_space_l"
+                    android:layout_marginBottom="@dimen/spacing_half"
+                    android:imeOptions="actionSearch|flagNoExtractUi"
+                    app:queryHint="@string/browser_search_hint" />
+
+            <LinearLayout
+                    android:id="@+id/browser_location"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/lhuna_touch_target"
+                    android:gravity="center_vertical"
                     android:orientation="horizontal"
-                    app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-                    tools:itemCount="4"
-                    tools:listitem="@layout/browser_breadcrumbs_entry" />
+                    android:paddingLeft="@dimen/lhuna_space_l">
+
+                <Button
+                        android:id="@+id/browser_roots"
+                        style="@style/Button.Breadcrumbs"
+                        android:layout_width="wrap_content"
+                        android:contentDescription="@string/browser"
+                        android:drawableLeft="@drawable/ic_browser_sources" />
+
+                <!-- Path is scrolled to the end, faded edges tell about the hidden part -->
+                <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/browser_breadcrumb"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginLeft="@dimen/spacing_half"
+                        android:clipToPadding="false"
+                        android:fadingEdgeLength="@dimen/lhuna_space_xl"
+                        android:orientation="horizontal"
+                        android:paddingRight="@dimen/lhuna_space_l"
+                        android:requiresFadingEdge="horizontal"
+                        app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
+                        tools:itemCount="4"
+                        tools:listitem="@layout/browser_breadcrumbs_entry" />
+            </LinearLayout>
         </LinearLayout>
     </FrameLayout>
 
@@ -46,21 +70,31 @@
             android:id="@+id/browser_loading"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="@dimen/lhuna_progress_height"
             android:layout_below="@id/browser_top_panel"
-            android:max="100" />
+            android:layout_marginLeft="@dimen/lhuna_space_l"
+            android:layout_marginRight="@dimen/lhuna_space_l"
+            android:indeterminateTint="@color/lhuna_accent"
+            android:max="100"
+            android:maxHeight="@dimen/lhuna_progress_height"
+            android:minHeight="@dimen/lhuna_progress_height"
+            android:progressDrawable="@drawable/lhuna_progress"
+            android:visibility="invisible"
+            tools:ignore="UnusedAttribute" />
 
     <androidx.recyclerview.widget.RecyclerView
             android:id="@+id/browser_content"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_below="@id/browser_loading"
+            android:clipToPadding="false"
+            android:paddingTop="@dimen/spacing_half"
+            android:paddingBottom="@dimen/spacing_full"
             app:fastScrollEnabled="true"
             app:fastScrollHorizontalThumbDrawable="@drawable/scroll_thumb"
             app:fastScrollHorizontalTrackDrawable="@drawable/scroll_track"
             app:fastScrollVerticalThumbDrawable="@drawable/scroll_thumb"
             app:fastScrollVerticalTrackDrawable="@drawable/scroll_track"
-            app:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
             tools:itemCount="20"
             tools:listitem="@layout/browser_listing_entry" />
 
@@ -70,7 +104,10 @@
             android:layout_height="match_parent"
             android:layout_below="@id/browser_loading"
             android:gravity="center"
+            android:paddingLeft="@dimen/lhuna_space_xl"
+            android:paddingRight="@dimen/lhuna_space_xl"
             android:text="@string/browser_empty"
+            android:textAppearance="@style/TextAppearance.Lhuna.Body.Secondary"
             android:visibility="invisible" />
 
     <TextView
@@ -78,8 +115,11 @@
             style="@style/ListItem"
             android:layout_alignParentBottom="true"
             android:layout_centerVertical="true"
-            android:background="?android:colorBackground"
+            android:layout_marginLeft="@dimen/spacing_full"
+            android:layout_marginRight="@dimen/spacing_full"
+            android:layout_marginBottom="@dimen/spacing_full"
+            android:background="@drawable/lhuna_mini_player_background"
             android:gravity="center"
-            android:textAppearance="?textAppearanceListItem"
+            android:textAppearance="@style/TextAppearance.Lhuna.Body"
             tools:text="Notification with long message" />
 </RelativeLayout>

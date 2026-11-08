@@ -3,6 +3,7 @@ package app.zxtune.ui.browser
 import android.net.Uri
 import androidx.annotation.DrawableRes
 import app.zxtune.R
+import app.zxtune.ui.ChipFamily
 
 // public for binding
 data class ListingEntry(
@@ -12,6 +13,7 @@ data class ListingEntry(
     val details: String?,
     val icon: Icon?,
     @field:DrawableRes val additionalIcon: Int?,
+    val family: ChipFamily? = null,
 ) {
     private val isFolder
         get() = details == null
@@ -34,7 +36,10 @@ data class ListingEntry(
 
     companion object {
         fun makeFolder(
-            uri: Uri, title: String, description: String, icon: Icon? = null
+            uri: Uri,
+            title: String,
+            description: String,
+            icon: Icon? = null
         ) = ListingEntry(uri, title, description, null, icon, null)
 
         fun makeFile(
@@ -43,7 +48,8 @@ data class ListingEntry(
             description: String,
             details: String,
             @DrawableRes typeIcon: Int?,
-            icon: Icon? = null
-        ) = ListingEntry(uri, title, description, details, icon, typeIcon)
+            icon: Icon? = null,
+            family: ChipFamily? = null,
+        ) = ListingEntry(uri, title, description, details, icon, typeIcon, family)
     }
 }

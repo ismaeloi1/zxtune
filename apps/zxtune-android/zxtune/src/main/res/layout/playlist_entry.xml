@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Playlist row: chip family badge, title over author, tabular duration, reordering grip.
+  Current track is a tonal card with accent bar and title, plus equalizer while playing -->
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
@@ -13,60 +15,111 @@
                 type="app.zxtune.ui.playlist.Entry" />
 
         <variable
+                name="isCurrent"
+                type="boolean" />
+
+        <variable
                 name="isPlaying"
                 type="boolean" />
     </data>
 
-    <RelativeLayout style="@style/ListItem">
+    <RelativeLayout style="@style/ListItem.Lhuna">
 
-        <ImageView
-                android:id="@+id/playlist_entry_state"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
+        <View
+                android:id="@+id/playlist_entry_highlight"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginHorizontal="@dimen/spacing_full"
+                android:layout_marginVertical="2dp"
+                android:background="@drawable/lhuna_current_track_background"
+                android:visibility="@{isCurrent ? View.VISIBLE : View.GONE}"
+                tools:visibility="gone" />
+
+        <View
+                android:id="@+id/playlist_entry_current_bar"
+                android:layout_width="@dimen/lhuna_current_bar_width"
+                android:layout_height="@dimen/item_half"
                 android:layout_alignParentLeft="true"
                 android:layout_centerVertical="true"
-                android:layout_marginRight="?android:listPreferredItemPaddingLeft"
-                android:src="@{isPlaying ? @drawable/ic_playing : @drawable/ic_drag_handler}"
-                app:tint="?colorControlNormal"
-                tools:src="@drawable/ic_drag_handler" />
+                android:layout_marginLeft="@dimen/lhuna_space_m"
+                android:background="@drawable/lhuna_current_bar"
+                android:visibility="@{isCurrent ? View.VISIBLE : View.GONE}"
+                tools:visibility="gone" />
+
+        <TextView
+                android:id="@+id/playlist_entry_badge"
+                style="@style/Lhuna.Badge"
+                android:layout_alignParentLeft="true"
+                android:layout_centerVertical="true"
+                android:layout_marginLeft="@dimen/lhuna_space_xl"
+                android:importantForAccessibility="no"
+                tools:text="SID" />
+
+        <ImageView
+                android:id="@+id/playlist_entry_handle"
+                android:layout_width="@dimen/lhuna_touch_target"
+                android:layout_height="match_parent"
+                android:layout_alignParentRight="true"
+                android:layout_marginRight="@dimen/spacing_full"
+                android:importantForAccessibility="no"
+                android:paddingHorizontal="@dimen/lhuna_space_m"
+                android:scaleType="fitCenter"
+                android:src="@drawable/ic_drag_handler"
+                app:tint="@color/lhuna_text_3" />
+
+        <TextView
+                android:id="@+id/playlist_entry_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginLeft="@dimen/spacing_full"
+                android:layout_toLeftOf="@id/playlist_entry_handle"
+                android:text="@{entry.getDuration().toString()}"
+                android:textAppearance="@style/TextAppearance.Lhuna.Mono.Duration"
+                android:textColor="@{isCurrent ? @color/lhuna_text_1 : @color/lhuna_text_2}"
+                tools:text="@tools:sample/date/hhmm" />
+
+        <ImageView
+                android:id="@+id/playlist_entry_playing"
+                android:layout_width="@dimen/item_half"
+                android:layout_height="@dimen/item_half"
+                android:layout_centerVertical="true"
+                android:layout_toLeftOf="@id/playlist_entry_duration"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_playing"
+                android:visibility="@{isPlaying ? View.VISIBLE : View.GONE}"
+                tools:visibility="gone" />
 
         <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_centerVertical="true"
-                android:layout_toLeftOf="@+id/playlist_entry_duration"
-                android:layout_toRightOf="@+id/playlist_entry_state"
+                android:layout_marginLeft="@dimen/lhuna_space_l"
+                android:layout_marginRight="@dimen/spacing_full"
+                android:layout_toLeftOf="@id/playlist_entry_playing"
+                android:layout_toRightOf="@id/playlist_entry_badge"
                 android:orientation="vertical">
 
             <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
                     android:text="@{entry.getDisplayTitle()}"
-                    android:textAppearance="?android:textAppearanceListItem"
+                    android:textAppearance="@style/TextAppearance.Lhuna.Title"
+                    android:textColor="@{isCurrent ? @color/lhuna_accent : @color/lhuna_text_1}"
                     tools:text="@tools:sample/lorem/random" />
 
             <TextView
                     android:id="@+id/list_item_text_aux"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:singleLine="true"
                     android:text="@{entry.getAuthor()}"
-                    android:textAppearance="?textAppearanceListItemSecondary"
+                    android:textAppearance="@style/TextAppearance.Lhuna.Body.Secondary"
                     android:visibility="@{entry.getAuthor().isEmpty() ? View.GONE : View.VISIBLE}"
                     tools:text="@tools:sample/full_names" />
         </LinearLayout>
-
-        <TextView
-                android:id="@+id/playlist_entry_duration"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentRight="true"
-                android:layout_centerVertical="true"
-                android:layout_marginLeft="?android:listPreferredItemPaddingRight"
-                android:text="@{entry.getDuration().toString()}"
-                android:textAppearance="?android:textAppearanceListItemSmall"
-                tools:text="@tools:sample/date/hhmm" />
-
     </RelativeLayout>
 </layout>

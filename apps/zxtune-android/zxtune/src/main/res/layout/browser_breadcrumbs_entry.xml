@@ -5,20 +5,16 @@
 
     <data>
 
-        <import type="android.view.View" />
-
         <variable
                 name="entry"
                 type="app.zxtune.ui.browser.BreadcrumbsEntry" />
-
-        <variable
-                name="isPlaying"
-                type="boolean" />
     </data>
 
+    <!-- Source is told by its logo only, icon is set by the adapter to fit the chip -->
     <Button
             style="@style/Button.Breadcrumbs"
-            android:drawableLeft="@{entry.icon != null ? context.getResources().getDrawable(entry.icon) : null}"
+            android:layout_width="wrap_content"
+            android:contentDescription="@{entry.title}"
             android:text="@{entry.icon == null ? entry.title : null}"
             tools:text="@tools:sample/cities" />
 </layout>

@@ -53,7 +53,9 @@ class PlaylistFragment : Fragment() {
         get() = MediaControllerCompat.getMediaController(requireActivity())
 
     override fun onCreateView(
-        inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
     ) = container?.let { inflater.inflate(R.layout.playlist, it, false) }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -61,7 +63,9 @@ class PlaylistFragment : Fragment() {
         val panel = view.findViewById<FrameLayout>(R.id.playlist_top_panel)
         setupToolbarMenu(panel)
         listing = setupListing(
-            panel, view.findViewById(R.id.playlist_content), view.findViewById(R.id.playlist_stub)
+            panel,
+            view.findViewById(R.id.playlist_content),
+            view.findViewById(R.id.playlist_stub)
         )
         search = setupSearchView(view.findViewById(R.id.playlist_search))
     }
@@ -89,76 +93,66 @@ class PlaylistFragment : Fragment() {
                 }
             }
 
-            override fun onMenuItemSelected(menuItem: MenuItem) =
-                processMenuItem(menuItem.itemId, selectionTracker.selection)
+            override fun onMenuItemSelected(menuItem: MenuItem) = processMenuItem(menuItem.itemId, selectionTracker.selection)
         })
     }
 
-    private fun setupListing(panel: FrameLayout, listing: RecyclerView, stub: View) =
-        listing.apply {
-            setHasFixedSize(true)
-            val adapter = ViewAdapter(model::move).apply {
-                adapter = this
+    private fun setupListing(panel: FrameLayout, listing: RecyclerView, stub: View) = listing.apply {
+        setHasFixedSize(true)
+        val adapter = ViewAdapter(model::move).apply {
+            adapter = this
+        }
+        selectionTracker = SelectionTracker.Builder(
+            "playlist_selection",
+            this,
+            ViewAdapter.KeyProvider(adapter),
+            ViewAdapter.DetailsLookup(this, adapter),
+            StorageStrategy.createLongStorage()
+        ).withSelectionPredicate(SelectionPredicates.createSelectAnything())
+            .withOnItemActivatedListener { item, _ ->
+                item.selectionKey?.let { onItemClick(it) }
+                false // for ripple
+            }.build().also {
+                adapter.setSelection(it.selection)
+                SelectionUtils.install(panel, it, SelectionClient(adapter))
             }
-            selectionTracker = SelectionTracker.Builder(
-                "playlist_selection",
-                this,
-                ViewAdapter.KeyProvider(adapter),
-                ViewAdapter.DetailsLookup(this, adapter),
-                StorageStrategy.createLongStorage()
-            ).withSelectionPredicate(SelectionPredicates.createSelectAnything())
-                .withOnItemActivatedListener { item, _ ->
-                    item.selectionKey?.let { onItemClick(it) }
-                    false // for ripple
-                }.build().also {
-                    adapter.setSelection(it.selection)
-                    SelectionUtils.install(panel, it, SelectionClient(adapter))
-                }
-            viewLifecycleOwner.whenLifecycleStarted {
-                launch {
-                    model.state.collect { state ->
-                        adapter.submitList(state.entries) {
-                            if (0 == adapter.itemCount) {
-                                visibility = View.GONE
-                                stub.visibility = View.VISIBLE
-                            } else {
-                                visibility = View.VISIBLE
-                                stub.visibility = View.GONE
-                            }
+        viewLifecycleOwner.whenLifecycleStarted {
+            launch {
+                model.state.collect { state ->
+                    adapter.submitList(state.entries) {
+                        if (0 == adapter.itemCount) {
+                            visibility = View.GONE
+                            stub.visibility = View.VISIBLE
+                        } else {
+                            visibility = View.VISIBLE
+                            stub.visibility = View.GONE
                         }
                     }
                 }
-                launch {
-                    mediaModel.playbackState.collect { state: PlaybackStateCompat? ->
-                        adapter.setIsPlaying(PlaybackStateCompat.STATE_PLAYING == state?.state)
-                    }
+            }
+            launch {
+                mediaModel.playbackState.collect { state: PlaybackStateCompat? ->
+                    adapter.setIsPlaying(PlaybackStateCompat.STATE_PLAYING == state?.state)
                 }
-                launch {
-                    mediaModel.metadata.collect { metadata ->
-                        metadata?.let {
-                            val uri = Uri.parse(it.description.mediaId)
-                            adapter.setNowPlaying(ProviderClient.findId(uri))
-                        }
+            }
+            launch {
+                mediaModel.metadata.collect { metadata ->
+                    metadata?.let {
+                        val uri = Uri.parse(it.description.mediaId)
+                        adapter.setNowPlaying(ProviderClient.findId(uri))
                     }
                 }
             }
         }
+    }
 
     private fun setupSearchView(view: SearchView) = view.apply {
         isSubmitButtonEnabled = false
-        setOnCloseListener {
-            post {
+        setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String) = true.also {
                 clearFocus()
             }
-            false
-        }
-        setOnQueryTextFocusChangeListener { _, hasFocus ->
-            if (!hasFocus && query.isEmpty()) {
-                isIconified = true
-            }
-        }
-        setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String) = true
+
             override fun onQueryTextChange(newText: String): Boolean {
                 model.filter = newText
                 return true
@@ -184,23 +178,20 @@ class PlaylistFragment : Fragment() {
     }
 
     private fun onItemClick(id: Long) = mediaController?.transportControls?.playFromUri(
-        ProviderClient.createUri(id), null
+        ProviderClient.createUri(id),
+        null
     ) ?: Unit
 
     // ArchivesService for selection
-    private inner class SelectionClient(private val adapter: ViewAdapter) :
-        SelectionUtils.Client<Long> {
-        override fun getTitle(count: Int) =
-            resources.getQuantityString(R.plurals.tracks, count, count)
+    private inner class SelectionClient(private val adapter: ViewAdapter) : SelectionUtils.Client<Long> {
+        override fun getTitle(count: Int) = resources.getQuantityString(R.plurals.tracks, count, count)
 
         override val allItems
             get() = adapter.currentList.map(Entry::id)
 
-        override fun fillMenu(inflater: MenuInflater, menu: Menu) =
-            inflater.inflate(R.menu.playlist_items, menu)
+        override fun fillMenu(inflater: MenuInflater, menu: Menu) = inflater.inflate(R.menu.playlist_items, menu)
 
-        override fun processMenu(itemId: Int, selection: Selection<Long>) =
-            processMenuItem(itemId, selection)
+        override fun processMenu(itemId: Int, selection: Selection<Long>) = processMenuItem(itemId, selection)
     }
 
     private fun processMenuItem(itemId: Int, selection: Selection<Long>): Boolean {
@@ -216,18 +207,19 @@ class PlaylistFragment : Fragment() {
             }
 
             R.id.action_save -> savePlaylist(convertSelection(selection))
+
             R.id.action_statistics -> showStatistics(convertSelection(selection))
+
             else -> return false
         }
         return true
     }
 
     // TODO: think about using DialogFragment - complicated lambda passing
-    private fun deletionAlert(@StringRes message: Int, action: () -> Unit) =
-        AlertDialog.Builder(requireContext()).setTitle(message)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                action()
-            }.show()
+    private fun deletionAlert(@StringRes message: Int, action: () -> Unit) = AlertDialog.Builder(requireContext()).setTitle(message)
+        .setPositiveButton(R.string.delete) { _, _ ->
+            action()
+        }.show()
 
     private fun savePlaylist(ids: LongArray?) = lifecycleScope.launch {
         val persistentStorageSetupAction =
@@ -238,15 +230,14 @@ class PlaylistFragment : Fragment() {
         fragment.show(parentFragmentManager, "save")
     }
 
-    private fun showStatistics(ids: LongArray?) =
-        PlaylistStatisticsFragment.createInstance(ids).show(parentFragmentManager, "statistics")
+    private fun showStatistics(ids: LongArray?) = PlaylistStatisticsFragment.createInstance(ids).show(parentFragmentManager, "statistics")
 
     companion object {
         @StringRes
         private fun getMenuTitle(by: ProviderClient.SortBy) = when (by) {
             ProviderClient.SortBy.title -> R.string.information_title
             ProviderClient.SortBy.author -> R.string.information_author
-            ProviderClient.SortBy.duration -> R.string.statistics_duration //TODO: extract
+            ProviderClient.SortBy.duration -> R.string.statistics_duration // TODO: extract
         }
 
         @DrawableRes
@@ -256,11 +247,10 @@ class PlaylistFragment : Fragment() {
         }
 
         @VisibleForTesting
-        fun convertSelection(selection: Selection<Long>) =
-            selection.takeUnless { it.isEmpty }?.iterator()?.let { iterator ->
-                LongArray(selection.size()) {
-                    iterator.next()
-                }
+        fun convertSelection(selection: Selection<Long>) = selection.takeUnless { it.isEmpty }?.iterator()?.let { iterator ->
+            LongArray(selection.size()) {
+                iterator.next()
             }
+        }
     }
 }
