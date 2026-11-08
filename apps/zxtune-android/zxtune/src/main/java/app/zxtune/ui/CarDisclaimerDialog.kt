@@ -21,6 +21,7 @@ import app.zxtune.MainActivity
 import app.zxtune.MainService
 import app.zxtune.R
 import app.zxtune.device.car.DrivingDisclaimer
+import app.zxtune.ui.utils.DialogSheets
 
 /**
  * Legal notice shown before enabling moving pictures in car.
@@ -120,7 +121,7 @@ class CarDisclaimerDialog : DialogFragment() {
                 .setTitle(R.string.car_disclaimer_title)
                 .setMessage(DrivingDisclaimer.getText(ctx))
                 .setPositiveButton(android.R.string.ok, null)
-                .show()
+                .create().let(DialogSheets::apply).show()
         }
 
         fun askRestart(ctx: Context) {
@@ -129,7 +130,7 @@ class CarDisclaimerDialog : DialogFragment() {
                 .setMessage(R.string.car_restart_message)
                 .setPositiveButton(R.string.car_restart_now) { _, _ -> restartApplication(ctx) }
                 .setNegativeButton(R.string.car_restart_later, null)
-                .show()
+                .create().let(DialogSheets::apply).show()
         }
 
         /**

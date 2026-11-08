@@ -16,6 +16,7 @@ import app.zxtune.ResultActivity
 import app.zxtune.analytics.Analytics
 import app.zxtune.device.PowerManagement
 import app.zxtune.rescue.RescueActivity
+import app.zxtune.ui.utils.DialogSheets
 import app.zxtune.ui.utils.item
 import kotlin.system.exitProcess
 
@@ -71,7 +72,7 @@ class ApplicationMenu(private val activity: FragmentActivity) : MenuProvider {
         setPositiveButton(R.string.problem_power_management_fixit) { _, _ ->
             tryOpenIntent(ResultActivity.createSetupPowerManagementIntent(activity))
         }
-    }.show()
+    }.create().let(DialogSheets::apply).show()
 
     private fun rate() {
         if (tryOpenIntent(Features.UserRating.intent)) {
