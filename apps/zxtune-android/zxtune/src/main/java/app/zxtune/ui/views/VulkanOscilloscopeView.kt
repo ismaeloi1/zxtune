@@ -171,9 +171,9 @@ class VulkanOscilloscopeView internal constructor(
             fail()
             return false
         }
-        var result = VulkanScopeNative.render(handle, frame.samples, frame.channels, frame.points, gainPercent)
+        var result = renderNative(frame)
         if (result == VulkanScopeNative.RESULT_RESIZED) {
-            result = VulkanScopeNative.render(handle, frame.samples, frame.channels, frame.points, gainPercent)
+            result = renderNative(frame)
         }
         return when (result) {
             VulkanScopeNative.RESULT_PRESENTED -> {
@@ -189,6 +189,9 @@ class VulkanOscilloscopeView internal constructor(
             else -> false
         }
     }
+
+    private fun renderNative(frame: ScopeFeed.Frame) =
+        VulkanScopeNative.render(handle, frame.samples, frame.channels, frame.points, gainPercent, NO_SHAPES, 0)
 
     // Layout or size is changed, so static data is updated
     private fun upload(frame: ScopeFeed.Frame, grid: ScopeGrid): Boolean {
@@ -217,3 +220,5 @@ class VulkanOscilloscopeView internal constructor(
         return true
     }
 }
+
+private val NO_SHAPES = FloatArray(0)

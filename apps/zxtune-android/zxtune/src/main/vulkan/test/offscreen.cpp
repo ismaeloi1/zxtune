@@ -10,6 +10,8 @@
 
 #include "apps/zxtune-android/zxtune/src/main/vulkan/renderer.h"
 
+#include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -454,7 +456,129 @@ namespace VulkanScope
     uint32_t Frames = 0;
   };
 
+  // Shapes pass as drawn by filter response view (see app.zxtune.ui.views.FilterScene): resonant curve of segments with
+  // fading tail and gradient fill, dots and rings of voices, ticks, glyphs of a synthetic atlas
+  struct ShapesScene
+  {
+    static const uint32_t SEGMENT = 0;
+    static const uint32_t CIRCLE = 1;
+    static const uint32_t GLYPH = 2;
+    static const uint32_t FILL = 3;
+
+    std::vector<float> Shapes;
+    std::vector<uint8_t> Atlas;
+    std::vector<uint8_t> Background;
+    static const uint32_t ATLAS_SIZE = 16;
+
+    ShapesScene(uint32_t width, uint32_t height)
+      : Atlas(ATLAS_SIZE * ATLAS_SIZE)
+      , Background(std::size_t(width) * height)
+    {
+      // glyph is a ring of 1px
+      for (uint32_t y = 0; y < ATLAS_SIZE; ++y)
+      {
+        for (uint32_t x = 0; x < ATLAS_SIZE; ++x)
+        {
+          const auto d = std::hypot(x + 0.5 - ATLAS_SIZE / 2.0, y + 0.5 - ATLAS_SIZE / 2.0);
+          Atlas[y * ATLAS_SIZE + x] = static_cast<uint8_t>(255 * std::clamp(1 - std::abs(d - 6), 0.0, 1.0));
+        }
+      }
+      for (uint32_t x = 0; x < width; x += width / 10)
+      {
+        for (uint32_t y = 0; y < height; ++y)
+        {
+          Background[y * width + x] = 38;
+        }
+      }
+      const float left = 10;
+      const float right = width - 10.0f;
+      const float top = 40;
+      const float bottom = height - 10.0f;
+      const auto respY = [&](float x) {
+        // resonant low-pass by log frequency
+        const double ratio = std::pow(1000.0, (x - left) / (right - left)) / 30;
+        const double dRe = 1 - ratio * ratio;
+        const double dIm = ratio / 4;
+        const double db = std::max(-60.0, -10 * std::log10(dRe * dRe + dIm * dIm));
+        return std::make_pair(static_cast<float>(top + (bottom - top) * (24 - db) / 60), db);
+      };
+      float prevX = left;
+      for (float x = left; x < right; x += 3)
+      {
+        const auto x1 = std::min(x + 3, right);
+        const auto [y0, db0] = respY(x);
+        const auto [y1, db1] = respY(x1);
+        const auto [yp, dbp] = respY(std::max(prevX, left));
+        const auto [yn, dbn] = respY(std::min(x1 + 3, right));
+        const float alpha = static_cast<float>(std::clamp((db0 + 36) / 12, 0.0, 1.0));
+        Add(FILL, {0, 0.0f, 0}, {x, y0, x1, y1}, {bottom, bottom, 0, 0}, {1, 1, 1, 0.14f * alpha});
+        Add(SEGMENT, {0.8f, 0, 0}, {x, y0, x1, y1},
+            {prevX < x ? prevX : x, prevX < x ? yp : y0, x1 + 3 <= right ? x1 + 3 : x1, x1 + 3 <= right ? yn : y1},
+            {1, 1, 1, alpha});
+        prevX = x;
+      }
+      const float colors[3][3] = {{1.0f, 0.71f, 0.28f}, {0.37f, 0.83f, 0.55f}, {1.0f, 0.44f, 0.65f}};
+      for (uint32_t voice = 0; voice < 3; ++voice)
+      {
+        const float x = left + (right - left) * (0.2f + 0.25f * voice);
+        const auto y = respY(x).first;
+        const auto* c = colors[voice];
+        Add(CIRCLE, {5.5f, voice == 1 ? 2.0f : 0.0f, 0}, {x, y, 0, 0}, {0, 0, 0, 0}, {c[0], c[1], c[2], 1});
+        Add(SEGMENT, {1.0f, 0, 0}, {x, bottom - 12, x, bottom}, {x, bottom - 12, x, bottom}, {c[0], c[1], c[2], 1});
+        Add(GLYPH, {0, 0, 0}, {x + 8, y - 24, x + 8 + ATLAS_SIZE, y - 24 + ATLAS_SIZE}, {0, 0, 1, 1},
+            {c[0], c[1], c[2], 1});
+      }
+    }
+
+    void Add(uint32_t kind, std::array<float, 3> head, std::array<float, 4> first, std::array<float, 4> second,
+             std::array<float, 4> color)
+    {
+      Shapes.push_back(static_cast<float>(kind));
+      Shapes.insert(Shapes.end(), head.begin(), head.end());
+      Shapes.insert(Shapes.end(), first.begin(), first.end());
+      Shapes.insert(Shapes.end(), second.begin(), second.end());
+      Shapes.insert(Shapes.end(), color.begin(), color.end());
+    }
+
+    uint32_t Count() const
+    {
+      return static_cast<uint32_t>(Shapes.size() / ScopeRenderer::SHAPE_FLOATS);
+    }
+  };
+
   using SamplesSource = std::function<void(uint32_t frame, int16_t* target)>;
+
+  void RenderShapes(const Device& dev, VkExtent2D extent, Rotation rotation, const std::string& path,
+                    const ShapesScene& scene, uint32_t frames)
+  {
+    OffscreenTargets targets(dev, extent, 3);
+    ScopeRenderer renderer(dev, OffscreenTargets::FORMAT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    renderer.SetTargets(targets.Images, extent, rotation);
+    const auto logical = renderer.LogicalSize();
+    renderer.SetBackground(scene.Background.data(), logical.width, logical.height, logical.width);
+    renderer.SetAtlas(scene.Atlas.data(), ShapesScene::ATLAS_SIZE, ShapesScene::ATLAS_SIZE, ShapesScene::ATLAS_SIZE);
+    renderer.SetTraces(nullptr, 0, logical.width, logical.height);
+    using Clock = std::chrono::steady_clock;
+    Clock::duration cpu = {};
+    uint32_t last = 0;
+    for (uint32_t frame = 0; frame < frames; ++frame)
+    {
+      const auto image = frame % targets.Images.size();
+      Check(dev.Vk().vkWaitForFences(dev.Handle(), 1, &targets.Fences[image], VK_TRUE, UINT64_MAX), "wait");
+      const auto start = Clock::now();
+      dev.Vk().vkResetFences(dev.Handle(), 1, &targets.Fences[image]);
+      renderer.Write(image, nullptr, 0, 0, ScopeRenderer::AUTO_GAIN, scene.Shapes.data(), scene.Count());
+      renderer.Submit(image, VK_NULL_HANDLE, VK_NULL_HANDLE, targets.Fences[image]);
+      cpu += Clock::now() - start;
+      last = image;
+    }
+    dev.Vk().vkDeviceWaitIdle(dev.Handle());
+    const auto pixels = targets.Read(last);
+    PngWriter::Write(path, pixels.data(), extent.width, extent.height);
+    using Us = std::chrono::duration<double, std::micro>;
+    std::cout << path << ": " << extent.width << "x" << extent.height << ", " << scene.Count() << " shapes, CPU "
+              << Us(cpu).count() / frames << "us/frame" << std::endl;
+  }
 
   void Render(const Device& dev, VkExtent2D extent, Rotation rotation, const std::string& path, uint32_t frames,
               const SamplesSource& source, uint32_t points = TestScene::POINTS)
@@ -532,6 +656,9 @@ int main(int argc, char** argv)
           SidScene::Samples(TestScene::CHANNELS, cellPoints, frame, target);
         },
         cellPoints);
+    // filter response view: shapes over background without traces, upright and pre-rotated
+    RenderShapes(dev, {1080, 608}, Rotation::NONE, dir + "/vk-shapes.png", ShapesScene(1080, 608), 60);
+    RenderShapes(dev, {608, 1080}, Rotation::CW90, dir + "/vk-shapes-rot90.png", ShapesScene(1080, 608), 10);
     // <dir> <driver or -> <dump> <points> <channels> <first>: traces dumped by module_test_scope_bench
     if (argc > 6)
     {

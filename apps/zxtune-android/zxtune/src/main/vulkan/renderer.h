@@ -27,7 +27,8 @@ namespace VulkanScope
 
   /*
    * Per frame work: samples copy to persistently mapped buffer of target image and submit of prerecorded command buffer
-   * (static background texture and single instanced draw of all the traces with parameters in the same buffer).
+   * (static background texture, single instanced draw of all the traces with parameters in the same buffer and single
+   * instanced draw of antialiased shapes, e.g. filter response view, with text glyphs from static atlas texture).
    */
   class ScopeRenderer
   {
@@ -35,6 +36,9 @@ namespace VulkanScope
     static const uint32_t MAX_CHANNELS = 32;
     static const uint32_t MAX_POINTS = 2048;
     static const int AUTO_GAIN = 0;
+    //! See shaders/shape.vert and app.zxtune.ui.views.ScopeShapes
+    static const uint32_t MAX_SHAPES = 4096;
+    static const uint32_t SHAPE_FLOATS = 16;
 
     //! @param finalLayout layout of targets after rendering (e.g. for presentation or copying)
     ScopeRenderer(const Device& device, VkFormat format, VkImageLayout finalLayout);
@@ -50,12 +54,17 @@ namespace VulkanScope
     //! @brief Static part of picture, white with alpha of logical view size
     void SetBackground(const uint8_t* alpha, uint32_t width, uint32_t height, uint32_t stride);
 
+    //! @brief Glyphs atlas for text shapes, white with alpha
+    void SetAtlas(const uint8_t* alpha, uint32_t width, uint32_t height, uint32_t stride);
+
     //! @param traces 4 values per channel in view pixels: left, width, vertical center, amplitude
     //! @param width,height view size, may differ from logical size of targets during resizing
     void SetTraces(const float* traces, uint32_t channels, uint32_t width, uint32_t height);
 
     //! @brief Fill data for target image, previous usage of it should be completed
-    void Write(uint32_t image, const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent);
+    //! @param shapes SHAPE_FLOATS values per shape drawn over traces
+    void Write(uint32_t image, const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent,
+               const float* shapes = nullptr, uint32_t shapesCount = 0);
 
     void Submit(uint32_t image, VkSemaphore wait, VkSemaphore signal, VkFence fence);
 
@@ -66,6 +75,14 @@ namespace VulkanScope
 
   private:
     void Intensity(const int16_t* data, uint32_t points, float gain, const float* trace, uint8_t* target);
+
+    struct Texture
+    {
+      VkImage Image = VK_NULL_HANDLE;
+      VkDeviceMemory Memory = VK_NULL_HANDLE;
+      VkImageView View = VK_NULL_HANDLE;
+      VkExtent2D Size = {};
+    };
 
     struct Frame
     {
@@ -80,11 +97,18 @@ namespace VulkanScope
 
     void Destroy();
     void CreatePipelines();
+    enum class Blending
+    {
+      NONE,
+      ADD,
+      OVER,
+    };
     VkPipeline CreatePipeline(const uint32_t* vertex, std::size_t vertexSize, const uint32_t* fragment,
-                              std::size_t fragmentSize, VkPrimitiveTopology topology, bool blend);
+                              std::size_t fragmentSize, Blending blend);
     void DestroyTargets();
-    void CreateBackground(uint32_t width, uint32_t height);
-    void DestroyBackground();
+    void CreateTexture(Texture& tex, uint32_t width, uint32_t height);
+    void DestroyTexture(Texture& tex);
+    void Upload(Texture& tex, const uint8_t* alpha, uint32_t width, uint32_t height, uint32_t stride);
     void UpdateDescriptors();
     void Record();
     VkCommandBuffer BeginOneTime();
@@ -99,14 +123,13 @@ namespace VulkanScope
     VkPipelineLayout Layout = VK_NULL_HANDLE;
     VkPipeline TracePipeline = VK_NULL_HANDLE;
     VkPipeline BackgroundPipeline = VK_NULL_HANDLE;
+    VkPipeline ShapePipeline = VK_NULL_HANDLE;
     VkSampler Sampler = VK_NULL_HANDLE;
     VkCommandPool CommandPool = VK_NULL_HANDLE;
     VkDescriptorPool DescriptorPool = VK_NULL_HANDLE;
 
-    VkImage Background = VK_NULL_HANDLE;
-    VkDeviceMemory BackgroundMemory = VK_NULL_HANDLE;
-    VkImageView BackgroundView = VK_NULL_HANDLE;
-    VkExtent2D BackgroundSize = {};
+    Texture Background;
+    Texture Atlas;
 
     std::vector<Frame> Frames;
     VkExtent2D Extent = {};

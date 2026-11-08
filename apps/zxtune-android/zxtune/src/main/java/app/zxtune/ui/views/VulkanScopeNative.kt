@@ -53,9 +53,25 @@ internal object VulkanScopeNative {
      */
     external fun setBackground(handle: Long, pixels: ByteBuffer, width: Int, height: Int, stride: Int): Int
 
+    /**
+     * @param pixels direct buffer with alpha values of glyphs, see [ScopeShapes]
+     */
+    external fun setAtlas(handle: Long, pixels: ByteBuffer, width: Int, height: Int, stride: Int): Int
+
     external fun setTraces(handle: Long, traces: FloatArray, channels: Int, width: Int, height: Int): Int
 
-    external fun render(handle: Long, samples: ShortArray, channels: Int, points: Int, gainPercent: Int): Int
+    /**
+     * @param shapes [ScopeShapes.FLOATS] values per shape drawn over traces, see [ScopeShapes]
+     */
+    external fun render(
+        handle: Long,
+        samples: ShortArray,
+        channels: Int,
+        points: Int,
+        gainPercent: Int,
+        shapes: FloatArray,
+        shapesCount: Int,
+    ): Int
 
     external fun destroy(handle: Long)
 }

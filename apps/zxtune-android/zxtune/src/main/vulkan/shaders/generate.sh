@@ -11,7 +11,7 @@ OUT="$DIR/../shaders.h"
   echo "#include <cstdint>"
   echo "namespace VulkanScope::Shaders"
   echo "{"
-  for src in trace.vert trace.frag background.vert background.frag; do
+  for src in trace.vert trace.frag background.vert background.frag shape.vert shape.frag; do
     name=$(echo "$src" | tr '.a-z' '_A-Z')
     echo "  const uint32_t $name[] = {"
     "$GLSLC" -O --target-env=vulkan1.0 -mfmt=num -o - "$DIR/$src"

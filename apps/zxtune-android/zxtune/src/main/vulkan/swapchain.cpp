@@ -204,7 +204,8 @@ namespace VulkanScope
     return prev.width != cur.width || prev.height != cur.height ? Result::RESIZED : Result::PRESENTED;
   }
 
-  Swapchain::Result Swapchain::Render(const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent)
+  Swapchain::Result Swapchain::Render(const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent,
+                                      const float* shapes, uint32_t shapesCount)
   {
     if (NeedRecreate || !Handle)
     {
@@ -236,7 +237,7 @@ namespace VulkanScope
     }
     ImageFences[image] = InFlight[Slot];
     Check(Vk.vkResetFences(dev, 1, &InFlight[Slot]), "vkResetFences");
-    ScopeRender->Write(image, samples, channels, points, gainPercent);
+    ScopeRender->Write(image, samples, channels, points, gainPercent, shapes, shapesCount);
     ScopeRender->Submit(image, Acquired[Slot], RenderDone[image], InFlight[Slot]);
     VkPresentInfoKHR present = {};
     present.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;

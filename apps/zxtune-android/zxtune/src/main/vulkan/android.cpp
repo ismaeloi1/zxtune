@@ -26,6 +26,7 @@ namespace VulkanScope
     ANativeWindow* Window = nullptr;
     std::unique_ptr<Swapchain> Chain;
     std::vector<int16_t> Samples;
+    std::vector<float> Shapes;
 
     ~Context()
     {
@@ -146,6 +147,24 @@ EXPORTED jint JNICALL Java_app_zxtune_ui_views_VulkanScopeNative_setBackground(J
       RESULT_ERROR);
 }
 
+EXPORTED jint JNICALL Java_app_zxtune_ui_views_VulkanScopeNative_setAtlas(JNIEnv* env, jobject /*self*/, jlong handle,
+                                                                          jobject pixels, jint width, jint height,
+                                                                          jint stride)
+{
+  return Call(
+      "setAtlas",
+      [&]() {
+        const auto* data = static_cast<const uint8_t*>(env->GetDirectBufferAddress(pixels));
+        if (!data || env->GetDirectBufferCapacity(pixels) < jlong(stride) * height || stride < width)
+        {
+          throw Error("Invalid atlas");
+        }
+        FromHandle(handle)->Chain->Renderer().SetAtlas(data, width, height, stride);
+        return jint(0);
+      },
+      RESULT_ERROR);
+}
+
 EXPORTED jint JNICALL Java_app_zxtune_ui_views_VulkanScopeNative_setTraces(JNIEnv* env, jobject /*self*/, jlong handle,
                                                                            jfloatArray traces, jint channels,
                                                                            jint width, jint height)
@@ -165,7 +184,8 @@ EXPORTED jint JNICALL Java_app_zxtune_ui_views_VulkanScopeNative_setTraces(JNIEn
 
 EXPORTED jint JNICALL Java_app_zxtune_ui_views_VulkanScopeNative_render(JNIEnv* env, jobject /*self*/, jlong handle,
                                                                         jshortArray samples, jint channels, jint points,
-                                                                        jint gainPercent)
+                                                                        jint gainPercent, jfloatArray shapes,
+                                                                        jint shapesCount)
 {
   return Call(
       "render",
@@ -175,11 +195,24 @@ EXPORTED jint JNICALL Java_app_zxtune_ui_views_VulkanScopeNative_render(JNIEnv* 
         {
           throw Error("Invalid samples");
         }
+        const auto floats = jlong(shapesCount) * ScopeRenderer::SHAPE_FLOATS;
+        if (shapesCount < 0 || shapesCount > jint(ScopeRenderer::MAX_SHAPES)
+            || (shapesCount && (!shapes || floats > env->GetArrayLength(shapes))))
+        {
+          throw Error("Invalid shapes");
+        }
         // copied before rendering: critical access to array would block garbage collector while waiting for vsync
         auto* ctx = FromHandle(handle);
         ctx->Samples.resize(std::size_t(channels) * points);
         env->GetShortArrayRegion(samples, 0, channels * points, ctx->Samples.data());
-        return static_cast<jint>(ctx->Chain->Render(ctx->Samples.data(), channels, points, gainPercent));
+        // capacity is kept, so no allocations after the first frame with the most shapes
+        ctx->Shapes.resize(std::size_t(floats));
+        if (floats)
+        {
+          env->GetFloatArrayRegion(shapes, 0, static_cast<jsize>(floats), ctx->Shapes.data());
+        }
+        return static_cast<jint>(ctx->Chain->Render(ctx->Samples.data(), channels, points, gainPercent,
+                                                    ctx->Shapes.data(), static_cast<uint32_t>(shapesCount)));
       },
       RESULT_ERROR);
 }
