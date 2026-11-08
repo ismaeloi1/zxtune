@@ -22,8 +22,14 @@ class OpenSourceComponentsTest {
 
     @Test
     fun format() {
-        val html = OpenSourceComponentsFormat.toHtml(OpenSourceComponents.ALL)
-        assertTrue(html.contains("<a href=\"https://github.com/cadaver/sidid\">"))
-        OpenSourceComponents.ALL.forEach { assertTrue(it.name, it.url.startsWith("https://")) }
+        val sidid = OpenSourceComponents.ALL.first { it.dir == "sidid" }
+        assertEquals("github.com/cadaver/sidid", OpenSourceComponentsFormat.link(sidid))
+        assertEquals("SIDId", OpenSourceComponentsFormat.shortName(sidid))
+        val sidplay = OpenSourceComponents.ALL.first { it.dir == "sidplayfp" }
+        assertEquals("libsidplayfp", OpenSourceComponentsFormat.shortName(sidplay))
+        OpenSourceComponents.ALL.forEach {
+            assertTrue(it.name, it.url.startsWith("https://"))
+            assertTrue(it.name, OpenSourceComponentsFormat.title(it.category).isNotEmpty())
+        }
     }
 }

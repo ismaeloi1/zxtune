@@ -1,66 +1,197 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- About: brand header, engines, team, libraries, system; licenses and plugins are sub pages -->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools">
 
-    <androidx.viewpager.widget.ViewPager
-            android:id="@+id/about_pager"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:padding="@dimen/spacing_full">
+    <ViewAnimator
+            android:id="@+id/about_pages"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/lhuna_surface_0"
+            android:inAnimation="@android:anim/fade_in"
+            android:outAnimation="@android:anim/fade_out">
 
-        <androidx.viewpager.widget.PagerTabStrip
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top" />
-        <!-- credits page -->
         <ScrollView
-                android:id="@+id/about_credits"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:scrollbars="vertical"
-                android:tag="@string/about_credits">
+                android:id="@+id/about_main"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:scrollbars="vertical">
 
             <LinearLayout
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    android:paddingLeft="@dimen/lhuna_space_l"
+                    android:paddingTop="@dimen/lhuna_space_s"
+                    android:paddingRight="@dimen/lhuna_space_l"
+                    android:paddingBottom="@dimen/lhuna_space_xl">
+
+                <ImageButton
+                        android:id="@+id/about_close"
+                        style="@style/Lhuna.RoundButton"
+                        android:contentDescription="@string/close"
+                        android:src="@drawable/ic_close"
+                        app:tint="@color/lhuna_text_1" />
+
+                <ImageView
+                        android:id="@+id/about_logo"
+                        android:layout_width="wrap_content"
+                        android:layout_height="@dimen/lhuna_about_logo_height"
+                        android:layout_gravity="center_horizontal"
+                        android:adjustViewBounds="true"
+                        android:contentDescription="@string/app_name"
+                        android:scaleType="fitCenter"
+                        android:src="@drawable/lhuna_logo" />
 
                 <TextView
-                        android:id="@+id/about_coauthor"
-                        android:textAppearance="?textAppearanceLargePopupMenu"
+                        android:id="@+id/about_app_name"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:paddingBottom="@dimen/spacing_full" />
+                        android:layout_gravity="center_horizontal"
+                        android:layout_marginTop="@dimen/lhuna_space_s"
+                        android:text="@string/about_product"
+                        android:textColor="@color/lhuna_text_1"
+                        android:textSize="24sp"
+                        android:textStyle="bold" />
 
                 <TextView
-                        android:textAppearance="?textAppearanceLargePopupMenu"
+                        android:id="@+id/about_version"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="@string/about_author" />
+                        android:layout_gravity="center_horizontal"
+                        android:fontFeatureSettings="tnum"
+                        android:textColor="@color/lhuna_text_2"
+                        android:textIsSelectable="true"
+                        android:textSize="14sp"
+                        tools:targetApi="21"
+                        tools:text="b5000 · fat" />
+
+                <TextView
+                        style="@style/Lhuna.About.Section"
+                        android:text="@string/about_section_engines" />
+
+                <LinearLayout
+                        android:id="@+id/about_engines"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal" />
+
+                <TextView
+                        style="@style/Lhuna.About.Section"
+                        android:text="@string/about_credits" />
+
+                <LinearLayout
+                        android:id="@+id/about_team"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/lhuna_card"
+                        android:orientation="vertical"
+                        android:paddingTop="@dimen/lhuna_space_s"
+                        android:paddingBottom="@dimen/lhuna_space_s" />
+
+                <TextView
+                        style="@style/Lhuna.About.Section"
+                        android:text="@string/about_section_libraries" />
+
+                <com.google.android.flexbox.FlexboxLayout
+                        android:id="@+id/about_libraries"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:flexWrap="wrap" />
+
+                <TextView
+                        style="@style/Lhuna.About.Section"
+                        android:text="@string/about_section_system" />
 
                 <TextView
                         android:id="@+id/about_system"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/lhuna_card"
+                        android:lineSpacingExtra="2dp"
+                        android:padding="@dimen/lhuna_space_l"
+                        android:textColor="@color/lhuna_text_2"
+                        android:textIsSelectable="true"
+                        android:textSize="13sp" />
+
+                <com.google.android.flexbox.FlexboxLayout
+                        android:id="@+id/about_actions"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/lhuna_space_xl"
+                        app:flexWrap="wrap">
+
+                    <Button
+                            android:id="@+id/about_rate"
+                            style="@style/Lhuna.Button.Pill.Filled"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_margin="@dimen/spacing_half"
+                            android:text="@string/review"
+                            app:layout_flexGrow="1" />
+
+                    <Button
+                            android:id="@+id/about_open_licenses"
+                            style="@style/Lhuna.Button.Pill.Outlined"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_margin="@dimen/spacing_half"
+                            android:text="@string/about_licenses_action"
+                            app:layout_flexGrow="1" />
+
+                    <Button
+                            android:id="@+id/about_open_plugins"
+                            style="@style/Lhuna.Button.Pill.Outlined"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_margin="@dimen/spacing_half"
+                            android:text="@string/about_plugins"
+                            app:layout_flexGrow="1" />
+                </com.google.android.flexbox.FlexboxLayout>
             </LinearLayout>
         </ScrollView>
-        <!-- open source components page -->
-        <ScrollView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:scrollbars="vertical"
-                android:tag="@string/about_licenses">
 
-            <TextView
+        <LinearLayout
+                android:id="@+id/about_licenses_page"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+            <include
+                    android:id="@+id/about_licenses_header"
+                    layout="@layout/about_page_header" />
+
+            <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/about_licenses"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textIsSelectable="false" />
-        </ScrollView>
-        <!-- plugins page -->
-        <ExpandableListView
-                android:id="@+id/about_plugins"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:tag="@string/about_plugins" />
-    </androidx.viewpager.widget.ViewPager>
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:clipToPadding="false"
+                    android:paddingBottom="@dimen/lhuna_space_xl"
+                    android:scrollbars="vertical" />
+        </LinearLayout>
+
+        <LinearLayout
+                android:id="@+id/about_plugins_page"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+            <include
+                    android:id="@+id/about_plugins_header"
+                    layout="@layout/about_page_header" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/about_plugins"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:clipToPadding="false"
+                    android:paddingBottom="@dimen/lhuna_space_xl"
+                    android:scrollbars="vertical" />
+        </LinearLayout>
+    </ViewAnimator>
 </layout>

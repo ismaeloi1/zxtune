@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginRight="@dimen/lhuna_space_s"
+        android:layout_marginBottom="@dimen/lhuna_space_s"
+        android:background="@drawable/lhuna_chip_outlined"
+        android:gravity="center"
+        android:minHeight="36dp"
+        android:paddingLeft="@dimen/lhuna_space_m"
+        android:paddingRight="@dimen/lhuna_space_m"
+        android:textColor="@color/lhuna_text_1"
+        android:textSize="14sp" />

@@ -5,8 +5,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.TextView
 import androidx.appcompat.view.ContextThemeWrapper
 import androidx.databinding.DataBindingUtil
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import app.zxtune.R
 import app.zxtune.databinding.AboutBinding
@@ -16,10 +18,12 @@ import app.zxtune.playback.VoiceGauges
 import app.zxtune.playback.VoicesLayout
 import app.zxtune.ui.views.SidDashboardView
 import java.io.File
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -31,10 +35,9 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "w411dp-h915dp-xxhdpi")
 class AboutRenderTest {
-    private val context = ContextThemeWrapper(
-        ApplicationProvider.getApplicationContext(),
-        R.style.CustomTheme,
-    )
+    // locale may be changed by test
+    private val context
+        get() = ContextThemeWrapper(ApplicationProvider.getApplicationContext(), R.style.CustomTheme)
 
     private fun about() = DataBindingUtil.inflate<AboutBinding>(
         LayoutInflater.from(context),
@@ -45,16 +48,44 @@ class AboutRenderTest {
 
     @Test
     fun credits() {
-        val binding = about()
-        binding.aboutSystem.text = "Android 9"
-        render("about-credits", binding.aboutCoauthor.parent as View, 1080)
+        for (locale in listOf("en", "fr", "de", "ru", "cs")) {
+            RuntimeEnvironment.setQualifiers("$locale-w411dp-h915dp-xxhdpi")
+            val binding = about()
+            binding.aboutSystem.text = "Android 9 (API v28)\nPixel 3 (arm64-v8a/armeabi-v7a)\nnormal long port w411dp h915dp sw411dp xxhdpi $locale"
+            val brands = (0 until binding.aboutEngines.childCount).map {
+                binding.aboutEngines.getChildAt(it).findViewById<TextView>(R.id.engine_brand).text.toString()
+            }
+            assertEquals(listOf("NebulaWeave3", "NebulaWeaveSPC"), brands)
+            render("about-credits-$locale", binding.aboutMain.getChildAt(0), 1080)
+        }
     }
 
     @Test
     fun licenses() {
         val binding = about()
-        assertTrue(binding.aboutLicenses.text.contains("SIDId"))
-        render("about-licenses", binding.aboutLicenses, 1080)
+        AboutFragment.showPage(binding, 1)
+        val names = (0 until binding.aboutLicenses.adapter!!.itemCount).map {
+            val holder = binding.aboutLicenses.adapter!!.createViewHolder(binding.aboutLicenses, binding.aboutLicenses.adapter!!.getItemViewType(it))
+            @Suppress("UNCHECKED_CAST")
+            (binding.aboutLicenses.adapter as RecyclerView.Adapter<RecyclerView.ViewHolder>).onBindViewHolder(holder, it)
+            holder.itemView.findViewById<TextView>(R.id.license_name)?.text?.toString() ?: ""
+        }
+        assertTrue(names.toString(), names.any { it.startsWith("SIDId") })
+        render("about-licenses", binding.root, 1080, 2400)
+    }
+
+    @Test
+    fun plugins() {
+        val binding = about()
+        AboutFragment.fillPlugins(
+            binding,
+            listOf(
+                context.getString(R.string.plugin_player_sid) to listOf("Commodore 64 SID tunes (PSID, RSID)"),
+                context.getString(R.string.plugin_archive) to listOf("Zip", "Rar", "LHA", "7-Zip"),
+            ),
+        )
+        AboutFragment.showPage(binding, 2)
+        render("about-plugins", binding.root, 1080, 2400)
     }
 
     @Test
@@ -92,8 +123,7 @@ class AboutRenderTest {
         view.layout(0, 0, width, h)
         val bitmap = Bitmap.createBitmap(width, h, Bitmap.Config.ARGB_8888)
         repeat(4) {
-            // dialogs background of dark theme
-            bitmap.eraseColor(if (height > 0) 0 else Color.rgb(0x30, 0x30, 0x30))
+            bitmap.eraseColor(Color.BLACK)
             view.draw(Canvas(bitmap))
         }
         assertTrue(name, h > 100)

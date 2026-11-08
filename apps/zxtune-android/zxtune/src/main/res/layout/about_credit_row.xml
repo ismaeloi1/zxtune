@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Credits as key/value: role at start, names at end -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:baselineAligned="true"
+        android:minHeight="44dp"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/lhuna_space_l"
+        android:paddingTop="@dimen/lhuna_space_s"
+        android:paddingRight="@dimen/lhuna_space_l"
+        android:paddingBottom="@dimen/lhuna_space_s">
+
+    <TextView
+            android:id="@+id/credit_role"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            android:textColor="@color/lhuna_text_2"
+            android:textSize="14sp" />
+
+    <TextView
+            android:id="@+id/credit_names"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="@dimen/lhuna_space_m"
+            android:layout_weight="3"
+            android:gravity="right"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/lhuna_text_1"
+            android:textSize="15sp"
+            android:fontFamily="sans-serif-medium" />
+</LinearLayout>

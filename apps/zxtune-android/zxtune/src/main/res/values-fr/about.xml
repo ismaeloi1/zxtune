@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="about">À propos</string>
+    <string name="about_credits">Équipe</string>
+    <string name="about_plugins">Plugins</string>
+</resources>

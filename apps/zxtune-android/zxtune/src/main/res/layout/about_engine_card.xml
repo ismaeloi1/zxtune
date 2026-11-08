@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Engine card of About: decorative waveform in voice color, brand, emulated system, original driver -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="@drawable/lhuna_card"
+        android:orientation="vertical"
+        android:padding="@dimen/lhuna_space_l">
+
+    <ImageView
+            android:id="@+id/engine_wave"
+            android:layout_width="match_parent"
+            android:layout_height="16dp"
+            android:layout_marginBottom="@dimen/lhuna_space_m"
+            android:importantForAccessibility="no"
+            android:scaleType="fitXY"
+            android:src="@drawable/lhuna_wave" />
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/about_engine_running_on"
+            android:textAllCaps="true"
+            android:textColor="@color/lhuna_text_3"
+            android:letterSpacing="0.1"
+            android:textSize="11sp"
+            tools:targetApi="21" />
+
+    <TextView
+            android:id="@+id/engine_brand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/lhuna_text_1"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+    <TextView
+            android:id="@+id/engine_system"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/lhuna_text_2"
+            android:textSize="13sp" />
+
+    <TextView
+            android:id="@+id/engine_driver"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/spacing_half"
+            android:textColor="@color/lhuna_text_3"
+            android:textSize="12sp" />
+</LinearLayout>

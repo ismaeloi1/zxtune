@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Header of About sub pages: back and title -->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools">
+
+    <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:minHeight="64dp"
+            android:orientation="horizontal"
+            android:paddingLeft="@dimen/lhuna_space_l"
+            android:paddingTop="@dimen/lhuna_space_s"
+            android:paddingRight="@dimen/lhuna_space_l">
+
+        <ImageButton
+                android:id="@+id/back"
+                style="@style/Lhuna.RoundButton"
+                android:contentDescription="@string/navigate_back"
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/lhuna_text_1" />
+
+        <TextView
+                android:id="@+id/title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="@dimen/lhuna_space_l"
+                android:layout_weight="1"
+                android:accessibilityHeading="true"
+                android:ellipsize="end"
+                android:maxLines="2"
+                android:textColor="@color/lhuna_text_1"
+                android:textSize="22sp"
+                android:textStyle="bold"
+                tools:targetApi="28" />
+    </LinearLayout>
+</layout>

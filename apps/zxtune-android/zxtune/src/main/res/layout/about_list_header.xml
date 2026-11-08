@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+        style="@style/Lhuna.Settings.Header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="@dimen/lhuna_space_l"
+        android:paddingTop="@dimen/lhuna_space_xl"
+        android:paddingRight="@dimen/lhuna_space_l"
+        android:paddingBottom="@dimen/lhuna_space_s" />

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Decorative waveform of engine cards, tinted by voice color -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp"
+    android:height="16dp"
+    android:viewportWidth="120"
+    android:viewportHeight="16">
+    <path
+        android:pathData="M2,8 C8,1 14,1 20,8 S32,15 38,8 S50,1 56,8 S68,15 74,8 S86,1 92,8 S104,15 110,8 S116,3 118,5"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
