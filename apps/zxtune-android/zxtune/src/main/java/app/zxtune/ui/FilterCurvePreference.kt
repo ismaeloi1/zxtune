@@ -25,6 +25,8 @@ import app.zxtune.device.media.MediaModel
 import app.zxtune.ui.views.FilterCurveView
 import app.zxtune.ui.views.SidFilterModel
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -110,7 +112,18 @@ class FilterCurvePreference @JvmOverloads constructor(
         liveJob = owner.lifecycleScope.launch {
             owner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    model.playbackState.collect { target.isPlaying = it?.state == PlaybackStateCompat.STATE_PLAYING }
+                    model.playbackState.collect {
+                        val state = it?.state ?: PlaybackStateCompat.STATE_NONE
+                        target.isPlaying = state == PlaybackStateCompat.STATE_PLAYING
+                        if (state == PlaybackStateCompat.STATE_STOPPED || state == PlaybackStateCompat.STATE_NONE) {
+                            target.clearHistory()
+                        }
+                    }
+                }
+                launch {
+                    model.metadata.map { it?.description?.mediaId }.distinctUntilChanged().collect {
+                        target.clearHistory()
+                    }
                 }
                 try {
                     model.visualizer.collect { target.source = it }

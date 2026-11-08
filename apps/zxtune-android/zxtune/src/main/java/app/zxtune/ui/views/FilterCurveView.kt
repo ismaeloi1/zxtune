@@ -113,6 +113,17 @@ class FilterCurveView @JvmOverloads constructor(
             }
         }
 
+    /**
+     * Recent filter states of [selectedChip], filled at display rate by [app.zxtune.ui.FilterCurveFeed]
+     */
+    var history: FilterHistory? = null
+        set(value) {
+            if (field !== value) {
+                field = value
+                invalidate()
+            }
+        }
+
     private class Curves(
         val emulated6581: DoubleArray,
         val emulated8580: DoubleArray,

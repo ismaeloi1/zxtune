@@ -14,6 +14,7 @@ import java.time.Duration
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -59,7 +60,8 @@ class FilterCurveFeedTest {
         override fun post(callback: Choreographer.FrameCallback) {
             val task = Runnable {
                 callbacks.remove(callback)
-                callback.doFrame(System.nanoTime())
+                // frame time is of simulated clock like System.nanoTime of real display
+                callback.doFrame(SystemClock.uptimeMillis() * 1_000_000)
             }
             callbacks[callback] = task
             handler.postDelayed(task, nextFrameDelay())
@@ -101,6 +103,15 @@ class FilterCurveFeedTest {
         assertTrue("presented $frames", frames in 58..61)
         assertEquals(1, view.live.count)
         assertTrue(view.live.chips[0].cutoff > 50)
+        // frame per vsync, cutoff sweep is recorded
+        val history = feed.history
+        assertSame(history, view.history)
+        assertTrue("history ${history.size}", history.size in 58..61)
+        assertTrue(history.spanMs() in 950L..1020L)
+        val latest = history.latest()!!
+        assertTrue(latest.cutoffHz > history.frame(0).cutoffHz)
+        feed.clearHistory()
+        assertEquals(0, history.size)
     }
 
     @Test
