@@ -1,7 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="accent">#607d8b</color>
-    <color name="accent_transparent">#c0607d8b</color>
+    <!-- LHUNA design tokens: dark-first, one neon accent, tonal surfaces instead of shadows -->
+    <color name="lhuna_surface_0">#000000</color>
+    <color name="lhuna_surface_1">#0D0E13</color>
+    <color name="lhuna_surface_2">#15171F</color>
+    <color name="lhuna_surface_3">#1E2130</color>
+    <color name="lhuna_outline">#2A2E40</color>
+    <color name="lhuna_text_1">#F2F4FA</color>
+    <color name="lhuna_text_2">#A6ACC2</color>
+    <color name="lhuna_text_3">#767C92</color>
+    <!-- 'Signal' cyan: progress, active state, primary action -->
+    <color name="lhuna_accent">#00E5FF</color>
+    <!-- Tonal background of activated toggles, white content on it stays readable -->
+    <color name="lhuna_accent_container">#00404A</color>
+    <color name="lhuna_on_accent">#001418</color>
+    <!-- 'Lune' violet: secondary marks (loop point, cutoff, resonance) -->
+    <color name="lhuna_accent_2">#8A6CFF</color>
+    <color name="lhuna_danger">#FF5C6C</color>
+    <!-- Per voice colors, shared by oscilloscopes, dashboards and filter curves -->
+    <color name="lhuna_voice_1">#FFB547</color>
+    <color name="lhuna_voice_2">#5FD38D</color>
+    <color name="lhuna_voice_3">#FF6FA5</color>
+    <color name="lhuna_voice_4">#6FB8FF</color>
+    <color name="lhuna_voice_5">#C59BFF</color>
+    <color name="lhuna_voice_6">#D4EE6A</color>
+    <color name="lhuna_voice_7">#FF8A5C</color>
+    <color name="lhuna_voice_8">#4FD8C8</color>
+
+    <color name="accent">@color/lhuna_accent</color>
+    <color name="accent_transparent">#8000E5FF</color>
 
     <!-- AMOLED black only theme -->
     <color name="background">@android:color/black</color>

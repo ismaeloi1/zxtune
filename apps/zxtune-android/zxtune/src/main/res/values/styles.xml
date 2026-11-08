@@ -11,6 +11,7 @@
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:statusBarColor">@android:color/black</item>
         <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="colorControlActivated">@color/lhuna_accent</item>
     </style>
 
     <style name="FullscreenTheme" parent="Theme.AppCompat.NoActionBar">
@@ -66,6 +67,61 @@
         <item name="android:drawableRight">@drawable/breadcrumbs_delimiter</item>
         <item name="android:drawablePadding">1dp</item>
         <item name="android:padding">1dp</item>
+    </style>
+
+    <!-- Primary transport action: filled accent disc, the only element with a strong accent fill -->
+    <style name="Button.Play">
+        <item name="android:layout_width">@dimen/lhuna_play_size</item>
+        <item name="android:layout_height">@dimen/lhuna_play_size</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:padding">@dimen/spacing_full</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:background">@drawable/lhuna_play_background</item>
+        <item name="tint">@color/lhuna_on_accent</item>
+    </style>
+
+    <!-- LHUNA typography: Fredoka (display, Latin) / Nunito (UI) / JetBrains Mono (numbers, registers), all OFL-1.1.
+      Glyphs missing in the bundled subsets fall back to system font. -->
+    <style name="TextAppearance.Lhuna" parent="TextAppearance.AppCompat">
+        <item name="android:textColor">@color/lhuna_text_1</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Display">
+        <item name="android:textSize">28sp</item>
+        <item name="android:fontFamily">@font/lhuna_display</item>
+        <item name="fontFamily">@font/lhuna_display</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Headline">
+        <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">@font/lhuna_display</item>
+        <item name="fontFamily">@font/lhuna_display</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Title">
+        <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">@font/lhuna_text_bold</item>
+        <item name="fontFamily">@font/lhuna_text_bold</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Label">
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/lhuna_text_2</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.1</item>
+        <item name="android:fontFamily">@font/lhuna_mono</item>
+        <item name="fontFamily">@font/lhuna_mono</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Mono">
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">@font/lhuna_mono</item>
+        <item name="fontFamily">@font/lhuna_mono</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Mono.Secondary">
+        <item name="android:textColor">@color/lhuna_text_2</item>
     </style>
 
     <style name="CustomDialog" parent="Theme.AppCompat.Dialog">
