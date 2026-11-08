@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Short choice: segments at end of the row, or below the title when they don't fit -->
+<app.zxtune.ui.settings.TrailingControlLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="@dimen/lhuna_row_min_height"
+        android:paddingLeft="@dimen/lhuna_space_l"
+        android:paddingTop="@dimen/lhuna_space_m"
+        android:paddingRight="@dimen/lhuna_space_l"
+        android:paddingBottom="@dimen/lhuna_space_m">
+
+    <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+        <TextView
+                android:id="@android:id/title"
+                style="@style/Lhuna.Settings.Title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+        <TextView
+                android:id="@android:id/summary"
+                style="@style/Lhuna.Settings.Summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <app.zxtune.ui.settings.SegmentedControl
+            android:id="@+id/segmented"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+</app.zxtune.ui.settings.TrailingControlLayout>

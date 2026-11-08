@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings row: title and summary at start, control (widget frame) at end.
+  Rows are placed on grouped cards by app.zxtune.ui.settings.SettingsCards -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?android:attr/selectableItemBackground"
+        android:baselineAligned="false"
+        android:gravity="center_vertical"
+        android:minHeight="@dimen/lhuna_row_min_height"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/lhuna_space_l"
+        android:paddingTop="@dimen/lhuna_space_m"
+        android:paddingRight="@dimen/lhuna_space_l"
+        android:paddingBottom="@dimen/lhuna_space_m">
+
+    <FrameLayout
+            android:id="@id/icon_frame"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="@dimen/lhuna_space_l"
+            android:visibility="gone">
+
+        <ImageView
+                android:id="@android:id/icon"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:importantForAccessibility="no" />
+    </FrameLayout>
+
+    <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+        <TextView
+                android:id="@android:id/title"
+                style="@style/Lhuna.Settings.Title"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+        <TextView
+                android:id="@android:id/summary"
+                style="@style/Lhuna.Settings.Summary"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <LinearLayout
+            android:id="@android:id/widget_frame"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="@dimen/lhuna_space_l"
+            android:gravity="center"
+            android:orientation="vertical" />
+</LinearLayout>

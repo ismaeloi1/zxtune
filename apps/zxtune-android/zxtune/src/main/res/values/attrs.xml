@@ -5,4 +5,8 @@
         <attr name="spectrumMaxBarsCount" format="integer" />
         <attr name="spectrumMinBarWidth" format="dimension" />
     </declare-styleable>
+    <declare-styleable name="ValueSeekBarPreference">
+        <!-- Format of displayed value with unit, e.g. "%d ms" -->
+        <attr name="valueFormat" format="string" />
+    </declare-styleable>
 </resources>

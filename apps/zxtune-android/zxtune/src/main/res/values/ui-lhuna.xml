@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- LHUNA screens: navigation and About -->
+    <string name="navigate_back">Back</string>
+    <string name="close">Close</string>
+    <string name="about_section_engines">Sound engines</string>
+    <string name="about_engine_running_on">Running on</string>
+    <string name="about_engine_driver">Original driver: %s</string>
+    <string name="about_idea">Idea, code</string>
+    <string name="about_coauthor_label">Co-author</string>
+    <string name="about_design">Design</string>
+    <string name="about_sources">Used sources</string>
+    <string name="about_dedicated">Dedicated to</string>
+    <string name="about_section_libraries">Libraries</string>
+    <string name="about_section_system">System</string>
+    <string name="about_licenses_action">Licenses</string>
+    <!-- credits row of translator, only for translations made by a person -->
+    <string name="about_translation_label" tools:ignore="MissingTranslation"></string>
+    <string name="about_translation_value" tools:ignore="MissingTranslation"></string>
+</resources>

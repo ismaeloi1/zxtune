@@ -10,6 +10,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.XmlRes
@@ -28,6 +29,7 @@ import app.zxtune.rescue.RescueActivity
 import app.zxtune.ui.CarDisclaimerDialog
 import app.zxtune.ui.SidEngineBinding
 import app.zxtune.ui.TriggerPresetsBinding
+import app.zxtune.ui.settings.SettingsCards
 import app.zxtune.ui.utils.FragmentIntProperty
 import app.zxtune.ui.utils.ThemeUtils
 import app.zxtune.ui.utils.applyEdgeToEdge
@@ -62,17 +64,21 @@ class PreferencesActivity :
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // No action bar in the theme, so the list starts right at the top of the window
+        setContentView(R.layout.preferences_activity)
+        // No action bar in the theme, own header is the part of content
         applyEdgeToEdge()
         findViewById<View>(android.R.id.content).padWithSystemBars()
+        findViewById<View>(R.id.preferences_back).setOnClickListener {
+            onBackPressedDispatcher.onBackPressed()
+        }
 
         ThemeUtils.setupThemeChange(this, this)
 
         // Need to only create the first fragment
         supportFragmentManager.run {
-            if (findFragmentById(android.R.id.content) == null) {
+            if (findFragmentById(R.id.preferences_container) == null) {
                 beginTransaction()
-                    .add(android.R.id.content, makeFragment(R.xml.preferences))
+                    .add(R.id.preferences_container, makeFragment(R.xml.preferences, getString(R.string.prefs)))
                     .disallowAddToBackStack()
                     .commit()
             }
@@ -84,19 +90,25 @@ class PreferencesActivity :
     override fun onPreferenceStartFragment(
         caller: PreferenceFragmentCompat,
         pref: Preference
-    ) = nestedScreenOf(pref.key)?.let { openNested(it) } ?: false
+    ) = nestedScreenOf(pref.key)?.let { openNested(it, pref.title?.toString() ?: "") } ?: false
 
-    private fun openNested(@XmlRes layout: Int): Boolean {
+    override fun onTitleChanged(title: CharSequence?, color: Int) {
+        super.onTitleChanged(title, color)
+        findViewById<TextView>(R.id.preferences_title)?.text = title
+    }
+
+    private fun openNested(@XmlRes layout: Int, title: String): Boolean {
         supportFragmentManager
             .beginTransaction()
-            .replace(android.R.id.content, makeFragment(layout))
+            .replace(R.id.preferences_container, makeFragment(layout, title))
             .addToBackStack(null)
             .commit()
         return true
     }
 
-    private fun makeFragment(@XmlRes layout: Int) = PrefFragment().apply {
+    private fun makeFragment(@XmlRes layout: Int, title: String) = PrefFragment().apply {
         this.layout = layout
+        requireArguments().putString(PrefFragment.TITLE_KEY, title)
     }
 
     class PrefFragment : PreferenceFragmentCompat() {
@@ -128,6 +140,17 @@ class PreferencesActivity :
                 startActivity(RescueActivity.createIntent(requireContext()))
                 true
             }
+        }
+
+        override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+            super.onViewCreated(view, savedInstanceState)
+            SettingsCards.install(this)
+        }
+
+        // Header of activity shows the screen on top of back stack
+        override fun onResume() {
+            super.onResume()
+            arguments?.getString(TITLE_KEY)?.let { requireActivity().title = it }
         }
 
         // Enabling is intercepted to show legal notice first, disabling is immediate
@@ -207,6 +230,10 @@ class PreferencesActivity :
             } else {
                 getString(R.string.pref_zxtune_mt32_roms_summary_empty)
             }
+        }
+
+        companion object {
+            internal const val TITLE_KEY = "title"
         }
 
         private fun copyMt32Roms(tree: Uri) = lifecycleScope.launch {

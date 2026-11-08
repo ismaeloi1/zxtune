@@ -10,6 +10,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
 import android.text.SpannableStringBuilder
 import android.text.Spanned
@@ -48,6 +49,7 @@ import app.zxtune.preferences.DataStore
 import app.zxtune.preferences.Mt32Roms
 import app.zxtune.preferences.Preferences
 import app.zxtune.preferences.VulkanDriver
+import app.zxtune.ui.settings.SettingsCards
 import app.zxtune.ui.utils.FragmentIntProperty
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.filterNotNull
@@ -58,7 +60,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 import org.xmlpull.v1.XmlPullParser
 
 /**
- * Semi-transparent panel over oscilloscope (it keeps animating behind), so changes are seen immediately.
+ * Opaque panel over part of oscilloscope (the rest keeps animating above it), so changes are seen immediately.
+ * Panel was translucent before, but waveforms behind made settings unreadable.
  * Shortcuts at the top lead to pages: oscilloscope display, trigger, emulation settings of the playing tune's chips
  * only (see [EmulationContext]), playback settings and all the emulation settings. Pages are taken from the main
  * preferences screen categories, so any preference added there is shown here as well.
@@ -78,8 +81,8 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
         val density = resources.displayMetrics.density
         val tabsRow = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
-            val pad = (density * 8).toInt()
-            setPadding(pad, pad, pad, pad / 2)
+            val pad = (density * 12).toInt()
+            setPadding(pad, pad, pad, pad / 3)
         }
         tabs = tabsRow
         pager = ViewPager(ctx).apply {
@@ -90,10 +93,7 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
         }
         return LinearLayout(ctx).apply {
             orientation = LinearLayout.VERTICAL
-            background = GradientDrawable().apply {
-                setColor(BACKGROUND)
-                cornerRadius = density * 12
-            }
+            background = panelBackground(ctx, resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE)
             addView(
                 HorizontalScrollView(ctx).apply {
                     isHorizontalScrollBarEnabled = false
@@ -161,8 +161,9 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
             val tab = tabs.getChildAt(idx) as TextView
             val selected = idx == position
             tab.isSelected = selected
-            (tab.background as GradientDrawable).setColor(if (selected) ContextCompat.getColor(tab.context, R.color.lhuna_accent_container) else TAB_BACKGROUND)
-            tab.setTextColor(if (selected) Color.WHITE else TAB_TEXT)
+            val ctx = tab.context
+            (tab.background as GradientDrawable).setColor(ContextCompat.getColor(ctx, if (selected) R.color.lhuna_accent else R.color.lhuna_surface_2))
+            tab.setTextColor(ContextCompat.getColor(ctx, if (selected) R.color.lhuna_on_accent else R.color.lhuna_text_2))
             if (selected) {
                 tab.post { (tabs.parent as? HorizontalScrollView)?.requestChildFocus(tabs, tab) }
             }
@@ -173,7 +174,7 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
         val density = resources.displayMetrics.density
         text = title
         textSize = 14f
-        typeface = Typeface.DEFAULT_BOLD
+        typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
         maxWidth = (density * 180).toInt()
@@ -184,10 +185,10 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
         setPadding(hpad, 0, hpad, 0)
         background = GradientDrawable().apply {
             cornerRadius = density * 20
-            setColor(TAB_BACKGROUND)
+            setColor(ContextCompat.getColor(ctx, R.color.lhuna_surface_2))
         }
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-            marginEnd = (density * 6).toInt()
+            marginEnd = (density * 8).toInt()
         }
         setOnClickListener { onClick() }
     }
@@ -260,6 +261,8 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
             super.onViewCreated(view, savedInstanceState)
             listView.setBackgroundColor(Color.TRANSPARENT)
+            // panel is narrower than settings screen
+            SettingsCards.install(this, R.dimen.lhuna_space_m)
         }
 
         // Nested screens (e.g. mixer) are opened in place, there's no preferences activity to handle them
@@ -343,10 +346,6 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
         // binder calls to playback service take milliseconds, the limit is for not connected service
         private const val DETECTION_TIMEOUT_MS = 1000L
 
-        // ~70% opacity
-        private const val BACKGROUND = 0xB3101010.toInt()
-        private const val TAB_BACKGROUND = 0x33FFFFFF
-        private const val TAB_TEXT = 0xDDFFFFFF.toInt()
         private const val PORTRAIT_HEIGHT = 0.6f
         private const val LANDSCAPE_WIDTH = 0.55f
         private const val EMULATION_PREFIX = "zxtune."
@@ -381,10 +380,34 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
             val start = length
             append("  ").append(ctx.getString(R.string.scope_settings_next_track))
             setSpan(RelativeSizeSpan(0.8f), start, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
-            setSpan(ForegroundColorSpan(NEXT_TRACK_COLOR), start, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            setSpan(ForegroundColorSpan(ContextCompat.getColor(ctx, R.color.lhuna_warning)), start, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
         }
 
-        private const val NEXT_TRACK_COLOR = 0xFFFFB74D.toInt()
+        // edge facing oscilloscope is outlined and rounded: oscilloscope is black as well
+        private fun panelBackground(ctx: Context, landscape: Boolean): LayerDrawable {
+            val radius = ctx.resources.getDimension(R.dimen.lhuna_radius_xl)
+            val radii = if (landscape) {
+                floatArrayOf(radius, radius, 0f, 0f, 0f, 0f, radius, radius)
+            } else {
+                floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
+            }
+            val outline = GradientDrawable().apply {
+                cornerRadii = radii
+                setColor(ContextCompat.getColor(ctx, R.color.lhuna_outline))
+            }
+            val surface = GradientDrawable().apply {
+                cornerRadii = radii
+                setColor(ContextCompat.getColor(ctx, R.color.lhuna_surface_0))
+            }
+            val stroke = maxOf(1, ctx.resources.displayMetrics.density.toInt())
+            return LayerDrawable(arrayOf(outline, surface)).apply {
+                if (landscape) {
+                    setLayerInset(1, stroke, 0, 0, 0)
+                } else {
+                    setLayerInset(1, 0, stroke, 0, 0)
+                }
+            }
+        }
 
         /**
          * Shortcuts: oscilloscope display, trigger, emulation of the playing tune's chips (if known), playback

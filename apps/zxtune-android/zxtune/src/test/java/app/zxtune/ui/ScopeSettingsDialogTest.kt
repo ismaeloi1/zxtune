@@ -26,6 +26,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -156,6 +157,20 @@ class ScopeSettingsDialogTest {
         renderOver("settings-scope", dialog)
         select(dialog, 3)
         renderOver("settings-general", dialog)
+    }
+
+    @Test
+    fun `render translations`() {
+        for (locale in listOf("fr", "de", "ru")) {
+            RuntimeEnvironment.setQualifiers("$locale-w411dp-h915dp-xxhdpi")
+            val (_, dialog) = show(SID)
+            select(dialog, 2)
+            renderOver("settings-sid-$locale", dialog)
+            select(dialog, 3)
+            renderOver("settings-general-$locale", dialog)
+            dialog.dismiss()
+            shadowOf(Looper.getMainLooper()).idle()
+        }
     }
 
     private companion object {

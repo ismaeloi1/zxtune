@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom sheet: attached to the bottom edge, only top corners are rounded -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
+    <corners
+            android:topLeftRadius="@dimen/lhuna_radius_xl"
+            android:topRightRadius="@dimen/lhuna_radius_xl" />
+    <solid android:color="@color/lhuna_surface_1" />
+    <padding android:top="@dimen/spacing_full" android:bottom="@dimen/spacing_full" />
+</shape>

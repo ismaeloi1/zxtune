@@ -3,12 +3,13 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto">
     <PreferenceCategory android:title="@string/pref_oscilloscope_display_title">
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="@integer/pref_oscilloscope_window_default"
                 android:key="ui.oscilloscope.window_ms"
                 android:max="100"
                 android:summary="@string/pref_oscilloscope_window_summary"
                 android:title="@string/pref_oscilloscope_window_title"
+                app:valueFormat="@string/pref_value_ms"
                 app:min="5"
                 app:showSeekBarValue="true" />
         <DropDownPreference
@@ -25,12 +26,13 @@
                 android:key="zxtune.sound.scope.max_periods"
                 android:title="@string/pref_oscilloscope_max_periods_title"
                 app:useSimpleSummaryProvider="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="@integer/pref_oscilloscope_gauge_window_default"
                 android:key="ui.oscilloscope.gauge_window_ms"
                 android:max="40"
                 android:summary="@string/pref_oscilloscope_gauge_window_summary"
                 android:title="@string/pref_oscilloscope_gauge_window_title"
+                app:valueFormat="@string/pref_value_ms"
                 app:min="2"
                 app:showSeekBarValue="true" />
         <DropDownPreference
@@ -69,87 +71,97 @@
                 android:key="ui.oscilloscope.trigger_preset"
                 android:title="@string/pref_oscilloscope_trigger_preset_title"
                 app:useSimpleSummaryProvider="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="40"
                 android:key="zxtune.sound.scope.trigger.width"
                 android:max="200"
                 android:summary="@string/pref_oscilloscope_trigger_width_summary"
                 android:title="@string/pref_oscilloscope_trigger_width_title"
+                app:valueFormat="@string/pref_value_ms"
                 app:min="10"
                 app:seekBarIncrement="5"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="100"
                 android:key="zxtune.sound.scope.trigger.edge_strength"
                 android:max="300"
                 android:summary="@string/pref_oscilloscope_trigger_edge_summary"
                 android:title="@string/pref_oscilloscope_trigger_edge_title"
+                app:valueFormat="@string/pref_value_percent"
                 app:min="0"
                 app:seekBarIncrement="10"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="25"
                 android:key="zxtune.sound.scope.trigger.slope_width"
                 android:max="100"
                 android:title="@string/pref_oscilloscope_trigger_slope_title"
+                app:valueFormat="@string/pref_value_percent_of_period"
                 app:min="5"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="100"
                 android:key="zxtune.sound.scope.trigger.buffer_strength"
                 android:max="300"
                 android:summary="@string/pref_oscilloscope_trigger_buffer_summary"
                 android:title="@string/pref_oscilloscope_trigger_buffer_title"
+                app:valueFormat="@string/pref_value_percent"
                 app:min="0"
                 app:seekBarIncrement="10"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="50"
                 android:key="zxtune.sound.scope.trigger.responsiveness"
                 android:max="100"
                 android:title="@string/pref_oscilloscope_trigger_responsiveness_title"
+                app:valueFormat="@string/pref_value_percent"
                 app:min="0"
                 app:seekBarIncrement="5"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="50"
                 android:key="zxtune.sound.scope.trigger.buffer_falloff"
                 android:max="200"
                 android:title="@string/pref_oscilloscope_trigger_falloff_title"
+                app:valueFormat="@string/pref_value_percent_of_period"
                 app:min="10"
                 app:seekBarIncrement="5"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="30"
                 android:key="zxtune.sound.scope.trigger.reset_below"
                 android:max="100"
                 android:summary="@string/pref_oscilloscope_trigger_reset_summary"
                 android:title="@string/pref_oscilloscope_trigger_reset_title"
+                app:valueFormat="@string/pref_value_percent"
                 app:min="0"
                 app:seekBarIncrement="5"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="0"
                 android:key="zxtune.sound.scope.trigger.mean_responsiveness"
                 android:max="100"
                 android:title="@string/pref_oscilloscope_trigger_mean_title"
+                app:valueFormat="@string/pref_value_percent"
                 app:min="0"
                 app:seekBarIncrement="5"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="0"
                 android:key="zxtune.sound.scope.trigger.sign_strength"
                 android:max="300"
                 android:summary="@string/pref_oscilloscope_trigger_sign_summary"
                 android:title="@string/pref_oscilloscope_trigger_sign_title"
+                app:valueFormat="@string/pref_value_percent"
                 app:min="0"
                 app:seekBarIncrement="10"
                 app:showSeekBarValue="true" />
-        <SeekBarPreference
+        <app.zxtune.ui.settings.ValueSeekBarPreference
                 android:defaultValue="50"
                 android:key="zxtune.sound.scope.trigger.diameter"
                 android:max="100"
                 android:title="@string/pref_oscilloscope_trigger_diameter_title"
+                app:valueFormat="@string/pref_value_percent_of_width"
                 app:min="10"
                 app:seekBarIncrement="5"
                 app:showSeekBarValue="true" />
@@ -171,19 +183,17 @@
                 android:title="@string/pref_oscilloscope_trigger_post_title"
                 app:min="0"
                 app:showSeekBarValue="true" />
-        <DropDownPreference
+        <app.zxtune.ui.settings.SegmentedListPreference
                 android:defaultValue="@string/pref_oscilloscope_trigger_rate_default"
                 android:entries="@array/pref_oscilloscope_trigger_rate_entries"
                 android:entryValues="@array/pref_oscilloscope_trigger_rate_values"
                 android:key="zxtune.sound.scope.trigger.search_rate"
-                android:title="@string/pref_oscilloscope_trigger_rate_title"
-                app:useSimpleSummaryProvider="true" />
-        <DropDownPreference
+                android:title="@string/pref_oscilloscope_trigger_rate_title" />
+        <app.zxtune.ui.settings.SegmentedListPreference
                 android:defaultValue="@string/pref_oscilloscope_trigger_subsampling_default"
                 android:entries="@array/pref_oscilloscope_trigger_subsampling_entries"
                 android:entryValues="@array/pref_oscilloscope_trigger_subsampling_values"
                 android:key="zxtune.sound.scope.trigger.subsampling"
-                android:title="@string/pref_oscilloscope_trigger_subsampling_title"
-                app:useSimpleSummaryProvider="true" />
+                android:title="@string/pref_oscilloscope_trigger_subsampling_title" />
     </PreferenceCategory>
 </PreferenceScreen>

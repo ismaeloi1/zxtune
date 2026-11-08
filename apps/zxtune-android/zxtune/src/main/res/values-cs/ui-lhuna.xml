@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigate_back">Zpět</string>
+    <string name="close">Zavřít</string>
+    <string name="about_section_engines">Zvuková jádra</string>
+    <string name="about_engine_running_on">Běží na</string>
+    <string name="about_engine_driver">Původní ovladač: %s</string>
+    <string name="about_idea">Myšlenka, kód</string>
+    <string name="about_coauthor_label">Spoluautor</string>
+    <string name="about_design">Návrh</string>
+    <string name="about_sources">Použité zdroje</string>
+    <string name="about_dedicated">Věnováno</string>
+    <string name="about_section_libraries">Knihovny</string>
+    <string name="about_section_system">Systém</string>
+    <string name="about_licenses_action">Licence</string>
+    <string name="about_translation_label">Český překlad</string>
+    <string name="about_translation_value" translatable="false">Pavel Fric</string>
+</resources>

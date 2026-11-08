@@ -25,21 +25,24 @@
         <item>custom</item>
     </string-array>
     <string name="pref_oscilloscope_trigger_preset_default" translatable="false">default</string>
-    <string name="pref_oscilloscope_trigger_width_title">Trigger width, ms</string>
+    <!-- slider values relative to wave, see ValueSeekBarPreference -->
+    <string name="pref_value_percent_of_period">%d%% of period</string>
+    <string name="pref_value_percent_of_width">%d%% of width</string>
+    <string name="pref_oscilloscope_trigger_width_title">Trigger width</string>
     <string name="pref_oscilloscope_trigger_width_summary">History buffer size, should exceed two periods of the lowest notes</string>
-    <string name="pref_oscilloscope_trigger_edge_title">Edge strength, %</string>
+    <string name="pref_oscilloscope_trigger_edge_title">Edge strength</string>
     <string name="pref_oscilloscope_trigger_edge_summary">Prefer steep rising edges: new notes are caught better, but sustained ones jump more</string>
-    <string name="pref_oscilloscope_trigger_slope_title">Slope width, % of period</string>
-    <string name="pref_oscilloscope_trigger_buffer_title">Buffer strength, %</string>
+    <string name="pref_oscilloscope_trigger_slope_title">Slope width</string>
+    <string name="pref_oscilloscope_trigger_buffer_title">Buffer strength</string>
     <string name="pref_oscilloscope_trigger_buffer_summary">Prefer similarity with previous frames</string>
-    <string name="pref_oscilloscope_trigger_responsiveness_title">Buffer responsiveness, %</string>
-    <string name="pref_oscilloscope_trigger_falloff_title">Buffer falloff, % of period</string>
-    <string name="pref_oscilloscope_trigger_reset_title">Reset below match, %</string>
+    <string name="pref_oscilloscope_trigger_responsiveness_title">Buffer responsiveness</string>
+    <string name="pref_oscilloscope_trigger_falloff_title">Buffer falloff</string>
+    <string name="pref_oscilloscope_trigger_reset_title">Reset below match</string>
     <string name="pref_oscilloscope_trigger_reset_summary">Forget history on new notes when wave doesn\'t match it</string>
-    <string name="pref_oscilloscope_trigger_mean_title">DC removal rate, %</string>
-    <string name="pref_oscilloscope_trigger_sign_title">Sign amplification, %</string>
+    <string name="pref_oscilloscope_trigger_mean_title">DC removal rate</string>
+    <string name="pref_oscilloscope_trigger_sign_title">Sign amplification</string>
     <string name="pref_oscilloscope_trigger_sign_summary">Steep zero crossings for waves without clear edges (e.g. triangle)</string>
-    <string name="pref_oscilloscope_trigger_diameter_title">Search range, % of width</string>
+    <string name="pref_oscilloscope_trigger_diameter_title">Search range</string>
     <string name="pref_oscilloscope_trigger_falling_title">Falling edges</string>
     <string name="pref_oscilloscope_trigger_falling_summary">E.g. for sampled trumpets</string>
     <string name="pref_oscilloscope_trigger_pitch_title">Pitch tracking</string>

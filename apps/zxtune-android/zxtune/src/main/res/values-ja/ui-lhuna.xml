@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigate_back">戻る</string>
+    <string name="close">閉じる</string>
+    <string name="about_section_engines">サウンドエンジン</string>
+    <string name="about_engine_running_on">動作エンジン</string>
+    <string name="about_engine_driver">オリジナルドライバ: %s</string>
+    <string name="about_idea">アイデア, プログラム</string>
+    <string name="about_coauthor_label">共著者</string>
+    <string name="about_design">デザイン</string>
+    <string name="about_sources">使用しているソースコード</string>
+    <string name="about_dedicated">献辞</string>
+    <string name="about_section_libraries">ライブラリ</string>
+    <string name="about_section_system">システム</string>
+    <string name="about_licenses_action">ライセンス</string>
+</resources>

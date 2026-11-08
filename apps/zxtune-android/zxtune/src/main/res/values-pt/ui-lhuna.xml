@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigate_back">Voltar</string>
+    <string name="close">Fechar</string>
+    <string name="about_section_engines">Motores de som</string>
+    <string name="about_engine_running_on">Executado em</string>
+    <string name="about_engine_driver">Driver original: %s</string>
+    <string name="about_idea">Ideia, código</string>
+    <string name="about_coauthor_label">Coautor</string>
+    <string name="about_design">Design</string>
+    <string name="about_sources">Fontes usadas</string>
+    <string name="about_dedicated">Dedicado a</string>
+    <string name="about_section_libraries">Bibliotecas</string>
+    <string name="about_section_system">Sistema</string>
+    <string name="about_licenses_action">Licenças</string>
+</resources>

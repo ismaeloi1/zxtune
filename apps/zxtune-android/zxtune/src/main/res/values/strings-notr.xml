@@ -3,4 +3,11 @@
     <string name="app_name" translatable="false">ZXTune_LHUNA</string>
     <string name="stub_time" translatable="false">--:--</string>
     <string name="playlists_storage_path" translatable="false">ZXTune/Playlists</string>
+    <!-- marks section header rows of settings lists -->
+    <string name="lhuna_settings_header_tag" translatable="false">settings_header</string>
+    <!-- values of settings sliders with units -->
+    <string name="pref_value_ms" translatable="false">%d ms</string>
+    <string name="pref_value_percent" translatable="false">%d%%</string>
+    <string name="pref_value_mv" translatable="false">%+d mV</string>
+    <string name="pref_value_tstates" translatable="false">%d T</string>
 </resources>

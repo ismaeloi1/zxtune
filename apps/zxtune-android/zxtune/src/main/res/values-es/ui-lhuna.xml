@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigate_back">Atrás</string>
+    <string name="close">Cerrar</string>
+    <string name="about_section_engines">Motores de sonido</string>
+    <string name="about_engine_running_on">Funciona con</string>
+    <string name="about_engine_driver">Controlador original: %s</string>
+    <string name="about_idea">Idea, programación</string>
+    <string name="about_coauthor_label">Coautor</string>
+    <string name="about_design">Diseño</string>
+    <string name="about_sources">Códigos fuente utilizados</string>
+    <string name="about_dedicated">Dedicado a</string>
+    <string name="about_section_libraries">Bibliotecas</string>
+    <string name="about_section_system">Sistema</string>
+    <string name="about_licenses_action">Licencias</string>
+</resources>

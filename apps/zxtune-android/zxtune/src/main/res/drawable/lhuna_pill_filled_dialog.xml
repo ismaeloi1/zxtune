@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dialog buttons bar has no room for margins (buttons are clipped), so spacing is part of the background -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+        android:drawable="@drawable/lhuna_pill_filled"
+        android:insetBottom="@dimen/lhuna_space_s"
+        android:insetTop="@dimen/lhuna_space_m" />

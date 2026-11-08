@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dropdown row: current value as summary, chevron as affordance. Hidden spinner anchors the popup. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+
+    <Spinner
+            android:id="@id/spinner"
+            style="@style/Lhuna.Spinner"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:layout_marginLeft="@dimen/lhuna_space_l"
+            android:visibility="invisible" />
+
+    <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="?android:attr/selectableItemBackground"
+            android:duplicateParentState="true"
+            android:gravity="center_vertical"
+            android:minHeight="@dimen/lhuna_row_min_height"
+            android:orientation="horizontal"
+            android:paddingLeft="@dimen/lhuna_space_l"
+            android:paddingTop="@dimen/lhuna_space_m"
+            android:paddingRight="@dimen/lhuna_space_m"
+            android:paddingBottom="@dimen/lhuna_space_m">
+
+        <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+            <TextView
+                    android:id="@android:id/title"
+                    style="@style/Lhuna.Settings.Title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+            <TextView
+                    android:id="@android:id/summary"
+                    style="@style/Lhuna.Settings.Summary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+        </LinearLayout>
+
+        <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginLeft="@dimen/lhuna_space_s"
+                android:duplicateParentState="true"
+                android:importantForAccessibility="no"
+                android:src="@drawable/ic_expand_more"
+                app:tint="@color/lhuna_pref_summary" />
+    </LinearLayout>
+</FrameLayout>

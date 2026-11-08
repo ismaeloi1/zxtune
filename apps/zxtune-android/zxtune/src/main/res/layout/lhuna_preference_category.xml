@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Section header above a group card, the tag marks it for app.zxtune.ui.settings.SettingsCards -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/lhuna_space_l"
+        android:paddingTop="@dimen/lhuna_space_xl"
+        android:paddingRight="@dimen/lhuna_space_l"
+        android:paddingBottom="@dimen/lhuna_space_s"
+        android:tag="@string/lhuna_settings_header_tag">
+
+    <TextView
+            android:id="@android:id/title"
+            style="@style/Lhuna.Settings.Header"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:accessibilityHeading="true"
+            tools:targetApi="28" />
+
+    <TextView
+            android:id="@android:id/summary"
+            style="@style/Lhuna.Settings.Summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textSize="13sp" />
+</LinearLayout>

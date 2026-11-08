@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- corners clipping of settings rows on grouped cards, see SettingsCards -->
+    <item name="settings_card_corners" type="id" />
+</resources>

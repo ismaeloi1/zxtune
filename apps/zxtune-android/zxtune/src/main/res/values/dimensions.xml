@@ -14,4 +14,16 @@
   <dimen name="lhuna_radius_xl">28dp</dimen>
   <dimen name="lhuna_play_size">48dp</dimen>
   <dimen name="lhuna_logo_height">28dp</dimen>
+  <!-- Settings rows and grouped cards -->
+  <dimen name="lhuna_space_s">8dp</dimen>
+  <dimen name="lhuna_space_m">12dp</dimen>
+  <dimen name="lhuna_space_l">16dp</dimen>
+  <dimen name="lhuna_space_xl">24dp</dimen>
+  <dimen name="lhuna_row_min_height">56dp</dimen>
+  <dimen name="lhuna_card_margin">16dp</dimen>
+  <dimen name="lhuna_pill_height">48dp</dimen>
+  <dimen name="lhuna_segment_height">40dp</dimen>
+  <dimen name="lhuna_round_button">48dp</dimen>
+  <dimen name="lhuna_sheet_max_width">600dp</dimen>
+  <dimen name="lhuna_about_logo_height">104dp</dimen>
 </resources>

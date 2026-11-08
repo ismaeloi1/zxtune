@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Slider row: title with value and unit at end, slider below across the row -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:orientation="vertical"
+        android:paddingLeft="@dimen/lhuna_space_l"
+        android:paddingTop="@dimen/lhuna_space_m"
+        android:paddingRight="@dimen/lhuna_space_l">
+
+    <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:baselineAligned="true"
+            android:orientation="horizontal">
+
+        <TextView
+                android:id="@android:id/title"
+                style="@style/Lhuna.Settings.Title"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:labelFor="@id/seekbar" />
+
+        <app.zxtune.ui.settings.ValueTextView
+                android:id="@id/seekbar_value"
+                style="@style/Lhuna.Settings.Value"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="@dimen/lhuna_space_m" />
+    </LinearLayout>
+
+    <TextView
+            android:id="@android:id/summary"
+            style="@style/Lhuna.Settings.Summary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+    <SeekBar
+            android:id="@id/seekbar"
+            style="@style/Lhuna.SeekBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+</LinearLayout>

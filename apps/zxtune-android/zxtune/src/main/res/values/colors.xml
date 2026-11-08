@@ -17,6 +17,14 @@
     <!-- 'Lune' violet: secondary marks (loop point, cutoff, resonance) -->
     <color name="lhuna_accent_2">#8A6CFF</color>
     <color name="lhuna_danger">#FF5C6C</color>
+    <!-- Notices that need attention but are not errors (e.g. setting applied to next track) -->
+    <color name="lhuna_warning">#FFB547</color>
+    <!-- Labels and controls of disabled settings, intentionally below text contrast -->
+    <color name="lhuna_text_disabled">#4E5366</color>
+    <!-- Pressed state of accent filled controls -->
+    <color name="lhuna_accent_pressed">#80F2FF</color>
+    <!-- Borders of outlined buttons and chips, visible on any surface -->
+    <color name="lhuna_outline_strong">#3C4157</color>
     <!-- Per voice colors, shared by oscilloscopes, dashboards and filter curves -->
     <color name="lhuna_voice_1">#FFB547</color>
     <color name="lhuna_voice_2">#5FD38D</color>

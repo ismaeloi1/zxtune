@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dialog shown in the middle of the screen, see lhuna_sheet_background for bottom sheets -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+        android:inset="16dp">
+    <shape android:shape="rectangle">
+        <corners android:radius="@dimen/lhuna_radius_xl" />
+        <solid android:color="@color/lhuna_surface_1" />
+    </shape>
+</inset>
