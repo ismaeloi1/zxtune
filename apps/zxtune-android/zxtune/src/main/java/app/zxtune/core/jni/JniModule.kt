@@ -23,6 +23,11 @@ internal class JniModule(handleVal: Int) : Module {
 
     private external fun getDurationMs(): Int
 
+    override val loopDuration
+        get() = TimeStamp.fromMilliseconds(getLoopDurationMs().toLong())
+
+    private external fun getLoopDurationMs(): Int
+
     external override fun createPlayer(samplerate: Int): Player
 
     external override fun getProperty(name: String, defVal: Long): Long
