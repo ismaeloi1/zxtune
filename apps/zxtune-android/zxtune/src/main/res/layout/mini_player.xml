@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Persistent mini player above bottom navigation, tap opens now playing page -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingLeft="@dimen/spacing_full"
+        android:paddingTop="@dimen/spacing_half"
+        android:paddingRight="@dimen/spacing_full"
+        android:paddingBottom="@dimen/spacing_full"
+        tools:ignore="RtlHardcoded">
+
+    <FrameLayout
+            android:id="@+id/mini_player_card"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/lhuna_mini_player_height"
+            android:background="@drawable/lhuna_mini_player_background"
+            android:clickable="true"
+            android:contentDescription="@string/mini_player_open"
+            android:focusable="true"
+            android:foreground="?selectableItemBackground">
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingLeft="@dimen/lhuna_space_m"
+                android:paddingRight="@dimen/spacing_full">
+
+            <TextView
+                    android:id="@+id/mini_player_badge"
+                    style="@style/Lhuna.Badge"
+                    android:importantForAccessibility="no"
+                    tools:text="SID" />
+
+            <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="@dimen/lhuna_space_m"
+                    android:layout_marginRight="@dimen/spacing_half"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                <TextView
+                        android:id="@+id/mini_player_title"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:textAppearance="@style/TextAppearance.Lhuna.Title"
+                        tools:text="@tools:sample/lorem/random" />
+
+                <TextView
+                        android:id="@+id/mini_player_subtitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:singleLine="true"
+                        android:textAppearance="@style/TextAppearance.Lhuna.Body.Secondary"
+                        tools:text="@tools:sample/full_names" />
+            </LinearLayout>
+
+            <ImageView
+                    android:id="@+id/mini_player_next"
+                    style="@style/Button.Icon"
+                    android:contentDescription="@string/playback_next"
+                    android:src="@drawable/ic_next" />
+
+            <ImageView
+                    android:id="@+id/mini_player_play_pause"
+                    style="@style/Button.Play"
+                    android:layout_marginLeft="@dimen/spacing_half"
+                    android:contentDescription="@string/playback_play"
+                    android:src="@drawable/ic_play" />
+        </LinearLayout>
+
+        <ProgressBar
+                android:id="@+id/mini_player_progress"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/lhuna_progress_height"
+                android:layout_gravity="top"
+                android:layout_marginLeft="@dimen/lhuna_space_l"
+                android:layout_marginRight="@dimen/lhuna_space_l"
+                android:importantForAccessibility="no"
+                android:maxHeight="@dimen/lhuna_progress_height"
+                android:minHeight="@dimen/lhuna_progress_height"
+                android:progressDrawable="@drawable/lhuna_progress"
+                tools:progress="33" />
+    </FrameLayout>
+</FrameLayout>

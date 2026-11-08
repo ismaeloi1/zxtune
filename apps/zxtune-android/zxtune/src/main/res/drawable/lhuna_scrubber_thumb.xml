@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Scrubber thumb, bigger while dragged -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="oval">
+            <size
+                    android:width="@dimen/lhuna_scrubber_thumb_pressed"
+                    android:height="@dimen/lhuna_scrubber_thumb_pressed" />
+            <solid android:color="@color/lhuna_text_1" />
+            <stroke
+                    android:width="3dp"
+                    android:color="@color/lhuna_accent" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="oval">
+            <size
+                    android:width="@dimen/lhuna_scrubber_thumb"
+                    android:height="@dimen/lhuna_scrubber_thumb" />
+            <solid android:color="@color/lhuna_text_1" />
+        </shape>
+    </item>
+</selector>

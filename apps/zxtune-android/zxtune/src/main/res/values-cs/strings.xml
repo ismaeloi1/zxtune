@@ -29,7 +29,6 @@
     <string name="scanning_title">Prohledává se</string>
     <string name="scanning_text">Klepněte pro zrušení</string>
     <!-- other -->
-    <string name="main">Hlavní strany</string>
     <plurals name="items">
         <item quantity="one">%d položka</item>
         <item quantity="few">%d položky</item>

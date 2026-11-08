@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Navigation items of the pages shared by all layouts -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <LinearLayout
+            android:id="@+id/navigation_playlist"
+            style="@style/Lhuna.NavItem"
+            android:contentDescription="@string/navigation_playlist">
+
+        <ImageView
+                style="@style/Lhuna.NavItem.Icon"
+                android:src="@drawable/ic_nav_playlist" />
+
+        <TextView
+                style="@style/Lhuna.NavItem.Label"
+                android:text="@string/navigation_playlist" />
+    </LinearLayout>
+
+    <LinearLayout
+            android:id="@+id/navigation_browser"
+            style="@style/Lhuna.NavItem"
+            android:contentDescription="@string/navigation_browser">
+
+        <ImageView
+                style="@style/Lhuna.NavItem.Icon"
+                android:src="@drawable/ic_nav_browse" />
+
+        <TextView
+                style="@style/Lhuna.NavItem.Label"
+                android:text="@string/navigation_browser" />
+    </LinearLayout>
+</merge>

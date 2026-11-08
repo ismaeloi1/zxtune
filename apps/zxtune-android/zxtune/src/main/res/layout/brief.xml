@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- Title block: big title, optional author, chips with chip family, format, subtune and program -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -11,56 +13,103 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
-            android:paddingHorizontal="@dimen/spacing_full"
+            android:paddingHorizontal="@dimen/lhuna_space_l"
             android:scrollbars="vertical"
             tools:text="Some\nmultiline\ntext\nwith\nmany\nlines" />
 
     <RelativeLayout
             android:id="@+id/brief_main"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/controls_height"
-            android:gravity="center_vertical"
-            android:orientation="vertical"
-            android:paddingHorizontal="@dimen/spacing_full">
+            android:layout_height="wrap_content"
+            android:paddingLeft="@dimen/lhuna_space_l"
+            android:paddingTop="@dimen/spacing_half"
+            android:paddingRight="@dimen/spacing_half">
+
+        <ImageView
+                android:id="@+id/brief_track_menu"
+                style="@style/Button.Icon"
+                android:layout_alignParentTop="true"
+                android:layout_alignParentRight="true"
+                android:contentDescription="@string/track_actions"
+                android:src="@drawable/ic_track_menu" />
+
+        <ImageButton
+                android:id="@+id/brief_details_toggle"
+                style="@style/Button.Icon.Toggled"
+                android:layout_alignParentTop="true"
+                android:layout_toLeftOf="@id/brief_track_menu"
+                android:contentDescription="@string/track_details"
+                android:src="@drawable/ic_menu_info" />
 
         <TextView
                 android:id="@+id/brief_title"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_alignWithParentIfMissing="true"
-                android:layout_above="@id/brief_subtitle"
+                android:layout_height="@dimen/lhuna_touch_target"
                 android:layout_alignParentLeft="true"
                 android:layout_alignParentTop="true"
+                android:layout_marginRight="@dimen/spacing_half"
                 android:layout_toLeftOf="@id/brief_details_toggle"
-                android:ellipsize="middle"
-                android:gravity="center"
-                android:singleLine="true"
-                android:textAlignment="gravity"
-                android:textAppearance="@style/TextAppearance.Lhuna.Title"
+                android:ellipsize="end"
+                android:gravity="center_vertical"
+                android:maxLines="1"
+                android:textAppearance="@style/TextAppearance.Lhuna.Display"
+                app:autoSizeMaxTextSize="28sp"
+                app:autoSizeMinTextSize="20sp"
+                app:autoSizeStepGranularity="1sp"
+                app:autoSizeTextType="uniform"
                 tools:text="@tools:sample/lorem/random" />
 
         <TextView
                 android:id="@+id/brief_subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_below="@id/brief_title"
                 android:layout_alignParentLeft="true"
-                android:layout_alignParentBottom="true"
-                android:layout_toLeftOf="@id/brief_details_toggle"
-                android:ellipsize="middle"
-                android:gravity="center"
+                android:layout_marginRight="@dimen/lhuna_space_m"
+                android:ellipsize="end"
                 android:singleLine="true"
-                android:textAlignment="gravity"
-                android:textAppearance="?textAppearanceListItemSecondary"
+                android:textAppearance="@style/TextAppearance.Lhuna.Subtitle"
                 android:visibility="gone"
                 tools:text="@tools:sample/full_names"
                 tools:visibility="visible" />
 
-        <ImageButton
-                android:id="@+id/brief_details_toggle"
-                style="@style/Button.Toggled.Compact"
-                android:layout_alignParentTop="true"
-                android:layout_alignParentRight="true"
-                android:layout_alignParentBottom="true"
-                android:src="@drawable/ic_menu_info" />
+        <LinearLayout
+                android:id="@+id/brief_chips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/brief_subtitle"
+                android:layout_marginTop="@dimen/spacing_full"
+                android:layout_marginRight="@dimen/lhuna_space_m"
+                android:orientation="horizontal">
+
+            <TextView
+                    android:id="@+id/brief_chip_family"
+                    style="@style/Lhuna.Chip"
+                    android:visibility="gone"
+                    tools:text="SID"
+                    tools:visibility="visible" />
+
+            <TextView
+                    android:id="@+id/brief_chip_format"
+                    style="@style/Lhuna.Chip"
+                    android:visibility="gone"
+                    tools:text="PT3"
+                    tools:visibility="visible" />
+
+            <TextView
+                    android:id="@+id/brief_chip_track"
+                    style="@style/Lhuna.Chip"
+                    android:visibility="gone"
+                    tools:text="#2"
+                    tools:visibility="visible" />
+
+            <TextView
+                    android:id="@+id/brief_chip_program"
+                    style="@style/Lhuna.Chip"
+                    android:layout_marginRight="0dp"
+                    android:visibility="gone"
+                    tools:text="Vortex Tracker II"
+                    tools:visibility="visible" />
+        </LinearLayout>
     </RelativeLayout>
 </LinearLayout>

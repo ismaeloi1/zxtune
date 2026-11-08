@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- The only theme: dark with pure black backgrounds for AMOLED screens -->
     <style name="CustomTheme" parent="Theme.AppCompat.NoActionBar">
@@ -30,11 +30,6 @@
         <item name="android:focusable">true</item>
     </style>
 
-    <style name="ListItem.Large">
-        <item name="android:layout_height">?android:listPreferredItemHeight</item>
-        <item name="android:paddingLeft">0px</item>
-    </style>
-
     <style name="Button" parent="Widget.AppCompat.Button.Borderless">
         <item name="android:layout_height">match_parent</item>
         <item name="android:layout_width">wrap_content</item>
@@ -42,31 +37,24 @@
         <item name="tint">?colorControlNormal</item>
     </style>
 
-    <!-- Playback controls without default 48dp minimal height to give more space to visualizer -->
-    <style name="Button.Compact">
-        <item name="android:minHeight">0dp</item>
-        <item name="android:padding">@dimen/spacing_half</item>
-        <item name="android:scaleType">fitCenter</item>
-    </style>
-
-    <style name="Button.Toggled.Compact">
-        <item name="android:minHeight">0dp</item>
-        <item name="android:minWidth">@dimen/controls_height</item>
-        <item name="android:layout_height">match_parent</item>
-        <item name="android:padding">@dimen/spacing_half</item>
-        <item name="android:scaleType">fitCenter</item>
-    </style>
-
-    <style name="Button.Toggled">
-        <item name="android:minWidth">48dp</item>
-        <item name="android:layout_height">wrap_content</item>
-        <item name="android:background">@drawable/toggle_button_background</item>
-    </style>
-
+    <!-- Breadcrumb chip, delimiters are drawn between chips by the listing -->
     <style name="Button.Breadcrumbs">
-        <item name="android:drawableRight">@drawable/breadcrumbs_delimiter</item>
-        <item name="android:drawablePadding">1dp</item>
-        <item name="android:padding">1dp</item>
+        <item name="android:layout_height">@dimen/lhuna_crumb_height</item>
+        <item name="android:layout_gravity">center_vertical</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:minWidth">@dimen/lhuna_crumb_height</item>
+        <item name="android:paddingLeft">@dimen/lhuna_space_m</item>
+        <item name="android:paddingRight">@dimen/lhuna_space_m</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <item name="android:drawablePadding">@dimen/spacing_full</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">middle</item>
+        <item name="android:maxWidth">240dp</item>
+        <item name="android:background">@drawable/lhuna_crumb_background</item>
+        <item name="android:textAppearance">@style/TextAppearance.Lhuna.Body</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:stateListAnimator" tools:targetApi="21">@null</item>
     </style>
 
     <!-- Primary transport action: filled accent disc, the only element with a strong accent fill -->
@@ -81,14 +69,15 @@
         <item name="tint">@color/lhuna_on_accent</item>
     </style>
 
-    <!-- LHUNA typography: Fredoka (display, Latin) / Nunito (UI) / JetBrains Mono (numbers, registers), all OFL-1.1.
-      Glyphs missing in the bundled subsets fall back to system font. -->
+    <!-- LHUNA typography: system font only (Roboto), hierarchy by size, weight and color.
+      Numbers use tabular figures so that times and durations do not jitter while changing. -->
     <style name="TextAppearance.Lhuna" parent="TextAppearance.AppCompat">
         <item name="android:textColor">@color/lhuna_text_1</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Display">
         <item name="android:textSize">28sp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Headline">
@@ -97,6 +86,20 @@
 
     <style name="TextAppearance.Lhuna.Title">
         <item name="android:textSize">16sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Body">
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Body.Secondary">
+        <item name="android:textColor">@color/lhuna_text_2</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Subtitle">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">@color/lhuna_text_2</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Label">
@@ -108,10 +111,160 @@
 
     <style name="TextAppearance.Lhuna.Mono">
         <item name="android:textSize">13sp</item>
+        <item name="android:fontFeatureSettings">tnum</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Mono.Secondary">
         <item name="android:textColor">@color/lhuna_text_2</item>
+    </style>
+
+    <!-- Durations in lists -->
+    <style name="TextAppearance.Lhuna.Mono.Duration">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/lhuna_text_2</item>
+    </style>
+
+    <!-- Playback position and duration under the scrubber -->
+    <style name="TextAppearance.Lhuna.Mono.Time">
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Mono.Time.Secondary">
+        <item name="android:textColor">@color/lhuna_text_2</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Badge">
+        <item name="android:textSize">12sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.05</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.Chip">
+        <item name="android:textSize">13sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/lhuna_text_2</item>
+    </style>
+
+    <style name="TextAppearance.Lhuna.NavLabel">
+        <item name="android:textSize">12sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/lhuna_nav_label</item>
+    </style>
+
+    <!-- LHUNA components -->
+
+    <!-- 64dp list row, states drawn as inset tonal cards -->
+    <style name="ListItem.Lhuna">
+        <item name="android:layout_height">@dimen/lhuna_list_item_height</item>
+        <item name="android:background">@drawable/lhuna_list_item_background</item>
+        <item name="android:paddingLeft">0dp</item>
+        <item name="android:paddingRight">0dp</item>
+    </style>
+
+    <style name="Lhuna.Badge" parent="">
+        <item name="android:layout_width">@dimen/lhuna_badge_size</item>
+        <item name="android:layout_height">@dimen/lhuna_badge_size</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textAppearance">@style/TextAppearance.Lhuna.Badge</item>
+    </style>
+
+    <style name="Lhuna.Chip" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">@dimen/lhuna_chip_height</item>
+        <item name="android:gravity">center</item>
+        <item name="android:paddingLeft">@dimen/lhuna_space_m</item>
+        <item name="android:paddingRight">@dimen/lhuna_space_m</item>
+        <item name="android:layout_marginRight">@dimen/spacing_full</item>
+        <item name="android:singleLine">true</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:background">@drawable/lhuna_chip_background</item>
+        <item name="android:textAppearance">@style/TextAppearance.Lhuna.Chip</item>
+    </style>
+
+    <style name="Lhuna.NavItem" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:gravity">center</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:background">?selectableItemBackgroundBorderless</item>
+    </style>
+
+    <style name="Lhuna.NavItem.Icon" parent="">
+        <item name="android:layout_width">@dimen/lhuna_nav_indicator_width</item>
+        <item name="android:layout_height">@dimen/lhuna_nav_indicator_height</item>
+        <item name="android:layout_weight">0</item>
+        <item name="android:scaleType">center</item>
+        <item name="android:background">@drawable/lhuna_nav_indicator</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="tint">@color/lhuna_nav_icon</item>
+    </style>
+
+    <style name="Lhuna.NavItem.Label" parent="">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">0</item>
+        <item name="android:layout_marginTop">@dimen/spacing_half</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:textAppearance">@style/TextAppearance.Lhuna.NavLabel</item>
+    </style>
+
+    <!-- Always visible search pill -->
+    <style name="Lhuna.SearchPill" parent="Widget.AppCompat.SearchView">
+        <item name="android:layout_height">@dimen/lhuna_search_height</item>
+        <item name="android:background">@drawable/lhuna_search_background</item>
+        <item name="android:paddingLeft">@dimen/spacing_half</item>
+        <item name="android:paddingRight">@dimen/spacing_half</item>
+        <item name="queryBackground">@null</item>
+        <item name="submitBackground">@null</item>
+        <item name="searchHintIcon">@null</item>
+        <item name="iconifiedByDefault">false</item>
+    </style>
+
+    <!-- Transport: secondary actions 48dp, skips 56dp, primary 72dp -->
+    <style name="Button.Transport">
+        <item name="android:layout_width">@dimen/lhuna_transport_button</item>
+        <item name="android:layout_height">@dimen/lhuna_transport_button</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:padding">@dimen/lhuna_transport_icon_padding</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:background">?selectableItemBackgroundBorderless</item>
+    </style>
+
+    <style name="Button.Transport.Toggled">
+        <item name="android:layout_width">@dimen/lhuna_touch_target</item>
+        <item name="android:layout_height">@dimen/lhuna_touch_target</item>
+        <item name="android:padding">@dimen/lhuna_space_m</item>
+        <item name="android:background">@drawable/toggle_button_background</item>
+    </style>
+
+    <style name="Button.Play.Large">
+        <item name="android:layout_width">@dimen/lhuna_play_size_large</item>
+        <item name="android:layout_height">@dimen/lhuna_play_size_large</item>
+        <item name="android:padding">@dimen/lhuna_space_l</item>
+    </style>
+
+    <!-- 48dp touch target around 24dp icon -->
+    <style name="Button.Icon">
+        <item name="android:layout_width">@dimen/lhuna_touch_target</item>
+        <item name="android:layout_height">@dimen/lhuna_touch_target</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:padding">@dimen/lhuna_space_m</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:background">?selectableItemBackgroundBorderless</item>
+    </style>
+
+    <style name="Button.Icon.Toggled">
+        <item name="android:background">@drawable/toggle_button_background</item>
     </style>
 
     <style name="CustomDialog" parent="Theme.AppCompat.Dialog">

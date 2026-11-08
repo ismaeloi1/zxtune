@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bottom navigation, labels are short: up to five items share the width of a phone -->
+    <string name="navigation_now_playing">Lecture</string>
+    <string name="navigation_playlist">Playlist</string>
+    <string name="navigation_browser">Parcourir</string>
+    <!-- Mini player and transport, for accessibility services -->
+    <string name="mini_player_open">Ouvrir le lecteur</string>
+    <string name="playback_play">Lecture</string>
+    <string name="playback_pause">Pause</string>
+    <string name="playback_prev">Morceau précédent</string>
+    <string name="playback_next">Morceau suivant</string>
+    <string name="playback_shuffle">Lecture aléatoire</string>
+    <string name="playback_repeat">Répéter le morceau</string>
+    <string name="track_actions">Actions sur le morceau</string>
+    <string name="track_details">Détails du morceau</string>
+</resources>

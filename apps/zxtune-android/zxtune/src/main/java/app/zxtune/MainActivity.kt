@@ -15,6 +15,7 @@ import android.os.StrictMode.ThreadPolicy
 import android.os.StrictMode.VmPolicy
 import android.support.v4.media.session.MediaControllerCompat
 import android.view.View
+import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.collection.SparseArrayCompat
 import androidx.collection.contains
@@ -25,6 +26,7 @@ import androidx.viewpager.widget.ViewPager.OnPageChangeListener
 import app.zxtune.analytics.Analytics
 import app.zxtune.device.media.MediaModel
 import app.zxtune.rescue.CrashReport
+import app.zxtune.ui.PagerNavigation
 import app.zxtune.ui.ViewPagerAdapter
 import app.zxtune.ui.utils.applyEdgeToEdge
 import app.zxtune.ui.utils.padWithSystemBars
@@ -41,13 +43,15 @@ class MainActivity : AppCompatActivity(R.layout.main_activity) {
         override fun onTabVisibilityChanged(isVisible: Boolean) = Unit
     }
 
+    private var navigation: PagerNavigation? = null
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         setupUi()
 
-        // On the content frame rather than per pane: it covers the tab strip, the top panel and
-        // every page's listing at once, and puts the controls above the navigation bar
+        // On the content frame rather than per pane: it covers the top panels and every page's
+        // listing at once, and puts the bottom navigation above the system navigation bar
         applyEdgeToEdge()
         findViewById<View>(android.R.id.content).padWithSystemBars()
 
@@ -112,6 +116,7 @@ class MainActivity : AppCompatActivity(R.layout.main_activity) {
                 }
 
                 override fun onPageScrollStateChanged(state: Int) = Unit
+
                 private fun getListener(idx: Int) = listeners.getOrElse(idx) {
                     createListener(idx).also {
                         listeners.put(idx, it)
@@ -129,8 +134,18 @@ class MainActivity : AppCompatActivity(R.layout.main_activity) {
                     }
                 }
             })
+            navigation = PagerNavigation(
+                this,
+                this@MainActivity.findViewById<ViewGroup>(R.id.navigation_bar),
+                this@MainActivity.findViewById(R.id.mini_player),
+            )
         }
     }
+
+    /**
+     * Brings now playing content to the screen if it is not always visible
+     */
+    fun showNowPlaying() = navigation?.show(PagerNavigation.NOW_PLAYING_PAGE) ?: false
 
     companion object {
         @JvmField

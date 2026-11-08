@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bottom navigation, labels are short: up to five items share the width of a phone -->
+    <string name="navigation_now_playing">Přehrávání</string>
+    <string name="navigation_playlist">Seznam</string>
+    <string name="navigation_browser">Procházet</string>
+    <!-- Mini player and transport, for accessibility services -->
+    <string name="mini_player_open">Otevřít přehrávač</string>
+    <string name="playback_play">Přehrát</string>
+    <string name="playback_pause">Pozastavit</string>
+    <string name="playback_prev">Předchozí skladba</string>
+    <string name="playback_next">Další skladba</string>
+    <string name="playback_shuffle">Náhodné pořadí</string>
+    <string name="playback_repeat">Opakovat skladbu</string>
+    <string name="track_actions">Akce se skladbou</string>
+    <string name="track_details">Podrobnosti skladby</string>
+</resources>

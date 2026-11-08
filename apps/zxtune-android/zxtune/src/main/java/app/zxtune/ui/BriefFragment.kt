@@ -2,6 +2,7 @@ package app.zxtune.ui
 
 import android.graphics.Typeface
 import android.os.Bundle
+import android.support.v4.media.MediaMetadataCompat
 import android.text.method.ScrollingMovementMethod
 import android.view.LayoutInflater
 import android.view.View
@@ -11,12 +12,15 @@ import android.widget.TextView
 import androidx.core.animation.ValueAnimator
 import androidx.fragment.app.Fragment
 import app.zxtune.R
+import app.zxtune.core.Identifier
 import app.zxtune.core.ModuleAttributes
 import app.zxtune.device.media.MediaModel
 import app.zxtune.preferences.Preferences
 import app.zxtune.ui.utils.UiUtils
 import app.zxtune.ui.utils.whenLifecycleStarted
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val MAX_LINES = 8
@@ -81,10 +85,31 @@ class BriefFragment : Fragment() {
         }
     }
 
+    /**
+     * What is playing in short: chip family, format if it says more than family, subtune and program
+     */
+    private class ChipsView(view: View) {
+        private val family = view.findViewById<TextView>(R.id.brief_chip_family)
+        private val format = view.findViewById<TextView>(R.id.brief_chip_format)
+        private val track = view.findViewById<TextView>(R.id.brief_chip_track)
+        private val program = view.findViewById<TextView>(R.id.brief_chip_program)
+
+        fun bind(metadata: MediaMetadataCompat) {
+            val type = metadata.getString(ModuleAttributes.TYPE).orEmpty()
+            val id = metadata.description.mediaUri?.let(::Identifier)
+            val chipFamily = ChipFamily.ofType(type) ?: ChipFamily.ofFilename(id?.tuneFilename)
+            family.showChipFamilyChip(chipFamily)
+            format.showChip(type.takeUnless { it == chipFamily?.label })
+            track.showChip(id?.trackIndex?.let { "#$it" })
+            program.showChip(metadata.getString(ModuleAttributes.PROGRAM))
+        }
+    }
+
     private lateinit var title: TextView
     private lateinit var subtitle: TextView
     private lateinit var details: DetailsView
     private lateinit var detailsToggle: ImageButton
+    private lateinit var chips: ChipsView
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -96,6 +121,7 @@ class BriefFragment : Fragment() {
             subtitle = findViewById(R.id.brief_subtitle)
             details = DetailsView(findViewById(R.id.brief_details))
             detailsToggle = findViewById(R.id.brief_details_toggle)
+            chips = ChipsView(this)
             detailsToggle.setOnClickListener {
                 val state = !isActivated
                 isActivated = state
@@ -105,7 +131,13 @@ class BriefFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) = MediaModel.of(requireActivity()).run {
+        val menu = TrackContextMenu(requireActivity(), view.findViewById(R.id.brief_track_menu))
         viewLifecycleOwner.whenLifecycleStarted {
+            launch {
+                combine(controller, metadata) { ctrl, meta ->
+                    menu.bind(ctrl, meta)
+                }.collect {}
+            }
             // re-read on each start, may be changed in preferences
             val showAuthor = withContext(Dispatchers.IO) {
                 Preferences.getDataStore(requireContext()).getBoolean(SHOW_AUTHOR_KEY, false)
@@ -116,6 +148,7 @@ class BriefFragment : Fragment() {
                     title.updateText(description.title)
                     // author is hidden by default to give more space to visualizer
                     subtitle.updateText(description.subtitle.takeIf { showAuthor })
+                    chips.bind(this)
                     val strings = getString(ModuleAttributes.STRINGS)
                     val comment = getString(ModuleAttributes.COMMENT)
                     if (strings != null) {

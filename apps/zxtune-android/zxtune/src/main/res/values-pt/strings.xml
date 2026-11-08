@@ -29,7 +29,6 @@
     <string name="scanning_title">Procurando.</string>
     <string name="scanning_text">Clique para cancelar</string>
     <!-- other -->
-    <string name="main">Principal</string>
     <plurals name="items">
         <item quantity="one">%d item</item>
         <item quantity="many">%d itens</item>

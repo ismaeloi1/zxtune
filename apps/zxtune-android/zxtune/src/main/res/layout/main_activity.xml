@@ -1,46 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Pages are switched by swipe or by bottom navigation in the thumb zone,
+  mini player keeps playback at hand while the now playing page is hidden -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
     <androidx.viewpager.widget.ViewPager
             android:id="@+id/view_pager"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_alignParentTop="true"
-            android:layout_above="@id/playback_controls">
-
-        <androidx.viewpager.widget.PagerTabStrip
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_gravity="top" />
+            android:layout_height="0dp"
+            android:layout_weight="1">
 
         <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/now_playing"
                 android:name="app.zxtune.ui.NowPlayingFragment"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:tag="@string/main" />
+                android:tag="@string/navigation_now_playing" />
 
         <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/playlist_view"
                 android:name="app.zxtune.ui.playlist.PlaylistFragment"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:tag="@string/playlist" />
+                android:tag="@string/navigation_playlist" />
 
         <androidx.fragment.app.FragmentContainerView
                 android:id="@+id/browser_view"
                 android:name="app.zxtune.ui.browser.BrowserFragment"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:tag="@string/browser" />
+                android:tag="@string/navigation_browser" />
     </androidx.viewpager.widget.ViewPager>
 
     <androidx.fragment.app.FragmentContainerView
-            android:id="@+id/playback_controls"
-            android:name="app.zxtune.ui.PlaybackControlsFragment"
+            android:id="@+id/mini_player"
+            android:name="app.zxtune.ui.MiniPlayerFragment"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignParentBottom="true"/>
-</RelativeLayout>
+            tools:layout="@layout/mini_player" />
+
+    <include layout="@layout/navigation_bar" />
+</LinearLayout>

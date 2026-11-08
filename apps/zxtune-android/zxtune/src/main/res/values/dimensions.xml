@@ -6,7 +6,6 @@
   <dimen name="spacing_full">8dp</dimen>
   <dimen name="scrollbar_width">16dp</dimen>
   <dimen name="now_playing_toolbar_height">44dp</dimen>
-  <dimen name="controls_height">40dp</dimen>
   <!-- LHUNA: 4dp grid, large radii echoing the rounded logo -->
   <dimen name="lhuna_radius_s">8dp</dimen>
   <dimen name="lhuna_radius_m">12dp</dimen>
@@ -14,4 +13,37 @@
   <dimen name="lhuna_radius_xl">28dp</dimen>
   <dimen name="lhuna_play_size">48dp</dimen>
   <dimen name="lhuna_logo_height">28dp</dimen>
+  <dimen name="lhuna_space_m">12dp</dimen>
+  <dimen name="lhuna_space_l">16dp</dimen>
+  <dimen name="lhuna_space_xl">24dp</dimen>
+  <!-- Minimal touch target of every interactive element -->
+  <dimen name="lhuna_touch_target">48dp</dimen>
+  <!-- Transport: play 72 / prev,next 56 / shuffle,repeat 48 -->
+  <dimen name="lhuna_play_size_large">72dp</dimen>
+  <dimen name="lhuna_transport_button">56dp</dimen>
+  <dimen name="lhuna_transport_icon_padding">14dp</dimen>
+  <dimen name="lhuna_scrubber_height">28dp</dimen>
+  <dimen name="lhuna_scrubber_thumb">16dp</dimen>
+  <dimen name="lhuna_scrubber_thumb_pressed">24dp</dimen>
+  <!-- Bottom navigation: tonal pill behind the icon of the active page, label below -->
+  <dimen name="lhuna_nav_height">64dp</dimen>
+  <dimen name="lhuna_nav_indicator_width">56dp</dimen>
+  <dimen name="lhuna_nav_indicator_height">32dp</dimen>
+  <dimen name="lhuna_mini_player_height">64dp</dimen>
+  <dimen name="lhuna_progress_height">2dp</dimen>
+  <!-- Lists: 64dp rows with 40dp chip family badge -->
+  <dimen name="lhuna_list_item_height">64dp</dimen>
+  <dimen name="lhuna_badge_size">40dp</dimen>
+  <dimen name="lhuna_corner_mark">18dp</dimen>
+  <dimen name="lhuna_current_bar_width">3dp</dimen>
+  <dimen name="lhuna_chip_height">28dp</dimen>
+  <dimen name="lhuna_chip_stroke">1.5dp</dimen>
+  <dimen name="lhuna_crumb_height">36dp</dimen>
+  <dimen name="lhuna_crumb_icon">24dp</dimen>
+  <dimen name="lhuna_search_height">48dp</dimen>
+  <dimen name="lhuna_source_card_min_width">160dp</dimen>
+  <dimen name="lhuna_source_logo">40dp</dimen>
+  <!-- page gutter 16dp minus card half gap 6dp -->
+  <dimen name="lhuna_cards_inset">10dp</dimen>
+  <dimen name="lhuna_cards_half_gap">6dp</dimen>
 </resources>

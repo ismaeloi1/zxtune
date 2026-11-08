@@ -17,6 +17,8 @@
     <!-- 'Lune' violet: secondary marks (loop point, cutoff, resonance) -->
     <color name="lhuna_accent_2">#8A6CFF</color>
     <color name="lhuna_danger">#FF5C6C</color>
+    <!-- Current track row: darker than accent_container to keep accent title readable on it -->
+    <color name="lhuna_accent_surface">#062A31</color>
     <!-- Per voice colors, shared by oscilloscopes, dashboards and filter curves -->
     <color name="lhuna_voice_1">#FFB547</color>
     <color name="lhuna_voice_2">#5FD38D</color>

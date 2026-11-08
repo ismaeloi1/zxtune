@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Bottom navigation, labels are short: up to five items share the width of a phone -->
+    <string name="navigation_now_playing">Now playing</string>
+    <string name="navigation_playlist">Playlist</string>
+    <string name="navigation_browser">Browse</string>
+    <!-- Mini player and transport, for accessibility services -->
+    <string name="mini_player_open">Open player</string>
+    <string name="playback_play">Play</string>
+    <string name="playback_pause">Pause</string>
+    <string name="playback_prev">Previous track</string>
+    <string name="playback_next">Next track</string>
+    <string name="playback_shuffle">Shuffle</string>
+    <string name="playback_repeat">Repeat track</string>
+    <string name="track_actions">Track actions</string>
+    <string name="track_details">Track details</string>
+</resources>

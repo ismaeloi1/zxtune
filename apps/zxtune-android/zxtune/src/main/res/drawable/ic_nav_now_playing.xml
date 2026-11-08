@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom navigation: now playing. Single color, tinted by state -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M10,8.6 A0.9,0.9 0 0 1 11.4,7.9 L16,11.2 A1,1 0 0 1 16,12.8 L11.4,16.1 A0.9,0.9 0 0 1 10,15.4 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.35" />
+    <path
+        android:pathData="M3,12 A9,9 0 1 0 21,12 A9,9 0 1 0 3,12 Z M10,8.6 A0.9,0.9 0 0 1 11.4,7.9 L16,11.2 A1,1 0 0 1 16,12.8 L11.4,16.1 A0.9,0.9 0 0 1 10,15.4 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
