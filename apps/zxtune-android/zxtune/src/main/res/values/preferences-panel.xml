@@ -14,4 +14,12 @@
     <string name="scope_settings_chip_saa" translatable="false">SAA1099</string>
     <string name="scope_settings_chip_mt32" translatable="false">MT-32</string>
     <string name="scope_settings_chip_sid" translatable="false">SID</string>
+    <!-- filter response view of oscilloscope, see FilterScene -->
+    <string name="scope_filter_title">%1$s - Filter</string>
+    <string name="scope_filter_resonance">Res</string>
+    <string name="visualizer_filter">Filter response</string>
+    <string name="visualizer_waveforms">Waveforms</string>
+    <string name="scope_filter_voice_filtered">filtered</string>
+    <string name="pref_oscilloscope_filter_waves_title">Waveforms under filter response</string>
+    <string name="pref_oscilloscope_filter_waves_summary">SID filter view shows response curve above voices waveforms, else response only</string>
 </resources>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Resonant low-pass response in the frame of visualizer icons -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M5.5,4.5 H18.5 A3,3 0 0 1 21.5,7.5 V16.5 A3,3 0 0 1 18.5,19.5 H5.5 A3,3 0 0 1 2.5,16.5 V7.5 A3,3 0 0 1 5.5,4.5 Z"
+        android:fillColor="#29E3FF"
+        android:fillAlpha="0.15" />
+    <path
+        android:pathData="M5.5,4.5 H18.5 A3,3 0 0 1 21.5,7.5 V16.5 A3,3 0 0 1 18.5,19.5 H5.5 A3,3 0 0 1 2.5,16.5 V7.5 A3,3 0 0 1 5.5,4.5 Z"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M5.5,11 H9 C10.6,11 11.2,8 12.4,8 C13.6,8 14.2,11.5 18.5,15.5"
+        android:strokeColor="#29E3FF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

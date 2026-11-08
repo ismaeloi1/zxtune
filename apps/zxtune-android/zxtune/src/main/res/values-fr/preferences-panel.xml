@@ -5,4 +5,11 @@
     <string name="scope_settings_tab_all">Tous les réglages</string>
     <string name="scope_settings_no_chip_settings">Aucun réglage d\'émulation pour cette puce</string>
     <string name="scope_settings_next_track">à partir du morceau suivant</string>
+    <string name="scope_filter_title">%1$s - Filtre</string>
+    <string name="scope_filter_resonance">Rés</string>
+    <string name="visualizer_filter">Réponse du filtre</string>
+    <string name="visualizer_waveforms">Formes d\'onde</string>
+    <string name="scope_filter_voice_filtered">filtré</string>
+    <string name="pref_oscilloscope_filter_waves_title">Formes d\'onde sous la réponse du filtre</string>
+    <string name="pref_oscilloscope_filter_waves_summary">La vue du filtre SID montre la courbe au-dessus des formes d\'onde des voix, sinon la courbe seule</string>
 </resources>

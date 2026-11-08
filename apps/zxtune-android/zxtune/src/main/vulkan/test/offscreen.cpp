@@ -546,6 +546,93 @@ namespace VulkanScope
     }
   };
 
+  // Scene of filter response view dumped by FilterSceneRenderTest (see ScopeShapesPainter.dump): background, traces,
+  // shapes and atlas as Kotlin side passes them to renderer
+  struct DumpedShapes
+  {
+    uint32_t Width = 0;
+    uint32_t Height = 0;
+    uint32_t Channels = 0;
+    uint32_t AtlasWidth = 0;
+    uint32_t AtlasHeight = 0;
+    std::vector<uint8_t> Background;
+    std::vector<float> Traces;
+    std::vector<float> Shapes;
+    std::vector<uint8_t> Atlas;
+
+    explicit DumpedShapes(const std::string& path)
+    {
+      std::ifstream in(path, std::ios::binary);
+      uint32_t header[6] = {};
+      in.read(reinterpret_cast<char*>(header), sizeof(header));
+      Width = header[0];
+      Height = header[1];
+      Channels = std::min(header[2], ScopeRenderer::MAX_CHANNELS);
+      AtlasWidth = header[4];
+      AtlasHeight = header[5];
+      Background.resize(std::size_t(Width) * Height);
+      in.read(reinterpret_cast<char*>(Background.data()), Background.size());
+      Traces.resize(std::size_t(header[2]) * 4);
+      in.read(reinterpret_cast<char*>(Traces.data()), Traces.size() * sizeof(float));
+      Shapes.resize(std::size_t(header[3]) * ScopeRenderer::SHAPE_FLOATS);
+      in.read(reinterpret_cast<char*>(Shapes.data()), Shapes.size() * sizeof(float));
+      Atlas.resize(std::size_t(AtlasWidth) * AtlasHeight);
+      in.read(reinterpret_cast<char*>(Atlas.data()), Atlas.size());
+      if (!in)
+      {
+        throw Error("Invalid scene dump");
+      }
+    }
+
+    uint32_t Count() const
+    {
+      return static_cast<uint32_t>(Shapes.size() / ScopeRenderer::SHAPE_FLOATS);
+    }
+  };
+
+  void RenderDump(const Device& dev, const std::string& path, const DumpedShapes& scene)
+  {
+    const VkExtent2D extent = {scene.Width, scene.Height};
+    OffscreenTargets targets(dev, extent, 1);
+    ScopeRenderer renderer(dev, OffscreenTargets::FORMAT, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL);
+    renderer.SetTargets(targets.Images, extent, Rotation::NONE);
+    renderer.SetBackground(scene.Background.data(), scene.Width, scene.Height, scene.Width);
+    renderer.SetAtlas(scene.Atlas.data(), scene.AtlasWidth, scene.AtlasHeight, scene.AtlasWidth);
+    renderer.SetTraces(scene.Traces.data(), scene.Channels, scene.Width, scene.Height);
+    // the same waveforms as of test's canvas reference
+    const uint32_t points = 512;
+    std::vector<int16_t> samples(std::size_t(scene.Channels) * points);
+    for (uint32_t chan = 0; chan < scene.Channels; ++chan)
+    {
+      for (uint32_t idx = 0; idx < points; ++idx)
+      {
+        const float phase = std::fmod(idx * (3.0f + chan % 3) / points, 1.0f);
+        float val = 0;
+        switch (chan % 3)
+        {
+        case 0:
+          val = phase < 0.3f ? 0.8f : -0.8f;
+          break;
+        case 1:
+          val = phase * 1.6f - 0.8f;
+          break;
+        default:
+          val = (phase < 0.5f ? phase : 1 - phase) * 3.2f - 0.8f;
+          break;
+        }
+        samples[chan * points + idx] = static_cast<int16_t>(val * 32767);
+      }
+    }
+    Check(dev.Vk().vkResetFences(dev.Handle(), 1, &targets.Fences[0]), "reset");
+    renderer.Write(0, samples.data(), scene.Channels, points, 100, scene.Shapes.data(), scene.Count());
+    renderer.Submit(0, VK_NULL_HANDLE, VK_NULL_HANDLE, targets.Fences[0]);
+    dev.Vk().vkDeviceWaitIdle(dev.Handle());
+    const auto pixels = targets.Read(0);
+    PngWriter::Write(path, pixels.data(), extent.width, extent.height);
+    std::cout << path << ": " << extent.width << "x" << extent.height << ", " << scene.Count() << " shapes"
+              << std::endl;
+  }
+
   using SamplesSource = std::function<void(uint32_t frame, int16_t* target)>;
 
   void RenderShapes(const Device& dev, VkExtent2D extent, Rotation rotation, const std::string& path,
@@ -639,6 +726,17 @@ int main(int argc, char** argv)
     const VulkanScope::Device dev(lib, {});
     std::cout << "Device: " << dev.GetDescription() << std::endl;
     using namespace VulkanScope;
+    // <dir> <driver or -> <scene>...: filter response scenes dumped by FilterSceneRenderTest
+    if (argc > 3 && std::string(argv[3]).ends_with(".scene"))
+    {
+      for (int arg = 3; arg < argc; ++arg)
+      {
+        const std::string path = argv[arg];
+        const auto name = std::filesystem::path(path).stem().string();
+        RenderDump(dev, dir + "/vk-" + name + ".png", DumpedShapes(path));
+      }
+      return 0;
+    }
     const SamplesSource smooth = &TestScene::Samples;
     const SamplesSource dense = &TestScene::DenseSamples;
     Render(dev, {1280, 720}, Rotation::NONE, dir + "/vk-scope.png", 600, smooth);

@@ -68,7 +68,10 @@ class VisualizerFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) = MediaModel.of(requireActivity()).run {
         analyzer = view.findViewById(R.id.spectrum)
-        oscilloscope = view.findViewById(R.id.oscilloscope)
+        oscilloscope = view.findViewById<OscilloscopeFrame>(R.id.oscilloscope).also {
+            // filter response toggle is shown only for chips with filter model
+            it.onFilterSupport = { updateControls() }
+        }
         dashboard = view.findViewById<SidDashboardView>(R.id.dashboard).also {
             it.attachTo(oscilloscope)
         }
@@ -129,8 +132,10 @@ class VisualizerFragment : Fragment() {
             launch {
                 // may be changed in preferences
                 OscilloscopeSettings.apply(requireContext(), oscilloscope, dashboard)
+                updateControls()
                 OscilloscopeSettings.changes.collect {
                     OscilloscopeSettings.apply(requireContext(), oscilloscope, dashboard)
+                    updateControls()
                 }
             }
             launch {
@@ -187,6 +192,7 @@ class VisualizerFragment : Fragment() {
     private var fullscreenItem: MenuItem? = null
     private var settingsItem: MenuItem? = null
     private var modeItem: MenuItem? = null
+    private var filterItem: MenuItem? = null
 
     // Items are updated directly, invalidating menu would recreate items of all the host's providers
     private val controls = object : MenuProvider {
@@ -195,6 +201,7 @@ class VisualizerFragment : Fragment() {
             fullscreenItem = menu.item(R.id.action_visualizer_fullscreen)
             settingsItem = menu.item(R.id.action_visualizer_settings)
             modeItem = menu.item(R.id.action_visualizer_mode)
+            filterItem = menu.item(R.id.action_visualizer_filter)
             updateControls()
         }
 
@@ -206,6 +213,14 @@ class VisualizerFragment : Fragment() {
 
             R.id.action_visualizer_settings -> {
                 ScopeSettingsDialog.show(childFragmentManager)
+                true
+            }
+
+            R.id.action_visualizer_filter -> {
+                val show = !oscilloscope.showFilter
+                scope.launch {
+                    OscilloscopeSettings.setShowFilter(requireContext(), show)
+                }
                 true
             }
 
@@ -227,6 +242,14 @@ class VisualizerFragment : Fragment() {
         val isScope = controlsState == State.OSCILLOSCOPE
         fullscreenItem?.isVisible = isScope
         settingsItem?.isVisible = isScope
+        // filter response and waveforms are switched in the same oscilloscope view, icon shows the next one
+        filterItem?.run {
+            val isAvailable = isScope && this@VisualizerFragment::oscilloscope.isInitialized && oscilloscope.isFilterSupported
+            isVisible = isAvailable
+            val isFilter = isAvailable && oscilloscope.showFilter
+            setIcon(if (isFilter) R.drawable.ic_oscilloscope else R.drawable.ic_filter_response)
+            title = getString(if (isFilter) R.string.visualizer_waveforms else R.string.visualizer_filter)
+        }
         modeItem?.run {
             isVisible = controlsState.isVisible
             setIcon(if (isScope) R.drawable.ic_spectrum else R.drawable.ic_oscilloscope)

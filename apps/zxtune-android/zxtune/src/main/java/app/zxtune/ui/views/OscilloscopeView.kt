@@ -36,20 +36,23 @@ class OscilloscopeView @JvmOverloads constructor(
     ScopeDisplay {
 
     private val labelTextSize = labelTextSize(context)
-    private val pending = ScopeFeed.Frame()
-    private var hasPending = false
-    private val feed = ScopeFeed(context) { frame ->
-        synchronized(pending) {
-            frame.samples.copyInto(pending.samples, 0, 0, frame.channels * frame.points)
-            pending.channels = frame.channels
-            pending.points = frame.points
-            pending.grid = frame.grid
-            pending.generation = frame.generation
-            hasPending = true
-        }
-        requestRender()
-        true
+
+    // filter response is built on feed thread, as by Vulkan backend
+    private class Pending {
+        val frame = ScopeFeed.Frame()
+        val shapes = FloatArray(ScopeShapes.MAX * ScopeShapes.FLOATS)
+        var shapesCount = 0
+        var filter: FilterLayout? = null
     }
+
+    private val pending = Pending()
+    private var hasPending = false
+    private val filterResources = FilterResources.of(context)
+    private val filterScene = FilterScene(filterResources)
+    private val feedShapes = ScopeShapes()
+    private var feedLayout: FilterLayout? = null
+    private var feedGeneration = -1
+    private val feed = ScopeFeed(context) { frame -> onFrame(frame) }
     private val activity = ScopeActivity(this, feed)
 
     init {
@@ -61,6 +64,48 @@ class OscilloscopeView @JvmOverloads constructor(
         preserveEGLContextOnPause = true
         setRenderer(ScopeRenderer())
         renderMode = RENDERMODE_WHEN_DIRTY
+        feed.onFilterSupport = { supported -> post { onFilterSupport?.invoke(supported) } }
+    }
+
+    // feed thread
+    private fun onFrame(frame: ScopeFeed.Frame): Boolean {
+        val layout = if (frame.isFilter) {
+            if (frame.generation != feedGeneration || feedLayout == null) {
+                feedLayout = frame.grid?.let { grid ->
+                    FilterLayout.of(
+                        context,
+                        frame.width,
+                        frame.height,
+                        frame.voicesLayout,
+                        grid,
+                        labelTextSize,
+                        filterResources,
+                        filterScene.settings.withWaves
+                    )
+                }
+            }
+            feedLayout?.also {
+                filterScene.build(it, frame.gauges, frame.gaugesCount, frame.status, frame.nanos, frame.isLive, feedShapes)
+            }
+        } else {
+            feedShapes.clear()
+            null
+        }
+        feedGeneration = frame.generation
+        synchronized(pending) {
+            val target = pending.frame
+            frame.samples.copyInto(target.samples, 0, 0, frame.channels * frame.points)
+            target.channels = frame.channels
+            target.points = frame.points
+            target.grid = frame.grid
+            target.generation = frame.generation
+            feedShapes.data.copyInto(pending.shapes, 0, 0, feedShapes.count * ScopeShapes.FLOATS)
+            pending.shapesCount = feedShapes.count
+            pending.filter = layout
+            hasPending = true
+        }
+        requestRender()
+        return true
     }
 
     override val source
@@ -69,6 +114,12 @@ class OscilloscopeView @JvmOverloads constructor(
     override var windowMs by feed::windowMs
 
     override var gauges by feed::gauges
+
+    override var showFilter by feed::showFilter
+
+    override var filterSettings by filterScene::settings
+
+    override var onFilterSupport: ((Boolean) -> Unit)? = null
 
     @Volatile
     override var gainPercent = AUTO_GAIN
@@ -117,6 +168,10 @@ class OscilloscopeView @JvmOverloads constructor(
 
     private inner class ScopeRenderer : Renderer {
         private val frame = ScopeFeed.Frame()
+        private val shapes = FloatArray(ScopeShapes.MAX * ScopeShapes.FLOATS)
+        private var shapesCount = 0
+        private var filter: FilterLayout? = null
+        private val shapesRenderer = ScopeShapesGles()
         private val values = FloatArray(ScopeGrid.MAX_POINTS)
         private val gain = AutoGain()
         private val traces = FloatArray(ScopeFeed.MAX_CHANNELS * 4)
@@ -161,7 +216,7 @@ class OscilloscopeView @JvmOverloads constructor(
             // neighbour segments are not accumulated into brighter dots at joints (EXT_blend_minmax is supported by
             // almost all the devices, otherwise alpha blending is kept)
             isMaxBlending = GLES20.glGetString(GLES20.GL_EXTENSIONS)?.contains("GL_EXT_blend_minmax") == true
-            GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
+            shapesRenderer.onSurfaceCreated(::createProgram)
         }
 
         override fun onSurfaceChanged(gl: GL10?, w: Int, h: Int) {
@@ -176,11 +231,15 @@ class OscilloscopeView @JvmOverloads constructor(
             val start = System.nanoTime()
             synchronized(pending) {
                 if (hasPending) {
-                    pending.samples.copyInto(frame.samples, 0, 0, pending.channels * pending.points)
-                    frame.channels = pending.channels
-                    frame.points = pending.points
-                    frame.grid = pending.grid
-                    frame.generation = pending.generation
+                    val src = pending.frame
+                    src.samples.copyInto(frame.samples, 0, 0, src.channels * src.points)
+                    frame.channels = src.channels
+                    frame.points = src.points
+                    frame.grid = src.grid
+                    frame.generation = src.generation
+                    pending.shapes.copyInto(shapes, 0, 0, pending.shapesCount * ScopeShapes.FLOATS)
+                    shapesCount = pending.shapesCount
+                    filter = pending.filter
                     hasPending = false
                 }
             }
@@ -189,7 +248,11 @@ class OscilloscopeView @JvmOverloads constructor(
             GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
             val grid = frame.grid ?: return
             drawBackground(grid)
-            drawChannels(grid)
+            val layout = filter
+            drawChannels(grid, layout)
+            if (layout != null) {
+                shapesRenderer.draw(shapes, shapesCount, layout.atlas.bitmap, width, height)
+            }
             val end = System.nanoTime()
             feed.stats.frame("gles", start, end)
             hint.report(feed.targetNanos, end - start)
@@ -217,7 +280,7 @@ class OscilloscopeView @JvmOverloads constructor(
         // Single channel texture, 4 times less memory traffic than RGBA one
         private fun updateBackground(grid: ScopeGrid) {
             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ALPHA_8)
-            grid.drawBackground(bitmap, labelTextSize)
+            filter?.drawBackground(bitmap) ?: grid.drawBackground(bitmap, labelTextSize)
             GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, backgroundTexture)
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST)
             GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_NEAREST)
@@ -228,10 +291,15 @@ class OscilloscopeView @JvmOverloads constructor(
             bitmap.recycle()
         }
 
-        private fun drawChannels(grid: ScopeGrid) {
-            val channels = minOf(frame.channels, grid.channels)
-            grid.traces(width, height, labelTextSize, traces)
+        private fun drawChannels(grid: ScopeGrid, layout: FilterLayout?) {
+            val channels = if (layout != null) {
+                minOf(frame.channels, layout.traces(traces))
+            } else {
+                grid.traces(width, height, labelTextSize, traces)
+                minOf(frame.channels, grid.channels)
+            }
             GLES20.glEnable(GLES20.GL_BLEND)
+            GLES20.glBlendFunc(GLES20.GL_ONE, GLES20.GL_ONE_MINUS_SRC_ALPHA)
             if (isMaxBlending) {
                 GLES20.glBlendEquation(GL_MAX_EXT)
             }
@@ -371,7 +439,7 @@ class OscilloscopeView @JvmOverloads constructor(
         private fun allocateFloats(count: Int): FloatBuffer = ByteBuffer.allocateDirect(count * 4)
             .order(ByteOrder.nativeOrder()).asFloatBuffer()
 
-        private fun createProgram(vertexCode: String, fragmentCode: String): Int {
+        internal fun createProgram(vertexCode: String, fragmentCode: String): Int {
             val vertex = loadShader(GLES20.GL_VERTEX_SHADER, vertexCode)
             val fragment = loadShader(GLES20.GL_FRAGMENT_SHADER, fragmentCode)
             return GLES20.glCreateProgram().also {
