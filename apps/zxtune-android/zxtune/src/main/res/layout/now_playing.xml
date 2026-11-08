@@ -13,9 +13,16 @@
             android:layout_height="@dimen/now_playing_toolbar_height"
             android:layout_alignParentTop="true"
             android:minHeight="@dimen/now_playing_toolbar_height"
-            app:title="@string/app_name"
-            app:titleTextAppearance="@style/TextAppearance.AppCompat.Medium"
-            tools:menu="@menu/main" />
+            tools:menu="@menu/main">
+
+        <ImageView
+                android:id="@+id/main_logo"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/lhuna_logo_height"
+                android:adjustViewBounds="true"
+                android:contentDescription="@string/app_name"
+                android:src="@drawable/lhuna_logo" />
+    </androidx.appcompat.widget.Toolbar>
 
     <androidx.fragment.app.FragmentContainerView
             android:id="@+id/visualizer"

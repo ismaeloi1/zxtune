@@ -7,4 +7,11 @@
   <dimen name="scrollbar_width">16dp</dimen>
   <dimen name="now_playing_toolbar_height">44dp</dimen>
   <dimen name="controls_height">40dp</dimen>
+  <!-- LHUNA: 4dp grid, large radii echoing the rounded logo -->
+  <dimen name="lhuna_radius_s">8dp</dimen>
+  <dimen name="lhuna_radius_m">12dp</dimen>
+  <dimen name="lhuna_radius_l">20dp</dimen>
+  <dimen name="lhuna_radius_xl">28dp</dimen>
+  <dimen name="lhuna_play_size">48dp</dimen>
+  <dimen name="lhuna_logo_height">28dp</dimen>
 </resources>

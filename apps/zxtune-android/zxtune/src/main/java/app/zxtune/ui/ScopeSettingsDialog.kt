@@ -161,7 +161,7 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
             val tab = tabs.getChildAt(idx) as TextView
             val selected = idx == position
             tab.isSelected = selected
-            (tab.background as GradientDrawable).setColor(if (selected) ContextCompat.getColor(tab.context, R.color.accent) else TAB_BACKGROUND)
+            (tab.background as GradientDrawable).setColor(if (selected) ContextCompat.getColor(tab.context, R.color.lhuna_accent_container) else TAB_BACKGROUND)
             tab.setTextColor(if (selected) Color.WHITE else TAB_TEXT)
             if (selected) {
                 tab.post { (tabs.parent as? HorizontalScrollView)?.requestChildFocus(tabs, tab) }
