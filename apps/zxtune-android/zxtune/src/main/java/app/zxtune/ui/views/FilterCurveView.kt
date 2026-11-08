@@ -264,7 +264,9 @@ class FilterCurveView @JvmOverloads constructor(
 
     private val locale = ConfigurationCompat.getLocales(resources.configuration)[0] ?: java.util.Locale.US
     private val modeNames = resources.getStringArray(R.array.pref_zxtune_sid_filter_response_modes)
-    private val noteNames = resources.getStringArray(R.array.pref_zxtune_sid_filter_notes)
+
+    // same notation as dashboard and scopes (C, C#, ...), not localized solfege
+    private val noteNames = ChipWidgets.NOTE_NAMES
     private val noiseWord = context.getString(R.string.pref_zxtune_sid_filter_voice_noise)
     private val directWord = context.getString(R.string.pref_zxtune_sid_filter_voice_direct)
     private val dacWord = context.getString(R.string.pref_zxtune_sid_filter_dac_curve)

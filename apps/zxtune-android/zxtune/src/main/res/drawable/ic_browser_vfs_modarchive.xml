@@ -1,31 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Module archive: tracker pattern editor with the play cursor row -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:viewportWidth="384"
+    android:viewportHeight="384"
     android:width="32dp"
-    android:height="32dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:height="32dp">
     <path
-        android:pathData="M6.5,3.5 H17.5 A3,3 0 0 1 20.5,6.5 V17.5 A3,3 0 0 1 17.5,20.5 H6.5 A3,3 0 0 1 3.5,17.5 V6.5 A3,3 0 0 1 6.5,3.5 Z"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M6.5,10 H17.5 A1.5,1.5 0 0 1 19,11.5 V12.5 A1.5,1.5 0 0 1 17.5,14 H6.5 A1.5,1.5 0 0 1 5,12.5 V11.5 A1.5,1.5 0 0 1 6.5,10 Z"
-        android:fillColor="#FFB547"
-        android:fillAlpha="0.6" />
-    <path
-        android:pathData="M6.4,7.3 H8.4 M11,7.3 H13 M15.6,7.3 H17.6 M6.4,16.7 H8.4 M11,16.7 H13 M15.6,16.7 H17.6"
-        android:strokeColor="#E6ECEF"
-        android:strokeAlpha="0.75"
-        android:strokeWidth="1.8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M6.4,12 H8.4 M11,12 H13 M15.6,12 H17.6"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="1.8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:pathData="M0 384V240H24V36h72v204h24V84h60v156h24V48h60v192h26v-96h70v96h24v144z"
+        android:fillColor="#5c6969"
+        android:strokeWidth="4"
+        android:strokeColor="#4b4c4c" />
 </vector>

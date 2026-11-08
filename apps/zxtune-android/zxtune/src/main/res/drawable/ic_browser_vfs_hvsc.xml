@@ -1,33 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- C64 SID collection: generic 8-bit "breadbin" home computer -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:viewportWidth="400"
+    android:viewportHeight="400"
     android:width="32dp"
-    android:height="32dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:height="32dp">
     <path
-        android:pathData="M5.6,8.6 Q5.85,7.5 7,7.5 H17 Q18.15,7.5 18.4,8.6 L20.45,17.3 Q20.7,18.5 19.5,18.5 H4.5 Q3.3,18.5 3.55,17.3 Z"
-        android:fillColor="#A98CFF"
-        android:fillAlpha="0.28" />
+        android:pathData="M0 0H400V400H0Z"
+        android:fillColor="#4093cc" />
     <path
-        android:pathData="M5.6,8.6 Q5.85,7.5 7,7.5 H17 Q18.15,7.5 18.4,8.6 L20.45,17.3 Q20.7,18.5 19.5,18.5 H4.5 Q3.3,18.5 3.55,17.3 Z"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M7.35,10.8 A0.95,0.95 0 1 0 9.25,10.8 A0.95,0.95 0 1 0 7.35,10.8 Z M10.15,10.8 A0.95,0.95 0 1 0 12.05,10.8 A0.95,0.95 0 1 0 10.15,10.8 Z M12.95,10.8 A0.95,0.95 0 1 0 14.85,10.8 A0.95,0.95 0 1 0 12.95,10.8 Z M8.75,13.4 A0.95,0.95 0 1 0 10.65,13.4 A0.95,0.95 0 1 0 8.75,13.4 Z M11.55,13.4 A0.95,0.95 0 1 0 13.45,13.4 A0.95,0.95 0 1 0 11.55,13.4 Z"
-        android:fillColor="#E6ECEF" />
-    <path
-        android:pathData="M9,15.9 H13.6"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="1.8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M16.6,10.4 V11.4 M16.9,13.2 V14.2 M17.2,16 V17"
-        android:strokeColor="#A98CFF"
-        android:strokeWidth="1.8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:pathData="M125 300v-10c5 0 10 0 10 -5v-65c0 -10 -5 -10 -25 -10v-10c0 -10 10 -15 25 -15 40 0 55 30 55 55 0 25 -15 60 -55 60zm5 -205v15c15 0 15 0 15 15 -5 0 -15 5 -15 15 0 10 5 25 25 25 20 0 30 -10 30 -30 0 -20 -10 -40 -40 -40zm-30 30v155c0 5 10 10 20 10v10H105C85 300 45 270 45 200 45 130 85 95 110 95h15v15c-15 0 -25 5 -25 15zm180 125h-65v-25l60 -70v25l-45 55h50zm80 50v-15l-20 -5v-30h25V235H340V95h-25l-30 30v155l-20 5v15z"
+        android:fillColor="#ffffff" />
 </vector>

@@ -1,38 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Game music remixes: vinyl record with tonearm -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="32dp"
-    android:height="32dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+        android:width="32dp"
+        android:height="32dp"
+        android:viewportWidth="384"
+        android:viewportHeight="384">
     <path
-        android:pathData="M3,13.5 A7.5,7.5 0 1 0 18,13.5 A7.5,7.5 0 1 0 3,13.5 Z"
-        android:fillColor="#FF5CD6"
-        android:fillAlpha="0.2" />
+            android:pathData="m 100,20 c 35,0 45,15 45,35 0,20 -10,35 -45,35 -40,0 -45,-15 -45,-35 0,-20 5,-35 45,-35 z"
+            android:strokeWidth="24"
+            android:strokeColor="#ec6d14" />
     <path
-        android:pathData="M3,13.5 A7.5,7.5 0 1 0 18,13.5 A7.5,7.5 0 1 0 3,13.5 Z"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+            android:pathData="m 295,90 h -40 c -30,0 -45,-5 -45,-35 0,-30 10,-35 45,-35 h 40"
+            android:strokeWidth="24"
+            android:strokeColor="#ec6d14" />
     <path
-        android:pathData="M5.99,11.86 A4.8,4.8 0 0 1 12.14,8.99"
-        android:strokeColor="#E6ECEF"
-        android:strokeAlpha="0.6"
-        android:strokeWidth="1.2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M8.3,13.5 A2.2,2.2 0 1 0 12.7,13.5 A2.2,2.2 0 1 0 8.3,13.5 Z"
-        android:fillColor="#FF5CD6"
-        android:fillAlpha="0.9" />
-    <path
-        android:pathData="M19.5,5.5 V11.5 L16,15"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="1.8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M17.9,4.5 A1.6,1.6 0 1 0 21.1,4.5 A1.6,1.6 0 1 0 17.9,4.5 Z"
-        android:fillColor="#FF5CD6" />
+            android:fillColor="#565656"
+            android:pathData="m 45,155 v 220 h 75 V 275 h 40 l 95,95 h 95 L 225,250 h 65 c 50,1 50,-95 0,-95 z m 70,25 h 110 c 20,0 20,60 0,60 H 115 Z" />
 </vector>

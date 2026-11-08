@@ -419,20 +419,6 @@
     <!-- voice is not routed to filter -->
     <string name="pref_zxtune_sid_filter_voice_direct">direct</string>
     <string name="pref_zxtune_sid_filter_voice_noise">Noise</string>
-    <string-array name="pref_zxtune_sid_filter_notes">
-        <item>C</item>
-        <item>C#</item>
-        <item>D</item>
-        <item>D#</item>
-        <item>E</item>
-        <item>F</item>
-        <item>F#</item>
-        <item>G</item>
-        <item>G#</item>
-        <item>A</item>
-        <item>A#</item>
-        <item>B</item>
-    </string-array>
     <!-- zxtune.core.sid.combined_waveforms -->
     <string name="pref_zxtune_sid_combined_waveforms_title">reSIDfp: combined waveforms</string>
     <string-array name="pref_zxtune_sid_combined_waveforms_entries">

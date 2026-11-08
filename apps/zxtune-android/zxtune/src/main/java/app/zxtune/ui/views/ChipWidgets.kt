@@ -421,6 +421,7 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
         )
 
         private val NOTES = arrayOf("C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B")
+        val NOTE_NAMES: List<String> = NOTES.asList()
         private val BLACK_KEYS = BooleanArray(12) { it == 1 || it == 3 || it == 6 || it == 8 || it == 10 }
 
         fun noteName(hz: Float): String {

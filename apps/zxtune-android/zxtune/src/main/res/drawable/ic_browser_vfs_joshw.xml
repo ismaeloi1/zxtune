@@ -1,38 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Game music archives: generic handheld console -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:viewportWidth="384"
+    android:viewportHeight="384"
     android:width="32dp"
-    android:height="32dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:height="32dp">
     <path
-        android:pathData="M8,2.5 H16 A2.5,2.5 0 0 1 18.5,5 V19 A2.5,2.5 0 0 1 16,21.5 H8 A2.5,2.5 0 0 1 5.5,19 V5 A2.5,2.5 0 0 1 8,2.5 Z"
-        android:fillColor="#5CF29A"
-        android:fillAlpha="0.15" />
+        android:pathData="M0 0H384V384H0Z"
+        android:fillColor="#000075" />
     <path
-        android:pathData="M8,2.5 H16 A2.5,2.5 0 0 1 18.5,5 V19 A2.5,2.5 0 0 1 16,21.5 H8 A2.5,2.5 0 0 1 5.5,19 V5 A2.5,2.5 0 0 1 8,2.5 Z"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:pathData="M276 132l12 84 24 -72 24 72 12 -84m-138 0v84m0 -48c24 -12 36 -6 36 18v30m-54 -54h-24c-24 0 -24 24 0 24 24 0 24 24 0 24h-24m-42 0c-30 0 -30 -48 0 -48 30 0 30 48 0 48zM54 132v78c0 12 -6 24 -36 24"
+        android:strokeLineJoin="bevel"
+        android:strokeWidth="18"
+        android:strokeColor="#ffffff" />
     <path
-        android:pathData="M9,5 H15 A1,1 0 0 1 16,6 V10.5 A1,1 0 0 1 15,11.5 H9 A1,1 0 0 1 8,10.5 V6 A1,1 0 0 1 9,5 Z"
-        android:fillColor="#5CF29A"
-        android:fillAlpha="0.5" />
-    <path
-        android:pathData="M9,5 H15 A1,1 0 0 1 16,6 V10.5 A1,1 0 0 1 15,11.5 H9 A1,1 0 0 1 8,10.5 V6 A1,1 0 0 1 9,5 Z"
-        android:strokeColor="#E6ECEF"
-        android:strokeAlpha="0.6"
-        android:strokeWidth="1.4"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M7.6,16 H10.8 M9.2,14.4 V17.6"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="1.8"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M13.3,16.9 A1,1 0 1 0 15.3,16.9 A1,1 0 1 0 13.3,16.9 Z M15,14.9 A1,1 0 1 0 17,14.9 A1,1 0 1 0 15,14.9 Z"
-        android:fillColor="#5CF29A" />
+        android:pathData="M186 312v12m24 -72v12m0 60v-48m24 12c11 -9 24 -6 24 0v36m18 -42h36m-18 42v-48c0 -18 0 -18 18 -18m30 60c-18 0 -18 -36 0 -36 18 0 18 36 0 36zM234 276v48"
+        android:strokeWidth="12"
+        android:strokeColor="#ffffff" />
 </vector>

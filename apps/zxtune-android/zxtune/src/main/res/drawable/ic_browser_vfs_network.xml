@@ -1,30 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Online catalogues: globe -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="32dp"
-    android:height="32dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+        android:width="32dp"
+        android:height="32dp"
+        android:viewportWidth="384"
+        android:viewportHeight="384">
     <path
-        android:pathData="M3,12 A9,9 0 1 0 21,12 A9,9 0 1 0 3,12 Z"
-        android:fillColor="#29E3FF"
-        android:fillAlpha="0.2" />
+            android:fillColor="#607d8b"
+            android:pathData="M 84,288 H 295 C 408,288 408,96 264,96 264,0 96,12 96,103 -24,102 -19,288 84,288 Z" />
     <path
-        android:pathData="M3,12 A9,9 0 1 0 21,12 A9,9 0 1 0 3,12 Z"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M12,3 C7,7.5 7,16.5 12,21 C17,16.5 17,7.5 12,3 Z M3,12 H21"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M4.4,7.5 H19.6 M4.4,16.5 H19.6"
-        android:strokeColor="#29E3FF"
-        android:strokeWidth="1.6"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+            android:fillColor="#cfd8dc"
+            android:pathData="m 145,172 c -9,3 -8,11 -8,19 v 84 c -17,-5 -39,0 -48,16 -11,16 -1,40 16,48 20,11 49,6 60,-15 6,-13 3,-28 3,-42 v -74 c 0,-7 13,-9 18,-10 l 59,-14 c 4,0 12,0 12,15 v 59 c -19,-4 -46,6 -51,22 -5,16 -2,31 11,39 19,12 45,8 61,-7 9,-9 10,-26 10,-36 V 149 c 0,-5 -5,-10 -11,-9 z" />
 </vector>

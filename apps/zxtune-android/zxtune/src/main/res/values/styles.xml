@@ -89,20 +89,14 @@
 
     <style name="TextAppearance.Lhuna.Display">
         <item name="android:textSize">28sp</item>
-        <item name="android:fontFamily">@font/lhuna_display</item>
-        <item name="fontFamily">@font/lhuna_display</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Headline">
         <item name="android:textSize">20sp</item>
-        <item name="android:fontFamily">@font/lhuna_display</item>
-        <item name="fontFamily">@font/lhuna_display</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Title">
         <item name="android:textSize">16sp</item>
-        <item name="android:fontFamily">@font/lhuna_text_bold</item>
-        <item name="fontFamily">@font/lhuna_text_bold</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Label">
@@ -110,14 +104,10 @@
         <item name="android:textColor">@color/lhuna_text_2</item>
         <item name="android:textAllCaps">true</item>
         <item name="android:letterSpacing">0.1</item>
-        <item name="android:fontFamily">@font/lhuna_mono</item>
-        <item name="fontFamily">@font/lhuna_mono</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Mono">
         <item name="android:textSize">13sp</item>
-        <item name="android:fontFamily">@font/lhuna_mono</item>
-        <item name="fontFamily">@font/lhuna_mono</item>
     </style>
 
     <style name="TextAppearance.Lhuna.Mono.Secondary">

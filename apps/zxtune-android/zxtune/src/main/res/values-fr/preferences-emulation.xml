@@ -21,18 +21,4 @@
     <string name="pref_zxtune_sid_filter_dac_curve">Courbe du DAC</string>
     <string name="pref_zxtune_sid_filter_voice_direct">direct</string>
     <string name="pref_zxtune_sid_filter_voice_noise">Bruit</string>
-    <string-array name="pref_zxtune_sid_filter_notes">
-        <item>Do</item>
-        <item>Do#</item>
-        <item>Ré</item>
-        <item>Ré#</item>
-        <item>Mi</item>
-        <item>Fa</item>
-        <item>Fa#</item>
-        <item>Sol</item>
-        <item>Sol#</item>
-        <item>La</item>
-        <item>La#</item>
-        <item>Si</item>
-    </string-array>
 </resources>

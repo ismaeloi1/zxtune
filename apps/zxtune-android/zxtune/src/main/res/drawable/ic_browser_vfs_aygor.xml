@@ -1,27 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- AY chip music resource: three PSG square wave channels -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:viewportWidth="384"
+    android:viewportHeight="384"
     android:width="32dp"
-    android:height="32dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+    android:height="32dp">
     <path
-        android:pathData="M3,7.5 H5.5 V4.5 H10 V7.5 H14.5 V4.5 H19 V7.5 H21"
-        android:strokeColor="#E6ECEF"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:pathData="M12 372V252L72 132V12h84v120l60 120V372H120V252h-12v120z"
+        android:fillColor="#faec29" />
     <path
-        android:pathData="M3,14 H4.5 V11 H7.5 V14 H10.5 V11 H13.5 V14 H16.5 V11 H19.5 V14 H21"
-        android:strokeColor="#D8F25C"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
-    <path
-        android:pathData="M3,20.5 H6 V17.5 H8 V20.5 H10 V17.5 H12 V20.5 H14 V17.5 H16 V20.5 H18 V17.5 H21"
-        android:strokeColor="#E6ECEF"
-        android:strokeAlpha="0.7"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round" />
+        android:pathData="M168 12v120l60 120v120h84V252L372 132V12H276V132H264V12Z"
+        android:fillColor="#7efa17" />
 </vector>
