@@ -22,6 +22,8 @@ import androidx.core.os.ConfigurationCompat
 import app.zxtune.R
 import app.zxtune.playback.ChipGauges
 import app.zxtune.playback.ChipState
+import kotlin.math.abs
+import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -33,7 +35,6 @@ import kotlin.math.roundToInt
  * - main plot: frequency response (dB by logarithmic frequency) with voices marked at their fundamental frequencies,
  *   or (by tap) cutoff frequency by cutoff register value as emulated with current settings (see [SidFilterModel])
  *   with reference curve of selected preset, to compare settings and presets;
- * - history lanes of cutoff and voices pitches (see [FilterLanesPainter]);
  * - voices chips with note and gain applied by filter.
  * Live state is updated at display rate (see [app.zxtune.ui.FilterCurveFeed]), so drawing doesn't allocate:
  * texts are cached by displayed (rounded) values.
@@ -161,6 +162,7 @@ class FilterCurveView @JvmOverloads constructor(
     private val textColor = themeColor(android.R.attr.textColorPrimary, 0xffe0e0e0.toInt())
     private val secondaryColor = themeColor(android.R.attr.textColorSecondary, 0xff909090.toInt())
     private val accentColor = themeColor(androidx.appcompat.R.attr.colorAccent, 0xff4fc3f7.toInt())
+    private val backgroundColor = themeColor(android.R.attr.colorBackground, 0xff121212.toInt())
 
     // the only three text sizes
     private val captionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -259,7 +261,6 @@ class FilterCurveView @JvmOverloads constructor(
     private val box = RectF()
     private val path = Path()
     private val fillPath = Path()
-    private val lanesPainter = FilterLanesPainter(context)
 
     private val locale = ConfigurationCompat.getLocales(resources.configuration)[0] ?: java.util.Locale.US
     private val modeNames = resources.getStringArray(R.array.pref_zxtune_sid_filter_response_modes)
@@ -329,20 +330,20 @@ class FilterCurveView @JvmOverloads constructor(
     private val axisHeight
         get() = captionPaint.fontSpacing + 2 * density
 
-    private fun plotHeight(width: Int) = (width * 0.28f).coerceIn(96 * density, 170 * density)
+    // single big response plot: history lanes duplicated the dashboard and were unreadable with fast register updates
+    private fun plotHeight(width: Int) = (width * 0.55f).coerceIn(140 * density, 280 * density)
 
     private fun fixedHeight(width: Int) = pillHeight + gap + headerHeight + gap + plotHeight(width) + axisHeight + gap + gap + chipHeight
 
-    // history is the main part
-    private fun lanesHeight(width: Int) = fixedHeight(width) * LANES_SHARE / (1 - LANES_SHARE)
-
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        val desired = paddingTop + paddingBottom + fixedHeight(width) + lanesHeight(width)
+        val desired = paddingTop + paddingBottom + fixedHeight(width)
         setMeasuredDimension(width, resolveSize(desired.roundToInt(), heightMeasureSpec))
     }
 
     override fun onDraw(canvas: Canvas) {
+        // view is shown over translucent live settings panel, so dashboard must not show through the plot
+        canvas.drawColor(backgroundColor)
         val curves = curves ?: makeCurves().also { curves = it }
         val emulated = if (state.is8580) curves.emulated8580 else curves.emulated6581
         val left = paddingLeft.toFloat()
@@ -353,6 +354,7 @@ class FilterCurveView @JvmOverloads constructor(
         }
         val chip = selectedChip.takeIf { it < live.count } ?: 0
         val ch = live.chips[chip].takeIf { live.count > 0 }
+        smoothCutoffs(emulated)
         var y = paddingTop.toFloat()
 
         drawTopRow(canvas, left, right, y)
@@ -381,19 +383,11 @@ class FilterCurveView @JvmOverloads constructor(
                 drawResponse(canvas, ch, emulated, curvePaint, fillPaint)
             }
         }
-        y = plotBottom + axisHeight + gap
-
-        lanesRect.set(left, y, right, y + lanesHeight(width))
-        val hist = history
-        if (ch != null && hist != null) {
-            lanesPainter.draw(canvas, lanesRect, hist)
-        } else {
-            canvas.drawRect(lanesRect, plotPaint)
-            if (ch == null) {
-                drawHint(canvas)
-            }
+        lanesRect.set(left, plotBottom - plotHeight(width), right, plotBottom)
+        if (ch == null && !showDacCurve) {
+            drawHint(canvas)
         }
-        y = lanesRect.bottom + gap
+        y = plotBottom + axisHeight + gap
 
         drawVoices(canvas, ch, emulated, left, right, y)
     }
@@ -475,7 +469,35 @@ class FilterCurveView @JvmOverloads constructor(
         return rect.left
     }
 
-    private fun cutoffHz(chip: ChipState, emulated: DoubleArray) = emulated[chip.cutoff.coerceIn(0, SidFilterModel.CUTOFF_VALUES - 1)]
+    private fun rawCutoffHz(chip: ChipState, emulated: DoubleArray) = emulated[chip.cutoff.coerceIn(0, SidFilterModel.CUTOFF_VALUES - 1)]
+
+    // Players update cutoff every frame (sweeps, per-note jumps): drawn value glides in log domain to stay readable
+    private val smoothedCutoffs = DoubleArray(MAX_SMOOTHED)
+    private var lastSmoothNanos = 0L
+
+    private fun smoothCutoffs(emulated: DoubleArray) {
+        val now = System.nanoTime()
+        val dt = if (lastSmoothNanos == 0L) 1.0 else (now - lastSmoothNanos) / 1e9
+        lastSmoothNanos = now
+        val k = 1 - exp(-dt / CUTOFF_SMOOTH_SECONDS)
+        var settling = false
+        for (idx in 0 until minOf(live.count, MAX_SMOOTHED)) {
+            val target = rawCutoffHz(live.chips[idx], emulated)
+            val prev = smoothedCutoffs[idx]
+            val next = if (prev <= 0) target else exp(ln(prev) + (ln(target) - ln(prev)) * k)
+            smoothedCutoffs[idx] = next
+            settling = settling || abs(ln(next) - ln(target)) > 0.002
+        }
+        // while paused feed doesn't redraw, so the glide is finished here
+        if (settling) {
+            postInvalidateOnAnimation()
+        }
+    }
+
+    private fun cutoffHz(chip: ChipState, emulated: DoubleArray): Double {
+        val idx = live.chips.indexOf(chip)
+        return if (idx in 0 until minOf(live.count, MAX_SMOOTHED) && smoothedCutoffs[idx] > 0) smoothedCutoffs[idx] else rawCutoffHz(chip, emulated)
+    }
 
     private fun drawHeader(canvas: Canvas, chip: ChipState?, emulated: DoubleArray, left: Float, right: Float, top: Float) {
         val width = right - left
@@ -895,7 +917,8 @@ class FilterCurveView @JvmOverloads constructor(
         private const val COLUMNS = 3
         private val COLUMN_SHARES = floatArrayOf(0.40f, 0.37f, 0.23f)
 
-        private const val LANES_SHARE = 0.45f
+        private const val MAX_SMOOTHED = 3
+        private const val CUTOFF_SMOOTH_SECONDS = 0.08
         private const val CHIP_PADDING = 10f
         private const val CHIP_GAP = 8f
         private const val EXT_CHIP_WIDTH = 40f
