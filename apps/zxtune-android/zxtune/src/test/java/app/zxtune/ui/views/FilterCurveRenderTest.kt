@@ -63,12 +63,36 @@ class FilterCurveRenderTest {
         }
     }
 
+    // last 4 seconds at display rate: cutoff sweeping around current value, voices changing notes each second
+    private fun history(chip: Chip) = FilterHistory().apply {
+        val frames = 240
+        for (idx in 0 until frames) {
+            push(idx * 1000L / 60) { frame ->
+                val phase = idx * 2 * Math.PI / 120
+                frame.cutoffHz = (200 + chip.cutoff * 2 * (1.2 + kotlin.math.sin(phase))).toFloat()
+                frame.resonance = chip.resonance
+                frame.mode = chip.mode
+                frame.extRouted = chip.routing and 8 != 0
+                chip.voices.forEachIndexed { voice, v ->
+                    val out = frame.voices[voice]
+                    val step = (idx * 4 / frames + voice) % 3
+                    out.active = v != null && v.envelope != 0 && v.control and 0xf0 != 0
+                    out.freqHz = ((v?.hz ?: 0.0) * (1.0 + 0.12 * step)).toFloat()
+                    out.level = (v?.envelope ?: 0) / 255f
+                    out.routed = chip.routing and (1 shl voice) != 0
+                    out.noise = (v?.control ?: 0) and 0x80 != 0
+                }
+            }
+        }
+    }
+
     private fun render(
         name: String,
         state: FilterCurveView.State,
         chips: List<Chip> = emptyList(),
         selected: Int = 0,
         width: Int = 1080,
+        dac: Boolean = false,
     ): FilterCurveView {
         val ctx = ContextThemeWrapper(ApplicationProvider.getApplicationContext(), R.style.CustomTheme)
         val root = FrameLayout(ctx)
@@ -80,6 +104,8 @@ class FilterCurveRenderTest {
         view.state = state
         fill(view.live, chips)
         view.selectedChip = selected
+        view.showDacCurve = dac
+        chips.getOrNull(selected)?.let { view.history = history(it) }
         root.measure(
             View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
@@ -163,6 +189,7 @@ class FilterCurveRenderTest {
 
     // all three voices are filtered, the case of user report
     @Test
+    @Config(qualifiers = "fr-w411dp-h915dp-night-xxhdpi")
     fun allVoicesBandpassFr() = render(
         "6581-bandpass-3voices-fr",
         FilterCurveView.State(settings = SidFilterModel.Settings(residFp = false, preset6581 = 16), presetName = "ZrX 6581R3 0384"),
@@ -175,6 +202,18 @@ class FilterCurveRenderTest {
                 voices = listOf(Voice(130.8, 0x41), Voice(1046.5, 0x21), Voice(4186.0, 0x81))
             )
         ),
+    ).let {}
+
+    // main plot switched to cutoff register curve by tap
+    @Test
+    @Config(qualifiers = "fr-w411dp-h915dp-night-xxhdpi")
+    fun dacCurveFr() = render(
+        "6581-dac-fr",
+        FilterCurveView.State(settings = SidFilterModel.Settings(residFp = false, preset6581 = 16), presetName = "ZrX 6581R3 0384"),
+        listOf(
+            Chip(cutoff = 900, mode = 1, resonance = 8, routing = 0x03, voices = listOf(Voice(130.8, 0x41), Voice(1046.5, 0x21)))
+        ),
+        dac = true,
     ).let {}
 
     @Test
