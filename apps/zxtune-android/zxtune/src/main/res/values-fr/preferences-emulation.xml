@@ -5,28 +5,34 @@
     <string name="pref_zxtune_sid_filter_curve_legend_reference">référence du préréglage</string>
     <string name="pref_zxtune_sid_filter_curve_idle">Lancez un morceau SID pour voir comment le filtre modifie chaque voix</string>
     <string name="pref_zxtune_sid_filter_curve_custom">Personnalisé</string>
-    <string name="pref_zxtune_sid_filter_curve_panel">Courbe de coupure : valeur du registre \u2192 fréquence</string>
     <string-array name="pref_zxtune_sid_filter_response_modes">
-        <item>Sorties du filtre coupées</item>
+        <item>Arrêt</item>
         <item>Passe-bas</item>
         <item>Passe-bande</item>
-        <item>Passe-bas + passe-bande</item>
+        <item>Bas+bande</item>
         <item>Passe-haut</item>
         <item>Coupe-bande</item>
-        <item>Passe-bande + passe-haut</item>
-        <item>Toutes les sorties</item>
+        <item>Bande+haut</item>
+        <item>Tout</item>
     </string-array>
-    <string name="pref_zxtune_sid_filter_response_summary">%1$s · coupure %2$s · résonance %3$d %%</string>
-    <string name="pref_zxtune_sid_filter_response_no_voices">aucune voix filtrée</string>
-    <string name="pref_zxtune_sid_filter_response_chip">SID %1$d sur %2$d, touchez pour changer</string>
-    <string name="pref_zxtune_sid_filter_voice_cut">filtrée, atténuée de %d dB</string>
-    <string name="pref_zxtune_sid_filter_voice_boost">filtrée, amplifiée de %d dB</string>
-    <string name="pref_zxtune_sid_filter_voice_unchanged">filtrée, inchangée</string>
-    <string name="pref_zxtune_sid_filter_voice_removed">filtrée, supprimée</string>
-    <string name="pref_zxtune_sid_filter_voice_bypass">non filtrée</string>
-    <string name="pref_zxtune_sid_filter_voice_off">silencieuse</string>
-    <string name="pref_zxtune_sid_filter_voice_muted">coupée</string>
-    <string name="pref_zxtune_sid_filter_voice_ext">Entrée externe</string>
-    <string name="pref_zxtune_sid_filter_voice_ext_filtered">filtrée</string>
+    <string name="pref_zxtune_sid_filter_caption_mode">Mode</string>
+    <string name="pref_zxtune_sid_filter_caption_cutoff">Coupure</string>
+    <string name="pref_zxtune_sid_filter_caption_resonance">Résonance</string>
+    <string name="pref_zxtune_sid_filter_dac_curve">Courbe du DAC</string>
+    <string name="pref_zxtune_sid_filter_voice_direct">direct</string>
     <string name="pref_zxtune_sid_filter_voice_noise">Bruit</string>
+    <string-array name="pref_zxtune_sid_filter_notes">
+        <item>Do</item>
+        <item>Do#</item>
+        <item>Ré</item>
+        <item>Ré#</item>
+        <item>Mi</item>
+        <item>Fa</item>
+        <item>Fa#</item>
+        <item>Sol</item>
+        <item>Sol#</item>
+        <item>La</item>
+        <item>La#</item>
+        <item>Si</item>
+    </string-array>
 </resources>
