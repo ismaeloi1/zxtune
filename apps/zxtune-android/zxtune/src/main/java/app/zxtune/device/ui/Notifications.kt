@@ -12,6 +12,7 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.StringRes
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.core.content.getSystemService
 import app.zxtune.R
 
@@ -25,7 +26,7 @@ object Notifications {
     fun sendEvent(ctx: Context, @DrawableRes icon: Int, @StringRes title: Int, text: String) {
         val manager = ctx.getSystemService<NotificationManager>()
         if (manager != null && canSendNotifications(manager)) {
-            NotificationCompat.Builder(ctx, EVENTS_CHANNEL_ID).setOngoing(false).setSmallIcon(icon)
+            NotificationCompat.Builder(ctx, EVENTS_CHANNEL_ID).setOngoing(false).setSmallIcon(icon).setColor(accentOf(ctx))
                 .setContentTitle(ctx.getString(title)).setContentText(text).run {
                     manager.notify(text.hashCode(), build())
                 }
@@ -34,8 +35,10 @@ object Notifications {
         }
     }
 
-    private fun canSendNotifications(manager: NotificationManager) =
-        Build.VERSION.SDK_INT < 24 || manager.areNotificationsEnabled()
+    // tints small icon and actions where system allows it, the rest of notification is rendered by system
+    private fun accentOf(ctx: Context) = ContextCompat.getColor(ctx, R.color.lhuna_accent)
+
+    private fun canSendNotifications(manager: NotificationManager) = Build.VERSION.SDK_INT < 24 || manager.areNotificationsEnabled()
 
     @JvmStatic
     fun setup(ctx: Context) {
@@ -67,7 +70,7 @@ object Notifications {
     class Controller internal constructor(ctx: Context, val id: Int) {
         private val manager = NotificationManagerCompat.from(ctx)
         val builder = NotificationCompat.Builder(ctx, SERVICES_CHANNEL_ID).apply {
-            setSmallIcon(id).setShowWhen(false)
+            setSmallIcon(id).setShowWhen(false).setColor(accentOf(ctx))
         }
 
         @SuppressLint("MissingPermission")

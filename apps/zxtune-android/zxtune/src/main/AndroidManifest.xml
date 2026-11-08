@@ -39,6 +39,13 @@
         <meta-data
                 android:name="com.google.android.gms.car.application"
                 android:resource="@xml/automotive_app_desc" />
+        <!-- Android Auto takes accent from this theme and small icon for media notifications -->
+        <meta-data
+                android:name="com.google.android.gms.car.application.theme"
+                android:resource="@style/CarTheme" />
+        <meta-data
+                android:name="com.google.android.gms.car.notification.SmallIcon"
+                android:resource="@drawable/ic_stat_notify_play" />
         <activity
                 android:name=".MainActivity"
                 android:exported="true"
