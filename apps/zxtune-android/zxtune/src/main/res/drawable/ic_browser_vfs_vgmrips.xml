@@ -1,10 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Video game chip music rips: game cartridge with waveform label -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-        android:width="32dp"
-        android:height="32dp"
-        android:viewportWidth="384"
-        android:viewportHeight="384">
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-            android:fillColor="#00fc00"
-            android:pathData="M 48,48 V 192 L 192,336 336,192 V 48 h -84 v 120 l -60,60 -60,-60 V 48 Z" />
+        android:pathData="M6,3.5 H18 A1.5,1.5 0 0 1 19.5,5 V19 A1.5,1.5 0 0 1 18,20.5 H6 A1.5,1.5 0 0 1 4.5,19 V5 A1.5,1.5 0 0 1 6,3.5 Z"
+        android:fillColor="#5CF29A"
+        android:fillAlpha="0.15" />
+    <path
+        android:pathData="M6,3.5 H18 A1.5,1.5 0 0 1 19.5,5 V19 A1.5,1.5 0 0 1 18,20.5 H6 A1.5,1.5 0 0 1 4.5,19 V5 A1.5,1.5 0 0 1 6,3.5 Z"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M8.7,6.5 H15.3 A1.2,1.2 0 0 1 16.5,7.7 V12.8 A1.2,1.2 0 0 1 15.3,14 H8.7 A1.2,1.2 0 0 1 7.5,12.8 V7.7 A1.2,1.2 0 0 1 8.7,6.5 Z"
+        android:fillColor="#5CF29A"
+        android:fillAlpha="0.45" />
+    <path
+        android:pathData="M9,10.6 C10,7.6 11,7.6 12,10.25 C13,12.9 14,12.9 15,9.9"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M8.5,17.5 V18.5 M10.5,17.5 V18.5 M12.5,17.5 V18.5 M14.5,17.5 V18.5"
+        android:strokeColor="#5CF29A"
+        android:strokeWidth="1.3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>

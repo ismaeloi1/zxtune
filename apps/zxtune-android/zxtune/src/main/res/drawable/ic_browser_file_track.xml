@@ -1,19 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Track badge -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-        android:width="20dp"
-        android:height="20dp"
-        android:viewportWidth="40"
-        android:viewportHeight="40">
+    android:width="20dp"
+    android:height="20dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-            android:pathData="m0,20 a20,20 0 0 0,40 0 a20,20 0 0 0 -40,0"
-            android:fillColor="#cfd8dc"
-            />
+        android:pathData="M1.5,12 A10.5,10.5 0 1 0 22.5,12 A10.5,10.5 0 1 0 1.5,12 Z"
+        android:fillColor="#0B0F14" />
     <path
-            android:pathData="M 27,22 C 28,16 31,11 22,7 V 33"
-            android:strokeWidth="4"
-            android:strokeColor="#607d8b"
-            android:strokeLineCap="round" />
+        android:pathData="M1.5,12 A10.5,10.5 0 1 0 22.5,12 A10.5,10.5 0 1 0 1.5,12 Z"
+        android:strokeColor="#29E3FF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
     <path
-            android:fillColor="#607d8b"
-            android:pathData="m 24,32 a 7,5 0 0 1 -7,5 7,5 0 0 1 -7,-5 7,5 0 0 1 7,-5 7,5 0 0 1 7,5 z" />
+        android:pathData="M14,15.5 V6.5 Q14,9.5 17,10.3"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M9.2,15.6 A2.4,2.4 0 1 0 14,15.6 A2.4,2.4 0 1 0 9.2,15.6 Z"
+        android:fillColor="#29E3FF" />
+    <path
+        android:pathData="M9.2,15.6 A2.4,2.4 0 1 0 14,15.6 A2.4,2.4 0 1 0 9.2,15.6 Z"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>
