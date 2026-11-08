@@ -149,19 +149,11 @@ class PlaylistFragment : Fragment() {
 
     private fun setupSearchView(view: SearchView) = view.apply {
         isSubmitButtonEnabled = false
-        setOnCloseListener {
-            post {
+        setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String) = true.also {
                 clearFocus()
             }
-            false
-        }
-        setOnQueryTextFocusChangeListener { _, hasFocus ->
-            if (!hasFocus && query.isEmpty()) {
-                isIconified = true
-            }
-        }
-        setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String) = true
+
             override fun onQueryTextChange(newText: String): Boolean {
                 model.filter = newText
                 return true

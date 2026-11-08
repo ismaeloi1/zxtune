@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pressed overlay of rounded cards, ripple on newer platforms -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/lhuna_radius_l" />
+            <solid android:color="#1FFFFFFF" />
+        </shape>
+    </item>
+</selector>

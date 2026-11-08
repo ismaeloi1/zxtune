@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom navigation: browse catalogs, a crate of records. Single color, tinted by state -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M4,9.5 H20 V17 A2.5,2.5 0 0 1 17.5,19.5 H6.5 A2.5,2.5 0 0 1 4,17 Z"
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.35" />
+    <path
+        android:pathData="M6.5,4.5 H17.5 A2.5,2.5 0 0 1 20,7 V17 A2.5,2.5 0 0 1 17.5,19.5 H6.5 A2.5,2.5 0 0 1 4,17 V7 A2.5,2.5 0 0 1 6.5,4.5 Z M4,9.5 H20"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

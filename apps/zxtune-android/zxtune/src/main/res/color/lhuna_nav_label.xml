@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Bottom navigation label: active page is told by weight of the color and the pill, not by accent text -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/lhuna_text_1" android:state_selected="true" />
+    <item android:color="@color/lhuna_text_2" />
+</selector>

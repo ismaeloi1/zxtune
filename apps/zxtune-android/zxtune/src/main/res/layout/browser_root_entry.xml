@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Source card of the top level: official logo as is, name, description -->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:app="http://schemas.android.com/apk/res-auto"
+        xmlns:tools="http://schemas.android.com/tools"
+        tools:ignore="RtlHardcoded">
+
+    <data>
+
+        <variable
+                name="entry"
+                type="app.zxtune.ui.browser.ListingEntry" />
+    </data>
+
+    <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clickable="true"
+            android:focusable="true"
+            android:padding="@dimen/lhuna_cards_half_gap">
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/lhuna_card_background"
+                android:orientation="vertical"
+                android:padding="@dimen/lhuna_space_l">
+
+            <FrameLayout
+                    android:id="@+id/browser_entry_icon"
+                    android:layout_width="@dimen/lhuna_source_logo"
+                    android:layout_height="@dimen/lhuna_source_logo"
+                    android:clipChildren="false">
+
+                <ImageView
+                        android:id="@+id/browser_entry_main_icon"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:importantForAccessibility="no"
+                        android:scaleType="fitCenter"
+                        app:resource="@{entry.getMainIcon()}"
+                        tools:src="@drawable/ic_browser_vfs_hvsc" />
+
+                <ImageView
+                        android:id="@+id/browser_entry_main_image"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:importantForAccessibility="no"
+                        android:scaleType="fitCenter" />
+
+                <TextView
+                        android:id="@+id/browser_entry_badge"
+                        style="@style/Lhuna.Badge"
+                        android:importantForAccessibility="no"
+                        android:visibility="gone" />
+
+                <ImageView
+                        android:id="@+id/browser_entry_additional_icon"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="bottom|right"
+                        android:importantForAccessibility="no"
+                        app:resource="@{entry.getAdditionalIcon()}" />
+            </FrameLayout>
+
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/lhuna_space_m"
+                    android:ellipsize="end"
+                    android:lines="2"
+                    android:text="@{entry.title}"
+                    android:textAppearance="@style/TextAppearance.Lhuna.Title"
+                    tools:text="High Voltage SID Collection" />
+
+            <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="@{entry.description}"
+                    android:textAppearance="@style/TextAppearance.Lhuna.Body.Secondary"
+                    tools:text="Via http://www.prg.dtu.dk" />
+        </LinearLayout>
+
+        <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/lhuna_card_foreground"
+                android:duplicateParentState="true" />
+    </FrameLayout>
+</layout>

@@ -335,6 +335,18 @@ EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniModule_getDurationMs(JNIEnv* e
   });
 }
 
+EXPORTED jint JNICALL Java_app_zxtune_core_jni_JniModule_getLoopDurationMs(JNIEnv* env, jobject self)
+{
+  return Jni::Call(env, [=]() {
+    const auto moduleHandle = NativeModuleJni::GetHandle(env, self);
+    return Module::Storage::Instance()
+        .Get(moduleHandle)
+        ->GetModuleInformation()
+        .LoopDuration.CastTo<Player::TimeBase>()
+        .Get();
+  });
+}
+
 template<class T>
 T JniModuleGetProperty(JNIEnv* env, jobject self, jstring propName, T defVal)
 {

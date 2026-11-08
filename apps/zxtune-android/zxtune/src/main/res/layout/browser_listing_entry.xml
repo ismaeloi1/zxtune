@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Browser row: icon, cover or chip family badge in the same column as playlist badges, title over description,
+  size in tabular digits -->
 <layout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
@@ -13,20 +15,27 @@
                 type="app.zxtune.ui.browser.ListingEntry" />
     </data>
 
-    <RelativeLayout style="@style/ListItem.Large">
+    <!-- type mark sticks out of the icon corner -->
+    <RelativeLayout
+            style="@style/ListItem.Lhuna"
+            android:clipChildren="false">
 
         <FrameLayout
                 android:id="@+id/browser_entry_icon"
-                android:layout_width="?android:listPreferredItemHeight"
-                android:layout_height="match_parent"
-                android:layout_alignParentLeft="true">
+                android:layout_width="@dimen/lhuna_badge_size"
+                android:layout_height="@dimen/lhuna_badge_size"
+                android:clipChildren="false"
+                android:layout_alignParentLeft="true"
+                android:layout_centerVertical="true"
+                android:layout_marginLeft="@dimen/lhuna_space_xl">
 
             <ImageView
                     android:id="@+id/browser_entry_main_icon"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_gravity="center"
-                    android:padding="@dimen/spacing_full"
+                    android:importantForAccessibility="no"
+                    android:scaleType="fitCenter"
                     app:resource="@{entry.getMainIcon()}"
                     tools:src="@sample/browser.json/data/icon" />
 
@@ -34,49 +43,28 @@
                     android:id="@+id/browser_entry_main_image"
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:layout_gravity="center_vertical"
-                    android:paddingVertical="@dimen/spacing_half"
-                    android:paddingLeft="0dp"
-                    android:paddingRight="@dimen/spacing_full"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
                     android:scaleType="fitCenter"
                     tools:src="@sample/browser.json/data/image" />
+
+            <TextView
+                    android:id="@+id/browser_entry_badge"
+                    style="@style/Lhuna.Badge"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone"
+                    tools:text="SID" />
 
             <ImageView
                     android:id="@+id/browser_entry_additional_icon"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:paddingHorizontal="@dimen/spacing_half"
+                    android:importantForAccessibility="no"
                     app:resource="@{entry.getAdditionalIcon()}"
                     tools:layout_gravity="@sample/browser.json/data/badge_gravity"
                     tools:src="@sample/browser.json/data/badge" />
         </FrameLayout>
-
-        <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:layout_toLeftOf="@+id/browser_entry_details"
-                android:layout_toRightOf="@+id/browser_entry_icon"
-                android:orientation="vertical">
-
-            <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:maxLines="1"
-                    android:text="@{entry.title}"
-                    android:textAppearance="?android:textAppearanceListItem"
-                    tools:text="@sample/browser.json/data/title" />
-
-            <TextView
-                    android:id="@+id/list_item_text_aux"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:maxLines="1"
-                    app:text="@{entry.description}"
-                    android:textAppearance="?textAppearanceListItemSecondary"
-                    tools:text="@sample/browser.json/data/subtitle" />
-        </LinearLayout>
 
         <TextView
                 android:id="@+id/browser_entry_details"
@@ -84,10 +72,40 @@
                 android:layout_height="wrap_content"
                 android:layout_alignParentRight="true"
                 android:layout_centerVertical="true"
-                android:layout_marginLeft="?android:listPreferredItemPaddingRight"
+                android:layout_marginLeft="@dimen/spacing_full"
+                android:layout_marginRight="@dimen/lhuna_space_xl"
+                android:textAppearance="@style/TextAppearance.Lhuna.Mono.Duration"
                 app:text="@{entry.details}"
-                android:textAppearance="?android:textAppearanceListItemSmall"
                 tools:text="@sample/browser.json/data/details" />
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginLeft="@dimen/lhuna_space_l"
+                android:layout_marginRight="@dimen/spacing_full"
+                android:layout_toLeftOf="@id/browser_entry_details"
+                android:layout_toRightOf="@id/browser_entry_icon"
+                android:orientation="vertical">
+
+            <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="@{entry.title}"
+                    android:textAppearance="@style/TextAppearance.Lhuna.Title"
+                    tools:text="@sample/browser.json/data/title" />
+
+            <TextView
+                    android:id="@+id/list_item_text_aux"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:textAppearance="@style/TextAppearance.Lhuna.Body.Secondary"
+                    app:text="@{entry.description}"
+                    tools:text="@sample/browser.json/data/subtitle" />
+        </LinearLayout>
     </RelativeLayout>
 </layout>
-

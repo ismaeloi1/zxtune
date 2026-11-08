@@ -6,16 +6,24 @@ import app.zxtune.TimeStamp
 /**
  * Module interface
  */
-interface Module : PropertiesAccessor, AdditionalFiles, Releaseable {
-  /**
-   * @return Module's duration in milliseconds
-   */
-  val duration: TimeStamp
+interface Module :
+    PropertiesAccessor,
+    AdditionalFiles,
+    Releaseable {
+    /**
+     * @return Module's duration in milliseconds
+     */
+    val duration: TimeStamp
 
-  /**
-   * Creates new player object
-   *
-   * @throws RuntimeException in case of error
-   */
-  fun createPlayer(samplerate: Int): Player
+    /**
+     * @return Duration of the looped part at the end of the module, equal to [duration] if it is looped as a whole
+     */
+    val loopDuration: TimeStamp
+
+    /**
+     * Creates new player object
+     *
+     * @throws RuntimeException in case of error
+     */
+    fun createPlayer(samplerate: Int): Player
 }

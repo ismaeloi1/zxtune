@@ -1,10 +1,9 @@
 package app.zxtune.ui.browser
 
 import android.net.Uri
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ProgressBar
-import android.widget.SearchView
+import androidx.appcompat.widget.SearchView
 import androidx.core.net.toUri
 import androidx.core.view.get
 import androidx.fragment.app.testing.FragmentScenario
@@ -114,10 +113,14 @@ class BrowserFragmentTest {
                     verify(errorsFlow).collect(any())
                     verify(playbackEventsFlow).collect(any())
                 }
-                //verify(model).onCleared()
+                // verify(model).onCleared()
             }.close()
             verifyNoMoreInteractions(
-                stateFlow, progressFlow, notificationsFlow, errorsFlow, playbackEventsFlow
+                stateFlow,
+                progressFlow,
+                notificationsFlow,
+                errorsFlow,
+                playbackEventsFlow
             )
         }
     }
@@ -161,13 +164,12 @@ class BrowserFragmentTest {
                     val listing = findViewById<RecyclerView>(R.id.browser_content)
                     assertEquals(5, listing.childCount)
                     // TODO: investigate RV click emulation possibility
+                    // search field is always visible, back leaves search mode first
                     findViewById<SearchView>(R.id.browser_search).let { view ->
-                        assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT, view.layoutParams.width)
-                        view.isIconified = false
-                        assertEquals(ViewGroup.LayoutParams.MATCH_PARENT, view.layoutParams.width)
+                        assertTrue(view.requestFocus())
+                        view.setQuery("query", false)
                         it.requireActivity().onBackPressed()
-                        assertEquals(true, view.isIconified)
-                        assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT, view.layoutParams.width)
+                        assertEquals("", view.query.toString())
                         flushEvents()
                     }
                 }
@@ -186,9 +188,9 @@ class BrowserFragmentTest {
                 verifyBlocking(persistentState) {
                     updateCurrentPosition(0)
                 }
-                //verify(model).onClear()
+                // verify(model).onClear()
             }
-            //verifyNoMoreInteractions(modelConstruction.constructedInstance)
+            // verifyNoMoreInteractions(modelConstruction.constructedInstance)
         }
     }
 
@@ -286,9 +288,9 @@ class BrowserFragmentTest {
                     verify(model).filter = "File "
                     verify(model).filter = "Model query"
                     verify(model).search("Model query")
-                    //verify(model).onClear()
+                    // verify(model).onClear()
                 }
-                //verifyNoMoreInteractions(model)
+                // verifyNoMoreInteractions(model)
             }.close()
             flushEvents()
         }
@@ -309,7 +311,7 @@ class BrowserFragmentTest {
     @Test
     fun `selection mode`() {
     }
-    */
+     */
 
     companion object {
         // Resources identifiers cannot be const values
@@ -324,7 +326,8 @@ class BrowserFragmentTest {
             val breadcrumbs = ArrayList<BreadcrumbsEntry>(depth).apply {
                 val builder = Uri.Builder().scheme("scheme")
                 for (idx in 0 until depth) {
-                    add(BreadcrumbsEntry(uri = builder.appendPath("p$idx").build(),
+                    add(BreadcrumbsEntry(
+                        uri = builder.appendPath("p$idx").build(),
                         title = "Parent $idx",
                         icon = parentIcon().takeIf { idx == 0 } // only first
                     ))
@@ -341,10 +344,14 @@ class BrowserFragmentTest {
                             title = "Dir$idx",
                             description = "Directory $idx",
                             icon = when (dirs % 3) {
-                                1 -> ListingEntry.DrawableIcon(folderIcon()) // first one
+                                1 -> ListingEntry.DrawableIcon(folderIcon())
+
+                                // first one
                                 2 -> ListingEntry.LoadableIcon("icon://uri/$idx".toUri())
+
                                 else -> null
-                            })
+                            }
+                        )
                     } else {
                         ListingEntry.makeFile(
                             uri = builder.appendEncodedPath("file$idx").build(),

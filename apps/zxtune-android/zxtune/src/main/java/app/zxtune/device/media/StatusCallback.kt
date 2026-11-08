@@ -185,6 +185,13 @@ internal class StatusCallback private constructor(
                     ModuleAttributes.CHANNELS_NAMES,
                     item.module.getProperty(ModuleAttributes.CHANNELS_NAMES, "")
                 )
+                // scrubber marks the looped part only if there's an intro before it
+                item.module.run { duration.toMilliseconds() to loopDuration.toMilliseconds() }
+                    .let { (total, loop) ->
+                        if (loop in 1 until total) {
+                            putLong(METADATA_KEY_LOOP_START, total - loop)
+                        }
+                    }
             }
             putLong(MediaMetadataCompat.METADATA_KEY_DURATION, item.duration.toMilliseconds())
             putLong(ModuleAttributes.SIZE, item.size)

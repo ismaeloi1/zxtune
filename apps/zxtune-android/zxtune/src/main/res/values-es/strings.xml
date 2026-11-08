@@ -29,7 +29,6 @@
   <string name="scanning_title">Escaneo.</string>
   <string name="scanning_text">Haga clic para cancelar</string>
   <!--other-->
-  <string name="main">Principal</string>
   <plurals name="items">
     <item quantity="one">%d elemento</item>
     <item quantity="many">%d elementos</item>

@@ -29,7 +29,6 @@
     <string name="scanning_title">Scannen.</string>
     <string name="scanning_text">Klicken Sie zum Abbrechen</string>
     <!-- other -->
-    <string name="main">Hauptseiten</string>
     <plurals name="items">
       <item quantity="one">%d Element</item>
       <item quantity="other">%d Elemente</item>

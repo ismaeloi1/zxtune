@@ -173,7 +173,7 @@ class MediaModel(app: Application) : AndroidViewModel(app) {
         private fun extractBinder(extras: Bundle, key: String) = if (Build.VERSION.SDK_INT >= 18) {
             extras.getBinder(key)
         } else {
-            //required for proper deserialization
+            // required for proper deserialization
             extras.classLoader = ParcelableBinder::class.java.classLoader
             ParcelableBinder.deserialize(extras.getParcelableCompat<ParcelableBinder>(key))
         }
@@ -196,5 +196,13 @@ class MediaModel(app: Application) : AndroidViewModel(app) {
 internal fun fromMediaTime(ts: Long) = TimeStamp.fromMilliseconds(ts)
 internal fun TimeStamp.toMediaTime() = toMilliseconds()
 
-internal fun MediaMetadataCompat.getDuration() =
-    fromMediaTime(getLong(MediaMetadataCompat.METADATA_KEY_DURATION))
+internal fun MediaMetadataCompat.getDuration() = fromMediaTime(getLong(MediaMetadataCompat.METADATA_KEY_DURATION))
+
+/**
+ * Start of the looped part of the tune in ms, absent if the whole tune is looped
+ */
+internal const val METADATA_KEY_LOOP_START = "app.zxtune.metadata.LOOP_START"
+
+internal fun MediaMetadataCompat.getLoopStart() = METADATA_KEY_LOOP_START.takeIf(::containsKey)?.let {
+    fromMediaTime(getLong(it))
+}

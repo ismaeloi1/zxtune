@@ -33,7 +33,6 @@
     <string name="scanning_title">Scanning.</string>
     <string name="scanning_text">Click to cancel</string>
     <!-- other -->
-    <string name="main">Main</string>
     <plurals name="items">
       <item quantity="one">%d item</item>
       <item quantity="other">%d items</item>

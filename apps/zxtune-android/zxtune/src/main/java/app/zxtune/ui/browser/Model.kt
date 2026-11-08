@@ -14,7 +14,9 @@ import app.zxtune.analytics.Analytics
 import app.zxtune.fs.provider.Schema
 import app.zxtune.fs.provider.VfsProviderClient
 import app.zxtune.fs.provider.VfsProviderClient.ParentsCallback
+import app.zxtune.ui.ChipFamily
 import app.zxtune.ui.utils.FilteredListState
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineName
@@ -42,7 +44,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.supervisorScope
-import java.util.concurrent.atomic.AtomicReference
 
 /*
 TODO:
@@ -73,11 +74,15 @@ class Model @VisibleForTesting internal constructor(
     @JvmInline
     private value class SearchingContent(val entries: List<ListingEntry>) : Content
 
+    /**
+     * @param isRoot entries are the sources at the top level, not a directory content or search results
+     */
     class State private constructor(
         val breadcrumbs: List<BreadcrumbsEntry>,
-        private val listing: FilteredListState<ListingEntry>
+        private val listing: FilteredListState<ListingEntry>,
+        val isRoot: Boolean,
     ) {
-        constructor() : this(emptyList(), FilteredListState(Companion::matchEntry))
+        constructor() : this(emptyList(), FilteredListState(Companion::matchEntry), false)
 
         val uri: Uri
             get() = breadcrumbs.lastOrNull()?.uri ?: Uri.EMPTY
@@ -88,17 +93,15 @@ class Model @VisibleForTesting internal constructor(
         val filter
             get() = listing.filter
 
-        fun withContent(breadcrumbs: List<BreadcrumbsEntry>, entries: List<ListingEntry>) =
-            State(breadcrumbs, listing.withContent(entries))
+        fun withContent(breadcrumbs: List<BreadcrumbsEntry>, entries: List<ListingEntry>) = State(breadcrumbs, listing.withContent(entries), breadcrumbs.isEmpty())
 
-        fun withEntries(entries: List<ListingEntry>) =
-            State(breadcrumbs, listing.withContent(entries))
+        fun withEntries(entries: List<ListingEntry>) = State(breadcrumbs, listing.withContent(entries), false)
 
         fun withFilter(filter: String) = listing.withFilter(filter).let {
             if (listing === it) {
                 this
             } else {
-                State(breadcrumbs, it)
+                State(breadcrumbs, it, isRoot)
             }
         }
     }
@@ -119,13 +122,16 @@ class Model @VisibleForTesting internal constructor(
 
     // Dynamic search content
     private val _searchContent = MutableSharedFlow<SearchingContent>(
-        extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
     // Mixin. Should be state in order to get latest content
     @OptIn(FlowPreview::class)
     private val _state = merge(
-        _content, _filter.debounce(500), _searchContent
+        _content,
+        _filter.debounce(500),
+        _searchContent
     ).runningFold(EMPTY_STATE) { state, update ->
         when (update) {
             is FilterContent -> {
@@ -134,10 +140,13 @@ class Model @VisibleForTesting internal constructor(
             }
 
             is ListingContent -> state.withContent(update.breadcrumbs, update.entries)
+
             is SearchingContent -> state.withEntries(update.entries)
         }
     }.flowOn(defaultDispatcher).stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5000), EMPTY_STATE
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        EMPTY_STATE
     )
 
     // Notifications. Should be state to get latest value
@@ -166,7 +175,10 @@ class Model @VisibleForTesting internal constructor(
 
     @Suppress("UNUSED")
     constructor(application: Application) : this(
-        application, VfsProviderClient(application), Dispatchers.IO, Dispatchers.Default
+        application,
+        VfsProviderClient(application),
+        Dispatchers.IO,
+        Dispatchers.Default
     )
 
     val state: Flow<State>
@@ -263,7 +275,8 @@ class Model @VisibleForTesting internal constructor(
 
     @VisibleForTesting
     suspend fun updateContent(
-        breadcrumbs: List<BreadcrumbsEntry>, entries: List<ListingEntry>
+        breadcrumbs: List<BreadcrumbsEntry>,
+        entries: List<ListingEntry>
     ) = _content.emit(ListingContent(breadcrumbs, entries))
 
     private inner class BrowseTask(private val uri: Uri) : AsyncOperation {
@@ -273,6 +286,7 @@ class Model @VisibleForTesting internal constructor(
 
         override suspend fun execute() = when (resolve(uri)) {
             ObjectType.FILE, ObjectType.DIR_WITH_FEED -> coroutineScope { _toPlay.send(uri) }
+
             ObjectType.DIR -> coroutineScope {
                 val entries = async { getEntries(uri) }
                 val parents = getParents()
@@ -291,8 +305,7 @@ class Model @VisibleForTesting internal constructor(
         }
     }
 
-    private inner class BrowseParentTask(private val items: List<BreadcrumbsEntry>) :
-        AsyncOperation {
+    private inner class BrowseParentTask(private val items: List<BreadcrumbsEntry>) : AsyncOperation {
 
         override val description
             get() = "browse parent"
@@ -352,14 +365,15 @@ class Model @VisibleForTesting internal constructor(
     }
 
     internal enum class ObjectType {
-        DIR, DIR_WITH_FEED, FILE
+        DIR,
+        DIR_WITH_FEED,
+        FILE
     }
 
     private suspend fun resolve(uri: Uri): ObjectType? {
         var result: ObjectType? = null
         providerClient.resolve(uri, object : VfsProviderClient.ListingCallback {
-            override fun onProgress(status: Schema.Status.Progress) =
-                updateProgress(status.done, status.total)
+            override fun onProgress(status: Schema.Status.Progress) = updateProgress(status.done, status.total)
 
             override fun onDir(dir: Schema.Listing.Dir) {
                 result = if (dir.hasFeed) ObjectType.DIR_WITH_FEED else ObjectType.DIR
@@ -374,8 +388,7 @@ class Model @VisibleForTesting internal constructor(
 
     private suspend fun getEntries(uri: Uri) = ArrayList<ListingEntry>().apply {
         providerClient.list(uri, object : VfsProviderClient.ListingCallback {
-            override fun onProgress(status: Schema.Status.Progress) =
-                updateProgress(status.done, status.total)
+            override fun onProgress(status: Schema.Status.Progress) = updateProgress(status.done, status.total)
 
             override fun onDir(dir: Schema.Listing.Dir) {
                 add(makeFolder(dir))
@@ -392,8 +405,7 @@ class Model @VisibleForTesting internal constructor(
 
         private val EMPTY_STATE = State()
 
-        private fun matchEntry(entry: ListingEntry, filter: String) =
-            entry.title.contains(filter, true) || entry.description.contains(filter, true)
+        private fun matchEntry(entry: ListingEntry, filter: String) = entry.title.contains(filter, true) || entry.description.contains(filter, true)
 
         private fun makeFolder(dir: Schema.Listing.Dir) = dir.run {
             ListingEntry.makeFolder(uri, name, description, icon?.asListingEntryIcon())
@@ -407,6 +419,9 @@ class Model @VisibleForTesting internal constructor(
                 details,
                 type.asIcon(),
                 icon?.asListingEntryIcon(),
+                type.takeUnless { it == Schema.Listing.File.Type.UNSUPPORTED }?.let {
+                    ChipFamily.ofFilename(name) ?: ChipFamily.ofFilename(uri.lastPathSegment)
+                },
             )
         }
 

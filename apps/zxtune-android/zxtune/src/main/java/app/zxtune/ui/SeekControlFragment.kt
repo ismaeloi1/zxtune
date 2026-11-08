@@ -8,7 +8,6 @@ package app.zxtune.ui
 import android.os.Bundle
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
-import android.support.v4.media.session.PlaybackStateCompat
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +20,7 @@ import app.zxtune.R
 import app.zxtune.TimeStamp
 import app.zxtune.device.media.MediaModel
 import app.zxtune.device.media.getDuration
+import app.zxtune.device.media.getLoopStart
 import app.zxtune.device.media.toMediaTime
 import app.zxtune.ui.utils.UiUtils
 import app.zxtune.ui.utils.whenLifecycleStarted
@@ -36,14 +36,12 @@ class SeekControlFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) = MediaModel.of(requireActivity()).run {
         val position = PositionControl(view)
-        val looping = RepeatModeControl(view)
 
         viewLifecycleOwner.whenLifecycleStarted {
             launch {
                 controller.collect { controller ->
                     UiUtils.setViewEnabled(view, controller != null)
                     position.bindController(controller)
-                    looping.bindController(controller)
                 }
             }
             launch {
@@ -63,6 +61,9 @@ class SeekControlFragment : Fragment() {
         private val currentPosition = view.findViewById<SeekBar>(R.id.position_seek)
         private val totalTime = view.findViewById<TextView>(R.id.position_duration)
         private val normalTimeColor = currentTime.textColors
+        private val track = PositionBarsDrawable(view.context).also {
+            currentPosition.progressDrawable = it
+        }
 
         // Position selected by user while dragging, VLC-like: seek is performed only on release
         // because emulated formats should render all the data up to target position
@@ -76,12 +77,15 @@ class SeekControlFragment : Fragment() {
         fun initTrack(metadata: MediaMetadataCompat?) = if (metadata != null) {
             metadata.getDuration().run {
                 totalTime.text = toString()
-                // TODO: use secondary progress to show loop
                 currentPosition.max = toSeekBarItem()
+                track.loopStart = metadata.getLoopStart()?.takeIf { toMilliseconds() > 0 }?.let { loop ->
+                    loop.toMilliseconds().toFloat() / toMilliseconds()
+                }
             }
         } else {
             totalTime.setText(R.string.stub_time)
             currentTime.setText(R.string.stub_time)
+            track.loopStart = null
         }
 
         fun bindController(ctrl: MediaControllerCompat?) {
@@ -128,40 +132,6 @@ class SeekControlFragment : Fragment() {
             } else {
                 currentTime.setText(R.string.stub_time)
             }
-        }
-    }
-
-    private class RepeatModeControl(view: View) {
-        private var button = view.findViewById<View>(R.id.controls_track_mode)
-        private var repeatMode = PlaybackStateCompat.REPEAT_MODE_INVALID
-            set(value) {
-                field = value
-                button.run {
-                    isEnabled = value != PlaybackStateCompat.REPEAT_MODE_INVALID
-                    isActivated = value == PlaybackStateCompat.REPEAT_MODE_ONE
-                }
-            }
-
-        init {
-            bindController(null)
-        }
-
-        fun bindController(controller: MediaControllerCompat?) {
-            repeatMode = controller?.repeatMode ?: PlaybackStateCompat.REPEAT_MODE_INVALID
-            button.setOnClickListener(controller?.transportControls?.let { transport ->
-                {
-                    getNextMode()?.let { newMode ->
-                        transport.setRepeatMode(newMode)
-                        repeatMode = newMode
-                    }
-                }
-            })
-        }
-
-        private fun getNextMode() = when (repeatMode) {
-            PlaybackStateCompat.REPEAT_MODE_NONE -> PlaybackStateCompat.REPEAT_MODE_ONE
-            PlaybackStateCompat.REPEAT_MODE_ONE -> PlaybackStateCompat.REPEAT_MODE_NONE
-            else -> null
         }
     }
 }

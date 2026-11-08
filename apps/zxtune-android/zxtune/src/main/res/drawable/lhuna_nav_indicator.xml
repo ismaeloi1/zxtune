@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Tonal pill behind the icon of the active page of bottom navigation -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <corners android:radius="16dp" />
+            <solid android:color="@color/lhuna_accent_container" />
+        </shape>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>
