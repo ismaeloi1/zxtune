@@ -1,26 +1,58 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- ZX Spectrum music portal: tape cassette with rainbow stripes -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:viewportWidth="384"
-    android:viewportHeight="384"
     android:width="32dp"
-    android:height="32dp">
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-        android:pathData="M108 384h48L384 156V108L108 384"
-        android:fillColor="#ff0000" />
+        android:pathData="M5,4.5 H19 A2.5,2.5 0 0 1 21.5,7 V17 A2.5,2.5 0 0 1 19,19.5 H5 A2.5,2.5 0 0 1 2.5,17 V7 A2.5,2.5 0 0 1 5,4.5 Z"
+        android:fillColor="#E6ECEF"
+        android:fillAlpha="0.12" />
     <path
-        android:pathData="M156 384h48L384 204V156L156 384"
-        android:fillColor="#ffc800" />
+        android:pathData="M5,4.5 H19 A2.5,2.5 0 0 1 21.5,7 V17 A2.5,2.5 0 0 1 19,19.5 H5 A2.5,2.5 0 0 1 2.5,17 V7 A2.5,2.5 0 0 1 5,4.5 Z"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
     <path
-        android:pathData="M204 384h48L384 252V204L204 384"
-        android:fillColor="#259e00" />
+        android:pathData="M7,7.5 H17 A1.5,1.5 0 0 1 18.5,9 V11 A1.5,1.5 0 0 1 17,12.5 H7 A1.5,1.5 0 0 1 5.5,11 V9 A1.5,1.5 0 0 1 7,7.5 Z"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="1.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
     <path
-        android:pathData="M252 384h48l84 -84V252L252 384"
-        android:fillColor="#0030d2" />
+        android:pathData="M7.75,10 A1.25,1.25 0 1 0 10.25,10 A1.25,1.25 0 1 0 7.75,10 Z M13.75,10 A1.25,1.25 0 1 0 16.25,10 A1.25,1.25 0 1 0 13.75,10 Z"
+        android:fillColor="#E6ECEF" />
     <path
-        android:pathData="M48 144v24h96v24h-24v24H96v24H72v24H48v24h204v-24h24v-24h24v24h24v24h48v-24h-24v-24.2l-24 0.2v-48h24v-24h24v-24h-48v24h-24v24h-24v-24h-24v-24zm144 24h36v24h24v48h-24v24H120v-24h24v-24h24v-24h24z"
-        android:fillColor="#000000"
-        android:fillAlpha="0.5" />
+        android:pathData="M10.4,10 H13.6"
+        android:strokeColor="#E6ECEF"
+        android:strokeAlpha="0.6"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
     <path
-        android:pathData="M24 120v24h96v24H96v24H72v24H48v24H24v24h204v-24h24v-24h24v24h24v24h48v-24h-24v-24.2l-24 0.2v-48h24v-24h24v-24h-48v24h-24v24h-24v-24h-24v-24zm144 24h36v24h24v48h-24v24H96v-24h24v-24h24v-24h24z"
-        android:fillColor="#ffffff" />
+        android:pathData="M9.2,17.3 L10.8,14.7"
+        android:strokeColor="#FF4D5E"
+        android:strokeWidth="1.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M10.95,17.3 L12.55,14.7"
+        android:strokeColor="#FFD23F"
+        android:strokeWidth="1.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M12.7,17.3 L14.3,14.7"
+        android:strokeColor="#4DE36B"
+        android:strokeWidth="1.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M14.45,17.3 L16.05,14.7"
+        android:strokeColor="#29E3FF"
+        android:strokeWidth="1.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>

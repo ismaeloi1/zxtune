@@ -1,14 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Companies: office building -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-        android:width="32dp"
-        android:height="32dp"
-        android:viewportWidth="384"
-        android:viewportHeight="384">
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-            android:fillColor="#385a7f"
-            android:pathData="M 60,60 V 336 H 192 V 60 Z m 12,36 h 48 v 48 H 72 Z m 60,0 h 48 v 48 h -48 z m -60,72 h 48 v 48 H 72 Z m 60,0 h 48 v 48 h -48 z m 84,24 v 144 h 24 v -72 h 60 v 72 h 24 V 192 Z M 72,240 h 48 v 48 H 72 Z m 60,0 h 48 v 48 h -48 z" />
+        android:pathData="M5.5,3.5 H12.5 A1.5,1.5 0 0 1 14,5 V19 A1.5,1.5 0 0 1 12.5,20.5 H5.5 A1.5,1.5 0 0 1 4,19 V5 A1.5,1.5 0 0 1 5.5,3.5 Z"
+        android:fillColor="#5CF29A"
+        android:fillAlpha="0.3" />
     <path
-            android:strokeColor="#385a7f"
-            android:strokeWidth="12"
-            android:pathData="M 216,168 H 324" />
+        android:pathData="M5.5,3.5 H12.5 A1.5,1.5 0 0 1 14,5 V19 A1.5,1.5 0 0 1 12.5,20.5 H5.5 A1.5,1.5 0 0 1 4,19 V5 A1.5,1.5 0 0 1 5.5,3.5 Z"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M14,9.5 H18.5 A1.5,1.5 0 0 1 20,11 V20.5"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M2.5,20.5 H21.5"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M6.05,7 A0.95,0.95 0 1 0 7.95,7 A0.95,0.95 0 1 0 6.05,7 Z M10.05,7 A0.95,0.95 0 1 0 11.95,7 A0.95,0.95 0 1 0 10.05,7 Z M6.05,10.5 A0.95,0.95 0 1 0 7.95,10.5 A0.95,0.95 0 1 0 6.05,10.5 Z M10.05,10.5 A0.95,0.95 0 1 0 11.95,10.5 A0.95,0.95 0 1 0 10.05,10.5 Z M6.05,14 A0.95,0.95 0 1 0 7.95,14 A0.95,0.95 0 1 0 6.05,14 Z M10.05,14 A0.95,0.95 0 1 0 11.95,14 A0.95,0.95 0 1 0 10.05,14 Z"
+        android:fillColor="#E6ECEF" />
+    <path
+        android:pathData="M16.05,13 A0.95,0.95 0 1 0 17.95,13 A0.95,0.95 0 1 0 16.05,13 Z M16.05,16.5 A0.95,0.95 0 1 0 17.95,16.5 A0.95,0.95 0 1 0 16.05,16.5 Z"
+        android:fillColor="#5CF29A" />
 </vector>

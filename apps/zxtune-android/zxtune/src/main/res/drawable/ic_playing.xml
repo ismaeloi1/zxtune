@@ -1,10 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Now playing marker in playlist -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:viewportWidth="128"
-    android:viewportHeight="128"
     android:width="32dp"
-    android:height="32dp">
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-        android:pathData="M76.5 4v90c0 0 -10 -10 -25 -10 -15 0 -30 10 -30 20 0 10 15 20 30 20 15 0 35 -10 35 -20V34c0 0 5 0 10 10 5 10 0 25 0 25 0 0 10 -10 10 -20 0 -10 0 -15 -15 -25 -15 -10 -15 -20 -15 -20z"
-        android:fillColor="#cfd8dc" />
+        android:pathData="M6,18.5 V12 M10,18.5 V6.5 M18,18.5 V9"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M14,18.5 V13.5"
+        android:strokeColor="#29E3FF"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>

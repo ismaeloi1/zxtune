@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- LHUNA adaptive launcher icon CONCEPT (preview only, not referenced): full-bleed background + bubble "L" monogram inside the 66dp safe zone. To adopt, split into background/foreground layers. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M0,0 H108 V108 H0 Z"
+        android:fillColor="#0A0D18" />
+    <path
+        android:pathData="M18,0 V108 M36,0 V108 M54,0 V108 M72,0 V108 M90,0 V108 M0,18 H108 M0,36 H108 M0,54 H108 M0,72 H108 M0,90 H108"
+        android:strokeColor="#29E3FF"
+        android:strokeAlpha="0.08"
+        android:strokeWidth="0.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M21,54 A33,33 0 1 0 87,54 A33,33 0 1 0 21,54 Z"
+        android:strokeColor="#FF5CD6"
+        android:strokeAlpha="0.35"
+        android:strokeWidth="1.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M6,62 C12,52 18,52 24,62 C30,72 36,72 42,62 C48,52 54,52 60,62 C66,72 72,72 78,62 C84,52 90,52 96,62 C99,67 101,68.5 104,68"
+        android:strokeColor="#29E3FF"
+        android:strokeAlpha="0.85"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M47.5,38.5 V69.5 H67.5"
+        android:strokeColor="#FF5CD6"
+        android:strokeAlpha="0.6"
+        android:strokeWidth="26"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M45,36 V67 H65"
+        android:strokeColor="#29E3FF"
+        android:strokeAlpha="0.18"
+        android:strokeWidth="31"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M45,36 V67 H65"
+        android:strokeColor="#29E3FF"
+        android:strokeAlpha="0.45"
+        android:strokeWidth="28.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M45,36 V67 H65"
+        android:strokeColor="#05070C"
+        android:strokeWidth="26"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M45,36 V67 H65"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="22"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M45,36 V67 H65"
+        android:strokeColor="#05070C"
+        android:strokeWidth="19.6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M45,36 V67 H65"
+        android:strokeColor="#DCE3EA"
+        android:strokeWidth="17.4"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M45,37 V67 H64"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="13"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M74,30 L75.5,36 L81.5,37.5 L75.5,39 L74,45 L72.5,39 L66.5,37.5 L72.5,36 Z"
+        android:fillColor="#FFFFFF" />
+    <path
+        android:pathData="M79.9,46 A1.6,1.6 0 1 0 83.1,46 A1.6,1.6 0 1 0 79.9,46 Z"
+        android:fillColor="#FF5CD6" />
+</vector>

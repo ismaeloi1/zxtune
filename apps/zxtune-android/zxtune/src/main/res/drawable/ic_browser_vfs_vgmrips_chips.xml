@@ -1,10 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Chips: DIP sound chip -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-        android:width="32dp"
-        android:height="32dp"
-        android:viewportWidth="384"
-        android:viewportHeight="384">
+    android:width="32dp"
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-            android:fillColor="#385a7f"
-            android:pathData="M 120,60 C 108,60 96,72 96,84 v 216 c 0,12 12,24 24,24 h 144 c 12,0 24,-12 24,-24 V 84 C 288,72 276,60 264,60 Z m 36,24 c 12,0 24,12 24,24 0,12 -12,24 -24,24 -12,0 -24,-12 -24,-24 0,-12 12,-24 24,-24 z m -72,0 -48,24 48,24 z m 216,0 v 48 l 48,-24 z m -216,84 -48,23 48,25 z m 216,0 v 48 l 48,-24 z m -216,84 -48,24 48,24 z m 216,0 v 48 l 48,-24 z" />
+        android:pathData="M4.3,7 H6.8 M17.2,7 H19.7 M4.3,10.5 H6.8 M17.2,10.5 H19.7 M4.3,14 H6.8 M17.2,14 H19.7 M4.3,17.5 H6.8 M17.2,17.5 H19.7"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M8.5,3.5 H10.5 A1.5,1.5 0 0 0 13.5,3.5 H15.5 A1.5,1.5 0 0 1 17,5 V19 A1.5,1.5 0 0 1 15.5,20.5 H8.5 A1.5,1.5 0 0 1 7,19 V5 A1.5,1.5 0 0 1 8.5,3.5 Z"
+        android:fillColor="#5CF29A"
+        android:fillAlpha="0.3" />
+    <path
+        android:pathData="M8.5,3.5 H10.5 A1.5,1.5 0 0 0 13.5,3.5 H15.5 A1.5,1.5 0 0 1 17,5 V19 A1.5,1.5 0 0 1 15.5,20.5 H8.5 A1.5,1.5 0 0 1 7,19 V5 A1.5,1.5 0 0 1 8.5,3.5 Z"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M8.7,7 A1,1 0 1 0 10.7,7 A1,1 0 1 0 8.7,7 Z"
+        android:fillColor="#5CF29A" />
 </vector>

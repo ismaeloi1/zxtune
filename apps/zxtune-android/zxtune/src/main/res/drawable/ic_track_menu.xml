@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Track actions -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
     android:width="32dp"
-    android:height="32dp">
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-        android:pathData="M6 3C5 3 4 4 4 5 4 6 5 7 6 7 7 7 8 6 8 5 8 4 7 3 6 3M6 9C5 9 4 10 4 11 4 12 5 13 6 13 7 13 8 12 8 11 8 10 7 9 6 9m0 6c-1 0 -2 1 -2 2 0 1 1 2 2 2 1 0 2 -1 2 -2C8 16 7 15 6 15M18 7c1 0 2 -1 2 -2 0 -1 -1 -2 -2 -2 -1 0 -2 1 -2 2 0 1 1 2 2 2m-6 8c-1 0 -2 1 -2 2 0 1 1 2 2 2 1 0 2 -1 2 -2 0 -1 -1 -2 -2 -2m6 0c-1 0 -2 1 -2 2 0 1 1 2 2 2 1 0 2 -1 2 -2 0 -1 -1 -2 -2 -2m0 -6c-1 0 -2 1 -2 2 0 1 1 2 2 2 1 0 2 -1 2 -2 0 -1 -1 -2 -2 -2m-6 0c-1 0 -2 1 -2 2 0 1 1 2 2 2 1 0 2 -1 2 -2 0 -1 -1 -2 -2 -2m0 -6c-1 0 -2 1 -2 2 0 1 1 2 2 2 1 0 2 -1 2 -2 0 -1 -1 -2 -2 -2"
-        android:fillColor="#cfd8dc" />
+        android:pathData="M4.4,6 A1.6,1.6 0 1 0 7.6,6 A1.6,1.6 0 1 0 4.4,6 Z M10.4,6 A1.6,1.6 0 1 0 13.6,6 A1.6,1.6 0 1 0 10.4,6 Z M16.4,6 A1.6,1.6 0 1 0 19.6,6 A1.6,1.6 0 1 0 16.4,6 Z M4.4,12 A1.6,1.6 0 1 0 7.6,12 A1.6,1.6 0 1 0 4.4,12 Z M16.4,12 A1.6,1.6 0 1 0 19.6,12 A1.6,1.6 0 1 0 16.4,12 Z M4.4,18 A1.6,1.6 0 1 0 7.6,18 A1.6,1.6 0 1 0 4.4,18 Z M10.4,18 A1.6,1.6 0 1 0 13.6,18 A1.6,1.6 0 1 0 10.4,18 Z M16.4,18 A1.6,1.6 0 1 0 19.6,18 A1.6,1.6 0 1 0 16.4,18 Z"
+        android:fillColor="#E6ECEF" />
+    <path
+        android:pathData="M10.1,12 A1.9,1.9 0 1 0 13.9,12 A1.9,1.9 0 1 0 10.1,12 Z"
+        android:fillColor="#29E3FF" />
 </vector>

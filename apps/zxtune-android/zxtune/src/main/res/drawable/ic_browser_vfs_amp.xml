@@ -1,16 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Amiga Music Preservation: 3.5" floppy disk -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:viewportWidth="384"
-    android:viewportHeight="384"
     android:width="32dp"
-    android:height="32dp">
+    android:height="32dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
     <path
-        android:pathData="M0 0H384V384H0Z"
-        android:fillColor="#795104" />
+        android:pathData="M5.5,3.5 H16.2 L20.5,7.8 V18.5 A2,2 0 0 1 18.5,20.5 H5.5 A2,2 0 0 1 3.5,18.5 V5.5 A2,2 0 0 1 5.5,3.5 Z"
+        android:fillColor="#FFB547"
+        android:fillAlpha="0.28" />
     <path
-        android:pathData="M129 28L54 378h137l12 -62h37l12 62H376L301 28H128Zm99 87l12 137h-37z"
-        android:fillColor="#311004" />
+        android:pathData="M5.5,3.5 H16.2 L20.5,7.8 V18.5 A2,2 0 0 1 18.5,20.5 H5.5 A2,2 0 0 1 3.5,18.5 V5.5 A2,2 0 0 1 5.5,3.5 Z"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
     <path
-        android:pathData="M120 24L48 360h132l12 -60h36l12 60H360L288 24Zm96 84l12 132h-36z"
-        android:fillColor="#db9d24" />
+        android:pathData="M8,3.5 V7.5 A1,1 0 0 0 9,8.5 H14.5 A1,1 0 0 0 15.5,7.5 V3.5"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M12.6,5 V7"
+        android:strokeColor="#FFB547"
+        android:strokeWidth="1.8"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M8.2,12.5 H15.8 A1.2,1.2 0 0 1 17,13.7 V19.3 A1.2,1.2 0 0 1 15.8,20.5 H8.2 A1.2,1.2 0 0 1 7,19.3 V13.7 A1.2,1.2 0 0 1 8.2,12.5 Z"
+        android:fillColor="#FFB547"
+        android:fillAlpha="0.55" />
+    <path
+        android:pathData="M7,20.5 V13.7 A1.2,1.2 0 0 1 8.2,12.5 H15.8 A1.2,1.2 0 0 1 17,13.7 V20.5"
+        android:strokeColor="#E6ECEF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 </vector>
