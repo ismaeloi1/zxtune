@@ -327,7 +327,7 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
         override fun getString(key: String, defValue: String?) = delegate.getString(key, defValue)
 
         private fun notify(key: String) {
-            if (key.startsWith(OscilloscopeSettings.PREFIX)) {
+            if (key.startsWith(OscilloscopeSettings.PREFIX) || key.startsWith(OscilloscopeSettings.SID_PREFIX)) {
                 OscilloscopeSettings.notifyChanged()
             }
         }

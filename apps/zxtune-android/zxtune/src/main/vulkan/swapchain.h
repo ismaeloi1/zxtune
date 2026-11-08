@@ -39,7 +39,9 @@ namespace VulkanScope
     //! @brief Recreate swapchain on surface changes
     Result Update();
 
-    Result Render(const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent);
+    //! @param shapes see ScopeRenderer::Write
+    Result Render(const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent, const float* shapes,
+                  uint32_t shapesCount);
 
     ScopeRenderer& Renderer()
     {

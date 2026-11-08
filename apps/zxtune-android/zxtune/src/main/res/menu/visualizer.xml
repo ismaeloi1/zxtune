@@ -17,6 +17,14 @@
             android:visible="false"
             app:showAsAction="always"
             tools:ignore="AlwaysShowAction" />
+    <!-- shown only for chips with filter model, see VisualizerFragment.updateControls -->
+    <item
+            android:id="@+id/action_visualizer_filter"
+            android:icon="@drawable/ic_filter_response"
+            android:title="@string/visualizer_filter"
+            android:visible="false"
+            app:showAsAction="always"
+            tools:ignore="AlwaysShowAction" />
     <item
             android:id="@+id/action_visualizer_mode"
             android:icon="@drawable/ic_oscilloscope"

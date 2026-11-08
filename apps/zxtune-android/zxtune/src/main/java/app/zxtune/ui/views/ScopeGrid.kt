@@ -48,13 +48,14 @@ internal class ScopeGrid private constructor(
 
     /**
      * Trace areas in pixels (y is from top), 4 values per channel: left, width, vertical center, amplitude
+     * @param viewTop top of grid's area, e.g. under filter response (see [FilterLayout])
      */
-    fun traces(viewWidth: Int, viewHeight: Int, textSize: Float, target: FloatArray) {
+    fun traces(viewWidth: Int, viewHeight: Int, textSize: Float, target: FloatArray, viewTop: Float = 0f) {
         val band = labelBand(viewHeight, textSize)
         val cellH = viewHeight.toFloat() / rows
         for (chan in 0 until channels) {
             val cellW = viewWidth * width(chan)
-            val top = cellH * row(chan) + band
+            val top = viewTop + cellH * row(chan) + band
             val traceH = cellH - band
             target[chan * 4] = viewWidth * left(chan) + cellW * CELL_MARGIN
             target[chan * 4 + 1] = cellW * (1 - 2 * CELL_MARGIN)
@@ -68,10 +69,15 @@ internal class ScopeGrid private constructor(
      * Drawn once per layout or size change, so per frame only traces are drawn over it.
      */
     fun drawBackground(bitmap: Bitmap, textSize: Float) {
-        val width = bitmap.width
-        val height = bitmap.height
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.TRANSPARENT, android.graphics.PorterDuff.Mode.SRC)
+        drawBackground(canvas, bitmap.width, bitmap.height, textSize)
+    }
+
+    /**
+     * @param height of grid's area at the top of [canvas] (translated for other placement)
+     */
+    fun drawBackground(canvas: Canvas, width: Int, height: Int, textSize: Float) {
         val cellH = height.toFloat() / rows
         val band = labelBand(height, textSize)
         val linePaint = Paint().apply {
@@ -111,10 +117,10 @@ internal class ScopeGrid private constructor(
 
         // labels are never drawn over traces, so they are shrunk for short cells to keep traces high enough
         private const val MAX_BAND_PART = 0.4f
-        private const val LABEL_BAND_TO_TEXT = 1.4f
+        const val LABEL_BAND_TO_TEXT = 1.4f
         private const val MIN_LABEL_SCALE = 0.6f
         private const val AMPLIFICATION = 0.95f
-        private const val CELL_MARGIN = 0.01f
+        const val CELL_MARGIN = 0.01f
         private const val LABEL_ALPHA = 200
 
         // 0.15 of white

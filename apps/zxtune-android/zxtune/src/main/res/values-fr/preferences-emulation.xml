@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="pref_zxtune_sid_filter_curve_title">Réponse du filtre</string>
+    <string name="pref_zxtune_sid_filter_curve_title">Courbe de coupure du filtre</string>
     <string name="pref_zxtune_sid_filter_curve_legend_emulated">émulée</string>
     <string name="pref_zxtune_sid_filter_curve_legend_reference">référence du préréglage</string>
-    <string name="pref_zxtune_sid_filter_curve_idle">Lancez un morceau SID pour voir comment le filtre modifie chaque voix</string>
     <string name="pref_zxtune_sid_filter_curve_custom">Personnalisé</string>
     <string-array name="pref_zxtune_sid_filter_response_modes">
         <item>Arrêt</item>
@@ -15,10 +14,6 @@
         <item>Bande+haut</item>
         <item>Tout</item>
     </string-array>
-    <string name="pref_zxtune_sid_filter_caption_mode">Mode</string>
-    <string name="pref_zxtune_sid_filter_caption_cutoff">Coupure</string>
-    <string name="pref_zxtune_sid_filter_caption_resonance">Résonance</string>
-    <string name="pref_zxtune_sid_filter_dac_curve">Courbe du DAC</string>
     <string name="pref_zxtune_sid_filter_voice_direct">direct</string>
     <string name="pref_zxtune_sid_filter_voice_noise">Bruit</string>
     <string name="pref_zxtune_sid_model_summary">Utilisé si le morceau ne le précise pas</string>

@@ -58,6 +58,31 @@ class OscilloscopeFrame @JvmOverloads constructor(
             display?.gauges = value
         }
 
+    override var showFilter = false
+        set(value) {
+            field = value
+            display?.showFilter = value
+        }
+
+    override var filterSettings = FilterSettings()
+        set(value) {
+            val relayout = value.withWaves != field.withWaves
+            field = value
+            display?.filterSettings = value
+            if (relayout) {
+                // forces layout update
+                display?.showFilter = showFilter
+            }
+        }
+
+    override var onFilterSupport: ((Boolean) -> Unit)? = null
+
+    /**
+     * Playing source supports filter response, see [showFilter]
+     */
+    var isFilterSupported = false
+        private set
+
     /**
      * @param preference see [ScopeBackend.select]
      * @param customDriver Vulkan driver to use instead of system one
@@ -133,6 +158,14 @@ class OscilloscopeFrame @JvmOverloads constructor(
         view.gainPercent = gainPercent
         view.maxFps = maxFps
         view.gauges = gauges
+        view.showFilter = showFilter
+        view.filterSettings = filterSettings
+        view.onFilterSupport = { supported ->
+            if (supported != isFilterSupported) {
+                isFilterSupported = supported
+                onFilterSupport?.invoke(supported)
+            }
+        }
         view.setSource(source, isLive)
     }
 }

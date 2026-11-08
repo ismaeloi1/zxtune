@@ -35,6 +35,11 @@
                 app:valueFormat="@string/pref_value_ms"
                 app:min="2"
                 app:showSeekBarValue="true" />
+        <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="ui.oscilloscope.filter_waves"
+                android:summary="@string/pref_oscilloscope_filter_waves_summary"
+                android:title="@string/pref_oscilloscope_filter_waves_title" />
         <DropDownPreference
                 android:defaultValue="@string/pref_oscilloscope_max_fps_default"
                 android:entries="@array/pref_oscilloscope_max_fps_entries"

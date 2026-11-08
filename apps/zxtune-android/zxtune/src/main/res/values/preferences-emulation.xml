@@ -396,12 +396,11 @@
         <item>5</item>
     </string-array>
     <string name="pref_zxtune_sid_filter_preset_default" translatable="false">0</string>
-    <string name="pref_zxtune_sid_filter_curve_title">Filter response</string>
+    <string name="pref_zxtune_sid_filter_curve_title">Filter cutoff curve</string>
     <string name="pref_zxtune_sid_filter_curve_legend_emulated">emulated</string>
     <string name="pref_zxtune_sid_filter_curve_legend_reference">preset reference</string>
-    <string name="pref_zxtune_sid_filter_curve_idle">Play a SID tune to see how the filter changes each voice</string>
     <string name="pref_zxtune_sid_filter_curve_custom">Custom</string>
-    <!-- filter outputs combination by mode bits: none, LP, BP, LP+BP, HP, LP+HP, BP+HP, all; short for big display -->
+    <!-- filter outputs combination by mode bits: none, LP, BP, LP+BP, HP, LP+HP, BP+HP, all; shown by filter view of oscilloscope -->
     <string-array name="pref_zxtune_sid_filter_response_modes">
         <item>Off</item>
         <item>Low-pass</item>
@@ -412,11 +411,6 @@
         <item>Band+high</item>
         <item>All</item>
     </string-array>
-    <string name="pref_zxtune_sid_filter_caption_mode">Mode</string>
-    <string name="pref_zxtune_sid_filter_caption_cutoff">Cutoff</string>
-    <string name="pref_zxtune_sid_filter_caption_resonance">Resonance</string>
-    <!-- switches main plot to cutoff register to frequency curve -->
-    <string name="pref_zxtune_sid_filter_dac_curve">DAC curve</string>
     <!-- voice is not routed to filter -->
     <string name="pref_zxtune_sid_filter_voice_direct">direct</string>
     <string name="pref_zxtune_sid_filter_voice_noise">Noise</string>

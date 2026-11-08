@@ -41,6 +41,12 @@ class VulkanOscilloscopeView internal constructor(
     private var background: Bitmap? = null
     private var backgroundPixels: ByteBuffer? = null
     private val traces = FloatArray(ScopeFeed.MAX_CHANNELS * 4)
+    private val filterResources = FilterResources.of(context)
+    private val filterScene = FilterScene(filterResources)
+    private var filterLayout: FilterLayout? = null
+    private var filterChannels = 0
+    private var atlasPixels: ByteBuffer? = null
+    private val shapes = ScopeShapes()
 
     @Volatile
     private var description = ""
@@ -50,6 +56,7 @@ class VulkanOscilloscopeView internal constructor(
         holder.setFormat(PixelFormat.RGBX_8888)
         setZOrderOnTop(true)
         holder.addCallback(this)
+        feed.onFilterSupport = { supported -> post { onFilterSupport?.invoke(supported) } }
     }
 
     override val source
@@ -58,6 +65,12 @@ class VulkanOscilloscopeView internal constructor(
     override var windowMs by feed::windowMs
 
     override var gauges by feed::gauges
+
+    override var showFilter by feed::showFilter
+
+    override var filterSettings by filterScene::settings
+
+    override var onFilterSupport: ((Boolean) -> Unit)? = null
 
     @Volatile
     override var gainPercent = OscilloscopeView.AUTO_GAIN
@@ -171,9 +184,16 @@ class VulkanOscilloscopeView internal constructor(
             fail()
             return false
         }
-        var result = VulkanScopeNative.render(handle, frame.samples, frame.channels, frame.points, gainPercent)
+        val layout = filterLayout?.takeIf { frame.isFilter }
+        if (layout != null) {
+            filterScene.build(layout, frame.gauges, frame.gaugesCount, frame.status, frame.nanos, frame.isLive, shapes)
+        } else {
+            shapes.clear()
+        }
+        val channels = if (layout != null) minOf(frame.channels, filterChannels) else frame.channels
+        var result = renderNative(frame, channels)
         if (result == VulkanScopeNative.RESULT_RESIZED) {
-            result = VulkanScopeNative.render(handle, frame.samples, frame.channels, frame.points, gainPercent)
+            result = renderNative(frame, channels)
         }
         return when (result) {
             VulkanScopeNative.RESULT_PRESENTED -> {
@@ -190,7 +210,17 @@ class VulkanOscilloscopeView internal constructor(
         }
     }
 
-    // Layout or size is changed, so static data is updated
+    private fun renderNative(frame: ScopeFeed.Frame, channels: Int) = VulkanScopeNative.render(
+        handle,
+        frame.samples,
+        channels,
+        frame.points,
+        gainPercent,
+        shapes.data,
+        shapes.count
+    )
+
+    // Layout, size or displayed mode is changed, so static data is updated
     private fun upload(frame: ScopeFeed.Frame, grid: ScopeGrid): Boolean {
         val width = frame.width
         val height = frame.height
@@ -199,15 +229,38 @@ class VulkanOscilloscopeView internal constructor(
                 background?.recycle()
                 background = it
             }
-        grid.drawBackground(bitmap, labelTextSize)
-        val size = bitmap.rowBytes * height
-        val pixels = backgroundPixels?.takeIf { it.capacity() == size } ?: ByteBuffer.allocateDirect(size).also {
-            backgroundPixels = it
+        val layout = if (frame.isFilter) {
+            FilterLayout.of(
+                context,
+                width,
+                height,
+                frame.voicesLayout,
+                grid,
+                labelTextSize,
+                filterResources,
+                filterScene.settings.withWaves
+            )
+        } else {
+            null
         }
-        pixels.rewind()
-        bitmap.copyPixelsToBuffer(pixels)
-        grid.traces(width, height, labelTextSize, traces)
-        val channels = minOf(grid.channels, ScopeFeed.MAX_CHANNELS)
+        filterLayout = layout
+        if (layout != null) {
+            layout.drawBackground(bitmap)
+            val atlas = layout.atlas.bitmap
+            val atlasData = copyPixels(atlas, atlasPixels).also { atlasPixels = it }
+            if (VulkanScopeNative.setAtlas(handle, atlasData, atlas.width, atlas.height, atlas.rowBytes) != 0) {
+                return false
+            }
+        } else {
+            grid.drawBackground(bitmap, labelTextSize)
+        }
+        val pixels = copyPixels(bitmap, backgroundPixels).also { backgroundPixels = it }
+        val channels = if (layout != null) {
+            layout.traces(traces).also { filterChannels = it }
+        } else {
+            grid.traces(width, height, labelTextSize, traces)
+            grid.channels
+        }.coerceAtMost(ScopeFeed.MAX_CHANNELS)
         if (VulkanScopeNative.setBackground(handle, pixels, width, height, bitmap.rowBytes) != 0 ||
             VulkanScopeNative.setTraces(handle, traces, channels, width, height) != 0
         ) {
@@ -215,5 +268,13 @@ class VulkanOscilloscopeView internal constructor(
         }
         uploadedGeneration = frame.generation
         return true
+    }
+
+    private fun copyPixels(bitmap: Bitmap, reused: ByteBuffer?): ByteBuffer {
+        val size = bitmap.rowBytes * bitmap.height
+        val pixels = reused?.takeIf { it.capacity() == size } ?: ByteBuffer.allocateDirect(size)
+        pixels.rewind()
+        bitmap.copyPixelsToBuffer(pixels)
+        return pixels
     }
 }

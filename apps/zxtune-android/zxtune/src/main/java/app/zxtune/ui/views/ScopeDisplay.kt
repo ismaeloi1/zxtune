@@ -43,6 +43,21 @@ interface ScopeDisplay {
     var gauges: GaugesExchange?
 
     /**
+     * Filter response of chips (see [FilterScene]) is displayed instead of waveforms if supported by source
+     */
+    var showFilter: Boolean
+
+    /**
+     * Emulation settings for filter response
+     */
+    var filterSettings: FilterSettings
+
+    /**
+     * Called on UI thread when support of filter response by source is changed
+     */
+    var onFilterSupport: ((Boolean) -> Unit)?
+
+    /**
      * @param src source of data or null to stop updating (last picture is kept)
      * @param isLive false to display single picture from source (e.g. paused playback)
      */

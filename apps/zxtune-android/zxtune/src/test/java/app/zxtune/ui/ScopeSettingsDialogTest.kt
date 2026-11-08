@@ -109,14 +109,15 @@ class ScopeSettingsDialogTest {
     }
 
     @Test
-    fun `filter curve stops live updates with its page`() {
+    fun `filter curve stops updates with its page`() {
         val (activity, dialog) = show(SID)
         val curve = select(dialog, 2).findPreference<FilterCurvePreference>("ui.sid.filter_curve")!!
         dialog.dismiss()
         shadowOf(Looper.getMainLooper()).idle()
         activity.supportFragmentManager.executePendingTransactions()
-        val job = FilterCurvePreference::class.java.getDeclaredField("liveJob").apply { isAccessible = true }.get(curve)
-        assertNull(job)
+        // settings polling is stopped and view is released
+        val view = FilterCurvePreference::class.java.getDeclaredField("view").apply { isAccessible = true }.get(curve)
+        assertNull(view)
     }
 
     @Test

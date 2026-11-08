@@ -20,7 +20,8 @@ private val LOG = Logger("ScopeFeed")
  * Requests waveforms on own thread paced by vsync (no binder calls on UI thread) and limits frame rate.
  * Each vsync is presented: comparing frames for identical data saved nothing measurable (triggered waves of playing
  * voices differ at each frame, and the feed is idle while paused anyway, see [ScopeActivity]).
- * Dashboard gauges of the same moment are requested by the same call, see [gauges].
+ * Dashboard gauges of the same moment are requested by the same call, see [gauges]. Chips gauges are requested for
+ * filter response as well (see [showFilter]), even if dashboard is hidden.
  */
 internal class ScopeFeed(context: android.content.Context, private val sink: Sink) {
 
@@ -44,6 +45,21 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         var generation = 0
         var width = 1
         var height = 1
+
+        /** Filter response instead of waveforms, see [showFilter] */
+        var isFilter = false
+
+        /** Gauges of the same moment, valid only during [Sink.onFrame] */
+        var gauges = EMPTY
+        var gaugesCount = 0
+        var voicesLayout = VoicesLayout.MASTER
+
+        /** Emulation status, requested for filter response only */
+        var status = ""
+
+        /** Continuous animation, else single picture (e.g. paused) */
+        var isLive = true
+        var nanos = 0L
     }
 
     val stats = ScopeStats()
@@ -69,6 +85,28 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
      */
     @Volatile
     var maxFps = 0
+
+    /**
+     * Filter response is requested instead of waveforms, displayed if source supports it (see [onFilterSupport])
+     */
+    @Volatile
+    var showFilter = false
+        set(value) {
+            field = value
+            forceUpdate = true
+        }
+
+    /**
+     * Called on feed thread when support of filter response is changed (chips with registers state are played)
+     */
+    @Volatile
+    var onFilterSupport: ((Boolean) -> Unit)? = null
+
+    private var isFilterSupported = false
+    private var ownGauges = EMPTY
+    private var status = ""
+    private var statusSource: Visualizer? = null
+    private var statusTime = 0L
 
     @Volatile
     private var forceUpdate = true
@@ -220,12 +258,24 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         val points = current.grid?.points(w) ?: ScopeGrid.MAX_POINTS
         val exchange = gauges?.takeIf { it.isEnabled }
         val gaugesLayout = voicesLayout
-        val gaugesKind = exchange?.let { GaugesExchange.kindOf(gaugesLayout) } ?: FrameResult.GAUGES_NONE
-        val gaugesBuffer = exchange?.buffer(gaugesKind, gaugesLayout) ?: EMPTY
+        val isFilter = showFilter && isFilterSupported && src === layoutSource
+        val gaugesKind = if (exchange != null || isFilter) GaugesExchange.kindOf(gaugesLayout) else FrameResult.GAUGES_NONE
+        val gaugesBuffer = when {
+            gaugesKind == FrameResult.GAUGES_NONE -> EMPTY
+
+            exchange != null -> exchange.buffer(gaugesKind, gaugesLayout)
+
+            else -> ownGauges.takeIf { it.size == GaugesExchange.sizeOf(gaugesKind, gaugesLayout) }
+                ?: ByteArray(GaugesExchange.sizeOf(gaugesKind, gaugesLayout)).also { ownGauges = it }
+        }
+        val waveWindowMs = exchange?.waveWindowMs ?: FILTER_WAVE_WINDOW_MS
+        if (isFilter) {
+            updateStatus(src)
+        }
         val dataStart = System.nanoTime()
         val result = try {
             FrameResult(
-                src.getFrame(frame.samples, points, windowMs, gaugesBuffer, gaugesKind, exchange?.waveWindowMs ?: 0)
+                src.getFrame(frame.samples, points, windowMs, gaugesBuffer, gaugesKind, waveWindowMs)
             )
         } catch (e: Exception) {
             LOG.w(e) { "Failed to get scope data" }
@@ -240,6 +290,11 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         frame.height = h
         frame.generation = current.generation
         frame.grid = current.grid
+        frame.gauges = gaugesBuffer
+        frame.gaugesCount = 0
+        frame.status = status
+        frame.isLive = isRunning
+        frame.nanos = dataStart
         if (channels == 0) {
             return
         }
@@ -253,9 +308,18 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
             layoutSource = src
             layoutId = layout.id
             frame.grid = null
+            updateFilterSupport(voicesLayout.hasRegisters)
         } else {
             // gauges of another layout are dropped, the next frame has them right
             exchange?.publish(gaugesKind, result.gauges, gaugesLayout)
+            if (gaugesKind == FrameResult.GAUGES_CHIPS) {
+                frame.gaugesCount = result.gauges
+            }
+        }
+        frame.voicesLayout = voicesLayout
+        frame.isFilter = showFilter && isFilterSupported
+        if (frame.isFilter != current.isFilter) {
+            frame.grid = null
         }
         if (frame.grid?.channels != channels || w != current.width || h != current.height || force) {
             frame.grid = frame.grid?.takeIf { it.channels == channels } ?: ScopeGrid.of(voicesLayout, channels)
@@ -267,9 +331,36 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
         }
     }
 
+    private fun updateFilterSupport(supported: Boolean) {
+        if (supported != isFilterSupported) {
+            LOG.d { "filter=$supported" }
+            isFilterSupported = supported
+            onFilterSupport?.invoke(supported)
+        }
+    }
+
+    // chip model and clock are changed only with tune, so rarely requested text is enough
+    private fun updateStatus(src: Visualizer) {
+        val now = System.nanoTime()
+        if (src !== statusSource || now - statusTime > STATUS_PERIOD_NS) {
+            statusSource = src
+            statusTime = now
+            status = try {
+                src.getStatus()
+            } catch (e: Exception) {
+                LOG.w(e) { "Failed to get status" }
+                ""
+            }
+        }
+    }
+
     companion object {
         const val MAX_CHANNELS = 32
         private val EMPTY = ByteArray(0)
+        private const val STATUS_PERIOD_NS = 1_000_000_000L
+
+        // only registers snapshot is used if dashboard is not displayed
+        private const val FILTER_WAVE_WINDOW_MS = 10
 
         // Single thread for all the views (usually only one is visible), so nothing to release
         private val sharedThread by lazy {

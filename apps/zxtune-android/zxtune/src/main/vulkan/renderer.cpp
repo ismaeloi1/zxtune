@@ -44,8 +44,15 @@ namespace VulkanScope
   static_assert(sizeof(FrameHeader) % 4 == 0, "Layout mismatch");
 
   // samples, then intensities
-  const VkDeviceSize FRAME_SIZE =
+  const VkDeviceSize TRACES_SIZE =
       sizeof(FrameHeader) + ScopeRenderer::MAX_CHANNELS * ScopeRenderer::MAX_POINTS * (sizeof(int16_t) + 1);
+  // shapes are bound separately, offset is aligned as any minStorageBufferOffsetAlignment
+  const VkDeviceSize SHAPES_OFFSET = (TRACES_SIZE + 255) & ~VkDeviceSize(255);
+  // indirect draw command, then shapes, see shaders/shape.vert
+  const VkDeviceSize SHAPES_SIZE =
+      sizeof(VkDrawIndirectCommand) + ScopeRenderer::MAX_SHAPES * ScopeRenderer::SHAPE_FLOATS * sizeof(float);
+  const VkDeviceSize FRAME_SIZE = SHAPES_OFFSET + SHAPES_SIZE;
+  static_assert(sizeof(VkDrawIndirectCommand) == 16, "Layout mismatch");
   // swapchains rarely have more images
   const uint32_t MAX_IMAGES = 8;
   // Thin line keeps steps, spikes and noise of waveform distinguishable (thick one merged them into blobs), antialiased
@@ -105,18 +112,20 @@ namespace VulkanScope
       passInfo.pDependencies = &dependency;
       Check(Vk.vkCreateRenderPass(Dev.Handle(), &passInfo, nullptr, &RenderPass), "vkCreateRenderPass");
 
-      VkDescriptorSetLayoutBinding bindings[2] = {};
-      bindings[0].binding = 0;
-      bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      bindings[0].descriptorCount = 1;
-      bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-      bindings[1].binding = 1;
-      bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      bindings[1].descriptorCount = 1;
-      bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+      // traces, background, glyphs atlas, shapes
+      VkDescriptorSetLayoutBinding bindings[4] = {};
+      for (uint32_t idx = 0; idx < 4; ++idx)
+      {
+        const bool isBuffer = idx == 0 || idx == 3;
+        bindings[idx].binding = idx;
+        bindings[idx].descriptorType = isBuffer ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+                                                : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[idx].descriptorCount = 1;
+        bindings[idx].stageFlags = isBuffer ? VK_SHADER_STAGE_VERTEX_BIT : VK_SHADER_STAGE_FRAGMENT_BIT;
+      }
       VkDescriptorSetLayoutCreateInfo setInfo = {};
       setInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-      setInfo.bindingCount = 2;
+      setInfo.bindingCount = 4;
       setInfo.pBindings = bindings;
       Check(Vk.vkCreateDescriptorSetLayout(Dev.Handle(), &setInfo, nullptr, &SetLayout), "vkCreateDescriptorSetLayout");
 
@@ -149,8 +158,8 @@ namespace VulkanScope
       poolInfo.queueFamilyIndex = Dev.QueueFamily();
       Check(Vk.vkCreateCommandPool(Dev.Handle(), &poolInfo, nullptr, &CommandPool), "vkCreateCommandPool");
 
-      VkDescriptorPoolSize sizes[2] = {{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, MAX_IMAGES},
-                                       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_IMAGES}};
+      VkDescriptorPoolSize sizes[2] = {{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 * MAX_IMAGES},
+                                       {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 2 * MAX_IMAGES}};
       VkDescriptorPoolCreateInfo descInfo = {};
       descInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
       descInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
@@ -159,8 +168,9 @@ namespace VulkanScope
       descInfo.pPoolSizes = sizes;
       Check(Vk.vkCreateDescriptorPool(Dev.Handle(), &descInfo, nullptr, &DescriptorPool), "vkCreateDescriptorPool");
 
-      // descriptors should be valid before the first real background
-      CreateBackground(1, 1);
+      // descriptors should be valid before the first real background and atlas
+      CreateTexture(Background, 1, 1);
+      CreateTexture(Atlas, 1, 1);
     }
     catch (...)
     {
@@ -179,7 +189,8 @@ namespace VulkanScope
     const auto dev = Dev.Handle();
     Vk.vkDeviceWaitIdle(dev);
     DestroyTargets();
-    DestroyBackground();
+    DestroyTexture(Background);
+    DestroyTexture(Atlas);
     if (DescriptorPool)
     {
       Vk.vkDestroyDescriptorPool(dev, DescriptorPool, nullptr);
@@ -195,7 +206,7 @@ namespace VulkanScope
       Vk.vkDestroySampler(dev, Sampler, nullptr);
       Sampler = VK_NULL_HANDLE;
     }
-    for (auto* pipeline : {&TracePipeline, &BackgroundPipeline})
+    for (auto* pipeline : {&TracePipeline, &BackgroundPipeline, &ShapePipeline})
     {
       if (*pipeline)
       {
@@ -223,14 +234,15 @@ namespace VulkanScope
   void ScopeRenderer::CreatePipelines()
   {
     TracePipeline = CreatePipeline(Shaders::TRACE_VERT, sizeof(Shaders::TRACE_VERT), Shaders::TRACE_FRAG,
-                                   sizeof(Shaders::TRACE_FRAG), VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, true);
+                                   sizeof(Shaders::TRACE_FRAG), Blending::ADD);
     BackgroundPipeline = CreatePipeline(Shaders::BACKGROUND_VERT, sizeof(Shaders::BACKGROUND_VERT),
-                                        Shaders::BACKGROUND_FRAG, sizeof(Shaders::BACKGROUND_FRAG),
-                                        VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, false);
+                                        Shaders::BACKGROUND_FRAG, sizeof(Shaders::BACKGROUND_FRAG), Blending::NONE);
+    ShapePipeline = CreatePipeline(Shaders::SHAPE_VERT, sizeof(Shaders::SHAPE_VERT), Shaders::SHAPE_FRAG,
+                                   sizeof(Shaders::SHAPE_FRAG), Blending::OVER);
   }
 
   VkPipeline ScopeRenderer::CreatePipeline(const uint32_t* vertex, std::size_t vertexSize, const uint32_t* fragment,
-                                           std::size_t fragmentSize, VkPrimitiveTopology topology, bool blend)
+                                           std::size_t fragmentSize, Blending blend)
   {
     VkShaderModule modules[2] = {};
     const uint32_t* codes[2] = {vertex, fragment};
@@ -256,7 +268,7 @@ namespace VulkanScope
       input.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
       VkPipelineInputAssemblyStateCreateInfo assembly = {};
       assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-      assembly.topology = topology;
+      assembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
       VkPipelineViewportStateCreateInfo viewport = {};
       viewport.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
       viewport.viewportCount = 1;
@@ -273,12 +285,13 @@ namespace VulkanScope
       VkPipelineColorBlendAttachmentState attachment = {};
       attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT
                                   | VK_COLOR_COMPONENT_A_BIT;
-      if (blend)
+      if (blend != Blending::NONE)
       {
-        // white traces are lit additively as phosphor, see shaders/trace.frag
+        // white traces are lit additively as phosphor (see shaders/trace.frag), colored shapes are premultiplied
         attachment.blendEnable = VK_TRUE;
         attachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;
-        attachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE;
+        attachment.dstColorBlendFactor = blend == Blending::ADD ? VK_BLEND_FACTOR_ONE
+                                                                : VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         attachment.colorBlendOp = VK_BLEND_OP_ADD;
         // surface is opaque
         attachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;
@@ -426,7 +439,7 @@ namespace VulkanScope
     Record();
   }
 
-  void ScopeRenderer::CreateBackground(uint32_t width, uint32_t height)
+  void ScopeRenderer::CreateTexture(Texture& tex, uint32_t width, uint32_t height)
   {
     const auto dev = Dev.Handle();
     VkImageCreateInfo info = {};
@@ -442,23 +455,23 @@ namespace VulkanScope
     info.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    Check(Vk.vkCreateImage(dev, &info, nullptr, &Background), "vkCreateImage");
+    Check(Vk.vkCreateImage(dev, &info, nullptr, &tex.Image), "vkCreateImage");
     VkMemoryRequirements req = {};
-    Vk.vkGetImageMemoryRequirements(dev, Background, &req);
+    Vk.vkGetImageMemoryRequirements(dev, tex.Image, &req);
     VkMemoryAllocateInfo alloc = {};
     alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc.allocationSize = req.size;
     alloc.memoryTypeIndex = Dev.FindMemory(req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, 0);
-    Check(Vk.vkAllocateMemory(dev, &alloc, nullptr, &BackgroundMemory), "vkAllocateMemory");
-    Check(Vk.vkBindImageMemory(dev, Background, BackgroundMemory, 0), "vkBindImageMemory");
+    Check(Vk.vkAllocateMemory(dev, &alloc, nullptr, &tex.Memory), "vkAllocateMemory");
+    Check(Vk.vkBindImageMemory(dev, tex.Image, tex.Memory, 0), "vkBindImageMemory");
     VkImageViewCreateInfo viewInfo = {};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = Background;
+    viewInfo.image = tex.Image;
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.format = VK_FORMAT_R8_UNORM;
     viewInfo.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    Check(Vk.vkCreateImageView(dev, &viewInfo, nullptr, &BackgroundView), "vkCreateImageView");
-    BackgroundSize = {width, height};
+    Check(Vk.vkCreateImageView(dev, &viewInfo, nullptr, &tex.View), "vkCreateImageView");
+    tex.Size = {width, height};
     // initial content is undefined
     auto* cmd = BeginOneTime();
     VkImageMemoryBarrier barrier = {};
@@ -467,7 +480,7 @@ namespace VulkanScope
     barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.image = Background;
+    barrier.image = tex.Image;
     barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
     Vk.vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
@@ -475,27 +488,35 @@ namespace VulkanScope
     EndOneTime(cmd);
   }
 
-  void ScopeRenderer::DestroyBackground()
+  void ScopeRenderer::DestroyTexture(Texture& tex)
   {
     const auto dev = Dev.Handle();
-    if (BackgroundView)
+    if (tex.View)
     {
-      Vk.vkDestroyImageView(dev, BackgroundView, nullptr);
-      BackgroundView = VK_NULL_HANDLE;
+      Vk.vkDestroyImageView(dev, tex.View, nullptr);
     }
-    if (Background)
+    if (tex.Image)
     {
-      Vk.vkDestroyImage(dev, Background, nullptr);
-      Background = VK_NULL_HANDLE;
+      Vk.vkDestroyImage(dev, tex.Image, nullptr);
     }
-    if (BackgroundMemory)
+    if (tex.Memory)
     {
-      Vk.vkFreeMemory(dev, BackgroundMemory, nullptr);
-      BackgroundMemory = VK_NULL_HANDLE;
+      Vk.vkFreeMemory(dev, tex.Memory, nullptr);
     }
+    tex = Texture();
   }
 
   void ScopeRenderer::SetBackground(const uint8_t* alpha, uint32_t width, uint32_t height, uint32_t stride)
+  {
+    Upload(Background, alpha, width, height, stride);
+  }
+
+  void ScopeRenderer::SetAtlas(const uint8_t* alpha, uint32_t width, uint32_t height, uint32_t stride)
+  {
+    Upload(Atlas, alpha, width, height, stride);
+  }
+
+  void ScopeRenderer::Upload(Texture& tex, const uint8_t* alpha, uint32_t width, uint32_t height, uint32_t stride)
   {
     if (!width || !height)
     {
@@ -504,10 +525,10 @@ namespace VulkanScope
     const auto dev = Dev.Handle();
     // rare operation, so simple synchronization is used
     Vk.vkDeviceWaitIdle(dev);
-    if (BackgroundSize.width != width || BackgroundSize.height != height)
+    if (tex.Size.width != width || tex.Size.height != height)
     {
-      DestroyBackground();
-      CreateBackground(width, height);
+      DestroyTexture(tex);
+      CreateTexture(tex, width, height);
       UpdateDescriptors();
       Record();
     }
@@ -545,7 +566,7 @@ namespace VulkanScope
       barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
       barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
       barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-      barrier.image = Background;
+      barrier.image = tex.Image;
       barrier.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
       barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
       Vk.vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
@@ -553,7 +574,7 @@ namespace VulkanScope
       VkBufferImageCopy region = {};
       region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
       region.imageExtent = {width, height, 1};
-      Vk.vkCmdCopyBufferToImage(cmd, staging, Background, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+      Vk.vkCmdCopyBufferToImage(cmd, staging, tex.Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
       barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
       barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
       barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -639,26 +660,34 @@ namespace VulkanScope
   {
     for (auto& frame : Frames)
     {
-      VkDescriptorBufferInfo bufferInfo = {frame.Buffer, 0, FRAME_SIZE};
-      VkDescriptorImageInfo imageInfo = {Sampler, BackgroundView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL};
-      VkWriteDescriptorSet writes[2] = {};
-      writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      writes[0].dstSet = frame.Descriptors;
-      writes[0].dstBinding = 0;
-      writes[0].descriptorCount = 1;
-      writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      writes[0].pBufferInfo = &bufferInfo;
-      writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      writes[1].dstSet = frame.Descriptors;
-      writes[1].dstBinding = 1;
-      writes[1].descriptorCount = 1;
-      writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      writes[1].pImageInfo = &imageInfo;
-      Vk.vkUpdateDescriptorSets(Dev.Handle(), 2, writes, 0, nullptr);
+      const VkDescriptorBufferInfo buffers[2] = {{frame.Buffer, 0, TRACES_SIZE},
+                                                 {frame.Buffer, SHAPES_OFFSET, SHAPES_SIZE}};
+      const VkDescriptorImageInfo images[2] = {{Sampler, Background.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL},
+                                               {Sampler, Atlas.View, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL}};
+      VkWriteDescriptorSet writes[4] = {};
+      for (uint32_t idx = 0; idx < 4; ++idx)
+      {
+        const bool isBuffer = idx == 0 || idx == 3;
+        writes[idx].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[idx].dstSet = frame.Descriptors;
+        writes[idx].dstBinding = idx;
+        writes[idx].descriptorCount = 1;
+        writes[idx].descriptorType = isBuffer ? VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
+                                              : VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        if (isBuffer)
+        {
+          writes[idx].pBufferInfo = &buffers[idx == 0 ? 0 : 1];
+        }
+        else
+        {
+          writes[idx].pImageInfo = &images[idx == 1 ? 0 : 1];
+        }
+      }
+      Vk.vkUpdateDescriptorSets(Dev.Handle(), 4, writes, 0, nullptr);
     }
   }
 
-  // Commands depend only on targets and background, data is taken from buffer (including draw parameters)
+  // Commands depend only on targets and textures, data is taken from buffer (including draw parameters)
   void ScopeRenderer::Record()
   {
     PushConstants push = {};
@@ -706,6 +735,8 @@ namespace VulkanScope
       Vk.vkCmdDraw(cmd, 3, 1, 0, 0);
       Vk.vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, TracePipeline);
       Vk.vkCmdDrawIndirect(cmd, frame.Buffer, offsetof(FrameHeader, Draw), 1, sizeof(VkDrawIndirectCommand));
+      Vk.vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, ShapePipeline);
+      Vk.vkCmdDrawIndirect(cmd, frame.Buffer, SHAPES_OFFSET, 1, sizeof(VkDrawIndirectCommand));
       Vk.vkCmdEndRenderPass(cmd);
       Check(Vk.vkEndCommandBuffer(cmd), "vkEndCommandBuffer");
     }
@@ -755,7 +786,8 @@ namespace VulkanScope
     target[segments] = 255;
   }
 
-  void ScopeRenderer::Write(uint32_t image, const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent)
+  void ScopeRenderer::Write(uint32_t image, const int16_t* samples, uint32_t channels, uint32_t points, int gainPercent,
+                            const float* shapes, uint32_t shapesCount)
   {
     auto& frame = Frames.at(image);
     auto* header = static_cast<FrameHeader*>(frame.Mapped);
@@ -787,16 +819,28 @@ namespace VulkanScope
     }
     const auto samplesCount = std::size_t(channels) * points;
     auto* samplesArea = reinterpret_cast<uint8_t*>(header + 1);
-    std::memcpy(samplesArea, samples, samplesCount * sizeof(int16_t));
     // word aligned
     const auto intensities = static_cast<uint32_t>((samplesCount + 1) / 2);
-    std::memcpy(samplesArea + intensities * sizeof(uint32_t), Intensities.data(), samplesCount);
+    if (samplesCount)
+    {
+      std::memcpy(samplesArea, samples, samplesCount * sizeof(int16_t));
+      std::memcpy(samplesArea + intensities * sizeof(uint32_t), Intensities.data(), samplesCount);
+    }
     header->Intensities = intensities;
     header->Points = points;
     header->Draw.vertexCount = points > 1 ? (points - 1) * VERTICES_PER_SEGMENT : 0;
     header->Draw.instanceCount = channels;
     header->Draw.firstVertex = 0;
     header->Draw.firstInstance = 0;
+    // single instance of 6 vertices per shape, see shaders/shape.vert
+    shapesCount = shapes ? std::min(shapesCount, MAX_SHAPES) : 0;
+    auto* shapesArea = static_cast<uint8_t*>(frame.Mapped) + SHAPES_OFFSET;
+    const VkDrawIndirectCommand shapesDraw = {shapesCount * VERTICES_PER_SEGMENT, 1, 0, 0};
+    std::memcpy(shapesArea, &shapesDraw, sizeof(shapesDraw));
+    if (shapesCount)
+    {
+      std::memcpy(shapesArea + sizeof(shapesDraw), shapes, std::size_t(shapesCount) * SHAPE_FLOATS * sizeof(float));
+    }
   }
 
   void ScopeRenderer::Submit(uint32_t image, VkSemaphore wait, VkSemaphore signal, VkFence fence)
