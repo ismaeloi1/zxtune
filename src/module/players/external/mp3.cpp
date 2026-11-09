@@ -338,6 +338,12 @@ namespace Module::Mp3
         Data->Lookup.back().Frames++;
       }
       Data->Duration += Time::Microseconds::FromRatio(frame.Properties.SamplesCount, frame.Properties.Samplerate);
+      FramesSize += frame.Location.Size;
+      if (!Samplerate)
+      {
+        Samplerate = frame.Properties.Samplerate;
+        Channels = frame.Properties.Mono ? 1 : 2;
+      }
     }
 
     void SetContent(Binary::Data::Ptr data)
@@ -355,6 +361,10 @@ namespace Module::Mp3
       {
         Dbg("Built {} seek points", Data->Lookup.size());
         Data->Lookup.shrink_to_fit();
+        // minimp3 decodes all the MPEG-1/2 audio layers, but other ones are rare
+        Properties.SetStreamFormat("MP3"sv, Samplerate, Channels);
+        // tags are not included
+        Properties.SetBitrate(FramesSize, Data->Duration.CastTo<Time::Millisecond>());
         return Data;
       }
     }
@@ -363,6 +373,9 @@ namespace Module::Mp3
     const Model::RWPtr Data;
     PropertiesHelper& Properties;
     MetaProperties Meta;
+    uint64_t FramesSize = 0;
+    uint_t Samplerate = 0;
+    uint_t Channels = 0;
   };
 
   class Factory : public Module::Factory

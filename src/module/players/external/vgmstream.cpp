@@ -23,6 +23,7 @@
 #include "formats/multitrack/container.h"
 #include "math/numeric.h"
 #include "module/additional_files.h"
+#include "module/attributes.h"
 #include "sound/resampler.h"
 #include "strings/sanitize.h"
 
@@ -362,6 +363,21 @@ namespace Module::VGMStream
     const Parameters::Accessor::Ptr Properties;
   };
 
+  // "16-bit Little Endian PCM" -> 16
+  uint_t GetPcmBits(StringView codec)
+  {
+    uint_t bits = 0;
+    for (const auto sym : codec)
+    {
+      if (sym < '0' || sym > '9')
+      {
+        return sym == '-' ? bits : 0;
+      }
+      bits = bits * 10 + (sym - '0');
+    }
+    return 0;
+  }
+
   VGMStreamPtr TryOpenStream(const Vfs::Ptr& vfs, int subtrackIndex = -1)
   {
     // Streams are reopened for further seeking and partial decoding
@@ -397,6 +413,22 @@ namespace Module::VGMStream
         std::array<char, 1024> buf{0};
         ::describe_vgmstream(stream.get(), buf.data(), buf.size());
         props.SetComment(Strings::SanitizeMultiline(buf.data()));
+        ::get_vgmstream_coding_description(stream.get(), buf.data(), buf.size());
+        const auto coding = Strings::Sanitize(buf.data());
+        // e.g. "16-bit Little Endian PCM" or "32-bit float PCM", described the same way as by other formats
+        if (const auto bits = coding.ends_with(" PCM"sv) ? GetPcmBits(coding) : 0)
+        {
+          const auto isFloat = coding.find(" float "sv) != String::npos;
+          props.SetStreamFormat(isFloat ? "PCM float"sv : "PCM"sv, stream->sample_rate, stream->channels, bits);
+        }
+        else
+        {
+          props.SetStreamFormat(coding, stream->sample_rate, stream->channels);
+          if (const auto bitrate = ::get_vgmstream_average_bitrate(stream.get()); bitrate > 0)
+          {
+            properties->SetValue(ATTR_BITRATE, Parameters::IntType{bitrate});
+          }
+        }
       }
       return MakePtr<Holder>(std::move(vfs), std::move(stream), std::move(properties));
     }

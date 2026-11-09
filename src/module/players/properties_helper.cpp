@@ -18,6 +18,8 @@
 
 #include "string_view.h"
 
+#include <utility>
+
 namespace Module
 {
   void PropertiesHelper::SetNonEmptyProperty(StringView name, StringView value)
@@ -48,6 +50,27 @@ namespace Module
     Delegate.SetValue(ATTR_SIZE, source.Size());
     Delegate.SetValue(ATTR_CRC, source.Checksum());
     Delegate.SetValue(ATTR_FIXEDCRC, source.FixedChecksum());
+  }
+
+  void PropertiesHelper::SetStreamFormat(StringView codec, uint_t samplerate, uint_t channels, uint_t bits)
+  {
+    SetNonEmptyProperty(ATTR_CODEC, codec);
+    for (const auto& [name, value] : {std::pair{ATTR_SAMPLERATE, samplerate}, std::pair{ATTR_CHANNELS, channels},
+                                      std::pair{ATTR_SAMPLE_BITS, bits}})
+    {
+      if (value)
+      {
+        Delegate.SetValue(name, value);
+      }
+    }
+  }
+
+  void PropertiesHelper::SetBitrate(uint64_t bytes, Time::Milliseconds duration)
+  {
+    if (const auto ms = duration.Get())
+    {
+      Delegate.SetValue(ATTR_BITRATE, bytes * 8 * 1000 / ms);
+    }
   }
 
   void PropertiesHelper::SetAuthor(StringView author)

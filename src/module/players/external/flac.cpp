@@ -394,10 +394,11 @@ namespace Module::Flac
       Data->MaxFrameSize = maximal;
     }
 
-    void SetStreamParameters(uint_t sampleRate, uint_t channels, uint_t /*bitsPerSample*/) override
+    void SetStreamParameters(uint_t sampleRate, uint_t channels, uint_t bitsPerSample) override
     {
       Require(channels <= 2);
       Data->Frequency = sampleRate;
+      Properties.SetStreamFormat("FLAC"sv, sampleRate, channels, bitsPerSample);
     }
 
     void SetTotalSamples(uint64_t count) override
@@ -445,6 +446,7 @@ namespace Module::Flac
           if (auto data = dataBuilder.GetResult())
           {
             props.SetSource(*container);
+            props.SetBitrate(container->Size(), Time::Milliseconds::FromRatio(data->TotalSamples, data->Frequency));
             dataBuilder.SetContent(container);
             return MakePtr<Holder>(std::move(data), std::move(properties));
           }
