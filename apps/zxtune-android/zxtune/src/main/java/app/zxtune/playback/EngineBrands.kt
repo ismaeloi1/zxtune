@@ -27,7 +27,10 @@ object EngineBrands {
         "POKEY" to "NebulaWeavePOKEY",
         "PSX" to "NebulaWeavePSX",
         "N64" to "NebulaWeaveN64",
+        // Sega Saturn and Model 2A/2B/2C SCSP
         "SATURN" to "NebulaWeaveSCSP",
+        // Sega Model 1 and Model 2 YMW258-F (MultiPCM)
+        "MULTIPCM" to "NebulaWeaveYMW",
         "DREAMCAST" to "NebulaWeaveAICA",
         "MT32" to "NebulaWeaveMT32",
         "DAC" to "NebulaWeaveDAC",
@@ -79,6 +82,9 @@ object EngineBrands {
      * Chip name in emulation description (first status line) to system tag, first match wins
      */
     val BY_CHIP = listOf(
+        // music of Sega arcade boards is played by PCM chips, FM chip of Model 1 (YM3438) is secondary
+        "YMW258" to "MULTIPCM",
+        "SCSP" to "SATURN",
         "MOS6581" to "C64",
         "MOS8580" to "C64",
         "S-DSP" to "SNES",

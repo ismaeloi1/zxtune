@@ -49,6 +49,13 @@ class StatusHeaderTest {
         assertEquals("NebulaWeaveMOD", EngineBrands.brandOf("PSM", ""))
         assertEquals("NebulaWeaveNES", EngineBrands.brandOf("NSFE", "Nintendo NES, Game_Music_Emu"))
         assertEquals("NebulaWeavePCM", EngineBrands.brandOf("MP3", ""))
+        // Sega Model 1 music is played by YMW258, its YM3438 is secondary
+        assertEquals(
+            "NebulaWeaveYMW",
+            EngineBrands.brandOf("VGM", "YM3438 MAME 8.00MHz, YMW258/1 MAME 10.02MHz, YMW258/2 MAME 10.02MHz"),
+        )
+        assertEquals("NebulaWeaveSCSP", EngineBrands.brandOf("VGM", "SCSP MAME 22.58MHz"))
+        assertEquals("NebulaWeaveSCSP", EngineBrands.brandOf("SSF", ""))
         // every system has a brand
         (EngineBrands.BY_TYPE.values + EngineBrands.BY_CHIP.map { it.second }).forEach {
             assert(EngineBrands.BRANDS.containsKey(it)) { it }
