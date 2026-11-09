@@ -33,7 +33,7 @@ namespace VulkanScope
   class ScopeRenderer
   {
   public:
-    static const uint32_t MAX_CHANNELS = 32;
+    static const uint32_t MAX_CHANNELS = 64;
     static const uint32_t MAX_POINTS = 2048;
     static const int AUTO_GAIN = 0;
     //! See shaders/shape.vert and app.zxtune.ui.views.ScopeShapes

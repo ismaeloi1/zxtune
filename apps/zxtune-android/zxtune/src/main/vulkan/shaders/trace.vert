@@ -14,8 +14,8 @@ layout(std430, set = 0, binding = 0) readonly buffer Frame
   uint reserved1;
   uint reserved2;
   // left, width, vertical center and amplitude in pixels
-  vec4 traces[32];
-  float gains[32];
+  vec4 traces[64];
+  float gains[64];
   // 16-bit samples [channels][points], packed by pairs, then intensities [channels][points]
   uint samples[];
 } frame;

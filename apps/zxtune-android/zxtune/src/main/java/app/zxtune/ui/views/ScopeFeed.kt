@@ -355,7 +355,8 @@ internal class ScopeFeed(context: android.content.Context, private val sink: Sin
     }
 
     companion object {
-        const val MAX_CHANNELS = 32
+        // see Sound::ScopeDetails::MAX_VOICES
+        const val MAX_CHANNELS = 64
         private val EMPTY = ByteArray(0)
         private const val STATUS_PERIOD_NS = 1_000_000_000L
 

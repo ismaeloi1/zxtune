@@ -117,7 +117,7 @@ class GaugesExchange {
             else -> 0
         }
 
-        // limited by shared memory buffer of remote visualizer
-        private const val MAX_VOICES = 40
+        // limited by shared memory buffer of remote visualizer, two YMW258 of Sega Model 1 have 56 slots
+        const val MAX_VOICES = 64
     }
 }

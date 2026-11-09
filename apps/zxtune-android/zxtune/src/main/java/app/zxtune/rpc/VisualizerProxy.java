@@ -11,6 +11,7 @@ import app.zxtune.Log;
 import app.zxtune.playback.FrameResult;
 import app.zxtune.playback.ScopeLayout;
 import app.zxtune.playback.Visualizer;
+import app.zxtune.playback.VoiceGauges;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.ShortBuffer;
@@ -19,9 +20,10 @@ public final class VisualizerProxy {
 
     private static final String TAG = VisualizerProxy.class.getName();
 
-    // shared buffer layout: scope samples (up to 32 channels by 2048 points), then gauges
-    private static final int SCOPE_BYTES = 32 * 2048 * 2;
-    private static final int GAUGES_BYTES = 64 * 1024;
+    // shared buffer layout: scope samples (up to 64 channels by 2048 points), then gauges of up to
+    // 64 voices
+    private static final int SCOPE_BYTES = 64 * 2048 * 2;
+    private static final int GAUGES_BYTES = 64 * VoiceGauges.SIZE;
 
     // Data of each frame (tens of kilobytes) is not copied through binder: only small request is
     // sent
