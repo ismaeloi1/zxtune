@@ -275,6 +275,63 @@ class SidDashboardView @JvmOverloads constructor(
         tabularFigures()
     }
 
+    // wavetable PCM chips pages, see [drawPcm]
+    private val pcmTexts = Array(MAX_VOICES) { PcmSlotText() }
+    private val pcmEnvelopes = Array(MAX_VOICES) { PcmEnvelope() }
+    private val pcmGlobalText = PcmGlobalText()
+    private val pcmRowFitted = Array(MAX_VOICES) { Array(PcmCells.ROW.size) { FittedText() } }
+    private val pcmSlotFitted = Array(MAX_VOICES) { Array(PcmCells.SLOT.size) { FittedText() } }
+    private val pcmGlobalFitted = Array(PcmCells.GLOBAL.size) { FittedText() }
+    private val pcmTitleFitted = Array(3) { FittedTitle() }
+    private val pcmTemplates = TitleTemplates(PCM_TEMPLATE)
+
+    @androidx.annotation.VisibleForTesting
+    internal val pcmTable = CellGrid(PcmCells.ROW, 1)
+
+    @androidx.annotation.VisibleForTesting
+    internal val pcmSlotGrid = CellGrid(PcmCells.SLOT, PCM_INSPECTOR_LINES)
+
+    @androidx.annotation.VisibleForTesting
+    internal val pcmGlobalGrid = CellGrid(PcmCells.GLOBAL)
+    private val pcmInspectorGlobalGrid = CellGrid(PcmCells.GLOBAL)
+
+    /** Selected chip (voices group) of tabs */
+    @androidx.annotation.VisibleForTesting
+    internal var pcmTab = 0
+
+    /** Voice displayed in slot inspector or -1 */
+    @androidx.annotation.VisibleForTesting
+    internal var pcmFocus = -1
+
+    @androidx.annotation.VisibleForTesting
+    internal var pcmColumns = 1
+
+    @androidx.annotation.VisibleForTesting
+    internal var pcmRowHeight = 0f
+
+    @androidx.annotation.VisibleForTesting
+    internal var pcmTabsHeight = 0f
+    private var pcmShown = false
+    private var pcmTabsLayout: VoicesLayout? = null
+    private var pcmFirstVoices = IntArray(0)
+    private var pcmTabEdges = FloatArray(0)
+    private var pcmGroupColumns: ChipColumns? = null
+    private var pcmGroupColumnsOf = -1
+    private var pcmGeometryKey = -1f
+    private var pcmInspectorKey = -1f
+    private var pcmChipKey = -1
+    private var pcmGlobalTop = 0f
+    private var pcmTapRows = 0
+    private var pcmTapColumnW = 0f
+    private var pcmTapRowH = 0f
+    private var pcmTapFirst = 0
+    private var pcmTapCount = 0
+    private val pcmXs = FloatArray(5)
+    private val pcmLevels = FloatArray(5)
+
+    // time of frame for readouts of values changing at each tick, 0 for single picture
+    private var pcmFrameNanos = 0L
+
     // geometry of the last drawn gauges rows
     @androidx.annotation.VisibleForTesting
     internal var gaugesRowHeight = 0f
@@ -385,6 +442,8 @@ class SidDashboardView @JvmOverloads constructor(
         key = key * 31 + lines
         key = key * 31 + fmFocus.key
         key = key * 31 + spcFocus
+        key = key * 31 + pcmTab
+        key = key * 31 + pcmFocus
         if (data.kind == FrameResult.GAUGES_VOICES) {
             // cards layout depends on voice kind
             for (voice in 0 until minOf(data.count, data.bytes.size / VoiceGauges.SIZE)) {
@@ -410,6 +469,7 @@ class SidDashboardView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         val now = System.nanoTime()
         lastDrawNanos = now
+        pcmFrameNanos = if (source != null) now else 0L
         redrawPending.set(false)
         val data = exchange.acquire()
         if (source != null && now - lastStatusTime > STATUS_PERIOD_NS) {
@@ -629,8 +689,11 @@ class SidDashboardView @JvmOverloads constructor(
      * same cells of all voices are aligned in columns (as in trackers). Cells are wrapped to several lines and the
      * least important ones are dropped if there's not enough space, but never overlap.
      */
-    internal inner class CellGrid(val specs: Array<CellSpec>) {
+    internal inner class CellGrid(val specs: Array<CellSpec>, private val maxCellLines: Int = MAX_CELL_LINES) {
         private val widths = FloatArray(specs.size)
+
+        /** Cells not applicable to the current chip, never shown (call [update] after change) */
+        var excluded = IntArray(0)
 
         // the most important first
         private val importance = specs.indices.sortedBy { specs[it].priority }.toIntArray()
@@ -665,11 +728,20 @@ class SidDashboardView @JvmOverloads constructor(
             scale = candidate
             gap = cellPaint.textSize * CELL_GAP * scale
             measure()
-            val maxLines = if (w <= 0f) 0 else (space / cellLineHeight(scale)).toInt().coerceIn(0, MAX_CELL_LINES)
-            var shown = if (maxLines > 0) specs.size else 0
-            visible.fill(shown != 0)
-            while (pack(w) > maxLines) {
-                visible[importance[--shown]] = false
+            val maxLines = if (w <= 0f) 0 else (space / cellLineHeight(scale)).toInt().coerceIn(0, maxCellLines)
+            visible.fill(maxLines > 0)
+            for (idx in excluded) {
+                visible[idx] = false
+            }
+            var shown = visible.count { it }
+            var next = specs.size
+            while (pack(w) > maxLines && shown > 0) {
+                // the least important of visible ones
+                do {
+                    --next
+                } while (!visible[importance[next]])
+                visible[importance[next]] = false
+                --shown
             }
             return shown
         }
@@ -855,6 +927,11 @@ class SidDashboardView @JvmOverloads constructor(
         spcShown = voices >= SpcDescription.VOICES && VoiceGauges(data, 0).kind == VoiceGauges.Kind.SPC_DSP
         if (spcShown) {
             drawSpc(canvas, data, voices, areaHeight)
+            return
+        }
+        pcmShown = hasPcmSlots(current, data, voices)
+        if (pcmShown) {
+            drawPcm(canvas, data, current, voices, areaHeight)
             return
         }
         if (columnsLayout !== current) {
@@ -1587,6 +1664,531 @@ class SidDashboardView @JvmOverloads constructor(
         }
     }
 
+    // Wavetable PCM chips (YMW258/MultiPCM, SCSP) have 28-32 slots per chip, too many for cards: chip's page is a
+    // table of slots (row per slot with level bar and values in words, captions once in header) with chip-wide cells
+    // below; tap on a slot opens its inspector (output, envelope program and history panels with all the values).
+    // Chips of the tune (e.g. YM3438 and two YMW258 of Sega Model 1) are selected by tabs, other chips keep cards.
+    private fun drawPcm(canvas: Canvas, data: ByteArray, layout: VoicesLayout, voices: Int, areaHeight: Float) {
+        val groups = layout.groups
+        if (pcmTabsLayout !== layout) {
+            // inspector of the previous tune is closed, the first one may be opened beforehand
+            if (pcmTabsLayout != null) {
+                pcmFocus = -1
+            }
+            pcmTabsLayout = layout
+            pcmFirstVoices = IntArray(groups.size)
+            var first = 0
+            groups.forEachIndexed { idx, group ->
+                pcmFirstVoices[idx] = first
+                first += group.voices.size
+            }
+            pcmTabEdges = FloatArray(groups.size + 1)
+            pcmTab = groups.indices.firstOrNull { isPcmGroup(data, voices, it) } ?: 0
+            pcmGroupColumns = null
+        }
+        val tab = pcmTab.coerceIn(0, groups.size - 1)
+        val tabsH = if (groups.size > 1) drawPcmTabs(canvas, layout, data, voices) else 0f
+        pcmTabsHeight = tabsH
+        val first = pcmFirstVoices[tab]
+        val count = minOf(groups[tab].voices.size, voices - first)
+        if (count <= 0) {
+            return
+        }
+        canvas.save()
+        canvas.translate(0f, tabsH)
+        val h = areaHeight - tabsH
+        if (!isPcmGroup(data, voices, tab)) {
+            drawGroupCards(canvas, data, layout, voices, tab, h)
+        } else if (pcmFocus in first until first + count) {
+            drawPcmInspector(canvas, data, layout, tab, pcmFocus, h)
+        } else {
+            drawPcmTable(canvas, data, layout, tab, first, count, h)
+        }
+        canvas.restore()
+    }
+
+    private fun isPcmGroup(data: ByteArray, voices: Int, group: Int): Boolean {
+        val first = pcmFirstVoices.getOrElse(group) { return false }
+        return first < voices && VoiceGauges(data, first * VoiceGauges.SIZE).kind == VoiceGauges.Kind.PCM_SLOT
+    }
+
+    // @return height of tabs bar
+    private fun drawPcmTabs(canvas: Canvas, layout: VoicesLayout, data: ByteArray, voices: Int): Float {
+        val groups = layout.groups
+        val h = titlePaint.fontSpacing + density * 10
+        val fullW = width.toFloat()
+        // widths by names, the rest of width is shared equally
+        var total = 0f
+        for (group in groups) {
+            total += titlePaint.measureText(group.name) + density * 16
+        }
+        val extra = maxOf(0f, (fullW - total) / groups.size)
+        val scale = minOf(1f, fullW / total)
+        var x = 0f
+        groups.forEachIndexed { idx, group ->
+            pcmTabEdges[idx] = x
+            x += (titlePaint.measureText(group.name) + density * 16) * scale + extra
+        }
+        pcmTabEdges[groups.size] = fullW
+        if (pass.isStatic) {
+            groups.forEachIndexed { idx, group ->
+                val left = pcmTabEdges[idx]
+                val right = pcmTabEdges[idx + 1]
+                rect.set(left + density, density, right - density, h - density * 2)
+                if (idx == pcmTab) {
+                    spcFillPaint.color = Color.argb(70, 255, 255, 255)
+                    canvas.drawRect(rect, spcFillPaint)
+                }
+                canvas.drawRect(rect, framePaint)
+                val size = titlePaint.textSize
+                titlePaint.textSize = size * scale.coerceAtLeast(MIN_TITLE_SIZE_SP / TITLE_SIZE_SP)
+                titlePaint.textAlign = Paint.Align.CENTER
+                val label = ellipsize(group.name, right - left - density * 4, titlePaint)
+                canvas.drawText(label, (left + right) / 2, (h - density * 2) / 2 - (titlePaint.ascent() + titlePaint.descent()) / 2, titlePaint)
+                titlePaint.textAlign = Paint.Align.LEFT
+                titlePaint.textSize = size
+            }
+        }
+        // playing slots of chip under its tab
+        if (pass.isDynamic) {
+            groups.forEachIndexed { idx, group ->
+                val first = pcmFirstVoices[idx]
+                var playing = 0
+                for (voice in first until minOf(first + group.voices.size, voices)) {
+                    if (VoiceGauges(data, voice * VoiceGauges.SIZE).isKeyOn) {
+                        ++playing
+                    }
+                }
+                val left = pcmTabEdges[idx] + density * 3
+                val w = pcmTabEdges[idx + 1] - pcmTabEdges[idx] - density * 6
+                val part = if (group.voices.isEmpty()) 0f else playing.toFloat() / group.voices.size
+                spcFillPaint.color = Color.WHITE
+                canvas.drawRect(left, h - density * 3.5f, left + w * part, h - density * 1.5f, spcFillPaint)
+            }
+        }
+        return h
+    }
+
+    // Cards of chip without PCM slots, as [drawVoices] does for the whole layout
+    private fun drawGroupCards(canvas: Canvas, data: ByteArray, layout: VoicesLayout, voices: Int, group: Int, h: Float) {
+        if (fmFocus.draw(canvas, pass.isDynamic, layout, data, voices, width.toFloat(), h, smooth)) {
+            return
+        }
+        val desc = layout.groups[group]
+        val columns = pcmGroupColumns?.takeIf { pcmGroupColumnsOf == group } ?: ChipColumns(listOf(desc)).also {
+            pcmGroupColumns = it
+            pcmGroupColumnsOf = group
+        }
+        val fullW = width.toFloat()
+        val cellH = h / columns.rows(0)
+        val first = pcmFirstVoices[group]
+        desc.voices.forEachIndexed { idx, name ->
+            val voice = first + idx
+            if (voice >= voices) {
+                return
+            }
+            val col = columns.column(0, idx)
+            drawVoiceCard(
+                canvas, VoiceGauges(data, voice * VoiceGauges.SIZE), desc.name, name, fullW * columns.left(col),
+                cellH * columns.row(0, idx), fullW * columns.width(col), cellH, voice % MAX_VOICES
+            )
+        }
+    }
+
+    private fun updatePcmTexts(g: VoiceGauges, voice: Int, slot: Int) {
+        if (pass.isDynamic) {
+            pcmEnvelopes[voice].update(g)
+            pcmTexts[voice].update(g, slot, pcmEnvelopes[voice], pcmFrameNanos)
+        }
+    }
+
+    private fun pcmChipName(layout: VoicesLayout, group: Int) = layout.groups[group].name
+
+    private fun updatePcmExclusions(scsp: Boolean) {
+        val key = if (scsp) 1 else 0
+        if (key == pcmChipKey) {
+            return
+        }
+        pcmChipKey = key
+        pcmTable.excluded = if (scsp) IntArray(0) else PcmCells.ROW_SCSP_ONLY
+        pcmSlotGrid.excluded = if (scsp) IntArray(0) else PcmCells.SCSP_ONLY
+        pcmGlobalGrid.excluded = if (scsp) PcmCells.GLOBAL_YMW_ONLY else PcmCells.GLOBAL_SCSP_ONLY
+        pcmGeometryKey = -1f
+        pcmInspectorKey = -1f
+    }
+
+    // Row per slot in one or two columns (if rows would be too low), header of captions and chip-wide cells below
+    private fun drawPcmTable(canvas: Canvas, data: ByteArray, layout: VoicesLayout, group: Int, first: Int, count: Int, h: Float) {
+        val fullW = width.toFloat()
+        val g0 = VoiceGauges(data, first * VoiceGauges.SIZE)
+        updatePcmExclusions(PcmDescription.isScsp(g0))
+        val labelW = density * PCM_LABEL_DP
+        // a bit more than other grids, else the last column touches separator of columns
+        val pad = cellsPadding() * 3
+        val key = fullW * 100000 + h * 10 + count
+        if (key != pcmGeometryKey) {
+            pcmGeometryKey = key
+            pcmGlobalGrid.update(fullW - labelW - pad, h / 5, CELL_SCALES)
+            val globalH = if (pcmGlobalGrid.lines == 0) 0f else cellLineHeight(pcmGlobalGrid.scale) * pcmGlobalGrid.lines + density * 4
+            val minRow = cellPaint.fontSpacing * PCM_MIN_SCALE + density * 2
+            val wide = fullW >= density * PCM_TWO_COLUMNS_DP
+            fun rowH(columns: Int) = (h - globalH) / ((count + columns - 1) / columns + 1)
+            pcmColumns = if (rowH(1) >= minRow * PCM_ONE_COLUMN_ROWS || !wide) 1 else 2
+            pcmRowHeight = rowH(pcmColumns)
+            pcmGlobalTop = h - globalH
+            // values are a single line, text is shrunk to row height
+            val scale = minOf(1f, (pcmRowHeight - density * 2) / cellPaint.fontSpacing)
+            val colW = fullW / pcmColumns
+            pcmTable.update(colW - labelW - pad, cellLineHeight(scale) * 1.5f, floatArrayOf(scale, scale * 0.92f, scale * 0.85f))
+        }
+        val colW = fullW / pcmColumns
+        val rowH = pcmRowHeight
+        val rows = (count + pcmColumns - 1) / pcmColumns
+        val labelW2 = labelW
+        pcmTapRows = rows
+        pcmTapColumnW = colW
+        pcmTapRowH = rowH
+        pcmTapFirst = first
+        pcmTapCount = count
+        // header
+        for (col in 0 until pcmColumns) {
+            drawPcmRow(canvas, null, -1, col * colW + labelW2, 0f, rowH, -1)
+        }
+        for (slot in 0 until count) {
+            val voice = first + slot
+            val g = VoiceGauges(data, voice * VoiceGauges.SIZE)
+            updatePcmTexts(g, voice, slot)
+            val left = colW * (slot / rows)
+            val top = rowH * (1 + slot % rows)
+            drawPcmLabel(canvas, slot, g, left, top, labelW2, rowH)
+            drawPcmRow(canvas, pcmTexts[voice].cells, voice, left + labelW2, top, rowH, slot)
+            if (pass.isStatic && slot % rows != rows - 1) {
+                canvas.drawLine(left, top + rowH, left + colW, top + rowH, cellFramePaint)
+            }
+        }
+        if (pass.isStatic) {
+            for (col in 1 until pcmColumns) {
+                canvas.drawLine(colW * col, 0f, colW * col, pcmGlobalTop, separatorPaint)
+            }
+            canvas.drawLine(0f, rowH, fullW, rowH, framePaint)
+            canvas.drawLine(0f, pcmGlobalTop, fullW, pcmGlobalTop, separatorPaint)
+        }
+        drawPcmGlobal(canvas, g0, pcmChipName(layout, group), count, labelW2, pcmGlobalTop, fullW)
+    }
+
+    // Slot number with key mark and level bar (envelope with total level), the same as S-DSP rows labels
+    private fun drawPcmLabel(canvas: Canvas, slot: Int, g: VoiceGauges, left: Float, top: Float, w: Float, h: Float) {
+        if (pass.isStatic) {
+            // number is above the level bar
+            val titleSize = titlePaint.textSize
+            titlePaint.textSize = minOf(cellPaint.textSize * pcmTable.scale, (h - density * 5) * 0.85f)
+            val baseline = top + (h - density * 5) / 2 - (titlePaint.ascent() + titlePaint.descent()) / 2
+            canvas.drawText(PCM_SLOT_LABELS[slot % PCM_SLOT_LABELS.size], left + density * 4, baseline, titlePaint)
+            titlePaint.textSize = titleSize
+        }
+        if (!pass.isDynamic) {
+            return
+        }
+        val barTop = top + h - density * 4
+        val x = left + density * 4
+        val barW = w - density * 10
+        val level = if (g.hasLevel && PcmDescription.isPlaying(g)) ((g.level + PcmDescription.MAX_DB) / PcmDescription.MAX_DB).coerceIn(0f, 1f) else 0f
+        spcFillPaint.color = Color.argb(60, 255, 255, 255)
+        canvas.drawRect(x, barTop, x + barW, barTop + density * 2.5f, spcFillPaint)
+        spcFillPaint.color = Color.WHITE
+        canvas.drawRect(x, barTop, x + barW * level, barTop + density * 2.5f, spcFillPaint)
+        if (g.isKeyOn) {
+            canvas.drawCircle(left + w - density * 7, top + h / 2 - density, density * 2.5f, spcFillPaint)
+        }
+    }
+
+    // Values of slot at the same positions as captions of header, or header itself (texts is null)
+    private fun drawPcmRow(canvas: Canvas, texts: LiveTexts?, voice: Int, left: Float, top: Float, h: Float, slot: Int) {
+        val grid = pcmTable
+        if (grid.lines == 0 || (texts == null && !pass.isStatic) || (texts != null && !pass.isDynamic)) {
+            return
+        }
+        val paint = if (texts == null) captionPaint else cellPaint
+        val baseSize = paint.textSize
+        paint.textSize = if (texts == null) {
+            minOf(baseSize * grid.scale, h * 0.6f)
+        } else {
+            cellPaint.textSize * grid.scale
+        }
+        val baseline = top + h / 2 - (paint.ascent() + paint.descent()) / 2
+        val x0 = left + cellsPadding()
+        for (idx in grid.specs.indices) {
+            if (!grid.visible[idx]) {
+                continue
+            }
+            val cellLeft = x0 + grid.left[idx]
+            val cellRight = x0 + grid.right[idx]
+            val numeric = grid.specs[idx].numeric
+            paint.textAlign = if (numeric) Paint.Align.RIGHT else Paint.Align.LEFT
+            val x = if (numeric) cellRight else cellLeft
+            val w = cellRight - cellLeft
+            if (texts == null) {
+                canvas.drawText(grid.captions[idx].get(grid.specs[idx].caption, w, paint), x, baseline, paint)
+            } else {
+                val value = texts[PcmCells.ROW_SOURCE[idx]]
+                if (value.isNotEmpty()) {
+                    canvas.drawText(pcmRowFitted[voice][idx].get(value, w, paint), x, baseline, paint)
+                }
+            }
+        }
+        paint.textAlign = Paint.Align.LEFT
+        paint.textSize = baseSize
+    }
+
+    private fun drawPcmGlobal(canvas: Canvas, g: VoiceGauges, chipName: String, slots: Int, labelW: Float, top: Float, fullW: Float) {
+        if (pass.isDynamic) {
+            pcmGlobalText.update(g, chipName, slots)
+        }
+        drawCells(canvas, pcmGlobalGrid, pcmGlobalText.cells, pcmGlobalFitted, labelW, top + density * 2)
+        if (pass.isStatic) {
+            val size = spcLabelPaint.textSize
+            spcLabelPaint.textSize = minOf(size, size * (labelW - density * 6) / spcLabelPaint.measureText(PCM_HINT_TAP))
+            val y = top + cellLineHeight(pcmGlobalGrid.scale) * maxOf(pcmGlobalGrid.lines, 1)
+            canvas.drawText(PCM_HINT_TAP, density * 4, y - spcLabelPaint.descent(), spcLabelPaint)
+            spcLabelPaint.textSize = size
+        }
+    }
+
+    // Single slot with output, envelope and history panels, all its values and chip-wide values below
+    private fun drawPcmInspector(canvas: Canvas, data: ByteArray, layout: VoicesLayout, group: Int, voice: Int, h: Float) {
+        val fullW = width.toFloat()
+        val first = pcmFirstVoices[group]
+        val slot = voice - first
+        val g = VoiceGauges(data, voice * VoiceGauges.SIZE)
+        updatePcmExclusions(PcmDescription.isScsp(g))
+        val pad = cellsPadding() * 2
+        val key = fullW * 100000 + h
+        if (key != pcmInspectorKey) {
+            pcmInspectorKey = key
+            pcmSlotGrid.update(fullW - pad, h * 0.42f, CELL_SCALES)
+            pcmInspectorGlobalGrid.excluded = pcmGlobalGrid.excluded
+            pcmInspectorGlobalGrid.update(fullW - pad, h * 0.2f, floatArrayOf(pcmSlotGrid.scale))
+        }
+        updatePcmTexts(g, voice, slot)
+        val texts = pcmTexts[voice]
+        val hintH = spcLabelPaint.fontSpacing
+        val slotGridH = cellLineHeight(pcmSlotGrid.scale) * pcmSlotGrid.lines + density * 4
+        val globalGridH = cellLineHeight(pcmSlotGrid.scale) * pcmInspectorGlobalGrid.lines + density * 4
+        val panelsH = h - slotGridH - globalGridH - hintH
+        drawPcmPanels(canvas, texts.titles, 0f, 0f, fullW, panelsH, g, voice)
+        drawCells(canvas, pcmSlotGrid, texts.cells, pcmSlotFitted[voice], 0f, panelsH)
+        val globalTop = panelsH + slotGridH
+        if (pass.isDynamic) {
+            pcmGlobalText.update(g, pcmChipName(layout, group), layout.groups[group].voices.size)
+        }
+        drawCells(canvas, pcmInspectorGlobalGrid, pcmGlobalText.cells, pcmGlobalFitted, 0f, globalTop)
+        if (pass.isStatic) {
+            canvas.drawLine(0f, globalTop, fullW, globalTop, separatorPaint)
+            drawSpcHint(canvas, fullW, h)
+        }
+    }
+
+    // Panels with title bands of the same layout: output wave with sample position, envelope program, history
+    private fun drawPcmPanels(canvas: Canvas, texts: LiveTexts, left: Float, top: Float, w: Float, h: Float, g: VoiceGauges, voice: Int) {
+        selectSpcTitleLayout(pcmTemplates, w, h)
+        val pad = density
+        var x = left
+        for (idx in 0 until 3) {
+            val panelW = w * SPC_PANELS[idx]
+            rect.set(x + pad, top + pad, x + panelW - pad, top + h - pad)
+            x += panelW
+            if (pass.isStatic) {
+                canvas.drawRect(rect, framePaint)
+            }
+            val plotTop = drawGaugeTitleBand(canvas, rect, texts, pcmTemplates, idx, spcSecondLine, spcValueScale, pcmTitleFitted[idx]) + pad * 2
+            spcPlot.set(rect.left + pad * 2, plotTop, rect.right - pad * 2, rect.bottom - pad * 2)
+            if (!pass.isDynamic || spcPlot.height() < density * 4) {
+                continue
+            }
+            when (idx) {
+                0 -> drawPcmSample(canvas, spcPlot, g)
+                1 -> drawPcmEnvelope(canvas, spcPlot, g, pcmEnvelopes[voice])
+                else -> drawHistory(canvas, spcPlot, g, true)
+            }
+        }
+    }
+
+    // Output wave of slot and position in sample: the whole sample as a bar with looped part
+    private fun drawPcmSample(canvas: Canvas, area: RectF, g: VoiceGauges) {
+        val length = PcmDescription.loopEnd(g)
+        val hasBar = length > 0 && area.height() > density * 16
+        val barH = if (hasBar) minOf(density * 5, area.height() * 0.2f) else 0f
+        val waveBottom = area.bottom - (if (hasBar) barH + density * 3 else 0f)
+        drawSpcColumns(canvas, area.left, area.top, area.right, waveBottom, g, VoiceGauges.WAVE)
+        if (!hasBar) {
+            return
+        }
+        val top = area.bottom - barH
+        val w = area.width()
+        spcFillPaint.color = Color.argb(60, 255, 255, 255)
+        canvas.drawRect(area.left, top, area.right, area.bottom, spcFillPaint)
+        val loop = PcmDescription.loopStart(g)
+        if (PcmDescription.loopMode(g) != 0 && loop < length) {
+            spcFillPaint.color = Color.argb(130, 255, 255, 255)
+            canvas.drawRect(area.left + w * loop / length, top, area.right, area.bottom, spcFillPaint)
+        }
+        if (PcmDescription.isPlaying(g)) {
+            val pos = minOf(PcmDescription.position(g), length)
+            val px = area.left + w * pos / length
+            spcFillPaint.color = Color.WHITE
+            canvas.drawRect(px - density * 1.5f, top - density * 2, px + density * 1.5f, area.bottom, spcFillPaint)
+        }
+    }
+
+    // Envelope program in dB over log time as of FM inspector: attack, decay 1 to sustain level, decay 2 (a second of
+    // it, or flat if endless), release. Current stage is bright with a dot at the current level.
+    private fun drawPcmEnvelope(canvas: Canvas, area: RectF, g: VoiceGauges, env: PcmEnvelope) {
+        val withLabels = area.height() > density * 26
+        val labelH = if (withLabels) spcLabelPaint.descent() - spcLabelPaint.ascent() else 0f
+        val top = area.top + density
+        val bottom = area.bottom - labelH
+        val h = bottom - top
+        if (h < density * 4 || area.width() < density * 20) {
+            return
+        }
+        val maxDb = PcmDescription.MAX_DB
+        fun span(ms: Float) = if (ms.isInfinite()) PCM_INFINITE_SPAN else maxOf(PCM_MIN_SPAN, kotlin.math.log10(1f + ms / 2f))
+        val holdMs = PCM_HOLD_MS
+        val decay2Full = PcmDescription.decayMs(g, PcmDescription.effectiveRate(g, 2))
+        val sustainEnd = if (decay2Full.isInfinite()) env.sustainDb else maxOf(-maxDb, env.sustainDb - maxDb * holdMs / decay2Full)
+        val releaseMs = env.releaseFullMs * (sustainEnd + maxDb) / maxDb
+        val spans = floatArrayOf(span(env.attackMs), if (env.decay1Ms == 0f) PCM_MIN_SPAN / 2 else span(env.decay1Ms), PCM_SUSTAIN_SPAN, span(releaseMs))
+        val unit = area.width() / spans.sum()
+        fun yOf(db: Float) = top + h * (-db / maxDb).coerceIn(0f, 1f)
+        val xs = pcmXs
+        xs[0] = area.left
+        for (idx in 0 until 4) {
+            xs[idx + 1] = xs[idx] + spans[idx] * unit
+        }
+        xs[4] = area.right
+        val attackless = env.attackMs.isInfinite()
+        val levels = pcmLevels
+        levels[0] = env.startDb
+        levels[1] = if (attackless) env.startDb else 0f
+        levels[2] = if (attackless) env.startDb else env.sustainDb
+        levels[3] = if (attackless) env.startDb else sustainEnd
+        levels[4] = if (releaseMs.isInfinite()) levels[3] else -maxDb
+        val stage = PcmDescription.stage(g)
+        val current = when (stage) {
+            PcmDescription.Stage.ATTACK -> 0
+            PcmDescription.Stage.DECAY1 -> 1
+            PcmDescription.Stage.DECAY2 -> 2
+            PcmDescription.Stage.RELEASE -> 3
+            else -> -1
+        }
+        for (seg in 0 until 4) {
+            spcPath.reset()
+            spcPath.moveTo(xs[seg], bottom)
+            if (seg == 0 && env.isLinearAttack && !attackless) {
+                // linear amplitude is a curve in dB
+                val steps = 12
+                for (step in 0..steps) {
+                    val part = step / steps.toFloat()
+                    spcPath.lineTo(xs[0] + (xs[1] - xs[0]) * part, yOf(env.attackDbAt(part)))
+                }
+            } else {
+                spcPath.lineTo(xs[seg], yOf(levels[seg]))
+                spcPath.lineTo(xs[seg + 1], yOf(levels[seg + 1]))
+            }
+            spcPath.lineTo(xs[seg + 1], bottom)
+            spcPath.close()
+            spcFillPaint.color = Color.argb(if (seg == current) 140 else 40, 255, 255, 255)
+            canvas.drawPath(spcPath, spcFillPaint)
+            canvas.drawLine(xs[seg], yOf(levels[seg]), xs[seg + 1], yOf(levels[seg + 1]), if (seg == current) tracePaint else dimTracePaint)
+        }
+        // key off moment
+        canvas.drawLine(xs[3], top, xs[3], bottom, cellFramePaint)
+        if (current >= 0) {
+            val db = PcmDescription.envelopeDb(g)
+            val y = yOf(db)
+            val x = if (current == 3) {
+                val from = levels[3]
+                if (from <= -maxDb) xs[3] else xs[3] + (xs[4] - xs[3]) * ((from - db) / (from + maxDb)).coerceIn(0f, 1f)
+            } else {
+                val ms = env.timeInStage(current + 1, db)
+                val total = when (current) {
+                    0 -> env.attackMs
+                    1 -> env.decay1Ms
+                    else -> minOf(env.decay2Ms, holdMs)
+                }
+                if (total <= 0f || total.isInfinite()) (xs[current] + xs[current + 1]) / 2 else xs[current] + (xs[current + 1] - xs[current]) * (ms / total).coerceIn(0f, 1f)
+            }
+            spcFillPaint.color = Color.WHITE
+            canvas.drawLine(x, y, x, bottom, tracePaint)
+            canvas.drawCircle(x, y, density * 3, spcFillPaint)
+        }
+        if (withLabels) {
+            val baseline = area.bottom - spcLabelPaint.descent()
+            for (seg in 0 until 4) {
+                val label = PCM_STAGE_LABELS[seg]
+                val segW = xs[seg + 1] - xs[seg]
+                if (spcLabelPaint.measureText(label) <= segW - density * 2) {
+                    spcLabelPaint.textAlign = Paint.Align.CENTER
+                    spcLabelPaint.color = if (seg == current) Color.WHITE else Color.argb(150, 255, 255, 255)
+                    canvas.drawText(label, (xs[seg] + xs[seg + 1]) / 2, baseline, spcLabelPaint)
+                }
+            }
+            spcLabelPaint.color = Color.argb(150, 255, 255, 255)
+            spcLabelPaint.textAlign = Paint.Align.LEFT
+        }
+    }
+
+    /**
+     * Opens inspector of PCM slot (index of voice in layout), or closes it for -1
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun openPcmInspector(voice: Int) {
+        pcmFocus = voice
+        invalidate()
+    }
+
+    // @return true if tap is handled by PCM chips dashboard
+    private fun pcmTap(x: Float, y: Float, data: ByteArray, voices: Int): Boolean {
+        if (!pcmShown) {
+            return false
+        }
+        if (y < pcmTabsHeight) {
+            val tab = (0 until pcmTabEdges.size - 1).firstOrNull { x >= pcmTabEdges[it] && x < pcmTabEdges[it + 1] }
+            if (tab != null) {
+                pcmTab = tab
+                pcmFocus = -1
+                pcmGeometryKey = -1f
+            }
+            return true
+        }
+        if (!isPcmGroup(data, voices, pcmTab)) {
+            return fmFocus.tap(x, y - pcmTabsHeight, data, voices)
+        }
+        if (pcmFocus >= 0) {
+            pcmFocus = -1
+        } else if (pcmTapRowH > 0f && pcmTapColumnW > 0f) {
+            val row = ((y - pcmTabsHeight) / pcmTapRowH).toInt() - 1
+            val col = (x / pcmTapColumnW).toInt()
+            val slot = col * pcmTapRows + row
+            if (row in 0 until pcmTapRows && slot in 0 until pcmTapCount) {
+                pcmFocus = pcmTapFirst + slot
+            }
+        }
+        return true
+    }
+
+    // the first voice of each chip tells its kind
+    private fun hasPcmSlots(layout: VoicesLayout, data: ByteArray, voices: Int): Boolean {
+        var first = 0
+        for (group in layout.groups) {
+            if (first < voices && VoiceGauges(data, first * VoiceGauges.SIZE).kind == VoiceGauges.Kind.PCM_SLOT) {
+                return true
+            }
+            first += group.voices.size
+        }
+        return false
+    }
+
     @androidx.annotation.VisibleForTesting
     internal fun openFmInspector(voice: Int, operator: Int = -1): Boolean {
         val data = exchange.acquire()
@@ -1609,7 +2211,9 @@ class SidDashboardView @JvmOverloads constructor(
                 if (abs(event.x - downX) <= slop && abs(event.y - downY) <= slop) {
                     val data = exchange.acquire()
                     val voices = if (data.kind == FrameResult.GAUGES_VOICES) data.count else 0
-                    if (spcTap(event.x, event.y) || fmFocus.tap(event.x, event.y, data.bytes, voices)) {
+                    if (spcTap(event.x, event.y) || pcmTap(event.x, event.y, data.bytes, voices) ||
+                        fmFocus.tap(event.x, event.y, data.bytes, voices)
+                    ) {
                         invalidate()
                     }
                 }
@@ -2003,6 +2607,29 @@ class SidDashboardView @JvmOverloads constructor(
         private const val SPC_FIR_MIN_DB = -24f
         private const val SPC_FIR_MAX_DB = 12f
         private const val SPC_ECHO_REPEATS = 8
+
+        // PCM slots table and inspector, see [drawPcm]
+        private val PCM_TEMPLATE = arrayOf(
+            TitleTemplate("S32 \$7FFFE \u25CF", "", arrayOf("16-bit ping-pong", "#1FF 12-bit")),
+            TitleTemplate("Decay 2 \u221295.6 dB", "", arrayOf("AR 31 D1 31 DL 31 D2 31 RR 31")),
+            TitleTemplate("\u2248C#5 357.9 kHz", "", arrayOf("OCT -8 FNS 3FF"))
+        )
+        private const val PCM_LABEL_DP = 40
+        private const val PCM_HINT_TAP = "tap a slot"
+        private val PCM_SLOT_LABELS = Array(32) { "${it + 1}" }
+        private val PCM_STAGE_LABELS = arrayOf("A", "D1", "D2", "R")
+
+        // rows lower than that are split to two columns on wide screens
+        private const val PCM_ONE_COLUMN_ROWS = 1.25f
+        private const val PCM_MIN_SCALE = 0.85f
+        private const val PCM_TWO_COLUMNS_DP = 600
+        private const val PCM_INSPECTOR_LINES = 6
+
+        // log time spans of envelope stages, see drawPcmEnvelope
+        private const val PCM_MIN_SPAN = 0.15f
+        private const val PCM_INFINITE_SPAN = 3.5f
+        private const val PCM_SUSTAIN_SPAN = 1.2f
+        private const val PCM_HOLD_MS = 1000f
         private const val SPC_RELEASE_LABEL = "8 ms"
         private const val SPC_NO_ECHO = "no echo"
         private const val SPC_FIR_LOW = "0"

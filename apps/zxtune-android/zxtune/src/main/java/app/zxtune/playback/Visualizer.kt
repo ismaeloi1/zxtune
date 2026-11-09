@@ -218,6 +218,9 @@ class VoiceGauges(private val data: ByteArray, private val offset: Int) : Gauges
     /** Signed chip specific field */
     fun signedField(idx: Int) = data[stateOffset + 10 + idx].toInt()
 
+    /** Little endian 16 bit chip specific field */
+    fun field16(idx: Int) = field(idx) or (field(idx + 1) shl 8)
+
     /** Progress (0..1) of the last level and frequency column, see [ChipGauges.phase] */
     val phase
         get() = (data[offset + SIZE - 1].toInt() and 0xff) / 256f
@@ -252,6 +255,106 @@ class VoiceGauges(private val data: ByteArray, private val offset: Int) : Gauges
         const val NES_TRIANGLE = 12
         const val NES_NOISE = 13
         const val NES_DMC = 14
+        const val PCM_SLOT = 15
+    }
+
+    /**
+     * Fields of [Kind.PCM_SLOT] (YMW258/MultiPCM and SCSP slots), mirrors Module::VoiceState::PCM_*.
+     * Raw registers are in units of [CHIP], multibyte values are little endian.
+     */
+    object Pcm {
+        /** [CHIP_YMW258] or [CHIP_SCSP] */
+        const val CHIP = 0
+
+        /** envelope stage (see [STAGE_MASK]: 0 off, 1 attack, 2 decay 1, 3 decay 2, 4 release) | ST_* flags */
+        const val STATE = 1
+
+        /** envelope level 0..255 of 96dB */
+        const val EG = 2
+
+        /** 16 bit tone (sample header) number, YMW258 only */
+        const val TONE = 3
+
+        /** 24 bit start address in bytes */
+        const val START = 5
+
+        /** 16 bit loop start, loop end (sample length) and position in samples */
+        const val LOOP = 8
+        const val END = 10
+        const val POS = 12
+
+        /** bits 0..1: 0 8 bit, 1 12 bit, 2 16 bit; bits 2..3 loop mode; bits 4..5 source (memory, noise, silence) */
+        const val FORMAT = 14
+
+        /** signed octave */
+        const val OCT = 15
+
+        /** 16 bit F-number (10 bits) */
+        const val FNUM = 16
+
+        /** YMW258 0..127 (0.375dB), SCSP 0..255 (bits of 0.4..48dB) */
+        const val TL = 18
+
+        /** YMW258 0..15 (0 center, 1..7 right louder, 9..15 left louder, 8 muted), SCSP DIPAN 0..31 */
+        const val PAN = 19
+
+        /** direct send level 0..7 */
+        const val SEND = 20
+        const val AR = 21
+        const val D1R = 22
+        const val DL = 23
+        const val D2R = 24
+        const val RR = 25
+        const val KRS = 26
+
+        /** 4 bytes of effective rates 0..63 of AR, D1R, D2R, RR (0 is infinite) */
+        const val RATES = 27
+        const val LFOF = 31
+
+        /** depth 0..7 | waveform 0..3 shl 4 */
+        const val PLFO = 32
+        const val ALFO = 33
+
+        /** MODE_* flags */
+        const val MODE = 34
+        const val MDL = 35
+        const val MDXSL = 36
+        const val MDYSL = 37
+        const val ISEL = 38
+        const val IMXL = 39
+        const val EFSDL = 40
+        const val EFPAN = 41
+        const val SBCTL = 42
+
+        /** chip-wide: 32 bit clock, 16 bit output rate, master volume 0..15, GL_* flags, banks, playing slots */
+        const val CLOCK = 48
+        const val RATE = 52
+        const val MVOL = 54
+        const val GLOBAL = 55
+        const val BANK0 = 56
+        const val BANK1 = 58
+        const val ACTIVE = 60
+
+        const val CHIP_YMW258 = 1
+        const val CHIP_SCSP = 2
+
+        const val STAGE_MASK = 0x07
+        const val ST_KEY = 0x08
+        const val ST_PLAYING = 0x10
+        const val ST_REVERSE = 0x20
+        const val ST_LOOPED = 0x40
+
+        const val MODE_FM = 0x01
+        const val MODE_NOTRING = 0x02
+        const val MODE_DIRECT = 0x04
+        const val MODE_EGHOLD = 0x08
+        const val MODE_LPSLNK = 0x10
+        const val MODE_INTERP = 0x20
+
+        const val GL_DSP = 0x01
+        const val GL_DAC18B = 0x02
+        const val GL_MEM4MB = 0x04
+        const val GL_BANKING = 0x10
     }
 
     companion object {

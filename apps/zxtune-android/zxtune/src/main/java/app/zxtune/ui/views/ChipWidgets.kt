@@ -448,6 +448,9 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
             // S-DSP pitch is sample playback rate, the note depends on unknown sample tuning
             VoiceGauges.Kind.SPC_DSP -> if (g.field(0) == 0 && !g.isKeyOn) "off" else spcRate(g)
 
+            // the same for wavetable slots
+            VoiceGauges.Kind.PCM_SLOT -> if (!PcmDescription.isPlaying(g)) "off" else PcmDescription.hzWord(PcmDescription.playbackHz(g))
+
             else -> noteSummary(g.summaryMode, g.frequency.roundToInt(), noteName(g.frequency), g.level.roundToInt())
         }
 
