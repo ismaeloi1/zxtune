@@ -38,7 +38,10 @@ namespace Visualization
         {"POKEY", "NebulaWeavePOKEY"},
         {"PSX", "NebulaWeavePSX"},
         {"N64", "NebulaWeaveN64"},
+        // Sega Saturn and Model 2A/2B/2C SCSP
         {"SATURN", "NebulaWeaveSCSP"},
+        // Sega Model 1 and Model 2 YMW258-F (MultiPCM)
+        {"MULTIPCM", "NebulaWeaveYMW"},
         {"DREAMCAST", "NebulaWeaveAICA"},
         {"MT32", "NebulaWeaveMT32"},
         {"DAC", "NebulaWeaveDAC"},
@@ -88,13 +91,14 @@ namespace Visualization
 
     const std::map<std::string, std::string> BY_TYPE = MakeByType();
 
-    // first match wins
+    // first match wins, music of Sega arcade boards is played by PCM chips (FM chip of Model 1 is secondary)
     const std::vector<std::pair<std::string, std::string>> BY_CHIP = {
-        {"MOS6581", "C64"}, {"MOS8580", "C64"}, {"S-DSP", "SNES"}, {"AY-3-8910", "AY"}, {"YM2149", "AY"},
-        {"TurboFM", "OPL"}, {"YM2203", "OPL"},  {"YM2608", "OPL"}, {"YM2610", "OPL"},   {"YM2612", "OPL"},
-        {"YM3438", "OPL"},  {"YM2413", "OPL"},  {"YM3526", "OPL"}, {"YM3812", "OPL"},   {"Y8950", "OPL"},
-        {"YMF262", "OPL"},  {"YMF278", "OPL"},  {"YM2151", "OPM"}, {"SN76489", "PSG"},  {"SAA1099", "SAA"},
-        {"2A03", "NES"},    {"NES APU", "NES"}, {"GB DMG", "GB"},  {"HuC6280", "PCE"},  {"POKEY", "POKEY"},
+        {"YMW258", "MULTIPCM"}, {"SCSP", "SATURN"}, {"MOS6581", "C64"}, {"MOS8580", "C64"}, {"S-DSP", "SNES"},
+        {"AY-3-8910", "AY"},    {"YM2149", "AY"},   {"TurboFM", "OPL"}, {"YM2203", "OPL"},  {"YM2608", "OPL"},
+        {"YM2610", "OPL"},      {"YM2612", "OPL"},  {"YM3438", "OPL"},  {"YM2413", "OPL"},  {"YM3526", "OPL"},
+        {"YM3812", "OPL"},      {"Y8950", "OPL"},   {"YMF262", "OPL"},  {"YMF278", "OPL"},  {"YM2151", "OPM"},
+        {"SN76489", "PSG"},     {"SAA1099", "SAA"}, {"2A03", "NES"},    {"NES APU", "NES"}, {"GB DMG", "GB"},
+        {"HuC6280", "PCE"},     {"POKEY", "POKEY"},
     };
 
     // the same ids for AY and openmpt formats, AY variant always has description
