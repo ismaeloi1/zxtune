@@ -991,18 +991,19 @@ INLINE INT32 SCSP_UpdateSlot(scsp_state *scsp, SCSP_SLOT *slot)
 #endif
 	if (SSCTL(slot) == 0) // External DRAM data
 	{
+		// addresses wrap within sound RAM (modulation may make them negative), else it's read out of buffer
 		if (PCM8B(slot)) //8 bit signed
 		{
-			INT16 p1=(INT8)scsp->SCSPRAM[SA(slot)+addr1]<<8;
-			INT16 p2=(INT8)scsp->SCSPRAM[SA(slot)+addr2]<<8;
+			INT16 p1=(INT8)scsp->SCSPRAM[(SA(slot)+addr1)&(scsp->SCSPRAM_LENGTH-1)]<<8;
+			INT16 p2=(INT8)scsp->SCSPRAM[(SA(slot)+addr2)&(scsp->SCSPRAM_LENGTH-1)]<<8;
 			INT32 fpart=slot->cur_addr&((1<<SHIFT)-1);
 			INT32 s=(int)p1*((1<<SHIFT)-fpart)+(int)p2*fpart;
 			sample=(s>>SHIFT);
 		}
 		else    //16 bit signed
 		{
-			const UINT8 *pp1 = &scsp->SCSPRAM[SA(slot)+addr1];
-			const UINT8 *pp2 = &scsp->SCSPRAM[SA(slot)+addr2];
+			const UINT8 *pp1 = &scsp->SCSPRAM[(SA(slot)+addr1)&(scsp->SCSPRAM_LENGTH-1)];
+			const UINT8 *pp2 = &scsp->SCSPRAM[(SA(slot)+addr2)&(scsp->SCSPRAM_LENGTH-1)];
 			INT16 p1 = READ_BE16(pp1);
 			INT16 p2 = READ_BE16(pp2);
 			INT32 fpart=slot->cur_addr&((1<<SHIFT)-1);

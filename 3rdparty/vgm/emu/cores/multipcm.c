@@ -853,13 +853,11 @@ static void MultiPCM_update(void *info, UINT32 samples, DEV_SMPL **outputs)
 					{ // ab.c ..
 						INT16 w0 = (read_byte(ptChip, adr) << 8) | ((read_byte(ptChip, adr + 1) & 0xf) << 4);
 						csample = w0;
-						break;
 					}
 					else
 					{ // ..C. AB
 						INT16 w0 = (read_byte(ptChip, adr + 2) << 8) | (read_byte(ptChip, adr + 1) & 0xf0);
 						csample = w0;
-						break;
 					}
 				}
 				else
