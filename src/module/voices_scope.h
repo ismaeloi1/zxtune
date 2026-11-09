@@ -75,6 +75,99 @@ namespace Module
       NES_NOISE = 13,
       //! output level 0..127, rate index 0..15, active, loop
       NES_DMC = 14,
+      //! slot of wavetable chip (YMW258/MultiPCM, SCSP), see PCM_* fields
+      PCM_SLOT = 15,
+    };
+
+    //! PCM_SLOT fields, raw registers are in units of chip (PCM_CHIP):
+    //! - PCM_CHIP: PCM_CHIP_YMW258 or PCM_CHIP_SCSP
+    //! - PCM_STATE: envelope stage (0 off, 1 attack, 2 decay 1, 3 decay 2, 4 release) | PCM_ST_* flags
+    //! - PCM_EG: envelope level 0..255 (96dB range)
+    //! - PCM_TONE: 16 bit tone number (YMW258 sample header), PCM_START: 24 bit start address in bytes,
+    //!   PCM_LOOP, PCM_END, PCM_POS: 16 bit loop start, loop end and current position in samples
+    //! - PCM_FORMAT: bits 0..1 sample format (0 8 bit, 1 12 bit, 2 16 bit), bits 2..3 loop mode (0 none,
+    //!   1 forward, 2 reverse, 3 ping-pong), bits 4..5 source (0 memory, 1 noise, 2 silence)
+    //! - PCM_OCT: signed octave, PCM_FNUM: 16 bit F-number (10 bits)
+    //! - PCM_TL: total level (YMW258 0..127 by 0.375dB, SCSP 0..255 with bits of 0.4..48dB)
+    //! - PCM_PAN: YMW258 0..15 (0 center, 1..7 right louder, 9..15 left louder, 8 muted), SCSP DIPAN 0..31
+    //! - PCM_SEND: direct output level 0..7 (SCSP DISDL, always 7 for YMW258)
+    //! - PCM_AR, PCM_D1R, PCM_DL, PCM_D2R, PCM_RR, PCM_KRS: envelope registers (YMW258 0..15, SCSP 0..31)
+    //! - PCM_RATES: 4 bytes of effective (key scaled) rates 0..63 of AR, D1R, D2R, RR (0 is infinite)
+    //! - PCM_LFOF: LFO frequency (YMW258 0..7, SCSP 0..31), PCM_PLFO/PCM_ALFO: pitch/amplitude depth 0..7 |
+    //!   waveform 0..3 << 4 (SCSP)
+    //! - PCM_MODE: PCM_MODE_* flags, PCM_MDL: modulation level 0..15, PCM_MDXSL/PCM_MDYSL: modulation sources
+    //!   (slot + N of ring buffer), PCM_ISEL/PCM_IMXL: DSP input mixer register and send level,
+    //!   PCM_EFSDL/PCM_EFPAN: effect return level and pan of DSP output with slot's number, PCM_SBCTL: bits inversion
+    //! - chip-wide (same in all slots): PCM_CLOCK: 32 bit clock in Hz, PCM_RATE: 16 bit output rate in Hz,
+    //!   PCM_MVOL: master volume 0..15, PCM_GLOBAL: PCM_GL_* flags, PCM_BANK0/PCM_BANK1: 16 bit YMW258 Sega banks
+    //!   addresses >> 16, PCM_ACTIVE: playing slots count
+    //! Multibyte values are little endian. Mirrors DEVVOICE_PCM_* of libvgm
+    enum : uint8_t
+    {
+      PCM_CHIP = 0,
+      PCM_STATE = 1,
+      PCM_EG = 2,
+      PCM_TONE = 3,
+      PCM_START = 5,
+      PCM_LOOP = 8,
+      PCM_END = 10,
+      PCM_POS = 12,
+      PCM_FORMAT = 14,
+      PCM_OCT = 15,
+      PCM_FNUM = 16,
+      PCM_TL = 18,
+      PCM_PAN = 19,
+      PCM_SEND = 20,
+      PCM_AR = 21,
+      PCM_D1R = 22,
+      PCM_DL = 23,
+      PCM_D2R = 24,
+      PCM_RR = 25,
+      PCM_KRS = 26,
+      PCM_RATES = 27,
+      PCM_LFOF = 31,
+      PCM_PLFO = 32,
+      PCM_ALFO = 33,
+      PCM_MODE = 34,
+      PCM_MDL = 35,
+      PCM_MDXSL = 36,
+      PCM_MDYSL = 37,
+      PCM_ISEL = 38,
+      PCM_IMXL = 39,
+      PCM_EFSDL = 40,
+      PCM_EFPAN = 41,
+      PCM_SBCTL = 42,
+      PCM_CLOCK = 48,
+      PCM_RATE = 52,
+      PCM_MVOL = 54,
+      PCM_GLOBAL = 55,
+      PCM_BANK0 = 56,
+      PCM_BANK1 = 58,
+      PCM_ACTIVE = 60,
+    };
+
+    enum PcmChip : uint8_t
+    {
+      PCM_CHIP_YMW258 = 1,
+      PCM_CHIP_SCSP = 2,
+    };
+
+    enum : uint8_t
+    {
+      PCM_ST_KEY = 0x08,
+      PCM_ST_PLAYING = 0x10,
+      PCM_ST_REVERSE = 0x20,
+      PCM_ST_LOOPED = 0x40,
+      PCM_MODE_FM = 0x01,
+      PCM_MODE_NOTRING = 0x02,
+      PCM_MODE_DIRECT = 0x04,
+      PCM_MODE_EGHOLD = 0x08,
+      PCM_MODE_LPSLNK = 0x10,
+      PCM_MODE_INTERP = 0x20,
+      PCM_GL_DSP = 0x01,
+      PCM_GL_DAC18B = 0x02,
+      PCM_GL_MEM4MB = 0x04,
+      PCM_GL_BANKING = 0x10,
     };
 
     //! FM kinds (OPN_FM, OPL_2OP, OPL_4OP) fields extension, zero if not provided (FM_CHIP is FM_CHIP_NONE):

@@ -324,6 +324,40 @@ namespace Module::LibVGM
                     && VoiceState::FM_OPF_EGT == DEVVOICE_FM_OPF_EGT && VoiceState::FM_OPF_KSR == DEVVOICE_FM_OPF_KSR
                     && VoiceState::FM_CHIP_OPL3 == DEVVOICE_FM_CHIP_OPL3,
                 "FM voice fields mismatch");
+  static_assert(
+      VoiceState::PCM_SLOT == DEVVOICE_KIND_PCM_SLOT && VoiceState::PCM_CHIP == DEVVOICE_PCM_CHIP
+          && VoiceState::PCM_STATE == DEVVOICE_PCM_STATE && VoiceState::PCM_EG == DEVVOICE_PCM_EG
+          && VoiceState::PCM_TONE == DEVVOICE_PCM_TONE && VoiceState::PCM_START == DEVVOICE_PCM_START
+          && VoiceState::PCM_LOOP == DEVVOICE_PCM_LOOP && VoiceState::PCM_END == DEVVOICE_PCM_END
+          && VoiceState::PCM_POS == DEVVOICE_PCM_POS && VoiceState::PCM_FORMAT == DEVVOICE_PCM_FORMAT
+          && VoiceState::PCM_OCT == DEVVOICE_PCM_OCT && VoiceState::PCM_FNUM == DEVVOICE_PCM_FNUM
+          && VoiceState::PCM_TL == DEVVOICE_PCM_TL && VoiceState::PCM_PAN == DEVVOICE_PCM_PAN
+          && VoiceState::PCM_SEND == DEVVOICE_PCM_SEND && VoiceState::PCM_AR == DEVVOICE_PCM_AR
+          && VoiceState::PCM_D1R == DEVVOICE_PCM_D1R && VoiceState::PCM_DL == DEVVOICE_PCM_DL
+          && VoiceState::PCM_D2R == DEVVOICE_PCM_D2R && VoiceState::PCM_RR == DEVVOICE_PCM_RR
+          && VoiceState::PCM_KRS == DEVVOICE_PCM_KRS && VoiceState::PCM_RATES == DEVVOICE_PCM_RATES
+          && VoiceState::PCM_LFOF == DEVVOICE_PCM_LFOF && VoiceState::PCM_PLFO == DEVVOICE_PCM_PLFO
+          && VoiceState::PCM_ALFO == DEVVOICE_PCM_ALFO && VoiceState::PCM_MODE == DEVVOICE_PCM_MODE
+          && VoiceState::PCM_MDL == DEVVOICE_PCM_MDL && VoiceState::PCM_MDXSL == DEVVOICE_PCM_MDXSL
+          && VoiceState::PCM_MDYSL == DEVVOICE_PCM_MDYSL && VoiceState::PCM_ISEL == DEVVOICE_PCM_ISEL
+          && VoiceState::PCM_IMXL == DEVVOICE_PCM_IMXL && VoiceState::PCM_EFSDL == DEVVOICE_PCM_EFSDL
+          && VoiceState::PCM_EFPAN == DEVVOICE_PCM_EFPAN && VoiceState::PCM_SBCTL == DEVVOICE_PCM_SBCTL
+          && VoiceState::PCM_CLOCK == DEVVOICE_PCM_CLOCK && VoiceState::PCM_RATE == DEVVOICE_PCM_RATE
+          && VoiceState::PCM_MVOL == DEVVOICE_PCM_MVOL && VoiceState::PCM_GLOBAL == DEVVOICE_PCM_GLOBAL
+          && VoiceState::PCM_BANK0 == DEVVOICE_PCM_BANK0 && VoiceState::PCM_BANK1 == DEVVOICE_PCM_BANK1
+          && VoiceState::PCM_ACTIVE == DEVVOICE_PCM_ACTIVE && VoiceState::PCM_CHIP_YMW258 == DEVVOICE_PCM_CHIP_YMW258
+          && VoiceState::PCM_CHIP_SCSP == DEVVOICE_PCM_CHIP_SCSP && VoiceState::PCM_ST_KEY == DEVVOICE_PCM_ST_KEY
+          && VoiceState::PCM_ST_PLAYING == DEVVOICE_PCM_ST_PLAYING
+          && VoiceState::PCM_ST_REVERSE == DEVVOICE_PCM_ST_REVERSE
+          && VoiceState::PCM_ST_LOOPED == DEVVOICE_PCM_ST_LOOPED && VoiceState::PCM_MODE_FM == DEVVOICE_PCM_MODE_FM
+          && VoiceState::PCM_MODE_NOTRING == DEVVOICE_PCM_MODE_NOTRING
+          && VoiceState::PCM_MODE_DIRECT == DEVVOICE_PCM_MODE_DIRECT
+          && VoiceState::PCM_MODE_EGHOLD == DEVVOICE_PCM_MODE_EGHOLD
+          && VoiceState::PCM_MODE_LPSLNK == DEVVOICE_PCM_MODE_LPSLNK
+          && VoiceState::PCM_MODE_INTERP == DEVVOICE_PCM_MODE_INTERP && VoiceState::PCM_GL_DSP == DEVVOICE_PCM_GL_DSP
+          && VoiceState::PCM_GL_DAC18B == DEVVOICE_PCM_GL_DAC18B && VoiceState::PCM_GL_MEM4MB == DEVVOICE_PCM_GL_MEM4MB
+          && VoiceState::PCM_GL_BANKING == DEVVOICE_PCM_GL_BANKING,
+      "PCM voice fields mismatch");
 
   // Separate voices output for oscilloscope.
   // Chips with per-channel output support in emulation core (see RWF_VOICES) are tapped directly (as Furnace does).
@@ -780,7 +814,8 @@ namespace Module::LibVGM
       }
     };
 
-    static const uint_t MAX_VOICES = 32;
+    // two YMW258 of Sega Model 1 have 56 slots
+    static const uint_t MAX_VOICES = 64;
     static const uint_t MAX_SOLO_CHANNELS = 16;
     static const std::size_t MAX_NATIVE_SAMPLES = 1 << 20;
     static const uint_t STATES_PER_SECOND = 1000;

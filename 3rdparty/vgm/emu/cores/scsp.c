@@ -65,6 +65,8 @@ static void scsp_write_ram(void* info, UINT32 offset, UINT32 length, const UINT8
 static void scsp_set_mute_mask(void* info, UINT32 MuteMask);
 static void scsp_set_options(void* info, UINT32 Flags);
 static void scsp_set_log_cb(void* info, DEVCB_LOG func, void* param);
+static void scsp_set_voices_cb(void* info, DEVCB_VOICES cb, void* param);
+static UINT32 scsp_get_voices_state(void* info, UINT32 count, DEV_VOICE_STATE* states);
 
 
 static DEVDEF_RWFUNC devFunc[] =
@@ -75,6 +77,8 @@ static DEVDEF_RWFUNC devFunc[] =
 	{RWF_REGISTER | RWF_READ, DEVRW_A16D16, 0, SCSP_r16},
 	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, scsp_write_ram},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, scsp_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, scsp_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, scsp_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef =
@@ -342,6 +346,10 @@ struct _scsp_state
 	SCSPDSP DSP;
 
 	INT16 *RBUFDST;   //this points to where the sample will be stored in the RingBuf
+
+	DEVCB_VOICES voicesCb;
+	void* voicesParam;
+	INT32 voicesOut[32];
 
 	//LFO
 	//int PLFO_TRI[256], PLFO_SQR[256], PLFO_SAW[256], PLFO_NOI[256];
@@ -1137,6 +1145,8 @@ static void SCSP_DoMasterSamples(void* info, UINT32 nsamples, DEV_SMPL **outputs
 		DEV_SMPL smpl, smpr;
 
 		smpl = smpr = 0;
+		if (scsp->voicesCb)
+			memset(scsp->voicesOut, 0, sizeof(scsp->voicesOut));
 
 		for(sl=0;sl<32;++sl)
 		{
@@ -1162,6 +1172,12 @@ static void SCSP_DoMasterSamples(void* info, UINT32 nsamples, DEV_SMPL **outputs
 				{
 					smpl+=(sample*scsp->LPANTABLE[Enc])>>SHIFT;
 					smpr+=(sample*scsp->RPANTABLE[Enc])>>SHIFT;
+				}
+				if (scsp->voicesCb)
+				{
+					// direct output before panning (DIPAN 0 is full level of both sides), scaled as the mix
+					INT32 out=(sample*scsp->LPANTABLE[(TL(slot))|((DISDL(slot))<<0xd)])>>SHIFT;
+					scsp->voicesOut[sl] = DAC18B(scsp) ? out : (out>>2);
 				}
 			}
 
@@ -1217,6 +1233,8 @@ static void SCSP_DoMasterSamples(void* info, UINT32 nsamples, DEV_SMPL **outputs
 		}
 		bufl[s] = smpl;
 		bufr[s] = smpr;
+		if (scsp->voicesCb)
+			scsp->voicesCb(scsp->voicesParam, 32, scsp->voicesOut);
 	}
 }
 
@@ -1365,4 +1383,149 @@ static void scsp_set_log_cb(void* info, DEVCB_LOG func, void* param)
 	scsp_state *scsp = (scsp_state *)info;
 	dev_logger_set(&scsp->logger, scsp, func, param);
 	return;
+}
+
+static void scsp_set_voices_cb(void* info, DEVCB_VOICES cb, void* param)
+{
+	scsp_state *scsp = (scsp_state *)info;
+	scsp->voicesCb = cb;
+	scsp->voicesParam = param;
+	return;
+}
+
+// index of rate in table, actual step of slot is one of them (see Get_AR/Get_DR)
+static UINT8 scsp_rate_index(const int *table, int step)
+{
+	UINT8 idx;
+	
+	if (step == 0)
+		return 0;
+	for (idx = 2; idx < 64; idx ++)
+	{
+		if (table[idx] == step)
+			return idx;
+	}
+	return 63;
+}
+
+static void scsp_put16(UINT8* dst, UINT32 val)
+{
+	dst[0] = (UINT8)(val & 0xFF);
+	dst[1] = (UINT8)((val >> 8) & 0xFF);
+}
+
+static UINT32 scsp_get_voices_state(void* info, UINT32 count, DEV_VOICE_STATE* states)
+{
+	// stages to DEVVOICE ones
+	static const UINT8 STAGES[4] = {1, 2, 3, 4};
+	scsp_state *scsp = (scsp_state *)info;
+	UINT32 sl;
+	UINT8 active = 0;
+	
+	for (sl = 0; sl < 32; sl ++)
+	{
+		if (scsp->Slots[sl].active)
+			active ++;
+	}
+	for (sl = 0; sl < 32 && sl < count; sl ++)
+	{
+		SCSP_SLOT *slot = scsp->Slots + sl;
+		DEV_VOICE_STATE* state = &states[sl];
+		UINT8* f = state->fields;
+		int vol = slot->EG.volume >> EG_SHIFT;
+		UINT32 pos = slot->cur_addr >> SHIFT;
+		float tlDb = 0.0f;
+		float egDb;
+		
+		if (vol < 0)
+			vol = 0;
+		if (vol > 0x3FF)
+			vol = 0x3FF;
+		// attack is linear in amplitude, other stages are 3/32dB per step (see SCSP_UpdateSlot and EG_TABLE)
+		if (slot->EG.state == SCSP_ATTACK)
+			egDb = vol ? (float)(20.0 * log10((double)vol / 0x3FF)) : -96.0f;
+		else
+			egDb = 3.0f * (float)(vol - 0x3FF) / 32.0f;
+		if (egDb < -96.0f)
+			egDb = -96.0f;
+		memset(f, 0, sizeof(state->fields));
+		f[DEVVOICE_PCM_CHIP] = DEVVOICE_PCM_CHIP_SCSP;
+		if (slot->active)
+		{
+			f[DEVVOICE_PCM_STATE] = STAGES[slot->EG.state & 3] | DEVVOICE_PCM_ST_PLAYING
+				| (slot->EG.state != SCSP_RELEASE ? DEVVOICE_PCM_ST_KEY : 0)
+				| (slot->Backwards ? DEVVOICE_PCM_ST_REVERSE : 0)
+				| (pos >= LSA(slot) ? DEVVOICE_PCM_ST_LOOPED : 0);
+			f[DEVVOICE_PCM_EG] = (UINT8)((egDb + 96.0f) * 255.0f / 96.0f + 0.5f);
+		}
+		scsp_put16(&f[DEVVOICE_PCM_START], SA(slot) & 0xFFFF);
+		f[DEVVOICE_PCM_START + 2] = (UINT8)(SA(slot) >> 16);
+		scsp_put16(&f[DEVVOICE_PCM_LOOP], LSA(slot));
+		scsp_put16(&f[DEVVOICE_PCM_END], LEA(slot));
+		scsp_put16(&f[DEVVOICE_PCM_POS], pos);
+		f[DEVVOICE_PCM_FORMAT] = (PCM8B(slot) ? 0 : 2) | (LPCTL(slot) << 2) | ((SSCTL(slot) & 3) << 4);
+		f[DEVVOICE_PCM_OCT] = (UINT8)((OCT(slot) ^ 8) - 8);
+		scsp_put16(&f[DEVVOICE_PCM_FNUM], FNS(slot));
+		f[DEVVOICE_PCM_TL] = (UINT8)TL(slot);
+		f[DEVVOICE_PCM_PAN] = (UINT8)DIPAN(slot);
+		f[DEVVOICE_PCM_SEND] = (UINT8)DISDL(slot);
+		f[DEVVOICE_PCM_AR] = (UINT8)AR(slot);
+		f[DEVVOICE_PCM_D1R] = (UINT8)D1R(slot);
+		f[DEVVOICE_PCM_DL] = (UINT8)DL(slot);
+		f[DEVVOICE_PCM_D2R] = (UINT8)D2R(slot);
+		f[DEVVOICE_PCM_RR] = (UINT8)RR(slot);
+		f[DEVVOICE_PCM_KRS] = (UINT8)KRS(slot);
+		f[DEVVOICE_PCM_RATES + 0] = scsp_rate_index(scsp->ARTABLE, slot->EG.AR);
+		f[DEVVOICE_PCM_RATES + 1] = scsp_rate_index(scsp->DRTABLE, slot->EG.D1R);
+		f[DEVVOICE_PCM_RATES + 2] = scsp_rate_index(scsp->DRTABLE, slot->EG.D2R);
+		f[DEVVOICE_PCM_RATES + 3] = scsp_rate_index(scsp->DRTABLE, slot->EG.RR);
+		f[DEVVOICE_PCM_LFOF] = (UINT8)LFOF(slot);
+		f[DEVVOICE_PCM_PLFO] = (UINT8)(PLFOS(slot) | (PLFOWS(slot) << 4));
+		f[DEVVOICE_PCM_ALFO] = (UINT8)(ALFOS(slot) | (ALFOWS(slot) << 4));
+		f[DEVVOICE_PCM_MODE] = (MDL(slot) != 0 || MDXSL(slot) != 0 || MDYSL(slot) != 0 ? DEVVOICE_PCM_MODE_FM : 0)
+			| (STWINH(slot) ? DEVVOICE_PCM_MODE_NOTRING : 0) | (SDIR(slot) ? DEVVOICE_PCM_MODE_DIRECT : 0)
+			| (EGHOLD(slot) ? DEVVOICE_PCM_MODE_EGHOLD : 0) | (LPSLNK(slot) ? DEVVOICE_PCM_MODE_LPSLNK : 0);
+		f[DEVVOICE_PCM_MDL] = (UINT8)MDL(slot);
+		f[DEVVOICE_PCM_MDXSL] = (UINT8)MDXSL(slot);
+		f[DEVVOICE_PCM_MDYSL] = (UINT8)MDYSL(slot);
+		f[DEVVOICE_PCM_ISEL] = (UINT8)ISEL(slot);
+		f[DEVVOICE_PCM_IMXL] = (UINT8)IMXL(slot);
+		f[DEVVOICE_PCM_EFSDL] = (UINT8)EFSDL(slot);
+		f[DEVVOICE_PCM_EFPAN] = (UINT8)EFPAN(slot);
+		f[DEVVOICE_PCM_SBCTL] = (UINT8)SBCTL(slot);
+		scsp_put16(&f[DEVVOICE_PCM_CLOCK], scsp->clock & 0xFFFF);
+		scsp_put16(&f[DEVVOICE_PCM_CLOCK + 2], scsp->clock >> 16);
+		scsp_put16(&f[DEVVOICE_PCM_RATE], scsp->rate);
+		f[DEVVOICE_PCM_MVOL] = (UINT8)MVOL(scsp);
+		f[DEVVOICE_PCM_GLOBAL] = (BypassDSP ? 0 : DEVVOICE_PCM_GL_DSP) | (DAC18B(scsp) ? DEVVOICE_PCM_GL_DAC18B : 0)
+			| (MEM4B(scsp) ? DEVVOICE_PCM_GL_MEM4MB : 0);
+		f[DEVVOICE_PCM_ACTIVE] = active;
+		
+		state->freq = 0.0f;
+		state->kind = DEVVOICE_KIND_PCM_SLOT;
+		if (! slot->active)
+		{
+			state->level = -96.0f;
+			state->flags = DEVVOICE_LEVEL;
+			continue;
+		}
+		// see SCSP_Init for TL bits weights
+		if (TL(slot) & 0x01) tlDb -= 0.4f;
+		if (TL(slot) & 0x02) tlDb -= 0.8f;
+		if (TL(slot) & 0x04) tlDb -= 1.5f;
+		if (TL(slot) & 0x08) tlDb -= 3.0f;
+		if (TL(slot) & 0x10) tlDb -= 6.0f;
+		if (TL(slot) & 0x20) tlDb -= 12.0f;
+		if (TL(slot) & 0x40) tlDb -= 24.0f;
+		if (TL(slot) & 0x80) tlDb -= 48.0f;
+		// direct slots bypass envelope
+		state->level = SDIR(slot) ? 0.0f : egDb;
+		state->level += tlDb;
+		// direct send level as the tap has it, slots heard only through DSP are silent there
+		state->level += DISDL(slot) ? SDLT[DISDL(slot)] : -96.0f;
+		if (state->level < -96.0f)
+			state->level = -96.0f;
+		state->flags = DEVVOICE_LEVEL | (slot->EG.state != SCSP_RELEASE ? DEVVOICE_KEYON : 0);
+	}
+	return 32;
 }

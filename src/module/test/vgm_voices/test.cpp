@@ -24,6 +24,7 @@
 namespace
 {
   const uint_t FREQ = 48000;
+  const uint_t MAX_VOICES = 64;
 
   class TestScope : public Module::VoicesScope
   {
@@ -246,6 +247,17 @@ int main(int argc, char** argv)
                   s.Flags & Module::VoiceState::KEY_ON ? "*" : "");
     }
     std::printf("\n");
+    if (!st.empty() && st[st.size() / 4].Kind == Module::VoiceState::PCM_SLOT)
+    {
+      // raw fields at the first quarter, see Module::VoiceState::PCM_*
+      const auto& f = st[st.size() / 4].Fields;
+      std::printf("  pcm fields:");
+      for (uint_t idx = 0; idx < 62; ++idx)
+      {
+        std::printf("%s%02x", idx % 8 ? " " : " | ", f[idx]);
+      }
+      std::printf("\n");
+    }
   }
   {
     // Sound::Scope gauges check
@@ -253,8 +265,8 @@ int main(int argc, char** argv)
     auto sc = Sound::Scope::Create(FREQ);
     dynamic_cast<Module::VoicesScopeSource*>(r.get())->SetVoicesScope(sc);
     uint64_t played = 0;
-    std::vector<int16_t> wave(32 * 512);
-    sc->Get(32, 256, 0, 40, wave.data());  // activate
+    std::vector<int16_t> wave(MAX_VOICES * 512);
+    sc->Get(MAX_VOICES, 256, 0, 40, wave.data());  // activate
     while (played < FREQ * 2)
     {
       const auto chunk = r->Render();
@@ -268,12 +280,12 @@ int main(int argc, char** argv)
       const int frames = 120;
       for (int frame = 0; frame < frames; ++frame)
       {
-        sc->Get(32, 512, played - FREQ + frame * FREQ / 120, 40, wave.data());
+        sc->Get(MAX_VOICES, 512, played - FREQ + frame * FREQ / 120, 40, wave.data());
       }
       std::printf("trigger: %.2fms per frame\n",
                   std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / frames);
     }
-    const auto layout = sc->Get(32, 256, played - FREQ / 10, 40, wave.data());
+    const auto layout = sc->Get(MAX_VOICES, 256, played - FREQ / 10, 40, wave.data());
     std::printf("scope layout id=%u channels=%u:\n%s\n", layout.Id, layout.Channels, sc->GetLayout().c_str());
     if (argc > 4)
     {
@@ -281,12 +293,12 @@ int main(int argc, char** argv)
       std::ofstream traces(std::string(argv[4]) + ".scope", std::ios::binary);
       traces.write(reinterpret_cast<const char*>(wave.data()), layout.Channels * 256 * sizeof(wave.front()));
     }
-    std::vector<uint8_t> gauges(32 * Sound::Scope::VOICE_GAUGES_SIZE);
+    std::vector<uint8_t> gauges(MAX_VOICES * Sound::Scope::VOICE_GAUGES_SIZE);
     for (int pass = 0; pass < 20; ++pass)
     {
-      sc->GetVoiceGauges(32, played - FREQ / 10, 10, gauges.data());
+      sc->GetVoiceGauges(MAX_VOICES, played - FREQ / 10, 10, gauges.data());
     }
-    const auto voices = sc->GetVoiceGauges(32, played - FREQ / 10, 10, gauges.data());
+    const auto voices = sc->GetVoiceGauges(MAX_VOICES, played - FREQ / 10, 10, gauges.data());
     for (uint_t v = 0; v < voices; ++v)
     {
       const auto* g = gauges.data() + v * Sound::Scope::VOICE_GAUGES_SIZE;

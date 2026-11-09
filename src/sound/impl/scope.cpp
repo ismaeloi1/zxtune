@@ -39,7 +39,8 @@ namespace Sound
     const uint_t MAX_WINDOW_MS = 200;
     // see ScopeImpl::GetRenderWindow
     const uint_t MAX_ZOOM_POINTS = 4;
-    const uint_t MAX_VOICES = 32;
+    // two YMW258 of Sega Model 1 have 56 slots
+    const uint_t MAX_VOICES = 64;
     const uint_t MAX_FULL_RATE_TRIGGERS = 8;
     // searches are spread among frames, so serial processing of not so many voices fits into frame, while waking of
     // other cores costs power and delays (e.g. if they are busy or slow)

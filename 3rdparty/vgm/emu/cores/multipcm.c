@@ -61,6 +61,8 @@ static void multipcm_alloc_rom(void* info, UINT32 memsize);
 static void multipcm_write_rom(void *info, UINT32 offset, UINT32 length, const UINT8* data);
 
 static void multipcm_set_mute_mask(void *info, UINT32 MuteMask);
+static void multipcm_set_voices_cb(void *info, DEVCB_VOICES cb, void* param);
+static UINT32 multipcm_get_voices_state(void *info, UINT32 count, DEV_VOICE_STATE* states);
 
 
 static DEVDEF_RWFUNC devFunc[] =
@@ -71,6 +73,8 @@ static DEVDEF_RWFUNC devFunc[] =
 	{RWF_MEMORY | RWF_WRITE, DEVRW_BLOCK, 0, multipcm_write_rom},
 	{RWF_MEMORY | RWF_WRITE, DEVRW_MEMSIZE, 0, multipcm_alloc_rom},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, multipcm_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, multipcm_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, multipcm_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef =
@@ -231,6 +235,11 @@ struct _MultiPCM
 	UINT32 ROMMask;
 	UINT32 ROMSize;
 	UINT8 *ROM;
+	
+	UINT32 clock;
+	DEVCB_VOICES voicesCb;
+	void* voicesParam;
+	INT32 voicesOut[28];
 };
 
 
@@ -596,6 +605,7 @@ static UINT8 device_start_multipcm(const DEV_GEN_CFG* cfg, DEV_INFO* retDevInf)
 	ptChip->ROMSize = 0x00;
 	ptChip->ROMMask = 0x00;
 	ptChip->rate = (float)cfg->clock / MULTIPCM_CLOCKDIV;
+	ptChip->clock = cfg->clock;
 
 	if (! IsInit)
 	{
@@ -829,6 +839,8 @@ static void MultiPCM_update(void *info, UINT32 samples, DEV_SMPL **outputs)
 	{
 		DEV_SMPL smpl = 0;
 		DEV_SMPL smpr = 0;
+		if (ptChip->voicesCb)
+			memset(ptChip->voicesOut, 0, sizeof(ptChip->voicesOut));
 		for (sl = 0; sl < 28; ++sl)
 		{
 			slot_t *slot = &ptChip->slots[sl];
@@ -902,11 +914,15 @@ static void MultiPCM_update(void *info, UINT32 samples, DEV_SMPL **outputs)
 
 				smpl += (left_pan_table[vol] * sample) >> TL_SHIFT;
 				smpr += (right_pan_table[vol] * sample) >> TL_SHIFT;
+				// before panning: centered pan (0) is the full level of the louder side
+				ptChip->voicesOut[sl] = (left_pan_table[vol & 0x7f] * sample) >> TL_SHIFT;
 			}
 		}
 
 		outputs[0][i] = smpl;
 		outputs[1][i] = smpr;
+		if (ptChip->voicesCb)
+			ptChip->voicesCb(ptChip->voicesParam, 28, ptChip->voicesOut);
 	}
 }
 
@@ -1004,4 +1020,130 @@ static void multipcm_set_mute_mask(void *info, UINT32 MuteMask)
 		ptChip->slots[CurChn].muted = (MuteMask >> CurChn) & 0x01;
 	
 	return;
+}
+
+static void multipcm_set_voices_cb(void *info, DEVCB_VOICES cb, void* param)
+{
+	MultiPCM* ptChip = (MultiPCM *)info;
+	
+	ptChip->voicesCb = cb;
+	ptChip->voicesParam = param;
+	
+	return;
+}
+
+// index of rate in steps table, actual step of slot is one of them (see get_rate)
+static UINT8 multipcm_rate_index(const UINT32 *steps, INT32 step)
+{
+	UINT8 idx;
+	
+	if (step == 0)
+		return 0;
+	for (idx = 1; idx < 0x40; idx ++)
+	{
+		if (steps[idx] == (UINT32)step)
+			return idx;
+	}
+	return 0x3F;
+}
+
+static void put16(UINT8* dst, UINT32 val)
+{
+	dst[0] = (UINT8)(val & 0xFF);
+	dst[1] = (UINT8)((val >> 8) & 0xFF);
+}
+
+static UINT32 multipcm_get_voices_state(void *info, UINT32 count, DEV_VOICE_STATE* states)
+{
+	// envelope stages to DEVVOICE ones
+	static const UINT8 STAGES[4] = {1, 2, 3, 4};
+	MultiPCM* ptChip = (MultiPCM *)info;
+	UINT32 sl;
+	UINT8 active = 0;
+	
+	for (sl = 0; sl < 28; sl ++)
+	{
+		if (ptChip->slots[sl].playing)
+			active ++;
+	}
+	for (sl = 0; sl < 28 && sl < count; sl ++)
+	{
+		const slot_t *slot = &ptChip->slots[sl];
+		const envelope_gen_t *eg = &slot->envelope_gen;
+		DEV_VOICE_STATE* state = &states[sl];
+		UINT8* f = state->fields;
+		INT32 vol = eg->volume >> EG_SHIFT;
+		UINT32 tl = slot->total_level >> TL_SHIFT;
+		UINT32 pos = slot->offset >> TL_SHIFT;
+		
+		if (vol < 0)
+			vol = 0;
+		if (vol > 0x3FF)
+			vol = 0x3FF;
+		if (tl > 0x7F)
+			tl = 0x7F;
+		if (slot->reverse && pos < slot->sample.end)
+			pos = slot->sample.end - pos - 1;
+		memset(f, 0, sizeof(state->fields));
+		f[DEVVOICE_PCM_CHIP] = DEVVOICE_PCM_CHIP_YMW258;
+		if (slot->playing)
+		{
+			f[DEVVOICE_PCM_STATE] = STAGES[eg->state & 3] | DEVVOICE_PCM_ST_PLAYING
+				| (eg->state != RELEASE ? DEVVOICE_PCM_ST_KEY : 0)
+				| (slot->reverse ? DEVVOICE_PCM_ST_REVERSE : 0)
+				| (pos >= slot->sample.loop ? DEVVOICE_PCM_ST_LOOPED : 0);
+			// 96dB in 1024 steps (see linear_to_exp_volume)
+			f[DEVVOICE_PCM_EG] = (UINT8)((vol * 255 + 511) / 0x3FF);
+		}
+		put16(&f[DEVVOICE_PCM_TONE], slot->regs[1] | ((slot->regs[2] & 1) << 8));
+		put16(&f[DEVVOICE_PCM_START], slot->base & 0xFFFF);
+		f[DEVVOICE_PCM_START + 2] = (UINT8)((slot->base >> 16) & 0xFF);
+		put16(&f[DEVVOICE_PCM_LOOP], slot->sample.loop);
+		put16(&f[DEVVOICE_PCM_END], slot->sample.end);
+		put16(&f[DEVVOICE_PCM_POS], pos);
+		// samples are always looped from loop start to the end
+		f[DEVVOICE_PCM_FORMAT] = (slot->sample.format & 4 ? 1 : 0) | (1 << 2);
+		f[DEVVOICE_PCM_OCT] = (UINT8)(slot->octave & 8 ? slot->octave - 16 : slot->octave);
+		put16(&f[DEVVOICE_PCM_FNUM], slot->pitch);
+		f[DEVVOICE_PCM_TL] = (UINT8)tl;
+		f[DEVVOICE_PCM_PAN] = (UINT8)slot->pan;
+		f[DEVVOICE_PCM_SEND] = 7;
+		f[DEVVOICE_PCM_AR] = slot->sample.attack_reg;
+		f[DEVVOICE_PCM_D1R] = slot->sample.decay1_reg;
+		f[DEVVOICE_PCM_DL] = slot->sample.decay_level;
+		f[DEVVOICE_PCM_D2R] = slot->sample.decay2_reg;
+		f[DEVVOICE_PCM_RR] = slot->sample.release_reg;
+		f[DEVVOICE_PCM_KRS] = slot->sample.key_rate_scale;
+		f[DEVVOICE_PCM_RATES + 0] = multipcm_rate_index(ptChip->attack_step, eg->attack_rate);
+		f[DEVVOICE_PCM_RATES + 1] = multipcm_rate_index(ptChip->decay_release_step, eg->decay1_rate);
+		f[DEVVOICE_PCM_RATES + 2] = multipcm_rate_index(ptChip->decay_release_step, eg->decay2_rate);
+		f[DEVVOICE_PCM_RATES + 3] = multipcm_rate_index(ptChip->decay_release_step, eg->release_rate);
+		f[DEVVOICE_PCM_LFOF] = slot->lfo_frequency;
+		f[DEVVOICE_PCM_PLFO] = slot->vibrato;
+		f[DEVVOICE_PCM_ALFO] = slot->tremolo;
+		f[DEVVOICE_PCM_MODE] = (slot->regs[5] & 1) ? 0 : DEVVOICE_PCM_MODE_INTERP;
+		put16(&f[DEVVOICE_PCM_CLOCK], ptChip->clock & 0xFFFF);
+		put16(&f[DEVVOICE_PCM_CLOCK + 2], ptChip->clock >> 16);
+		put16(&f[DEVVOICE_PCM_RATE], (UINT32)(ptChip->rate + 0.5f));
+		f[DEVVOICE_PCM_MVOL] = 15;
+		f[DEVVOICE_PCM_GLOBAL] = ptChip->sega_banking ? DEVVOICE_PCM_GL_BANKING : 0;
+		put16(&f[DEVVOICE_PCM_BANK0], ptChip->bank0 >> 16);
+		put16(&f[DEVVOICE_PCM_BANK1], ptChip->bank1 >> 16);
+		f[DEVVOICE_PCM_ACTIVE] = active;
+		
+		state->freq = 0.0f;
+		if (slot->playing)
+		{
+			// envelope is 96dB, TL is 0.375dB per step (see pan tables)
+			state->level = -96.0f + 96.0f * (float)vol / 1024.0f - (float)tl * 24.0f / 64.0f;
+			state->flags = DEVVOICE_LEVEL | (eg->state != RELEASE ? DEVVOICE_KEYON : 0);
+		}
+		else
+		{
+			state->level = -96.0f;
+			state->flags = DEVVOICE_LEVEL;
+		}
+		state->kind = DEVVOICE_KIND_PCM_SLOT;
+	}
+	return 28;
 }

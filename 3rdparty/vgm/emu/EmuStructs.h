@@ -152,6 +152,67 @@ typedef void (*DEVFUNC_SET_VOICES_CB)(void* info, DEVCB_VOICES cb, void* param);
 #define DEVVOICE_FM_CHIP_OPL2	7	// YM3812
 #define DEVVOICE_FM_CHIP_OPL3	8	// YMF262
 
+// PCM slot of wavetable chips (YMW258/MultiPCM, SCSP), raw registers are in chip's own units (see DEVVOICE_PCM_CHIP)
+#define DEVVOICE_KIND_PCM_SLOT		0x0F
+#define DEVVOICE_PCM_CHIP		0	// see DEVVOICE_PCM_CHIP_*
+#define DEVVOICE_PCM_STATE		1	// envelope stage 0..4 (off, attack, decay 1, decay 2, release) | DEVVOICE_PCM_ST_*
+#define DEVVOICE_PCM_EG			2	// envelope level 0..255 (96dB range, 255 is maximal)
+#define DEVVOICE_PCM_TONE		3	// 2 bytes: tone (sample header) number, YMW258 only
+#define DEVVOICE_PCM_START		5	// 3 bytes: start address of sample in bytes
+#define DEVVOICE_PCM_LOOP		8	// 2 bytes: loop start in samples
+#define DEVVOICE_PCM_END		10	// 2 bytes: loop end (sample length) in samples
+#define DEVVOICE_PCM_POS		12	// 2 bytes: current position in samples
+#define DEVVOICE_PCM_FORMAT		14	// bits 0..1: 0 8 bit, 1 12 bit, 2 16 bit; bits 2..3: loop mode (0 none, 1 forward,
+									// 2 reverse, 3 ping-pong); bits 4..5: source (0 memory, 1 noise, 2 silence)
+#define DEVVOICE_PCM_OCT		15	// octave, signed
+#define DEVVOICE_PCM_FNUM		16	// 2 bytes: 10 bits F-number
+#define DEVVOICE_PCM_TL			18	// total level, YMW258 0..127 (0.375dB step), SCSP 0..255 (bits are 0.4..48dB)
+#define DEVVOICE_PCM_PAN		19	// YMW258 0..15 (0 center, 1..7 right louder, 9..15 left louder, 8 muted)
+									// SCSP DIPAN 0..31 (0..15 right attenuated, 16..31 left attenuated)
+#define DEVVOICE_PCM_SEND		20	// direct send level 0..7 (SCSP DISDL, 7 for YMW258)
+#define DEVVOICE_PCM_AR			21	// envelope registers: AR, D1R, DL, D2R, RR, KRS (YMW258 0..15, SCSP rates and DL 0..31)
+#define DEVVOICE_PCM_D1R		22
+#define DEVVOICE_PCM_DL			23
+#define DEVVOICE_PCM_D2R		24
+#define DEVVOICE_PCM_RR			25
+#define DEVVOICE_PCM_KRS		26
+#define DEVVOICE_PCM_RATES		27	// 4 bytes: effective (key scaled) rates 0..63 of AR, D1R, D2R, RR, 0 is infinite
+#define DEVVOICE_PCM_LFOF		31	// LFO frequency, YMW258 0..7, SCSP 0..31
+#define DEVVOICE_PCM_PLFO		32	// pitch LFO depth 0..7 | waveform 0..3 << 4 (SCSP)
+#define DEVVOICE_PCM_ALFO		33	// amplitude LFO depth 0..7 | waveform 0..3 << 4 (SCSP)
+#define DEVVOICE_PCM_MODE		34	// DEVVOICE_PCM_MODE_* flags
+#define DEVVOICE_PCM_MDL		35	// SCSP modulation level 0..15 (0 none, 5..15 is +-pi/16..+-64pi)
+#define DEVVOICE_PCM_MDXSL		36	// SCSP modulation sources 0..63 (ring buffer offsets, i.e. slot + N)
+#define DEVVOICE_PCM_MDYSL		37
+#define DEVVOICE_PCM_ISEL		38	// SCSP DSP input mixer register 0..15
+#define DEVVOICE_PCM_IMXL		39	// SCSP DSP send level 0..7
+#define DEVVOICE_PCM_EFSDL		40	// SCSP effect return level 0..7 of DSP output with slot's number (slots 0..17)
+#define DEVVOICE_PCM_EFPAN		41	// SCSP effect return pan 0..31
+#define DEVVOICE_PCM_SBCTL		42	// SCSP sample bits inversion 0..3
+#define DEVVOICE_PCM_CLOCK		48	// 4 bytes: chip clock in Hz (same in all slots)
+#define DEVVOICE_PCM_RATE		52	// 2 bytes: output (and envelope) sample rate in Hz
+#define DEVVOICE_PCM_MVOL		54	// SCSP master volume 0..15 (15 for YMW258)
+#define DEVVOICE_PCM_GLOBAL		55	// DEVVOICE_PCM_GL_* flags
+#define DEVVOICE_PCM_BANK0		56	// 2 bytes: YMW258 Sega banking low bank address >> 16
+#define DEVVOICE_PCM_BANK1		58	// 2 bytes: YMW258 Sega banking high bank address >> 16
+#define DEVVOICE_PCM_ACTIVE		60	// slots playing now (same in all slots)
+#define DEVVOICE_PCM_CHIP_YMW258	1
+#define DEVVOICE_PCM_CHIP_SCSP		2
+#define DEVVOICE_PCM_ST_KEY		0x08	// key is on (not released)
+#define DEVVOICE_PCM_ST_PLAYING	0x10	// slot is generating samples
+#define DEVVOICE_PCM_ST_REVERSE	0x20	// sample is played backwards
+#define DEVVOICE_PCM_ST_LOOPED	0x40	// position is past loop start
+#define DEVVOICE_PCM_MODE_FM		0x01	// SCSP: phase is modulated by ring buffer (MDL/MDXSL/MDYSL)
+#define DEVVOICE_PCM_MODE_NOTRING	0x02	// SCSP STWINH: output is not written to ring buffer
+#define DEVVOICE_PCM_MODE_DIRECT	0x04	// SCSP SDIR: envelope, LFO and TL are bypassed
+#define DEVVOICE_PCM_MODE_EGHOLD	0x08	// SCSP: attack holds maximal level
+#define DEVVOICE_PCM_MODE_LPSLNK	0x10	// SCSP: decay starts at loop start
+#define DEVVOICE_PCM_MODE_INTERP	0x20	// YMW258: TL is interpolated
+#define DEVVOICE_PCM_GL_DSP		0x01	// SCSP effects DSP is emulated (not bypassed)
+#define DEVVOICE_PCM_GL_DAC18B	0x02	// SCSP 18 bit DAC output
+#define DEVVOICE_PCM_GL_MEM4MB	0x04	// SCSP 4 Mbit memory
+#define DEVVOICE_PCM_GL_BANKING	0x10	// YMW258 Sega banking is enabled
+
 typedef struct _device_voice_state
 {
 	float freq;		// Hz
