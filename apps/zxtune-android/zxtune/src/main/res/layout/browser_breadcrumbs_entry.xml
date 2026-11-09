@@ -12,7 +12,7 @@
 
     <!-- Source is told by its logo only, icon is set by the adapter to fit the chip -->
     <Button
-            style="@style/Button.Breadcrumbs"
+            style="@style/Button.Breadcrumbs.Touch"
             android:layout_width="wrap_content"
             android:contentDescription="@{entry.title}"
             android:text="@{entry.icon == null ? entry.title : null}"

@@ -55,4 +55,9 @@
   <!-- page gutter 16dp minus card half gap 6dp -->
   <dimen name="lhuna_cards_inset">10dp</dimen>
   <dimen name="lhuna_cards_half_gap">6dp</dimen>
+  <!-- phase 5 -->
+  <!-- breadcrumb chip (lhuna_crumb_height) is drawn inset in the whole touch target -->
+  <dimen name="lhuna_crumb_inset">6dp</dimen>
+  <!-- segmented control: segments are touch targets of at least 48dp -->
+  <dimen name="lhuna_segment_touch_height">48dp</dimen>
 </resources>

@@ -43,7 +43,7 @@ class SegmentedControl @JvmOverloads constructor(
     private val inset = (4 * density).toInt()
     private val padding = (14 * density).toInt()
     private val compactPadding = (6 * density).toInt()
-    private val segmentHeight = resources.getDimensionPixelSize(R.dimen.lhuna_segment_height)
+    private val segmentHeight = resources.getDimensionPixelSize(R.dimen.lhuna_segment_touch_height)
     private val maxTextPx = sp(MAX_TEXT_SP)
     private val minTextPx = sp(MIN_TEXT_SP)
     private val measurePaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG)

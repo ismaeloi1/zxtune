@@ -8,7 +8,8 @@
     <color name="lhuna_outline">#2A2E40</color>
     <color name="lhuna_text_1">#F2F4FA</color>
     <color name="lhuna_text_2">#A6ACC2</color>
-    <color name="lhuna_text_3">#767C92</color>
+    <!-- tertiary text is at least 4.5:1 to every surface (WCAG AA) -->
+    <color name="lhuna_text_3">#878DA3</color>
     <!-- 'Signal' cyan: progress, active state, primary action -->
     <color name="lhuna_accent">#00E5FF</color>
     <!-- Tonal background of activated toggles, white content on it stays readable -->

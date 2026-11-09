@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- oscilloscope settings screen and overlay panel -->
+    <string name="pref_oscilloscope_summary">Affichage, déclenchement et performances</string>
+    <string name="pref_oscilloscope_display_title">Affichage</string>
+    <string name="pref_oscilloscope_trigger_title">Déclenchement</string>
+    <string name="pref_oscilloscope_trigger_summary">Déclenchement par corrélation comme dans corrscope : l\'onde est alignée par ses fronts et sa ressemblance avec les images précédentes</string>
+    <string name="pref_oscilloscope_trigger_preset_title">Préréglage</string>
+    <string-array name="pref_oscilloscope_trigger_preset_entries">
+        <item>Par défaut (modèle corrscope, 40 ms)</item>
+        <item>Notes évolutives (60 ms)</item>
+        <item>Chiptune carré/impulsion</item>
+        <item>Basses, notes graves</item>
+        <item>Triangle NES</item>
+        <item>Économie d\'énergie</item>
+        <item>Personnalisé</item>
+    </string-array>
+    <string name="pref_value_percent_of_period">%d %% de la période</string>
+    <string name="pref_value_percent_of_width">%d %% de la largeur</string>
+    <string name="pref_oscilloscope_trigger_width_title">Largeur de déclenchement</string>
+    <string name="pref_oscilloscope_trigger_width_summary">Taille de l\'historique, doit dépasser deux périodes des notes les plus graves</string>
+    <string name="pref_oscilloscope_trigger_edge_title">Force des fronts</string>
+    <string name="pref_oscilloscope_trigger_edge_summary">Préférer les fronts montants raides : les nouvelles notes sont mieux saisies, mais les notes tenues sautent davantage</string>
+    <string name="pref_oscilloscope_trigger_slope_title">Largeur de pente</string>
+    <string name="pref_oscilloscope_trigger_buffer_title">Force de l\'historique</string>
+    <string name="pref_oscilloscope_trigger_buffer_summary">Préférer la ressemblance avec les images précédentes</string>
+    <string name="pref_oscilloscope_trigger_responsiveness_title">Réactivité de l\'historique</string>
+    <string name="pref_oscilloscope_trigger_falloff_title">Atténuation de l\'historique</string>
+    <string name="pref_oscilloscope_trigger_reset_title">Réinitialiser sous la ressemblance</string>
+    <string name="pref_oscilloscope_trigger_reset_summary">Oublier l\'historique aux nouvelles notes si l\'onde ne lui ressemble pas</string>
+    <string name="pref_oscilloscope_trigger_mean_title">Vitesse de suppression du continu</string>
+    <string name="pref_oscilloscope_trigger_sign_title">Amplification du signe</string>
+    <string name="pref_oscilloscope_trigger_sign_summary">Passages par zéro raides pour les ondes sans fronts nets (p. ex. triangle)</string>
+    <string name="pref_oscilloscope_trigger_diameter_title">Plage de recherche</string>
+    <string name="pref_oscilloscope_trigger_falling_title">Fronts descendants</string>
+    <string name="pref_oscilloscope_trigger_falling_summary">P. ex. pour les trompettes échantillonnées</string>
+    <string name="pref_oscilloscope_trigger_pitch_title">Suivi de hauteur</string>
+    <string name="pref_oscilloscope_trigger_pitch_summary">Remettre l\'historique à l\'échelle quand la hauteur change</string>
+    <string name="pref_oscilloscope_trigger_post_title">Recalage au passage par zéro, échantillons</string>
+    <string name="pref_oscilloscope_trigger_post_summary">Glisser jusqu\'au passage par zéro montant le plus proche, 0 pour désactiver</string>
+    <string name="pref_oscilloscope_trigger_rate_title">Recherches complètes</string>
+    <string-array name="pref_oscilloscope_trigger_rate_entries">
+        <item>À chaque image</item>
+        <item>60 par seconde</item>
+        <item>30 par seconde</item>
+    </string-array>
+    <string name="pref_oscilloscope_trigger_subsampling_title">Sous-échantillonnage du déclenchement</string>
+    <string-array name="pref_oscilloscope_trigger_subsampling_entries">
+        <item>Automatique</item>
+        <item>Aucun (pleine fréquence)</item>
+        <item>2</item>
+        <item>4</item>
+    </string-array>
+    <string name="scope_settings">Réglages en direct</string>
+    <string name="pref_oscilloscope_max_periods_title">Périodes affichées au plus (zoom sur les notes aiguës)</string>
+    <string-array name="pref_oscilloscope_max_periods_entries">
+        <item>Désactivé (toute la fenêtre)</item>
+        <item>4 périodes</item>
+        <item>8 périodes</item>
+        <item>16 périodes</item>
+        <item>32 périodes</item>
+    </string-array>
+</resources>

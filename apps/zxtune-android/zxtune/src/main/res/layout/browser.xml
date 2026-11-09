@@ -43,7 +43,7 @@
 
                 <Button
                         android:id="@+id/browser_roots"
-                        style="@style/Button.Breadcrumbs"
+                        style="@style/Button.Breadcrumbs.Touch"
                         android:layout_width="wrap_content"
                         android:contentDescription="@string/browser"
                         android:drawableLeft="@drawable/ic_browser_sources" />

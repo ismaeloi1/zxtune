@@ -542,4 +542,11 @@
         <item name="android:windowCloseOnTouchOutside">true</item>
         <item name="colorAccent">@color/accent</item>
     </style>
+
+    <!-- phase 5 -->
+    <!-- Breadcrumb chip with the whole touch target, chip is inset by its background (lhuna_crumb_inset) -->
+    <style name="Button.Breadcrumbs.Touch">
+        <item name="android:layout_height">@dimen/lhuna_touch_target</item>
+        <item name="android:minWidth">@dimen/lhuna_touch_target</item>
+    </style>
 </resources>

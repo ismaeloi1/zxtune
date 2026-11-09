@@ -297,9 +297,11 @@ internal class FilterLayout private constructor(
         private const val LABEL_ALPHA = 200
         private const val GRID_ALPHA = 38
         private const val UNITY_ALPHA = 64
-        private const val AXIS_ALPHA = 110
+
+        // labels are at least 4.5:1 to black (WCAG AA)
+        private const val AXIS_ALPHA = 120
         private const val RULER_ALPHA = 70
-        private const val RULER_LABEL_ALPHA = 80
+        private const val RULER_LABEL_ALPHA = 120
 
         const val MIN_HZ = 20.0
         const val MAX_HZ = 20000.0
@@ -862,7 +864,7 @@ internal class FilterScene(private val res: FilterResources) {
     private fun appendGain(gain: RealtimeReadout) {
         appendDb(if (gain.isModulated) gain.low else gain.value)
         if (gain.isModulated) {
-            line.append(GAIN_RANGE)
+            line.append(RANGE)
             appendDb(gain.high)
         }
         line.append(" dB")
@@ -910,8 +912,9 @@ internal class FilterScene(private val res: FilterResources) {
         private const val TAG_KEYS = 4
         private const val RESONANCE_KEY = 3
         private const val SEPARATOR = " · "
-        private const val GAIN_RANGE = '…'
-        private const val RANGE = '–'
+
+        // the same range mark as dashboard texts, en dash would be confused with minus of gains
+        private const val RANGE = '…'
         private const val MAX_POINTS = 2048
 
         private const val CURVE_STEP_DP = 1.5f
@@ -932,7 +935,9 @@ internal class FilterScene(private val res: FilterResources) {
         private const val GHOST_RADIUS_DP = 2.5f
         private const val CAPTION_ALPHA = 0.6f
         private const val TAG_ALPHA = 0.85f
-        private const val PILL_ALPHA = 0.85f
+
+        // opaque, so traces and curves under tags don't reduce contrast of text
+        private const val PILL_ALPHA = 1f
         private const val MARKER_ALPHA = 0.3f
         private const val MARKER_LINE_DP = 1f
         private const val MARKER_RADIUS_DP = 3.5f

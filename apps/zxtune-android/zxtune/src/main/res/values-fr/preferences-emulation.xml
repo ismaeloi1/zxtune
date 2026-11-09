@@ -17,4 +17,170 @@
     <string name="pref_zxtune_sid_filter_voice_direct">direct</string>
     <string name="pref_zxtune_sid_filter_voice_noise">Bruit</string>
     <string name="pref_zxtune_sid_model_summary">Utilisé si le morceau ne le précise pas</string>
+    <string name="time_0s">Aucun</string>
+    <string name="time_1s">1 seconde</string>
+    <string name="time_2s">2 secondes</string>
+    <string name="time_3s">3 secondes</string>
+    <string name="time_4s">4 secondes</string>
+    <string name="time_5s">5 secondes</string>
+    <string name="time_10s">10 secondes</string>
+    <string name="time_15s">15 secondes</string>
+    <string name="pref_interpolation">Interpolation</string>
+    <string name="pref_zxtune_aym_clockrate_title">Fréquence d\'horloge</string>
+    <string name="pref_zxtune_aym_type_title">Type</string>
+    <string name="pref_zxtune_aym_layout_title">Disposition des canaux</string>
+    <string name="pref_zxtune_aym_duty_cycle_mask_title">Canaux à rapport cyclique</string>
+    <string name="pref_zxtune_aym_duty_cycle_title">Rapport cyclique</string>
+    <string name="pref_zxtune_aym_duty_cycle_summary">Largeur d\'impulsion du son pour les canaux choisis, 50 = onde carrée</string>
+    <string name="pref_zxtune_z80_title">Processeur Z80 (fichiers AY avec code du lecteur)</string>
+    <string name="pref_zxtune_z80_clockrate_title">Fréquence d\'horloge</string>
+    <string name="pref_zxtune_z80_int_ticks_title">Durée d\'interruption</string>
+    <string name="pref_zxtune_z80_int_ticks_summary">Durée d\'activité de la demande d\'interruption à chaque image</string>
+    <string name="pref_zxtune_fm_clockrate_title">Fréquence d\'horloge</string>
+    <string name="pref_zxtune_dac_title">Échantillons numériques</string>
+    <string name="pref_zxtune_saa_clockrate_title">Fréquence d\'horloge</string>
+    <string name="pref_main_screen_title">Écran principal</string>
+    <string name="pref_main_screen_show_author_title">Afficher l\'auteur</string>
+    <string name="pref_main_screen_show_author_summary">Auteur affiché sous le titre du morceau</string>
+    <string name="pref_oscilloscope_title">Oscilloscope</string>
+    <string name="pref_oscilloscope_gain_title">Amplification visuelle</string>
+    <string name="pref_oscilloscope_max_fps_title">Limite d\'images par seconde</string>
+    <string name="pref_oscilloscope_backend_title">Moteur graphique</string>
+    <string name="pref_oscilloscope_vulkan_driver_title">Pilote Vulkan personnalisé</string>
+    <string name="pref_oscilloscope_vulkan_driver_summary_empty">Choisir le paquet du pilote (zip avec meta.json ou bibliothèque .so, p. ex. Mesa Turnip pour les GPU Adreno)</string>
+    <string name="pref_oscilloscope_vulkan_driver_summary">Installé : %s</string>
+    <string name="pref_oscilloscope_vulkan_driver_unsupported">Non pris en charge sur cet appareil (Android 9+ et ARM 64 bits requis)</string>
+    <string name="pref_oscilloscope_vulkan_driver_failed">Échec de l\'installation du pilote : %s</string>
+    <string name="pref_oscilloscope_vulkan_driver_enabled_title">Utiliser le pilote Vulkan personnalisé</string>
+    <string name="pref_oscilloscope_vulkan_driver_enabled_summary">Le pilote du système est utilisé si le pilote personnalisé ne se charge pas</string>
+    <string name="pref_oscilloscope_window_title">Fenêtre des formes d\'onde</string>
+    <string name="pref_oscilloscope_window_summary">Durée affichée de la forme d\'onde de chaque voix</string>
+    <string name="pref_oscilloscope_gauge_window_title">Fenêtre des jauges SID</string>
+    <string name="pref_oscilloscope_gauge_window_summary">Durée affichée des jauges des oscillateurs et du volume général</string>
+    <string name="pref_zxtune_sid_filter_title">Émulation du filtre</string>
+    <string name="pref_zxtune_sid_engine_title">Moteur d\'émulation</string>
+    <string name="pref_zxtune_sid_model_title">Modèle de puce par défaut</string>
+    <string name="pref_zxtune_sid_model_force_title">Forcer le modèle de puce</string>
+    <string name="pref_zxtune_sid_force_summary">Ignorer la valeur indiquée dans le morceau</string>
+    <string name="pref_zxtune_sid_default_summary">%s (utilisé si le morceau ne le précise pas)</string>
+    <string name="pref_zxtune_sid_clock_title">Modèle de C64 par défaut</string>
+    <string name="pref_zxtune_sid_clock_force_title">Forcer le modèle de C64</string>
+    <string name="pref_zxtune_sid_digiboost_title">Digi boost du MOS8580</string>
+    <string name="pref_zxtune_sid_digiboost_summary">MOS8580 seulement : rend audibles les échantillons joués par le registre de volume</string>
+    <string name="pref_zxtune_sid_filter_bias_title">reSID : biais du filtre MOS6581</string>
+    <string name="pref_zxtune_sid_filter_bias_summary">Moteur reSID, filtre MOS6581 personnalisé seulement : décale la correspondance de la fréquence de coupure</string>
+    <string name="pref_zxtune_sid_filter_6581_curve_title">reSIDfp : courbe du filtre MOS6581</string>
+    <string name="pref_zxtune_sid_filter_6581_range_title">reSIDfp : plage du filtre MOS6581</string>
+    <string name="pref_zxtune_sid_filter_8580_curve_title">reSIDfp : courbe du filtre MOS8580</string>
+    <string name="pref_zxtune_sid_filter_curve_summary">Moteur reSIDfp, filtre personnalisé seulement : 0 = clair, 100 = sombre</string>
+    <string name="pref_zxtune_sid_filter_range_summary">Moteur reSIDfp, filtre personnalisé seulement : 0 = sombre, 100 = clair</string>
+    <string name="pref_zxtune_sid_filter_6581_preset_title">Préréglage du filtre MOS6581</string>
+    <string name="pref_zxtune_sid_filter_8580_preset_title">Préréglage du filtre MOS8580</string>
+    <string name="pref_zxtune_sid_combined_waveforms_title">reSIDfp : formes d\'onde combinées</string>
+    <string name="pref_zxtune_other_title">Autres</string>
+    <string name="pref_zxtune_default_duration_title">Durée par défaut</string>
+    <string name="pref_zxtune_mt32_roms_title">Dossier des ROM</string>
+    <string name="pref_zxtune_mt32_roms_summary_empty">Choisir le dossier des dumps de ROM de contrôle et PCM du MT-32 ou CM-32L (entiers ou moitiés de puces, détectés par leur contenu)</string>
+    <string name="pref_zxtune_mt32_roms_summary">%1$d fichiers copiés, les ROM sont détectées à la lecture</string>
+    <string name="pref_zxtune_mt32_roms_failed">Échec de la copie des fichiers ROM</string>
+    <string name="pref_zxtune_mt32_model_title">Modèle préféré</string>
+    <string name="pref_zxtune_mt32_voices_title">Voix de l\'oscilloscope</string>
+    <string name="pref_zxtune_sid_strong_pulse_saw_title">Impulsion+dent de scie du 6581 (reSIDfp)</string>
+    <string-array name="pref_interpolation_entries">
+        <item>Aucune</item>
+        <item>Performance</item>
+        <item>Qualité</item>
+    </string-array>
+    <string-array name="pref_zxtune_aym_clockrate_entries">
+        <item>ZX Spectrum (1,7734 MHz)</item>
+        <item>Pentagon (1,75 MHz)</item>
+        <item>Taganrog (3,5 MHz)</item>
+        <item>Atari ST (2 MHz)</item>
+        <item>Amstrad CPC (1 MHz)</item>
+    </string-array>
+    <string-array name="pref_zxtune_aym_layout_entries">
+        <item>ABC</item>
+        <item>ACB</item>
+        <item>BAC</item>
+        <item>BCA</item>
+        <item>CAB</item>
+        <item>CBA</item>
+        <item>Mono</item>
+    </string-array>
+    <string-array name="pref_zxtune_aym_duty_cycle_mask_entries">
+        <item>Aucun</item>
+        <item>A</item>
+        <item>B</item>
+        <item>C</item>
+        <item>A, B</item>
+        <item>A, C</item>
+        <item>B, C</item>
+        <item>Tous</item>
+    </string-array>
+    <string-array name="pref_zxtune_z80_clockrate_entries">
+        <item>ZX Spectrum 48K, Pentagon (3,5 MHz)</item>
+        <item>ZX Spectrum 128K (3,5469 MHz)</item>
+        <item>Amstrad CPC (4 MHz)</item>
+        <item>Turbo (7 MHz)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_clockrate_entries">
+        <item>1,75 MHz</item>
+        <item>TurboFM (3,5 MHz)</item>
+        <item>NTSC (3,58 MHz)</item>
+        <item>4 MHz</item>
+    </string-array>
+    <string-array name="pref_zxtune_saa_clockrate_entries">
+        <item>SAM Coupé (8 MHz)</item>
+        <item>Creative Music System (7,16 MHz)</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_gain_entries">
+        <item>Automatique (par voix)</item>
+        <item>×1</item>
+        <item>×1,5</item>
+        <item>×2</item>
+        <item>×3</item>
+        <item>×4</item>
+        <item>×6</item>
+        <item>×8</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_max_fps_entries">
+        <item>Fréquence de l\'écran</item>
+        <item>120 i/s</item>
+        <item>90 i/s</item>
+        <item>60 i/s</item>
+        <item>30 i/s</item>
+    </string-array>
+    <string-array name="pref_oscilloscope_backend_entries">
+        <item>Automatique (Vulkan si disponible)</item>
+        <item>Vulkan</item>
+        <item>OpenGL ES</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_combined_waveforms_entries">
+        <item>Moyennes</item>
+        <item>Faibles</item>
+        <item>Fortes</item>
+    </string-array>
+    <string-array name="pref_zxtune_default_duration_entries">
+        <item>30 secondes</item>
+        <item>1 minute</item>
+        <item>2 minutes</item>
+        <item>3 minutes</item>
+        <item>5 minutes</item>
+        <item>10 minutes</item>
+        <item>15 minutes</item>
+        <item>30 minutes</item>
+    </string-array>
+    <string-array name="pref_zxtune_mt32_model_entries">
+        <item>Automatique (MT-32 le plus récent d\'abord)</item>
+        <item>MT-32</item>
+        <item>CM-32L / LAPC-I</item>
+    </string-array>
+    <string-array name="pref_zxtune_mt32_voices_entries">
+        <item>9 parties (8 mélodiques + rythme)</item>
+        <item>32 partiels (synthèse LA)</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_strong_pulse_saw_entries">
+        <item>Normale (la plupart des 6581)</item>
+        <item>Forte (puces à impulsion+dent de scie forte)</item>
+    </string-array>
 </resources>
