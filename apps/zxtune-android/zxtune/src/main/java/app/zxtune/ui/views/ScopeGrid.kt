@@ -20,6 +20,13 @@ internal class ScopeGrid private constructor(
     private val cellColumns: IntArray,
     private val cellRows: IntArray,
     val labels: List<String>,
+    // for narrow cells (e.g. 4 columns of 28 slots of YMW258): chip and voice of the first voice of chip, then voice
+    private val shortLabels: List<String> = labels,
+    private val voiceLabels: List<String> = labels,
+    // columns where the next chip starts
+    private val chipStarts: IntArray = IntArray(0),
+    // group of each channel
+    private val chipOf: IntArray = IntArray(labels.size),
 ) {
     val channels
         get() = cellColumns.size
@@ -94,6 +101,15 @@ internal class ScopeGrid private constructor(
                 canvas.drawLine(left, top + band, right, top + band, linePaint)
             }
         }
+        // chips are separated, else many narrow columns of voices with short labels are not distinguished
+        val separatorPaint = Paint().apply {
+            color = Color.argb(SEPARATOR_ALPHA, 255, 255, 255)
+            strokeWidth = maxOf(1f, textSize / 8)
+        }
+        for (column in chipStarts) {
+            val x = width * columns.left(column)
+            canvas.drawLine(x, 0f, x, height.toFloat(), separatorPaint)
+        }
         val size = labelSize(cellH, textSize)
         if (labels.isEmpty() || size <= 0f) {
             return
@@ -103,12 +119,32 @@ internal class ScopeGrid private constructor(
             this.textSize = size
         }
         val padding = size * (LABEL_BAND_TO_TEXT - 1)
+        // the same form of labels for all the voices of chip
+        val fullFits = BooleanArray((chipOf.maxOrNull() ?: 0) + 1) { true }
+        for (chan in 0 until channels) {
+            if (textPaint.measureText(labels[chan]) > width * width(chan) - padding * 2) {
+                fullFits[chipOf[chan]] = false
+            }
+        }
         for (chan in 0 until channels) {
             val x = width * left(chan) + padding
             // centered in the band
             val y = cellH * row(chan) + padding / 2 - textPaint.ascent()
-            canvas.drawText(labels[chan], x, y, textPaint)
+            val room = width * width(chan) - padding * 2
+            val label = if (fullFits[chipOf[chan]]) labels[chan] else labelOf(chan, room, textPaint)
+            canvas.drawText(label, x, y, textPaint)
         }
+    }
+
+    // short label of chip's voice, never drawn over neighbour cells
+    private fun labelOf(chan: Int, room: Float, paint: Paint): String {
+        val short = shortLabels[chan]
+        if (paint.measureText(short) <= room) {
+            return short
+        }
+        val voice = voiceLabels[chan]
+        val count = paint.breakText(voice, true, maxOf(room, 0f), null)
+        return voice.substring(0, count)
     }
 
     companion object {
@@ -125,6 +161,7 @@ internal class ScopeGrid private constructor(
 
         // 0.15 of white
         private const val GRID_ALPHA = 38
+        private const val SEPARATOR_ALPHA = 110
 
         /**
          * @return text size of labels in cell of specified height, 0 if there's no space for labels
@@ -142,20 +179,31 @@ internal class ScopeGrid private constructor(
             val cellColumns = ArrayList<Int>()
             val rows = ArrayList<Int>()
             val labels = ArrayList<String>()
+            val shortLabels = ArrayList<String>()
+            val voiceLabels = ArrayList<String>()
+            val chips = ArrayList<Int>()
             layout.groups.forEachIndexed { group, desc ->
                 desc.voices.forEachIndexed { idx, voice ->
+                    chips.add(group)
                     cellColumns.add(columns.column(group, idx))
                     rows.add(columns.row(group, idx))
                     labels.add("${desc.name} - $voice")
+                    shortLabels.add(if (idx == 0) "${desc.name} $voice" else voice)
+                    voiceLabels.add(voice)
                 }
             }
+            val chipStarts = IntArray(layout.groups.size - 1) { columns.column(it + 1, 0) }
             val count = minOf(channels, cellColumns.size)
             return ScopeGrid(
                 columns,
                 columns.maxRows,
                 cellColumns.take(count).toIntArray(),
                 rows.take(count).toIntArray(),
-                labels.take(count)
+                labels.take(count),
+                shortLabels.take(count),
+                voiceLabels.take(count),
+                chipStarts,
+                chips.take(count).toIntArray(),
             )
         }
     }
