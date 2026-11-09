@@ -474,7 +474,8 @@ class ChipDashboardRenderTest {
     /**
      * Renders 60fps frames of jittering registers (vibrato, pulse width and cutoff sweeps, decaying envelope,
      * hard restart) on two chips at phone geometry and stacks title bands and cells of the first voice and global
-     * rows of sampled frames: cells should stay in place while values follow registers without delay.
+     * rows of sampled frames: cells should stay in place while values written at each tick are readable (refreshed
+     * a few times per second, swept range of vibrato).
      */
     @Test
     @Config(qualifiers = "w675dp-h1507dp-256dpi")
@@ -494,8 +495,9 @@ class ChipDashboardRenderTest {
         val pitches = HashSet<String>()
         val notes = HashSet<String>()
         val pulses = HashSet<String>()
-        for (frame in 0 until 60) {
+        for (frame in 0 until 120) {
             val t = frame * 1000L / 60
+            view.testFrameNanos = 1_000_000_000L + t * 1_000_000L
             jitter(regs, t)
             view.setGaugesData(makeSidData(2, regs), 2, sidStatus(2))
             bitmap.eraseColor(0)
@@ -511,7 +513,7 @@ class ChipDashboardRenderTest {
             pitches.add(texts.cells[SidCells.PITCH])
             notes.add(texts.cells[SidCells.NOTE])
             pulses.add(view.voiceTexts[0][1].cells[SidCells.DUTY])
-            if (frame % 6 == 0) {
+            if (frame % 12 == 0) {
                 val rowH = view.gaugesRowHeight.toInt()
                 val cellH = view.gaugesCellHeight.toInt()
                 val band = minOf(TITLE_BAND, cellH)
@@ -551,10 +553,11 @@ class ChipDashboardRenderTest {
             File(dir).mkdirs()
             File(dir, "sidcells-filmstrip.png").outputStream().use { strip.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        // vibrato is followed live by pitch, while the note is kept
-        assertTrue(pitches.toString(), pitches.size > 5)
+        // vibrato is shown as swept range refreshed at most 4 times per second, while the note is kept
+        assertTrue(pitches.toString(), pitches.size in 2..9)
+        assertTrue(pitches.toString(), pitches.any { it.contains('…') })
         assertEquals(setOf("C5"), notes)
-        assertTrue(pulses.toString(), pulses.size > 5)
+        assertTrue(pulses.toString(), pulses.size in 3..9)
     }
 
     // triangle with vibrato on V1 (+-70 cents), pulse width sweep and hard restarts on V2, release on V3, cutoff sweep

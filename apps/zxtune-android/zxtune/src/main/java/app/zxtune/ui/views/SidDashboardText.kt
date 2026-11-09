@@ -7,8 +7,6 @@ package app.zxtune.ui.views
 
 import app.zxtune.playback.ChipState
 import app.zxtune.ui.views.SidDescription.Words
-import kotlin.math.abs
-import kotlin.math.log2
 import kotlin.math.roundToInt
 
 /**
@@ -19,8 +17,12 @@ import kotlin.math.roundToInt
 internal class LiveTexts(size: Int) {
     private val keys = LongArray(size) { UNSET }
     private val texts = Array(size) { "" }
+    private val compacts = arrayOfNulls<String>(size)
 
     operator fun get(idx: Int) = texts[idx]
+
+    /** Shorter form of text displayed instead of it if it doesn't fit, e.g. center of modulation range */
+    fun compact(idx: Int) = compacts[idx]
 
     /**
      * @return true if text should be rebuilt for the new [key] (see [set])
@@ -37,11 +39,24 @@ internal class LiveTexts(size: Int) {
 
     operator fun set(idx: Int, text: String) {
         texts[idx] = text
+        compacts[idx] = null
+    }
+
+    fun set(idx: Int, text: String, compact: String?) {
+        texts[idx] = text
+        compacts[idx] = compact
     }
 
     private companion object {
         const val UNSET = Long.MIN_VALUE
     }
+}
+
+/**
+ * Text of [readout] (value or modulation range) with its center as compact form, see [LiveTexts.compact]
+ */
+internal inline fun LiveTexts.set(idx: Int, readout: RealtimeReadout, format: (Double) -> String) {
+    set(idx, readout.text(format), if (readout.isModulated) format(readout.value) else null)
 }
 
 /**
@@ -109,40 +124,39 @@ internal object SidCells {
 /**
  * Texts of gauges row: title bands of 3 gauges (raw registers with greyed human readable value split to main part
  * and tail, e.g. "60%" and "Sus") and cells grid below, see [SidDashboardView].
- * Values are displayed as is, without any delay; only quantization with hysteresis is applied where the last digit
- * would flicker without any meaning.
+ * Static values are displayed as is, values written at each player tick are shown by readouts (see
+ * [RealtimeReadout]), so texts stay readable while gauges show the exact state.
  */
 internal abstract class SidRowText(cells: Int) {
     val titles = LiveTexts(TITLES)
     val cells = LiveTexts(cells)
 
     companion object {
-        // vibrato often exceeds half of semitone, so the note is kept a bit more than its bounds
-        const val NOTE_MARGIN = 0.3f
         const val NONE = Int.MIN_VALUE
 
         const val TITLES = 9
         fun title(gauge: Int) = gauge
         fun main(gauge: Int) = 3 + gauge * 2
         fun tail(gauge: Int) = 4 + gauge * 2
-
-        fun semitones(hz: Float) = 12 * log2(hz / 440f) + 57
-
-        /**
-         * Quantizes [semitones] to note with hysteresis: [shown] note is kept while input is within [NOTE_MARGIN]
-         * beyond its half-step bounds. Doesn't delay real note changes.
-         */
-        fun note(semitones: Float, shown: Int) = if (shown != NONE && abs(semitones - shown) <= 0.5f + NOTE_MARGIN) shown else semitones.roundToInt()
     }
 }
 
+/**
+ * Values written by players at each frame (pitch with vibrato and slides, pulse width sweeps, envelope level) are
+ * shown by [RealtimeReadout] and [NoteReadout], so they're readable, while gauges show the exact state.
+ */
 internal class SidVoiceText : SidRowText(SidCells.VOICE.size) {
-    private var note = NONE
+    private val noteReadout = NoteReadout()
+    private val pitchReadout = RealtimeReadout(deadband = 1.0 / 48, modulationSpread = 1.0 / 12, isLogarithmic = true)
+    private val freqReadout = RealtimeReadout.ofRegister()
+    private val pulseReadout = RealtimeReadout.ofRegister()
+    private val levelReadout = RealtimeReadout.ofRegister()
 
     /**
      * @param chipLabel 1-based index of chip in multichip setup or 0
+     * @param nanos monotonic time of frame, 0 for single picture (values are shown at once)
      */
-    fun update(state: ChipState, voice: Int, trend: Int, chip: SidDescription.Chip, chipLabel: Int) {
+    fun update(state: ChipState, voice: Int, trend: Int, chip: SidDescription.Chip, chipLabel: Int, nanos: Long = 0L) {
         val ctrl = state.control(voice)
         val routing = state.routing
         val mode = state.mode
@@ -150,12 +164,18 @@ internal class SidVoiceText : SidRowText(SidCells.VOICE.size) {
         val ad = state.attackDecay(voice)
         val sr = state.sustainRelease(voice)
         val hz = SidDescription.frequencyHz(state.frequency(voice), chip)
-        note = if (hz < 1f) NONE else note(semitones(hz), note)
-        val pulse = SidDescription.pulsePercent(state.pulseWidth(voice))
-        val level = SidDescription.envelopePercent(state, voice)
+        noteReadout.update(hz.toDouble(), nanos)
+        pitchReadout.update(if (hz < 1f) Double.NaN else hz.toDouble(), nanos)
+        freqReadout.update(state.frequency(voice).toDouble(), nanos)
+        pulseReadout.update(state.pulseWidth(voice).toDouble(), nanos)
+        levelReadout.update(SidDescription.envelopePercent(state, voice).toDouble(), nanos)
+        val note = noteReadout.note.takeIf { it != NoteReadout.NONE && hz >= 1f } ?: NONE
+        val pulse = SidDescription.pulsePercent(pulseReadout.register())
+        val level = levelReadout.register()
         val phase = SidDescription.phase(state, voice, trend)
-        val roundedHz = hz.roundToInt()
+        val roundedHz = if (pitchReadout.value.isNaN()) 0 else pitchReadout.value.roundToInt()
         val noteName = if (note == NONE) "" else ChipWidgets.noteName(note)
+        val freq = freqReadout.register()
 
         // titles: raw registers
         val wave = (ctrl and 0xfe) or (if (filtered) 1 else 0)
@@ -166,8 +186,8 @@ internal class SidVoiceText : SidRowText(SidCells.VOICE.size) {
         if (titles.changed(title(1), (ad shl 8) or sr)) {
             titles[title(1)] = "Env ${hex4((ad shl 8) or sr)}"
         }
-        if (titles.changed(title(2), state.frequency(voice))) {
-            titles[title(2)] = "Freq ${hex4(state.frequency(voice))}"
+        if (titles.changed(title(2), freq)) {
+            titles[title(2)] = "Freq ${hex4(freq)}"
         }
         // titles: values
         if (titles.changed(main(0), (ctrl and 0xfe) or (pulse shl 8))) {
@@ -186,7 +206,7 @@ internal class SidVoiceText : SidRowText(SidCells.VOICE.size) {
             titles[main(2)] = noteName
         }
         if (titles.changed(tail(2), roundedHz)) {
-            titles[tail(2)] = "${roundedHz}Hz"
+            titles[tail(2)] = if (roundedHz == 0) "" else "${roundedHz}Hz"
         }
 
         // cells
@@ -200,8 +220,12 @@ internal class SidVoiceText : SidRowText(SidCells.VOICE.size) {
         if (cells.changed(SidCells.NOTE, note)) {
             cells[SidCells.NOTE] = noteName.ifEmpty { Words.DASH }
         }
-        if (cells.changed(SidCells.PITCH, roundedHz)) {
-            cells[SidCells.PITCH] = if (roundedHz == 0) Words.DASH else SidDescription.hzWord(roundedHz)
+        if (cells.changed(SidCells.PITCH, pitchReadout.version)) {
+            if (pitchReadout.value.isNaN()) {
+                cells[SidCells.PITCH] = Words.DASH
+            } else {
+                cells.set(SidCells.PITCH, pitchReadout) { SidDescription.hzWord(it.roundToInt()) }
+            }
         }
         if (cells.changed(SidCells.MOD, ctrl and 0x16)) {
             cells[SidCells.MOD] = SidDescription.modulationWord(ctrl, voice)
@@ -232,13 +256,29 @@ internal class SidVoiceText : SidRowText(SidCells.VOICE.size) {
     }
 }
 
+/**
+ * Cutoff swept by players at each frame is shown by [RealtimeReadout], volume register (also written by digi players
+ * thousands times per second) by its median.
+ */
 internal class SidGlobalText : SidRowText(SidCells.GLOBAL.size) {
-    fun update(state: ChipState, chip: SidDescription.Chip) {
+    private val cutoffReadout = RealtimeReadout(deadband = 1.0 / 24, modulationSpread = 1.0 / 4, isLogarithmic = true)
+    private val cutoffRegister = RealtimeReadout.ofRegister()
+    private val volumeRegister = RealtimeReadout.ofRegister()
+
+    /**
+     * @param nanos monotonic time of frame, 0 for single picture (values are shown at once)
+     */
+    fun update(state: ChipState, chip: SidDescription.Chip, nanos: Long = 0L) {
         val mode = state.mode
-        val cutoff = SidDescription.roundCutoff(SidDescription.cutoffHz(state.cutoff, chip))
-        if (titles.changed(title(0), state.volume)) {
-            titles[title(0)] = "Vol ${state.volume}"
-            titles[tail(0)] = SidDescription.percentOf15(state.volume)
+        cutoffReadout.update(SidDescription.cutoffHz(state.cutoff, chip).toDouble(), nanos)
+        cutoffRegister.update(state.cutoff.toDouble(), nanos)
+        volumeRegister.update(state.volume.toDouble(), nanos)
+        val volume = volumeRegister.register()
+        val cutoffReg = cutoffRegister.register()
+        val cutoff = SidDescription.roundCutoff(cutoffReadout.value.toFloat())
+        if (titles.changed(title(0), volume)) {
+            titles[title(0)] = "Vol $volume"
+            titles[tail(0)] = SidDescription.percentOf15(volume)
             cells[SidCells.VOLUME] = titles[tail(0)]
         }
         if (titles.changed(title(1), state.resonance)) {
@@ -246,8 +286,8 @@ internal class SidGlobalText : SidRowText(SidCells.GLOBAL.size) {
             titles[tail(1)] = SidDescription.percentOf15(state.resonance)
             cells[SidCells.RESONANCE] = titles[tail(1)]
         }
-        if (titles.changed(title(2), ((mode and 7) shl 11) or state.cutoff)) {
-            titles[title(2)] = SidDashboardView.filterTitle(mode, state.cutoff)
+        if (titles.changed(title(2), ((mode and 7) shl 11) or cutoffReg)) {
+            titles[title(2)] = SidDashboardView.filterTitle(mode, cutoffReg)
         }
         if (titles.changed(main(2), mode and 7)) {
             titles[main(2)] = SidDescription.modeShort(mode)
@@ -255,7 +295,18 @@ internal class SidGlobalText : SidRowText(SidCells.GLOBAL.size) {
         }
         if (titles.changed(tail(2), cutoff)) {
             titles[tail(2)] = SidDescription.cutoffWord(cutoff).replace(" ", "")
-            cells[SidCells.CUTOFF] = SidDescription.cutoffWord(cutoff)
+        }
+        if (cells.changed(SidCells.CUTOFF, cutoffReadout.version)) {
+            // cutoff is estimation, so the range is marked once
+            cells.set(
+                SidCells.CUTOFF,
+                if (cutoffReadout.isModulated) {
+                    "~" + cutoffReadout.text { SidDescription.cutoffWord(SidDescription.roundCutoff(it.toFloat())).removePrefix("~") }
+                } else {
+                    SidDescription.cutoffWord(cutoff)
+                },
+                SidDescription.cutoffWord(cutoff)
+            )
         }
         if (cells.changed(SidCells.ROUTED, state.routing and 15)) {
             cells[SidCells.ROUTED] = SidDescription.routingWord(state.routing)

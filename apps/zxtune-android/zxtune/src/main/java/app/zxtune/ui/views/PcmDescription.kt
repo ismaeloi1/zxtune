@@ -67,9 +67,11 @@ internal object PcmDescription {
     }
 
     /** Pitch relative to original rate of sample, semitones */
-    fun shiftSemitones(g: VoiceGauges): Float {
-        val exponent = octave(g) - if (isScsp(g)) 0 else 1
-        return 12f * (exponent + log2(1f + fnum(g) / 1024f))
+    fun shiftSemitones(g: VoiceGauges) = shiftSemitones(octave(g), fnum(g), isScsp(g))
+
+    fun shiftSemitones(octave: Int, fnum: Int, scsp: Boolean): Float {
+        val exponent = octave - if (scsp) 0 else 1
+        return 12f * (exponent + log2(1f + fnum / 1024f))
     }
 
     /** Attenuation of total level, dB (0 or negative) */

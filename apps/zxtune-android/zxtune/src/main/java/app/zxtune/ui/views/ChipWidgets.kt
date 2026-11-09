@@ -496,15 +496,21 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
 
     /**
      * Title band summary of voice card, rebuilt only when its displayed values are changed to avoid allocations per
-     * frame. Values are shown without delay, only the note is kept through vibrato (see [SidRowText.note]).
+     * frame. Pitch and level written at each player tick are shown by [NoteReadout] and [RealtimeReadout] (median
+     * only, as the summary is short), so they're readable while gauges show the exact state.
      */
     class LiveSummary {
         private var key = Long.MIN_VALUE
-        private var note = SidRowText.NONE
+        private val noteReadout = NoteReadout()
+        private val pitchReadout = RealtimeReadout(deadband = 1.0 / 48, modulationSpread = Double.MAX_VALUE, isLogarithmic = true)
+        private val levelReadout = RealtimeReadout(deadband = 1.0, modulationSpread = Double.MAX_VALUE)
         var text = ""
             private set
 
-        fun update(g: VoiceGauges) {
+        /**
+         * @param nanos monotonic time of frame, 0 for single picture (values are shown at once)
+         */
+        fun update(g: VoiceGauges, nanos: Long = 0L) {
             val kind = g.kind
             if (!kind.hasNoteSummary) {
                 val current = summaryOf(g)
@@ -516,14 +522,17 @@ internal class ChipWidgets(private val density: Float, textSizePx: Float) {
             }
             val mode = g.summaryMode
             val hasPitch = g.hasFrequency && g.frequency > 0f
-            note = if (hasPitch) SidRowText.note(semitones(g.frequency), note) else SidRowText.NONE
-            val hz = if (hasPitch) g.frequency.roundToInt() else 0
-            val level = if (g.hasLevel) g.level.roundToInt() else 0
+            noteReadout.update(if (hasPitch && mode == SUMMARY_NOTE) g.frequency.toDouble() else 0.0, nanos)
+            pitchReadout.update(if (hasPitch) g.frequency.toDouble() else Double.NaN, nanos)
+            levelReadout.update(if (g.hasLevel) g.level.toDouble() else Double.NaN, nanos)
+            val note = noteReadout.note
+            val hz = if (pitchReadout.value.isNaN()) 0 else pitchReadout.value.roundToInt()
+            val level = if (levelReadout.value.isNaN()) 0 else levelReadout.value.roundToInt()
             val current = (kind.toLong() shl 56) or (mode.toLong() shl 48) or ((note.toLong() and 0xff) shl 40) or
                 ((hz.toLong() and 0xffffff) shl 16) or (level.toLong() and 0xffff)
             if (current != key) {
                 key = current
-                text = noteSummary(mode, hz, if (note == SidRowText.NONE) "" else noteName(note), level)
+                text = noteSummary(mode, hz, if (note == NoteReadout.NONE) "" else noteName(note), level)
             }
         }
 

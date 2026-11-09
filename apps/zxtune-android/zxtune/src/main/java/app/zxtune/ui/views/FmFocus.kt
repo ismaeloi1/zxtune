@@ -42,6 +42,7 @@ internal class FmFocus(private val density: Float, private val scaledDensity: Fl
     }
 
     /**
+     * @param nanos monotonic time of frame for readouts of values changing at each tick, 0 for single picture
      * @return true if inspector is shown instead of cards
      */
     fun draw(
@@ -52,7 +53,8 @@ internal class FmFocus(private val density: Float, private val scaledDensity: Fl
         voices: Int,
         width: Float,
         height: Float,
-        smooth: Array<FloatArray>
+        smooth: Array<FloatArray>,
+        nanos: Long,
     ): Boolean {
         if (current !== layout) {
             layout = current
@@ -66,10 +68,12 @@ internal class FmFocus(private val density: Float, private val scaledDensity: Fl
         }
         if (dynamic) {
             area.set(0f, 0f, width, height)
-            inspector.draw(canvas, area, data, tabs, tab, smooth[focused % smooth.size], operator)
+            inspector.draw(canvas, area, data, tabs, tab, smooth[focused % smooth.size], operator, nanos)
         }
         return true
     }
+
+    fun readoutTexts() = inspector.readoutTexts()
 
     /**
      * @return true if view should be redrawn

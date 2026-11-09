@@ -330,7 +330,12 @@ class SidDashboardView @JvmOverloads constructor(
     private val pcmLevels = FloatArray(5)
 
     // time of frame for readouts of values changing at each tick, 0 for single picture
-    private var pcmFrameNanos = 0L
+    private var frameNanos = 0L
+    private var isLive = true
+
+    // frames of tests are drawn without source at given moments
+    @androidx.annotation.VisibleForTesting
+    internal var testFrameNanos = 0L
 
     // geometry of the last drawn gauges rows
     @androidx.annotation.VisibleForTesting
@@ -365,9 +370,9 @@ class SidDashboardView @JvmOverloads constructor(
      * @param stats provider of additional (UI side) statistics lines
      * @param isLive false for single picture (e.g. paused playback), see [ScopeDisplay.setSource]
      */
-    @Suppress("UNUSED_PARAMETER")
     fun setSource(src: Visualizer?, stats: (() -> String)? = null, isLive: Boolean = true) {
         source = src
+        this.isLive = isLive
         statsProvider = stats
         exchange.isEnabled = src != null
         if (src != null) {
@@ -469,7 +474,7 @@ class SidDashboardView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         val now = System.nanoTime()
         lastDrawNanos = now
-        pcmFrameNanos = if (source != null) now else 0L
+        frameNanos = if (source != null && isLive) now else testFrameNanos
         redrawPending.set(false)
         val data = exchange.acquire()
         if (source != null && now - lastStatusTime > STATUS_PERIOD_NS) {
@@ -555,14 +560,14 @@ class SidDashboardView @JvmOverloads constructor(
                 val texts = voiceTexts[idx][voice]
                 val row = idx * 4 + voice
                 if (pass.isDynamic) {
-                    texts.update(last, voice, envelopeTrend(gauges, last, voice), chip, chipLabel)
+                    texts.update(last, voice, envelopeTrend(gauges, last, voice), chip, chipLabel, frameNanos)
                 }
                 drawGaugesRow(canvas, gauges, VOICE_GAUGES[voice], texts.titles, voiceTemplates, left, rowH * voice, cellW, cellH, row)
                 drawCells(canvas, voiceGrid, texts.cells, voiceFitted[idx * 3 + voice], left, rowH * voice + cellH)
             }
             val texts = globalTexts[idx]
             if (pass.isDynamic) {
-                texts.update(last, chip)
+                texts.update(last, chip, frameNanos)
             }
             drawGaugesRow(canvas, gauges, GLOBAL_GAUGES, texts.titles, globalTemplates, left, rowH * 3, cellW, cellH, idx * 4 + 3)
             drawCells(canvas, globalGrid, texts.cells, globalFitted[idx], left, rowH * 3 + cellH)
@@ -819,12 +824,19 @@ class SidDashboardView @JvmOverloads constructor(
         private var size = 0f
         private var result = ""
 
-        fun get(text: String, maxWidth: Float, paint: Paint): String {
+        /**
+         * @param compact shorter form of [text] displayed if it doesn't fit, see [LiveTexts.compact]
+         */
+        fun get(text: String, maxWidth: Float, paint: Paint, compact: String? = null): String {
             if (text !== source || maxWidth != width || paint.textSize != size) {
                 source = text
                 width = maxWidth
                 size = paint.textSize
-                result = ellipsize(text, maxWidth, paint)
+                result = if (compact != null && paint.measureText(text) > maxWidth) {
+                    ellipsize(compact, maxWidth, paint)
+                } else {
+                    ellipsize(text, maxWidth, paint)
+                }
             }
             return result
         }
@@ -906,7 +918,7 @@ class SidDashboardView @JvmOverloads constructor(
             }
             val value = texts[idx]
             if (value.isNotEmpty() && pass.isDynamic) {
-                canvas.drawText(fitted[idx].get(value, w, cellPaint), x, valueBaseline, cellPaint)
+                canvas.drawText(fitted[idx].get(value, w, cellPaint, texts.compact(idx)), x, valueBaseline, cellPaint)
             }
         }
         captionPaint.textAlign = Paint.Align.LEFT
@@ -940,7 +952,7 @@ class SidDashboardView @JvmOverloads constructor(
             cardTitles.forEach { it.fill(null) }
         }
         // single FM channel inspector instead of cards
-        if (fmFocus.draw(canvas, pass.isDynamic, current, data, voices, width.toFloat(), areaHeight, smooth)) {
+        if (fmFocus.draw(canvas, pass.isDynamic, current, data, voices, width.toFloat(), areaHeight, smooth, frameNanos)) {
             return
         }
         val columns = columns
@@ -990,7 +1002,7 @@ class SidDashboardView @JvmOverloads constructor(
         // title band is separated from graphs to keep both readable
         val stable = summaries[voice]
         if (pass.isDynamic) {
-            stable.update(gauges)
+            stable.update(gauges, frameNanos)
         }
         val summary = stable.text
         if (summaryKinds[voice] != gauges.kind) {
@@ -1080,7 +1092,7 @@ class SidDashboardView @JvmOverloads constructor(
             val texts = spcVoiceTexts[voice]
             if (pass.isDynamic) {
                 spcEnvelopes[voice].update(g.field(2), g.field(3), g.field(4), g.field(0) * 16)
-                texts.update(g, voice, spcEnvelopes[voice])
+                texts.update(g, voice, spcEnvelopes[voice], frameNanos)
             }
             drawSpcPanels(canvas, texts.titles, spcVoiceTemplates, left, top, panelsW, panelH, voice, g)
             drawCells(canvas, spcVoiceGrid, texts.cells, spcVoiceFitted[voice], left + cellsDx, top + cellsDy, texts.captions, spcCaptionFitted[voice])
@@ -1120,7 +1132,7 @@ class SidDashboardView @JvmOverloads constructor(
             val texts = spcVoiceTexts[voice]
             if (pass.isDynamic) {
                 spcEnvelopes[voice].update(g.field(2), g.field(3), g.field(4), g.field(0) * 16)
-                texts.update(g, voice, spcEnvelopes[voice])
+                texts.update(g, voice, spcEnvelopes[voice], frameNanos)
             }
             drawSpcLabel(canvas, SPC_VOICE_LABELS[voice], left, top, labelW, rowH, g.field(0) / 127f, g.isKeyOn)
             drawCells(canvas, spcCompactGrid, texts.cells, spcVoiceFitted[voice], left + labelW, top + (rowH - gridH) / 2, texts.captions, spcCaptionFitted[voice])
@@ -1192,7 +1204,7 @@ class SidDashboardView @JvmOverloads constructor(
         val texts = spcVoiceTexts[voice]
         if (pass.isDynamic) {
             spcEnvelopes[voice].update(g.field(2), g.field(3), g.field(4), g.field(0) * 16)
-            texts.update(g, voice, spcEnvelopes[voice])
+            texts.update(g, voice, spcEnvelopes[voice], frameNanos)
             spcGlobalText.update(spcGlobals)
         }
         val voiceGridH = cellLineHeight(spcInspectorGrid.scale) * spcInspectorGrid.lines + density * 2
@@ -1771,7 +1783,7 @@ class SidDashboardView @JvmOverloads constructor(
 
     // Cards of chip without PCM slots, as [drawVoices] does for the whole layout
     private fun drawGroupCards(canvas: Canvas, data: ByteArray, layout: VoicesLayout, voices: Int, group: Int, h: Float) {
-        if (fmFocus.draw(canvas, pass.isDynamic, layout, data, voices, width.toFloat(), h, smooth)) {
+        if (fmFocus.draw(canvas, pass.isDynamic, layout, data, voices, width.toFloat(), h, smooth, frameNanos)) {
             return
         }
         val desc = layout.groups[group]
@@ -1798,7 +1810,7 @@ class SidDashboardView @JvmOverloads constructor(
     private fun updatePcmTexts(g: VoiceGauges, voice: Int, slot: Int) {
         if (pass.isDynamic) {
             pcmEnvelopes[voice].update(g)
-            pcmTexts[voice].update(g, slot, pcmEnvelopes[voice], pcmFrameNanos)
+            pcmTexts[voice].update(g, slot, pcmEnvelopes[voice], frameNanos)
         }
     }
 
@@ -1932,7 +1944,7 @@ class SidDashboardView @JvmOverloads constructor(
             } else {
                 val value = texts[PcmCells.ROW_SOURCE[idx]]
                 if (value.isNotEmpty()) {
-                    canvas.drawText(pcmRowFitted[voice][idx].get(value, w, paint), x, baseline, paint)
+                    canvas.drawText(pcmRowFitted[voice][idx].get(value, w, paint, texts.compact(PcmCells.ROW_SOURCE[idx])), x, baseline, paint)
                 }
             }
         }
@@ -2188,6 +2200,10 @@ class SidDashboardView @JvmOverloads constructor(
         }
         return false
     }
+
+    /** Texts of FM inspector's values written at each tick: note, pitch, volume and operators frequencies */
+    @androidx.annotation.VisibleForTesting
+    internal fun fmInspectorTexts() = fmFocus.readoutTexts()
 
     @androidx.annotation.VisibleForTesting
     internal fun openFmInspector(voice: Int, operator: Int = -1): Boolean {

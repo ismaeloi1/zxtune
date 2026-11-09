@@ -131,6 +131,9 @@ internal class PcmSlotText : SidRowText(PcmCells.SLOT.size) {
     private val noteReadout = NoteReadout()
     private val rateReadout = RealtimeReadout(deadband = 1.0 / 48, modulationSpread = 1.0 / 12, isLogarithmic = true)
     private val levelReadout = RealtimeReadout(deadband = 1.0, modulationSpread = 6.0)
+
+    // octave and F-number as single value monotonic with pitch, so its median is in between of written ones
+    private val pitchReadout = RealtimeReadout.ofRegister()
     private val att = FloatArray(2)
 
     /**
@@ -145,28 +148,27 @@ internal class PcmSlotText : SidRowText(PcmCells.SLOT.size) {
         val heardHz = SpcDescription.gaugeHz(g.max(VoiceGauges.FREQUENCY, VoiceGauges.COLUMNS - 1)).toDouble()
         val rate = if (playing) PcmDescription.playbackHz(g).toDouble() else Double.NaN
         val level = if (playing && g.hasLevel) g.level.toDouble() else -PcmDescription.MAX_DB.toDouble()
-        if (nanos == 0L) {
-            noteReadout.snap(if (playing) heardHz else 0.0)
-            if (!rate.isNaN()) rateReadout.snap(rate)
-            levelReadout.snap(level)
-        } else {
-            noteReadout.push(if (playing) heardHz else 0.0, nanos)
-            rateReadout.push(rate, nanos)
-            levelReadout.push(level, nanos)
-        }
+        noteReadout.update(if (playing) heardHz else 0.0, nanos)
+        rateReadout.update(rate, nanos)
+        levelReadout.update(level, nanos)
+        pitchReadout.update((PcmDescription.octave(g) * 1024 + PcmDescription.fnum(g)).toDouble(), nanos)
         val note = noteReadout.note
         val noteText = if (note == NoteReadout.NONE) "" else Words.ESTIMATED + ChipWidgets.noteName(note)
         // readouts are refreshed a few times per second, texts are rebuilt only then
         val playingBit = if (playing) 1L shl 40 else 0L
         if (cells.changed(PcmCells.RATE, playingBit or rateReadout.version.toLong())) {
-            cells[PcmCells.RATE] = if (!playing || rateReadout.value.isNaN()) {
-                Words.DASH
+            if (!playing || rateReadout.value.isNaN()) {
+                cells[PcmCells.RATE] = Words.DASH
             } else {
-                rangeWord(rateReadout) { PcmDescription.hzWord(it.toFloat()) }
+                cells.set(PcmCells.RATE, rateReadout) { PcmDescription.hzWord(it.toFloat()) }
             }
         }
         if (cells.changed(PcmCells.LEVEL, playingBit or levelReadout.version.toLong())) {
-            cells[PcmCells.LEVEL] = if (!playing) Words.DASH else rangeWord(levelReadout) { PcmDescription.dbWord(it.toFloat()) }
+            if (!playing) {
+                cells[PcmCells.LEVEL] = Words.DASH
+            } else {
+                cells.set(PcmCells.LEVEL, levelReadout) { PcmDescription.dbWord(it.toFloat()) }
+            }
         }
         val rateText = cells[PcmCells.RATE]
         val keyOn = PcmDescription.isKeyOn(g)
@@ -196,11 +198,13 @@ internal class PcmSlotText : SidRowText(PcmCells.SLOT.size) {
         if (titles.changed(title(2), (note.toLong() shl 42) or playingBit or rateReadout.version.toLong())) {
             titles[title(2)] = if (noteText.isEmpty()) rateText else "$noteText $rateText"
         }
-        val pitchKey = (PcmDescription.octave(g) shl 12) or PcmDescription.fnum(g)
-        if (titles.changed(tail(2), pitchKey)) {
-            titles[tail(2)] = "OCT ${PcmDescription.octave(g)} FNS ${PcmDescription.hex(PcmDescription.fnum(g), 3)}"
-            cells[PcmCells.PITCH] = "${PcmDescription.octave(g)}/${PcmDescription.fnum(g)}"
-            cells[PcmCells.SHIFT] = PcmDescription.semitonesWord(PcmDescription.shiftSemitones(g))
+        val pitch = pitchReadout.register()
+        val octave = pitch.floorDiv(1024)
+        val fnum = pitch.mod(1024)
+        if (titles.changed(tail(2), pitch.toLong() or (if (scsp) 1L shl 32 else 0L))) {
+            titles[tail(2)] = "OCT $octave FNS ${PcmDescription.hex(fnum, 3)}"
+            cells[PcmCells.PITCH] = "$octave/$fnum"
+            cells[PcmCells.SHIFT] = PcmDescription.semitonesWord(PcmDescription.shiftSemitones(octave, fnum, scsp))
         }
 
         // cells
@@ -273,17 +277,6 @@ internal class PcmSlotText : SidRowText(PcmCells.SLOT.size) {
         if (cells.changed(PcmCells.EFFECT, g.field(Pcm.EFSDL) or (slot shl 4))) {
             cells[PcmCells.EFFECT] = PcmDescription.effectWord(g, slot)
         }
-    }
-
-    // value or range of modulated value, e.g. "−12…−6 dB", the latter is formatted with unit
-    private inline fun rangeWord(readout: RealtimeReadout, format: (Double) -> String): String {
-        if (!readout.isModulated) {
-            return format(readout.value)
-        }
-        val low = format(readout.low)
-        val high = format(readout.high)
-        val unit = high.substringAfterLast(' ', "")
-        return if (unit.isNotEmpty() && low.endsWith(" $unit")) "${low.removeSuffix(" $unit")}…$high" else "$low…$high"
     }
 
     private fun centsWord(cents: Float) = if (cents < 10f) String.format(java.util.Locale.US, "%.1f", cents) else "${cents.roundToInt()}"

@@ -76,11 +76,16 @@ internal object SpcCells {
 }
 
 /**
- * Texts of voice row: title bands of sample, envelope and pitch panels, cells and captions of envelope cells
+ * Texts of voice row: title bands of sample, envelope and pitch panels, cells and captions of envelope cells.
+ * Values changing at each player tick (note, pitch register with vibrato, envelope level) are shown by [NoteReadout]
+ * and [RealtimeReadout].
  */
 internal class SpcVoiceText : SidRowText(SpcCells.VOICE.size) {
     val captions = LiveTexts(SpcCells.VOICE.size)
-    private var note = NONE
+    private val noteReadout = NoteReadout()
+    private val rateReadout = RealtimeReadout(deadband = 1.0 / 48, modulationSpread = 1.0 / 12, isLogarithmic = true)
+    private val pitchRegister = RealtimeReadout.ofRegister()
+    private val levelReadout = RealtimeReadout.ofRegister()
 
     init {
         for (idx in SpcCells.VOICE.indices) {
@@ -88,7 +93,10 @@ internal class SpcVoiceText : SidRowText(SpcCells.VOICE.size) {
         }
     }
 
-    fun update(g: VoiceGauges, voice: Int, env: SpcEnvelope) {
+    /**
+     * @param nanos monotonic time of frame, 0 for single picture (values are shown at once)
+     */
+    fun update(g: VoiceGauges, voice: Int, env: SpcEnvelope, nanos: Long = 0L) {
         val envx = g.field(0)
         val mode = g.field(1)
         val adsr1 = g.field(2)
@@ -97,18 +105,23 @@ internal class SpcVoiceText : SidRowText(SpcCells.VOICE.size) {
         val srcn = g.field(5)
         val volL = g.signedField(6)
         val volR = g.signedField(7)
-        val pitch = g.field(8) or ((g.field(9) and 0x3f) shl 8)
+        val written = g.field(8) or ((g.field(9) and 0x3f) shl 8)
         val flags = g.field(10)
         val adsr = SpcDescription.isAdsr(adsr1)
         val hasSample = SpcSample.hasInfo(g)
         val loops = hasSample && SpcSample.loops(g)
-        val level = SpcDescription.envelopePercent(envx)
+        levelReadout.update(SpcDescription.envelopePercent(envx).toDouble(), nanos)
+        val level = levelReadout.register()
         val stage = SpcDescription.Stage.of(mode)
         // pitch of output is estimated from audio, as the note depends on sample contents
         val hz = SpcDescription.gaugeHz(g.max(VoiceGauges.FREQUENCY, VoiceGauges.COLUMNS - 1))
-        note = if (hz <= 0f || envx == 0) NONE else note(semitones(hz), note)
-        val noteText = if (note == NONE) "" else Words.ESTIMATED + ChipWidgets.noteName(note)
-        val rate = SpcDescription.rateHz(pitch).roundToInt()
+        noteReadout.update(if (envx == 0) 0.0 else hz.toDouble(), nanos)
+        rateReadout.update(if (written == 0) Double.NaN else SpcDescription.rateHz(written).toDouble(), nanos)
+        pitchRegister.update(written.toDouble(), nanos)
+        val note = noteReadout.note
+        val noteText = if (note == NoteReadout.NONE) "" else Words.ESTIMATED + ChipWidgets.noteName(note)
+        val pitch = pitchRegister.register()
+        val rate = if (rateReadout.value.isNaN()) 0 else rateReadout.value.roundToInt()
 
         val sampleKind = if (!hasSample) {
             0
@@ -156,7 +169,7 @@ internal class SpcVoiceText : SidRowText(SpcCells.VOICE.size) {
                 "GAIN ${SpcDescription.hex2(gain)}"
             }
         }
-        if (titles.changed(title(2), (note.toLong() shl 32) or rate.toLong())) {
+        if (titles.changed(title(2), (note.toLong() shl 32) or rateReadout.version.toLong())) {
             val rateText = if (rate == 0) Words.OFF else "%.1f kHz".format(java.util.Locale.US, rate / 1000f)
             titles[title(2)] = if (noteText.isEmpty()) rateText else "$noteText $rateText"
         }
@@ -171,8 +184,12 @@ internal class SpcVoiceText : SidRowText(SpcCells.VOICE.size) {
         if (cells.changed(SpcCells.NOTE, note)) {
             cells[SpcCells.NOTE] = noteText.ifEmpty { Words.DASH }
         }
-        if (cells.changed(SpcCells.RATE, rate)) {
-            cells[SpcCells.RATE] = SidDescription.hzWord(rate)
+        if (cells.changed(SpcCells.RATE, rateReadout.version)) {
+            if (rate == 0) {
+                cells[SpcCells.RATE] = Words.DASH
+            } else {
+                cells.set(SpcCells.RATE, rateReadout) { SidDescription.hzWord(it.roundToInt()) }
+            }
         }
         if (cells.changed(SpcCells.SHIFT, pitch)) {
             cells[SpcCells.SHIFT] = if (pitch == 0) {

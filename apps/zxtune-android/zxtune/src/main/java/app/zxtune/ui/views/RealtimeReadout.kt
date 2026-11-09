@@ -105,6 +105,42 @@ class RealtimeReadout(
         ++version
     }
 
+    /**
+     * [push] at live frames or [snap] for single picture, NaN (no value, e.g. silent voice) clears the readout
+     * @param nanos monotonic time of frame, 0 for single picture
+     */
+    fun update(sample: Double, nanos: Long) {
+        if (sample.isNaN()) {
+            if (!value.isNaN()) {
+                reset()
+            }
+        } else if (nanos == 0L) {
+            snap(sample)
+        } else {
+            push(sample, nanos)
+        }
+    }
+
+    /**
+     * Text of value or range of modulated value with unit written once, e.g. "−12…−6 dB" or "508…539 Hz"
+     * @param format text of single value, unit is separated by space
+     */
+    inline fun text(format: (Double) -> String): String {
+        if (!isModulated) {
+            return format(value)
+        }
+        val lowText = format(low)
+        val highText = format(high)
+        val unit = highText.substringAfterLast(' ', "")
+        return if (unit.isNotEmpty() && lowText.endsWith(" $unit")) {
+            "${lowText.removeSuffix(" $unit")}…$highText"
+        } else if (lowText == highText) {
+            lowText
+        } else {
+            "$lowText…$highText"
+        }
+    }
+
     private fun refresh(nanos: Long): Boolean {
         val oldest = nanos - (windowSeconds * 1e9).toLong()
         var count = 0
@@ -153,10 +189,19 @@ class RealtimeReadout(
         return true
     }
 
-    private companion object {
+    companion object {
         // half second at 144Hz with some margin
-        const val CAPACITY = 128
+        private const val CAPACITY = 128
+
+        /**
+         * Raw register (e.g. frequency written by player with vibrato) is shown as median refreshed with the other
+         * texts, never as range: it's what the chip is programmed with, its musical meaning is shown by other texts
+         */
+        fun ofRegister() = RealtimeReadout(deadband = 0.5, modulationSpread = Double.MAX_VALUE)
     }
+
+    /** Displayed value of [ofRegister] readout, or [default] if nothing pushed */
+    fun register(default: Int = 0) = if (value.isNaN()) default else value.roundToInt()
 }
 
 /**
@@ -210,6 +255,24 @@ class NoteReadout(private val marginCents: Double = 20.0, private val holdSecond
     fun snap(hz: Double) {
         candidate = NONE
         set(if (hz > 0) semitonesOf(hz).roundToInt() else NONE)
+    }
+
+    /**
+     * [push] at live frames or [snap] for single picture
+     * @param nanos monotonic time of frame, 0 for single picture
+     */
+    fun update(hz: Double, nanos: Long) {
+        if (nanos == 0L) {
+            snap(hz)
+        } else {
+            push(hz, nanos)
+        }
+    }
+
+    /** Nothing is shown, e.g. other voice is displayed by the same readout */
+    fun reset() {
+        candidate = NONE
+        set(NONE)
     }
 
     private fun set(value: Int): Boolean {

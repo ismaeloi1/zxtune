@@ -91,6 +91,15 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
     private val r2 = RectF()
     private val graph = RectF()
     private val texts = LiveTexts(TEXTS)
+
+    // values written by players at each tick (vibrato, slides, volume envelopes), see [RealtimeReadout]
+    private var readoutsVoice = -1
+    private val noteReadout = NoteReadout()
+    private val pitchReadout = RealtimeReadout(deadband = 1.0 / 48, modulationSpread = 1.0 / 12, isLogarithmic = true)
+    private val volumeReadout = RealtimeReadout(deadband = 1.0, modulationSpread = 6.0)
+    private val operatorReadouts = Array(4) { RealtimeReadout(deadband = 1.0 / 48, modulationSpread = Double.MAX_VALUE, isLogarithmic = true) }
+    private val lfoReadout = RealtimeReadout(deadband = 1.0 / 48, modulationSpread = Double.MAX_VALUE, isLogarithmic = true)
+    private val csmReadout = RealtimeReadout(deadband = 1.0 / 48, modulationSpread = Double.MAX_VALUE, isLogarithmic = true)
     private val xs = FloatArray(5)
     private val ys = FloatArray(5)
     private val columns = FloatArray(COLUMNS + 1)
@@ -115,10 +124,12 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
      * @param tab current tab index
      * @param smooth eased values storage of current channel (at least [ChipWidgets.SMOOTH_SIZE])
      * @param selected highlighted operator or -1
+     * @param nanos monotonic time of frame, 0 for single picture (values are shown at once)
      */
-    fun draw(canvas: Canvas, rect: RectF, data: ByteArray, tabs: Tabs, tab: Int, smooth: FloatArray, selected: Int) {
+    fun draw(canvas: Canvas, rect: RectF, data: ByteArray, tabs: Tabs, tab: Int, smooth: FloatArray, selected: Int, nanos: Long = 0L) {
         val g = VoiceGauges(data, tabs.voices[tab] * VoiceGauges.SIZE)
         channel.update(g)
+        updateReadouts(tabs.voices[tab], nanos)
         widgets.easeLevels(channel, smooth)
         val pad = density * 6
         var top = rect.top + pad
@@ -145,6 +156,35 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
             drawOperators(canvas, left, y + pad, right, bottom - chipH - pad, selected)
             drawChipCells(canvas, left, bottom - chipH, right - left, tabs.chip)
         }
+    }
+
+    /** Note, pitch, volume and frequencies of operators as of the last frame */
+    fun readoutTexts() = listOf(texts[T_NOTE], texts[T_PITCH], texts[T_VOLUME]) +
+        (0 until channel.operatorsCount).map { texts[T_OPERATORS + it * T_PER_OPERATOR + 1] }
+
+    private fun updateReadouts(voice: Int, nanos: Long) {
+        if (voice != readoutsVoice) {
+            // history of other channel is not shown
+            readoutsVoice = voice
+            noteReadout.reset()
+            pitchReadout.reset()
+            volumeReadout.reset()
+            operatorReadouts.forEach { it.reset() }
+            lfoReadout.reset()
+            csmReadout.reset()
+        }
+        val ch = channel
+        val hz = ch.frequency
+        val heard = ch.levelDb > -96f && hz > 0f
+        noteReadout.update(if (heard) hz.toDouble() else 0.0, nanos)
+        pitchReadout.update(if (hz > 0f) hz.toDouble() else Double.NaN, nanos)
+        volumeReadout.update(if (ch.levelDb <= -95.5f) Double.NaN else ch.levelDb.toDouble(), nanos)
+        for (op in 0 until ch.operatorsCount) {
+            val opHz = ch.operatorHz(ch.operators[op])
+            operatorReadouts[op].update(if (opHz > 0f) opHz.toDouble() else Double.NaN, nanos)
+        }
+        lfoReadout.update(if (ch.hasLfo && ch.lfoHz > 0f) ch.lfoHz.toDouble() else Double.NaN, nanos)
+        csmReadout.update(if (ch.ch3Mode == 2 && ch.csmHz > 0f) ch.csmHz.toDouble() else Double.NaN, nanos)
     }
 
     /**
@@ -284,12 +324,12 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
     // values of channel as labelled cells, @return bottom
     private fun drawChannelCells(canvas: Canvas, left: Float, top: Float, width: Float): Float {
         val ch = channel
-        val hz = ch.frequency
-        val heard = ch.levelDb > -96f && hz > 0f
-        val hzKey = (hz * 10).roundToInt().toLong()
         cellsCount = 0
-        cell("Note", texts.text(T_NOTE, hzKey or (if (heard) 1L shl 40 else 0)) { if (heard) ChipWidgets.noteName(hz) else "-" })
-        cell("Pitch", texts.text(T_PITCH, hzKey) { if (hz > 0f) formatHz(hz) else "-" })
+        val note = noteReadout.note
+        cell("Note", texts.text(T_NOTE, note.toLong()) { if (note != NoteReadout.NONE) ChipWidgets.noteName(note) else DASH })
+        cell("Pitch", texts.text(T_PITCH, pitchReadout.version.toLong()) {
+            if (pitchReadout.value.isNaN()) DASH else pitchReadout.text { formatHz(it.toFloat(), pitchReadout.isModulated) }
+        })
         if (ch.isDetailed) {
             if (ch.family == FmChannel.FAMILY_OPM) {
                 cell("Key code", texts.text(T_FNUM, (ch.keyCode shl 8 or ch.keyFraction).toLong()) {
@@ -302,15 +342,15 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
         cell("Algorithm", texts.text(T_ALG, (ch.algorithm or (ch.operatorsCount shl 4) or (ch.family shl 8)).toLong()) {
             FmWidgets.algorithmName(ch)
         })
-        cell("Feedback", texts.text(T_FB, ch.feedback.toLong()) { if (ch.feedback == 0) "off" else "${ch.feedback}" })
+        cell("Feedback", texts.text(T_FB, ch.feedback.toLong()) { if (ch.feedback == 0) OFF else "${ch.feedback}" })
         if (ch.hasPan) {
             cell("Output", PAN_WORDS[ch.pan and 3])
         }
         if (ch.hasLfo) {
             cell("LFO sens", texts.text(T_LFO_SENS, (ch.ams shl 4 or ch.pms).toLong()) { "AM${ch.ams} PM${ch.pms}" })
         }
-        cell("Volume", texts.text(T_VOLUME, ch.levelDb.roundToInt().toLong()) {
-            if (ch.levelDb <= -95.5f) "off" else "${ch.levelDb.roundToInt()} dB"
+        cell("Volume", texts.text(T_VOLUME, volumeReadout.version.toLong()) {
+            if (volumeReadout.value.isNaN()) OFF else volumeReadout.text { formatDb(it.roundToInt().toFloat()) }
         })
         return drawCells(canvas, left, top, width, CHANNEL_TEMPLATE)
     }
@@ -333,45 +373,46 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
         when (ch.family) {
             FmChannel.FAMILY_OPL -> {
                 val gl = ch.global
-                cell("Rhythm mode", if (gl and FmChannel.GLOBAL_OPL_RHYTHM != 0) "on" else "off")
+                cell("Rhythm mode", if (gl and FmChannel.GLOBAL_OPL_RHYTHM != 0) ON else OFF)
                 cell("Tremolo depth", if (gl and FmChannel.GLOBAL_OPL_AM_DEPTH != 0) "4.8 dB" else "1 dB")
                 cell("Vibrato depth", if (gl and FmChannel.GLOBAL_OPL_VIB_DEPTH != 0) "14 cents" else "7 cents")
                 if (ch.chip == FmChannel.CHIP_OPL3) {
                     cell("4-op pairs", texts.text(T_PAIRS, (ch.global2 or (gl shl 8)).toLong()) { opl3Pairs(ch) })
                 } else if (ch.chip == FmChannel.CHIP_OPL2) {
-                    cell("Waveforms", if (gl and FmChannel.GLOBAL_OPL_WSE != 0) "enabled" else "sine only")
+                    cell("Waveforms", if (gl and FmChannel.GLOBAL_OPL_WSE != 0) "Enabled" else "Sine only")
                 }
                 if (gl and FmChannel.GLOBAL_OPL_CSM != 0) {
-                    cell("CSM", "on")
+                    cell("CSM", ON)
                 }
             }
 
             FmChannel.FAMILY_OPM -> {
-                cell("LFO", texts.text(T_LFO, (ch.global2 or (ch.global shl 8)).toLong()) {
-                    "${formatHz(ch.lfoHz)} ${LFO_WAVES[ch.global and 3]}"
+                cell("LFO", texts.text(T_LFO, lfoReadout.version.toLong() or ((ch.global.toLong() and 3) shl 32)) {
+                    "${formatHz(lfoReadout.value.toFloat())} ${LFO_WAVES[ch.global and 3]}"
                 })
                 cell("AM depth", texts.text(T_AMD, ch.amd.toLong()) { "${ch.amd}" })
                 cell("PM depth", texts.text(T_PMD, ch.pmd.toLong()) { "${ch.pmd}" })
                 cell("Noise (ch 8)", texts.text(T_NOISE, (ch.noise or (ch.global shl 8)).toLong()) {
-                    if (ch.global and FmChannel.GLOBAL_OPM_NOISE != 0) "on, ${ch.noise}" else "off"
+                    if (ch.global and FmChannel.GLOBAL_OPM_NOISE != 0) "On, ${ch.noise}" else OFF
                 })
             }
 
             else -> {
                 if (ch.hasLfo) {
-                    cell("LFO", texts.text(T_LFO, ch.global.toLong() and 15) {
-                        if (ch.lfoHz > 0f) formatHz(ch.lfoHz) else "off"
+                    cell("LFO", texts.text(T_LFO, lfoReadout.version.toLong()) {
+                        if (lfoReadout.value.isNaN()) OFF else formatHz(lfoReadout.value.toFloat())
                     })
                 }
-                cell("Channel 3", texts.text(T_CH3, (ch.ch3Mode or (ch.timerA shl 4)).toLong()) {
-                    when (ch.ch3Mode) {
-                        1 -> "own op. pitches"
-                        2 -> "CSM ${formatHz(ch.csmHz)}"
-                        else -> "normal"
+                cell("Channel 3", texts.text(T_CH3, ch.ch3Mode.toLong() or (csmReadout.version.toLong() shl 4)) {
+                    when {
+                        ch.ch3Mode == 1 -> "Own op. pitches"
+                        ch.ch3Mode == 2 && !csmReadout.value.isNaN() -> "CSM ${formatHz(csmReadout.value.toFloat())}"
+                        ch.ch3Mode == 2 -> "CSM"
+                        else -> "Normal"
                     }
                 })
                 if (ch.chip == FmChannel.CHIP_OPN2) {
-                    cell("DAC", if (ch.global and FmChannel.GLOBAL_OPN_DAC != 0) "on, replaces FM 6" else "off")
+                    cell("DAC", if (ch.global and FmChannel.GLOBAL_OPN_DAC != 0) "On, replaces FM 6" else OFF)
                 }
             }
         }
@@ -504,8 +545,8 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
         }
         val mulKey = (o.mul or (o.dt shl 4) or (o.dt2 shl 8)).toLong()
         cell(canvas, 1, y1, texts.text(slot, mulKey or (if (ch.isOpl) 1L shl 20 else 0)) { multipleText(o) }, cellText)
-        val opHz = ch.operatorHz(o)
-        cell(canvas, 1, y2, texts.text(slot + 1, (opHz * 10).roundToInt().toLong()) { if (opHz > 0f) formatHz(opHz) else "-" }, dimText)
+        val opHz = operatorReadouts[op]
+        cell(canvas, 1, y2, texts.text(slot + 1, opHz.version.toLong()) { if (opHz.value.isNaN()) DASH else formatHz(opHz.value.toFloat()) }, dimText)
         cell(canvas, 2, y1, texts.text(slot + 2, (o.tl or (o.ksl shl 8)).toLong()) {
             "TL ${o.tl}"
         }, cellText)
@@ -531,7 +572,7 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
             val srEff = ch.effectiveRate(o, o.sr)
             cell(canvas, 6, y1, texts.text(slot + 10, o.sr.toLong()) { "SR ${o.sr}" }, cellText)
             cell(canvas, 6, y2, texts.text(slot + 11, srEff.toLong() or (ch.envelopeRate.toLong() shl 8)) {
-                if (o.sr == 0) "hold" else formatMs(ch.decayMs(srEff))
+                if (o.sr == 0) "Hold" else formatMs(ch.decayMs(srEff))
             }, dimText)
             cell(canvas, 7, y1, texts.text(slot + 12, o.rr.toLong()) { "RR ${o.rr}" }, cellText)
             cell(canvas, 7, y2, texts.text(slot + 13, rrEff.toLong() or (ch.envelopeRate.toLong() shl 8)) { formatMs(ch.decayMs(rrEff)) }, dimText)
@@ -735,12 +776,12 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
         private val LEGEND_FILL = arrayOf("Fill: level now, thick: key on", "Fill: level now")
 
         private val OPN_HEADERS = arrayOf("Op", "Multiple", "Level", "Attack", "Decay", "Sustain", "Decay 2", "Release")
-        private val OPN_TEMPLATES = arrayOf("carrier", "4.40 kHz", "-95.3 dB", "1.05 s", "738 ms", "-93 dB", "29.5 s", "923 ms")
+        private val OPN_TEMPLATES = arrayOf("carrier", "4.40 kHz", "\u221295.3 dB", "1.05 s", "738 ms", "\u221293 dB", "29.5 s", "923 ms")
         private val OPL_HEADERS = arrayOf("Op", "Multiple", "Level", "Attack", "Decay", "Sustain", "Type", "Release")
-        private val OPL_TEMPLATES = arrayOf("carrier ∿∿", "4.40 kHz", "-47.3 dB", "1.05 s", "738 ms", "-93 dB", "sustains", "923 ms")
+        private val OPL_TEMPLATES = arrayOf("carrier ∿∿", "4.40 kHz", "\u221247.3 dB", "1.05 s", "738 ms", "\u221293 dB", "sustains", "923 ms")
         private val CHANNEL_TEMPLATE = "220.0 Hz"
         private val CHIP_TEMPLATE = "48.1 Hz"
-        private val PAN_WORDS = arrayOf("muted", "right", "left", "both")
+        private val PAN_WORDS = arrayOf("Muted", "Right", "Left", "Both")
         private val LFO_WAVES = arrayOf("saw", "square", "triangle", "noise")
 
         // OPL key scale level attenuation per octave
@@ -750,29 +791,41 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
         // SSG-EG shapes (with bit 3 set): repeat, once, alternate, once and hold, for both directions
         private val SSG_SHAPES = arrayOf("\\\\\\", "\\__", "\\/\\", "\\‾‾", "///", "/‾‾", "/\\/", "/__")
 
-        fun formatHz(hz: Float) = when {
-            hz >= 10000f -> "%.1f kHz".format(hz / 1000f)
-            hz >= 1000f -> "%.2f kHz".format(hz / 1000f)
-            hz >= 100f -> "%.1f Hz".format(hz)
-            hz >= 1f -> "%.2f Hz".format(hz)
-            else -> "%.3f Hz".format(hz)
+        // the same notation as other dashboards regardless of locale: decimal point, minus sign, em dash for none
+        private const val DASH = "\u2014"
+        private const val MINUS = "\u2212"
+        private const val ON = "On"
+        private const val OFF = "Off"
+
+        private fun String.formatUs(value: Float) = String.format(java.util.Locale.US, this, value)
+
+        /**
+         * @param coarse 3 significant digits, e.g. for bounds of range
+         */
+        fun formatHz(hz: Float, coarse: Boolean = false) = when {
+            hz >= 10000f -> "%.1f kHz".formatUs(hz / 1000f)
+            hz >= 1000f -> "%.2f kHz".formatUs(hz / 1000f)
+            coarse && hz >= 100f -> "${hz.roundToInt()} Hz"
+            hz >= 100f -> "%.1f Hz".formatUs(hz)
+            hz >= 1f -> "%.2f Hz".formatUs(hz)
+            else -> "%.3f Hz".formatUs(hz)
         }
 
         fun formatMs(ms: Float) = when {
             ms.isInfinite() -> "∞"
             ms < 0.05f -> "0 ms"
-            ms < 10f -> "%.1f ms".format(ms)
+            ms < 10f -> "%.1f ms".formatUs(ms)
             ms < 1000f -> "${ms.roundToInt()} ms"
-            ms < 10000f -> "%.2f s".format(ms / 1000f)
-            else -> "%.1f s".format(ms / 1000f)
+            ms < 10000f -> "%.2f s".formatUs(ms / 1000f)
+            else -> "%.1f s".formatUs(ms / 1000f)
         }
 
         fun formatDb(db: Float) = if (db == 0f) {
             "0 dB"
         } else if (db % 1f == 0f) {
-            "${db.toInt()} dB"
+            "${db.toInt()} dB".replace("-", MINUS)
         } else {
-            "%.1f dB".format(db)
+            "%.1f dB".formatUs(db).replace("-", MINUS)
         }
 
         private fun opl3Pairs(ch: FmChannel): String {
@@ -781,7 +834,7 @@ internal class FmInspector(private val density: Float, scaledDensity: Float) {
             }
             val mask = ch.global2 and 0x3f
             if (mask == 0) {
-                return "none"
+                return "None"
             }
             return buildString {
                 for (bit in 0 until 6) {
