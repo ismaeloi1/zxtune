@@ -1658,7 +1658,7 @@ void VGMPlayer::InitDevices(void)
 			VGM_BASEDEV* clDev = chipDev.base.linkDev;
 			size_t optID = DeviceID2OptionID(PLR_DEV_ID(DEVID_AY8910, chipID));
 			if (optID != (size_t)-1 && clDev != NULL && clDev->defInf.devDef->SetOptionBits != NULL)
-				clDev->defInf.devDef->SetOptionBits(devInf->dataPtr, _devOpts[optID].coreOpts);
+				clDev->defInf.devDef->SetOptionBits(clDev->defInf.dataPtr, _devOpts[optID].coreOpts);
 		}
 
 		_vdDevMap[sdCfg.vgmChipType][chipID] = _devices.size();
