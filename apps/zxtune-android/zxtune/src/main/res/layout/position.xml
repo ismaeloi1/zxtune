@@ -1,46 +1,43 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Scrubber: bars track with loop marker, 48dp touch height, times at the ends below -->
+<!-- Scrubber row: times at the ends of the bars track with loop marker, the whole row height is the touch target -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingLeft="@dimen/spacing_half"
-        android:paddingRight="@dimen/spacing_half"
+        android:layout_height="@dimen/lhuna_touch_target"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="@dimen/lhuna_space_m"
+        android:paddingRight="@dimen/lhuna_space_m"
         tools:ignore="RtlHardcoded">
+
+    <TextView
+            android:id="@+id/position_time"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="left"
+            android:minWidth="@dimen/lhuna_compact_time_width"
+            android:text="@string/stub_time"
+            android:textAppearance="@style/TextAppearance.Lhuna.Mono" />
 
     <SeekBar
             android:id="@+id/position_seek"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/lhuna_touch_target"
-            android:maxHeight="@dimen/lhuna_scrubber_height"
-            android:minHeight="@dimen/lhuna_scrubber_height"
-            android:paddingLeft="@dimen/lhuna_space_m"
-            android:paddingRight="@dimen/lhuna_space_m"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:maxHeight="@dimen/lhuna_compact_scrubber_height"
+            android:minHeight="@dimen/lhuna_compact_scrubber_height"
+            android:paddingLeft="@dimen/spacing_full"
+            android:paddingRight="@dimen/spacing_full"
             android:splitTrack="false"
             android:thumb="@drawable/lhuna_scrubber_thumb"
             tools:progress="33" />
 
-    <RelativeLayout
-            android:layout_width="match_parent"
+    <TextView
+            android:id="@+id/position_duration"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingLeft="@dimen/lhuna_space_m"
-            android:paddingRight="@dimen/lhuna_space_m">
-
-        <TextView
-                android:id="@+id/position_time"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentLeft="true"
-                android:text="@string/stub_time"
-                android:textAppearance="@style/TextAppearance.Lhuna.Mono.Time" />
-
-        <TextView
-                android:id="@+id/position_duration"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_alignParentRight="true"
-                android:text="@string/stub_time"
-                android:textAppearance="@style/TextAppearance.Lhuna.Mono.Time.Secondary" />
-    </RelativeLayout>
+            android:gravity="right"
+            android:minWidth="@dimen/lhuna_compact_time_width"
+            android:text="@string/stub_time"
+            android:textAppearance="@style/TextAppearance.Lhuna.Mono.Secondary" />
 </LinearLayout>

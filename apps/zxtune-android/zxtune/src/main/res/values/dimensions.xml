@@ -60,4 +60,17 @@
   <dimen name="lhuna_crumb_inset">6dp</dimen>
   <!-- segmented control: segments are touch targets of at least 48dp -->
   <dimen name="lhuna_segment_touch_height">48dp</dimen>
+  <!-- compact layout -->
+  <!-- Bottom part of now playing is kept as low as possible to give the height to the visualizer: one 48dp row for
+    the scrubber with times at its ends, one 48dp row for the transport, slim icons-only navigation -->
+  <dimen name="lhuna_compact_transport_icon_padding">12dp</dimen>
+  <dimen name="lhuna_compact_scrubber_height">14dp</dimen>
+  <dimen name="lhuna_compact_scrubber_thumb">14dp</dimen>
+  <dimen name="lhuna_compact_scrubber_thumb_pressed">22dp</dimen>
+  <dimen name="lhuna_compact_time_width">48dp</dimen>
+  <dimen name="lhuna_compact_nav_height">48dp</dimen>
+  <dimen name="lhuna_compact_mini_player_height">48dp</dimen>
+  <dimen name="lhuna_compact_mini_badge_size">32dp</dimen>
+  <!-- Collapsible now playing information -->
+  <dimen name="lhuna_compact_info_chip_height">22dp</dimen>
 </resources>

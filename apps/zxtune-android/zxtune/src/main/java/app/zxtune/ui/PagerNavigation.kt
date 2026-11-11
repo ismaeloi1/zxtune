@@ -3,6 +3,7 @@ package app.zxtune.ui
 import android.view.View
 import android.view.ViewGroup
 import androidx.annotation.IdRes
+import androidx.appcompat.widget.TooltipCompat
 import androidx.core.view.isVisible
 import androidx.viewpager.widget.ViewPager
 import app.zxtune.R
@@ -25,8 +26,12 @@ class PagerNavigation(
     init {
         check(bar.childCount == pagesIds.size) { "${bar.childCount} items for ${pagesIds.size} pages" }
         for (idx in 0 until bar.childCount) {
-            bar.getChildAt(idx).setOnClickListener {
-                showPage(idx)
+            bar.getChildAt(idx).run {
+                setOnClickListener {
+                    showPage(idx)
+                }
+                // items are icons only, long press names them
+                TooltipCompat.setTooltipText(this, contentDescription)
             }
         }
         pager.addOnPageChangeListener(this)

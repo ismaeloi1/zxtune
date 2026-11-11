@@ -10,10 +10,6 @@
         <ImageView
                 style="@style/Lhuna.NavItem.Icon"
                 android:src="@drawable/ic_nav_playlist" />
-
-        <TextView
-                style="@style/Lhuna.NavItem.Label"
-                android:text="@string/navigation_playlist" />
     </LinearLayout>
 
     <LinearLayout
@@ -24,9 +20,5 @@
         <ImageView
                 style="@style/Lhuna.NavItem.Icon"
                 android:src="@drawable/ic_nav_browse" />
-
-        <TextView
-                style="@style/Lhuna.NavItem.Label"
-                android:text="@string/navigation_browser" />
     </LinearLayout>
 </merge>

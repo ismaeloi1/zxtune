@@ -14,4 +14,6 @@
     <string name="playback_repeat">Opakovat skladbu</string>
     <string name="track_actions">Akce se skladbou</string>
     <string name="track_details">Podrobnosti skladby</string>
+    <string name="track_information_show">Zobrazit informace o skladbě</string>
+    <string name="track_information_hide">Skrýt informace o skladbě</string>
 </resources>

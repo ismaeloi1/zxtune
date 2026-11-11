@@ -28,6 +28,7 @@ internal object OscilloscopeSettings {
     private const val BACKEND_KEY = "ui.oscilloscope.backend"
     private const val FILTER_KEY = "ui.oscilloscope.filter"
     private const val FILTER_WAVES_KEY = "ui.oscilloscope.filter_waves"
+    private const val SHOW_STATS_KEY = "ui.oscilloscope.show_stats"
 
     /** Native SID options affecting filter response view */
     const val SID_PREFIX = "zxtune.core.sid."
@@ -60,6 +61,7 @@ internal object OscilloscopeSettings {
         oscilloscope.gainPercent = prefs.getString(GAIN_KEY, null)?.toIntOrNull() ?: OscilloscopeView.AUTO_GAIN
         oscilloscope.maxFps = prefs.getString(MAX_FPS_KEY, null)?.toIntOrNull() ?: 0
         dashboard.waveWindowMs = prefs.getInt(GAUGE_WINDOW_KEY, SidDashboardView.DEFAULT_WAVE_WINDOW_MS)
+        dashboard.showStatistics = prefs.getBoolean(SHOW_STATS_KEY, true)
         oscilloscope.showFilter = prefs.getBoolean(FILTER_KEY, false)
         oscilloscope.filterSettings = readFilterSettings(prefs)
     }

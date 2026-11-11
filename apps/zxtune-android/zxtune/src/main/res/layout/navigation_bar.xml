@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Bottom navigation, items order follows pages of the view pager -->
+<!-- Slim bottom navigation, items order follows pages of the view pager. Icons only, names are in content
+  descriptions and tooltips -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         android:id="@+id/navigation_bar"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/lhuna_nav_height"
+        android:layout_height="@dimen/lhuna_compact_nav_height"
         android:background="@color/lhuna_surface_1"
         android:orientation="horizontal">
 
@@ -15,10 +16,6 @@
         <ImageView
                 style="@style/Lhuna.NavItem.Icon"
                 android:src="@drawable/ic_nav_now_playing" />
-
-        <TextView
-                style="@style/Lhuna.NavItem.Label"
-                android:text="@string/navigation_now_playing" />
     </LinearLayout>
 
     <include layout="@layout/navigation_bar_lists" />

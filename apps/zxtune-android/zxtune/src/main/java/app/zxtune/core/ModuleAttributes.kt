@@ -53,4 +53,16 @@ object ModuleAttributes {
      * Endl-separated channel names if muting is supported
      */
     const val CHANNELS_NAMES = "ChannelsNames"
+
+    /**
+     * Stored sound stream of sampled formats (see Module::ATTR_CODEC and next ones): codec name, sample rate in Hz,
+     * bits per sample, channels count and average bitrate in bits per second
+     */
+    const val CODEC = "Codec"
+    const val SAMPLERATE = "Samplerate"
+    const val SAMPLE_BITS = "SampleBits"
+    const val CHANNELS = "Channels"
+    const val BITRATE = "Bitrate"
+
+    val STREAM_NUMBERS = listOf(SAMPLERATE, SAMPLE_BITS, CHANNELS, BITRATE)
 }

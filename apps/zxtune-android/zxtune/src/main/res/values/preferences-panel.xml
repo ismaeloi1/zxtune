@@ -27,4 +27,8 @@
     <string name="scope_filter_voice_filtered">filtered</string>
     <string name="pref_oscilloscope_filter_waves_title">Waveforms under filter response</string>
     <string name="pref_oscilloscope_filter_waves_summary">SID filter view shows response curve above voices waveforms, else response only</string>
+    <string name="pref_oscilloscope_show_stats_title">Show technical statistics</string>
+    <string name="pref_oscilloscope_show_stats_summary">Scope, sound output, rendering and GPU lines below the dashboard</string>
+    <string name="pref_main_screen_show_information_title">Show track information</string>
+    <string name="pref_main_screen_show_information_summary">Title, chips, stream format, chip emulation, original driver and engine above the controls. Also toggled by the button at the left of the controls</string>
 </resources>

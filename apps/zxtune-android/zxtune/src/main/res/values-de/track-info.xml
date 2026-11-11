@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="information_format">Format</string>
+    <string name="information_codec">Codec</string>
+    <string name="information_samplerate">Abtastrate</string>
+    <string name="information_sample_bits">Bittiefe</string>
+    <string name="information_channels">Kanäle</string>
+    <string name="information_bitrate">Bitrate</string>
+    <string name="information_playback">Wiedergabe</string>
+    <string name="info_channels_mono">mono</string>
+    <string name="info_channels_stereo">stereo</string>
+    <string name="info_channels_count">%d Kan.</string>
+    <string name="info_sample_bits">%d Bit</string>
+    <string name="info_sample_bits_float">%d Bit Float</string>
+</resources>

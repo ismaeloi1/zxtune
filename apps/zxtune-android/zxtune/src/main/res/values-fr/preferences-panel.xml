@@ -12,4 +12,8 @@
     <string name="scope_filter_voice_filtered">filtré</string>
     <string name="pref_oscilloscope_filter_waves_title">Formes d\'onde sous la réponse du filtre</string>
     <string name="pref_oscilloscope_filter_waves_summary">La vue du filtre SID montre la courbe au-dessus des formes d\'onde des voix, sinon la courbe seule</string>
+    <string name="pref_oscilloscope_show_stats_title">Afficher les statistiques techniques</string>
+    <string name="pref_oscilloscope_show_stats_summary">Lignes de l\'oscilloscope, de la sortie son, du rendu et du GPU sous le tableau de bord</string>
+    <string name="pref_main_screen_show_information_title">Afficher les informations du morceau</string>
+    <string name="pref_main_screen_show_information_summary">Titre, puces, format du flux, émulation des puces, pilote d\'origine et moteur au-dessus des commandes. Aussi basculé par le bouton à gauche des commandes</string>
 </resources>

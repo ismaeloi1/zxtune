@@ -292,7 +292,8 @@ namespace Module::Ogg
   {
   public:
     explicit DataBuilder(PropertiesHelper& props)
-      : Meta(props)
+      : Properties(props)
+      , Meta(props)
     {}
 
     Formats::Chiptune::MetaBuilder& GetMetaBuilder() override
@@ -316,8 +317,12 @@ namespace Module::Ogg
 
     void AddUnknownPacket(Binary::View /*data*/) override {}
 
-    void SetProperties(uint_t /*channels*/, uint_t frequency, uint_t /*blockSizeLo*/, uint_t /*blockSizeHi*/) override
+    void SetProperties(uint_t channels, uint_t frequency, uint_t /*blockSizeLo*/, uint_t /*blockSizeHi*/) override
     {
+      if (!DefaultStream)
+      {
+        Properties.SetStreamFormat("Vorbis"sv, frequency, channels);
+      }
       AllocateStream()->Frequency = frequency;
     }
 
@@ -378,6 +383,7 @@ namespace Module::Ogg
     uint_t CurrentStreamId = 0;
     Model* CurrentStream = nullptr;
     Model::Ptr DefaultStream;
+    PropertiesHelper& Properties;
     MetaProperties Meta;
   };
 
@@ -396,6 +402,7 @@ namespace Module::Ogg
           if (auto data = dataBuilder.GetResult())
           {
             props.SetSource(*container);
+            props.SetBitrate(container->Size(), Time::Milliseconds::FromRatio(data->TotalSamples, data->Frequency));
             dataBuilder.SetContent(container);
             return MakePtr<Holder>(std::move(data), std::move(properties));
           }

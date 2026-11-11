@@ -33,6 +33,22 @@ object StatusHeader {
 
     fun isHeader(line: String) = line.startsWith(DRIVER_PREFIX) || line.startsWith(ENGINE_PREFIX)
 
+    // Diagnostics of playback itself rather than of the tune: oscilloscope feed, sound output, rendering speed and
+    // views drawing, the latter are usually provided by views themselves
+    private val STATISTICS_PREFIXES = listOf(SCOPE_PREFIX, "output:", "render:", "gpu:", "vulkan:", "vk:")
+
+    /**
+     * @return true for diagnostics lines, false for the lines describing the tune and its emulation
+     */
+    fun isStatistics(line: String) = STATISTICS_PREFIXES.any { line.startsWith(it) }
+
+    /**
+     * Sound output sample rate in Hz from "output: 48000Hz ..." line, 0 if unknown
+     */
+    fun outputRateOf(status: String) = OUTPUT_RATE.find(status)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+
+    private val OUTPUT_RATE = Regex("""^output: (\d+)Hz""", RegexOption.MULTILINE)
+
     /**
      * Inserts header right after emulation description line (if any), so the first line is still
      * a description.

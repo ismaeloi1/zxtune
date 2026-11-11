@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Title block: big title, optional author, chips with chip family, format, subtune and program -->
+<!-- Collapsible now playing information, hidden by default to give the height to the visualizer: one line title,
+  one line of chips (chip family, format, subtune, program), stream format and emulation lines -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:app="http://schemas.android.com/apk/res-auto"
         xmlns:tools="http://schemas.android.com/tools"
@@ -17,58 +18,52 @@
             android:scrollbars="vertical"
             tools:text="Some\nmultiline\ntext\nwith\nmany\nlines" />
 
-    <RelativeLayout
+    <LinearLayout
             android:id="@+id/brief_main"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:orientation="vertical"
             android:paddingLeft="@dimen/lhuna_space_l"
-            android:paddingTop="@dimen/spacing_half"
-            android:paddingRight="@dimen/spacing_half">
+            android:paddingRight="@dimen/spacing_half"
+            android:paddingBottom="@dimen/spacing_half"
+            android:visibility="gone"
+            tools:visibility="visible">
 
-        <ImageView
-                android:id="@+id/brief_track_menu"
-                style="@style/Button.Icon"
-                android:layout_alignParentTop="true"
-                android:layout_alignParentRight="true"
-                android:contentDescription="@string/track_actions"
-                android:src="@drawable/ic_track_menu" />
-
-        <ImageButton
-                android:id="@+id/brief_details_toggle"
-                style="@style/Button.Icon.Toggled"
-                android:layout_alignParentTop="true"
-                android:layout_toLeftOf="@id/brief_track_menu"
-                android:contentDescription="@string/track_details"
-                android:src="@drawable/ic_menu_info" />
-
-        <TextView
-                android:id="@+id/brief_title"
+        <!-- Tap on title collapses the block back -->
+        <LinearLayout
+                android:id="@+id/brief_header"
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/lhuna_touch_target"
-                android:layout_alignParentLeft="true"
-                android:layout_alignParentTop="true"
-                android:layout_marginRight="@dimen/spacing_half"
-                android:layout_toLeftOf="@id/brief_details_toggle"
-                android:ellipsize="end"
+                android:background="?selectableItemBackground"
                 android:gravity="center_vertical"
-                android:maxLines="1"
-                android:textAppearance="@style/TextAppearance.Lhuna.Display"
-                app:autoSizeMaxTextSize="28sp"
-                app:autoSizeMinTextSize="20sp"
-                app:autoSizeStepGranularity="1sp"
-                app:autoSizeTextType="uniform"
-                tools:text="@tools:sample/lorem/random" />
+                android:orientation="horizontal">
+
+            <TextView
+                    android:id="@+id/brief_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="@style/TextAppearance.Lhuna.Headline"
+                    android:textStyle="bold"
+                    tools:text="@tools:sample/lorem/random" />
+
+            <ImageButton
+                    android:id="@+id/brief_details_toggle"
+                    style="@style/Button.Icon.Toggled"
+                    android:contentDescription="@string/track_details"
+                    android:src="@drawable/ic_menu_info" />
+        </LinearLayout>
 
         <TextView
                 android:id="@+id/brief_subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/brief_title"
-                android:layout_alignParentLeft="true"
                 android:layout_marginRight="@dimen/lhuna_space_m"
                 android:ellipsize="end"
                 android:singleLine="true"
-                android:textAppearance="@style/TextAppearance.Lhuna.Subtitle"
+                android:textAppearance="@style/TextAppearance.Lhuna.Body.Secondary"
                 android:visibility="gone"
                 tools:text="@tools:sample/full_names"
                 tools:visibility="visible" />
@@ -77,39 +72,51 @@
                 android:id="@+id/brief_chips"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_below="@id/brief_subtitle"
-                android:layout_marginTop="@dimen/spacing_full"
                 android:layout_marginRight="@dimen/lhuna_space_m"
                 android:orientation="horizontal">
 
             <TextView
                     android:id="@+id/brief_chip_family"
-                    style="@style/Lhuna.Chip"
+                    style="@style/Lhuna.Chip.Small"
                     android:visibility="gone"
                     tools:text="SID"
                     tools:visibility="visible" />
 
             <TextView
                     android:id="@+id/brief_chip_format"
-                    style="@style/Lhuna.Chip"
+                    style="@style/Lhuna.Chip.Small"
                     android:visibility="gone"
                     tools:text="PT3"
                     tools:visibility="visible" />
 
             <TextView
                     android:id="@+id/brief_chip_track"
-                    style="@style/Lhuna.Chip"
+                    style="@style/Lhuna.Chip.Small"
                     android:visibility="gone"
                     tools:text="#2"
                     tools:visibility="visible" />
 
             <TextView
                     android:id="@+id/brief_chip_program"
-                    style="@style/Lhuna.Chip"
+                    style="@style/Lhuna.Chip.Small"
                     android:layout_marginRight="0dp"
                     android:visibility="gone"
                     tools:text="Vortex Tracker II"
                     tools:visibility="visible" />
         </LinearLayout>
-    </RelativeLayout>
+
+        <!-- Stream format or chips emulation, original driver, engine, timing -->
+        <TextView
+                android:id="@+id/brief_info"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/spacing_half"
+                android:layout_marginRight="@dimen/lhuna_space_m"
+                android:fontFamily="monospace"
+                android:textColor="@color/lhuna_text_2"
+                android:textSize="11sp"
+                android:visibility="gone"
+                tools:text="PAL, MOS6581, reSIDfp, resample · out 48 kHz\nOriginal driver: CheeseCutter 2.x\nRunning on NebulaWeave3"
+                tools:visibility="visible" />
+    </LinearLayout>
 </LinearLayout>

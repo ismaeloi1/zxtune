@@ -125,6 +125,7 @@ namespace Module::Wav
                                const Formats::Chiptune::Wav::Guid& formatId, Binary::View restData) override
     {
       FormatId = formatId;
+      ValidBits = validBitsOrBlockSize;
       WavProperties.BlockSizeSamples = validBitsOrBlockSize;
       ExtraData.resize(restData.Size());
       std::memcpy(ExtraData.data(), restData.Start(), restData.Size());
@@ -147,6 +148,55 @@ namespace Module::Wav
     }
 
     Model::Ptr GetResult()
+    {
+      auto result = CreateModel();
+      if (result)
+      {
+        SetStreamProperties(*result);
+      }
+      return result;
+    }
+
+  private:
+    void SetStreamProperties(const Model& model) const
+    {
+      using namespace Formats::Chiptune::Wav;
+      const auto isExtended = FormatCode == Format::EXTENDED;
+      const auto isInteger = FormatCode == Format::PCM || (isExtended && FormatId == EXTENSIBLE_PCM);
+      const auto isFloat = FormatCode == Format::IEEE_FLOAT || (isExtended && FormatId == EXTENSIBLE_IEEE_FLOAT);
+      if (isInteger || isFloat)
+      {
+        // extensible format stores valid bits, e.g. 20 or 24 in 32-bit containers
+        const auto bits = isExtended && ValidBits ? ValidBits : WavProperties.Bits;
+        // bitrate is defined by the format itself
+        Properties.SetStreamFormat(isFloat ? "PCM float"sv : "PCM"sv, WavProperties.Frequency, WavProperties.Channels,
+                                   bits);
+      }
+      else
+      {
+        Properties.SetStreamFormat(GetCodecName(), WavProperties.Frequency, WavProperties.Channels);
+        Properties.SetBitrate(WavProperties.Data->Size(),
+                              Time::Milliseconds::FromRatio(model.GetTotalSamples(), model.GetSamplerate()));
+      }
+    }
+
+    StringView GetCodecName() const
+    {
+      using namespace Formats::Chiptune::Wav;
+      switch (FormatCode)
+      {
+      case Format::ADPCM:
+        return "MS ADPCM"sv;
+      case Format::IMA_ADPCM:
+        return "IMA ADPCM"sv;
+      case Format::ATRAC3:
+        return "ATRAC3"sv;
+      default:
+        return FormatId == ATRAC3PLUS ? "ATRAC3plus"sv : (FormatId == ATRAC9 ? "ATRAC9"sv : ""sv);
+      }
+    }
+
+    Model::Ptr CreateModel()
     {
       if (!WavProperties.Data)
       {
@@ -200,11 +250,11 @@ namespace Module::Wav
       }
     }
 
-  private:
     PropertiesHelper& Properties;
     MetaProperties Meta;
     uint_t FormatCode = ~0;
     Formats::Chiptune::Wav::Guid FormatId;
+    uint_t ValidBits = 0;
     Wav::Properties WavProperties;
     Binary::Dump ExtraData;
   };

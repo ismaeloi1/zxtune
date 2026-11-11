@@ -14,4 +14,6 @@
     <string name="playback_repeat">Repetir faixa</string>
     <string name="track_actions">Ações da faixa</string>
     <string name="track_details">Detalhes da faixa</string>
+    <string name="track_information_show">Mostrar informações da faixa</string>
+    <string name="track_information_hide">Ocultar informações da faixa</string>
 </resources>

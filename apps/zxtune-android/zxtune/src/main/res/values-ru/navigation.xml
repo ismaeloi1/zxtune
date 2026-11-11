@@ -14,4 +14,6 @@
     <string name="playback_repeat">Повтор трека</string>
     <string name="track_actions">Действия с треком</string>
     <string name="track_details">Сведения о треке</string>
+    <string name="track_information_show">Показать информацию о треке</string>
+    <string name="track_information_hide">Скрыть информацию о треке</string>
 </resources>

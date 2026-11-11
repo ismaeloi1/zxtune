@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Track information dialog fields -->
+    <string name="information_format">Format</string>
+    <string name="information_codec">Codec</string>
+    <string name="information_samplerate">Sample rate</string>
+    <string name="information_sample_bits">Bit depth</string>
+    <string name="information_channels">Channels</string>
+    <string name="information_bitrate">Bitrate</string>
+    <string name="information_playback">Playback</string>
+    <!-- Compact stream line of now playing information, e.g. "FLAC · 44.1 kHz · 16 bit · stereo" -->
+    <string name="info_channels_mono">mono</string>
+    <string name="info_channels_stereo">stereo</string>
+    <string name="info_channels_count">%d ch</string>
+    <string name="info_sample_bits">%d bit</string>
+    <string name="info_sample_bits_float">%d bit float</string>
+</resources>

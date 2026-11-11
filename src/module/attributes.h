@@ -54,6 +54,21 @@ namespace Module
   //@}
 
   //@{
+  //! @name Sampled stream attributes, set only by formats with stored sound data
+
+  //! Codec or encoding name, e.g. "FLAC", "Vorbis", "PCM". Floating point PCM ends with "float"
+  constexpr auto ATTR_CODEC = "Codec"sv;
+  //! Stream sample rate in Hz, before resampling to output one
+  constexpr auto ATTR_SAMPLERATE = "Samplerate"sv;
+  //! Bits per stored sample, for PCM and lossless codecs only
+  constexpr auto ATTR_SAMPLE_BITS = "SampleBits"sv;
+  //! Stream channels count
+  constexpr auto ATTR_CHANNELS = "Channels"sv;
+  //! Average bitrate of compressed stream in bits per second
+  constexpr auto ATTR_BITRATE = "Bitrate"sv;
+  //@}
+
+  //@{
   //! @name Storage-related attributes
 
   //! Raw module data crc32 checksum

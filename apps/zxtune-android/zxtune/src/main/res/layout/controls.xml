@@ -1,16 +1,23 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<!-- Transport in the thumb zone: big accent play, skips around it, modes at the edges -->
+<!-- Single transport row: accent play in the middle, skips around it, modes next to them,
+  collapsible information toggle and track actions at the edges -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingLeft="@dimen/spacing_full"
-        android:paddingTop="@dimen/spacing_half"
-        android:paddingRight="@dimen/spacing_full"
-        android:paddingBottom="@dimen/spacing_full"
+        android:paddingLeft="@dimen/spacing_half"
+        android:paddingRight="@dimen/spacing_half"
         tools:ignore="RtlHardcoded">
+
+    <ImageButton
+            android:id="@+id/controls_information"
+            style="@style/Button.Icon"
+            android:contentDescription="@string/track_information_show"
+            android:src="@drawable/ic_expand" />
+
+    <Space style="@style/Lhuna.TransportGap" />
 
     <ImageButton
             android:id="@+id/controls_sequence_mode"
@@ -18,48 +25,44 @@
             android:contentDescription="@string/playback_shuffle"
             android:src="@drawable/ic_sequence_shuffle" />
 
-    <Space
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+    <Space style="@style/Lhuna.TransportGap" />
 
     <ImageView
             android:id="@+id/controls_prev"
-            style="@style/Button.Transport"
+            style="@style/Button.Transport.Compact"
             android:contentDescription="@string/playback_prev"
             android:src="@drawable/ic_prev" />
 
-    <Space
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+    <Space style="@style/Lhuna.TransportGap" />
 
     <!-- Primary action: the only filled accent element of the screen -->
     <ImageView
             android:id="@+id/controls_play_pause"
-            style="@style/Button.Play.Large"
+            style="@style/Button.Play"
             android:contentDescription="@string/playback_play"
             android:src="@drawable/ic_play" />
 
-    <Space
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+    <Space style="@style/Lhuna.TransportGap" />
 
     <ImageView
             android:id="@+id/controls_next"
-            style="@style/Button.Transport"
+            style="@style/Button.Transport.Compact"
             android:contentDescription="@string/playback_next"
             android:src="@drawable/ic_next" />
 
-    <Space
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+    <Space style="@style/Lhuna.TransportGap" />
 
     <ImageButton
             android:id="@+id/controls_track_mode"
             style="@style/Button.Transport.Toggled"
             android:contentDescription="@string/playback_repeat"
             android:src="@drawable/ic_track_looped" />
+
+    <Space style="@style/Lhuna.TransportGap" />
+
+    <ImageView
+            android:id="@+id/controls_track_menu"
+            style="@style/Button.Icon"
+            android:contentDescription="@string/track_actions"
+            android:src="@drawable/ic_track_menu" />
 </LinearLayout>

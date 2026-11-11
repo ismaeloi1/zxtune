@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
 import androidx.core.animation.ValueAnimator
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import app.zxtune.R
 import app.zxtune.core.Identifier
@@ -19,11 +20,14 @@ import app.zxtune.preferences.Preferences
 import app.zxtune.ui.utils.UiUtils
 import app.zxtune.ui.utils.whenLifecycleStarted
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val MAX_LINES = 8
+private const val STATUS_PERIOD_MS = 1000L
 private const val SHOW_AUTHOR_KEY = "ui.brief.show_author"
 
 class BriefFragment : Fragment() {
@@ -86,7 +90,7 @@ class BriefFragment : Fragment() {
     }
 
     /**
-     * What is playing in short: chip family, format if it says more than family, subtune and program
+     * What is playing in short, in one line: chip family, format if it says more than family, subtune and program
      */
     private class ChipsView(view: View) {
         private val family = view.findViewById<TextView>(R.id.brief_chip_family)
@@ -105,11 +109,13 @@ class BriefFragment : Fragment() {
         }
     }
 
+    private lateinit var main: View
     private lateinit var title: TextView
     private lateinit var subtitle: TextView
     private lateinit var details: DetailsView
     private lateinit var detailsToggle: ImageButton
     private lateinit var chips: ChipsView
+    private lateinit var info: TextView
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -117,11 +123,13 @@ class BriefFragment : Fragment() {
         savedInstanceState: Bundle?
     ) = container?.let {
         inflater.inflate(R.layout.brief, it, false).apply {
+            main = findViewById(R.id.brief_main)
             title = findViewById(R.id.brief_title)
             subtitle = findViewById(R.id.brief_subtitle)
             details = DetailsView(findViewById(R.id.brief_details))
             detailsToggle = findViewById(R.id.brief_details_toggle)
             chips = ChipsView(this)
+            info = findViewById(R.id.brief_info)
             detailsToggle.setOnClickListener {
                 val state = !isActivated
                 isActivated = state
@@ -131,12 +139,39 @@ class BriefFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) = MediaModel.of(requireActivity()).run {
-        val menu = TrackContextMenu(requireActivity(), view.findViewById(R.id.brief_track_menu))
+        val state = NowPlayingInfo
+        view.findViewById<View>(R.id.brief_header).setOnClickListener { state.toggle(it.context) }
         viewLifecycleOwner.whenLifecycleStarted {
+            launch { state.reload(requireContext()) }
             launch {
-                combine(controller, metadata) { ctrl, meta ->
-                    menu.bind(ctrl, meta)
-                }.collect {}
+                state.isExpanded.collect { expanded ->
+                    main.isVisible = expanded == true
+                    if (expanded != true) {
+                        // details are a part of the block
+                        detailsToggle.isActivated = false
+                        details.setVisibility(false)
+                    }
+                }
+            }
+            launch {
+                // status is polled only while visible, it's not free for the playback service
+                combine(state.isExpanded, visualizer, metadata) { expanded, src, meta ->
+                    Triple(expanded == true, src, meta)
+                }.collectLatest { (expanded, src, meta) ->
+                    if (!expanded) {
+                        return@collectLatest
+                    }
+                    fun show(status: String) = TrackInfoLines.build(resources, meta, status).let { lines ->
+                        info.isVisible = lines.isNotEmpty()
+                        info.text = lines.joinToString("\n")
+                    }
+                    // stream format is known without playback status
+                    show("")
+                    while (src != null) {
+                        show(withContext(Dispatchers.IO) { runCatching { src.getStatus() }.getOrDefault("") })
+                        delay(STATUS_PERIOD_MS)
+                    }
+                }
             }
             // re-read on each start, may be changed in preferences
             val showAuthor = withContext(Dispatchers.IO) {

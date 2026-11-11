@@ -40,6 +40,11 @@
                 android:key="ui.oscilloscope.filter_waves"
                 android:summary="@string/pref_oscilloscope_filter_waves_summary"
                 android:title="@string/pref_oscilloscope_filter_waves_title" />
+        <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="ui.oscilloscope.show_stats"
+                android:summary="@string/pref_oscilloscope_show_stats_summary"
+                android:title="@string/pref_oscilloscope_show_stats_title" />
         <DropDownPreference
                 android:defaultValue="@string/pref_oscilloscope_max_fps_default"
                 android:entries="@array/pref_oscilloscope_max_fps_entries"

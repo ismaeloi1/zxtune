@@ -61,4 +61,21 @@ class StatusHeaderTest {
             assert(EngineBrands.BRANDS.containsKey(it)) { it }
         }
     }
+
+    @Test
+    fun statistics() {
+        assertEquals(
+            listOf(false, false, false, true, true, true),
+            listOf(
+                "PAL, MOS6581, reSIDfp, resample",
+                "Original driver: x",
+                "timing: VBI 50 Hz",
+                "scope: 3/3 ch",
+                "output: 48000Hz buffer=160ms",
+                "render: 152% realtime",
+            ).map(StatusHeader::isStatistics),
+        )
+        assertEquals(44100, StatusHeader.outputRateOf("AY\nscope: 3/3\noutput: 44100Hz buffer=160ms\nrender: 1%"))
+        assertEquals(0, StatusHeader.outputRateOf("AY\nrender: 1%"))
+    }
 }

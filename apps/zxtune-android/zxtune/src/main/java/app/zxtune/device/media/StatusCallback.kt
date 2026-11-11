@@ -185,6 +185,11 @@ internal class StatusCallback private constructor(
                     ModuleAttributes.CHANNELS_NAMES,
                     item.module.getProperty(ModuleAttributes.CHANNELS_NAMES, "")
                 )
+                // technical information about the stored stream, displayed in now playing information
+                putNonEmptyString(ModuleAttributes.CODEC, item.module.getProperty(ModuleAttributes.CODEC, ""))
+                for (key in ModuleAttributes.STREAM_NUMBERS) {
+                    item.module.getProperty(key, 0L).takeIf { it > 0 }?.let { putLong(key, it) }
+                }
                 // scrubber marks the looped part only if there's an intro before it
                 item.module.run { duration.toMilliseconds() to loopDuration.toMilliseconds() }
                     .let { (total, loop) ->

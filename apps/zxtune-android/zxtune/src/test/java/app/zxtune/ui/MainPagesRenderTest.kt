@@ -25,6 +25,8 @@ import app.zxtune.TimeStamp
 import app.zxtune.core.Identifier
 import app.zxtune.core.ModuleAttributes
 import app.zxtune.device.media.MediaModel
+import app.zxtune.playback.Visualizer
+import app.zxtune.playback.stubs.VisualizerStub
 import app.zxtune.playlist.ProviderClient
 import app.zxtune.ui.browser.BreadcrumbsEntry
 import app.zxtune.ui.browser.ListingEntry
@@ -66,9 +68,16 @@ class MainPagesRenderTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val constructions = ArrayList<MockedConstruction<*>>()
     private val browserState = MutableStateFlow(BrowserModel.State())
+    private val currentMetadata = MutableStateFlow(metadata())
+    private var status = AY_STATUS
+    private val visualizer = object : Visualizer by VisualizerStub {
+        override fun getStatus() = status
+    }
 
     @Before
     fun setUp() {
+        // process-wide state outlives activities, collapsed by default
+        NowPlayingInfo.reset()
         // no playback service in tests
         shadowOf(app).declareComponentUnbindable(ComponentName(app, MainService::class.java))
         val session = MediaSessionCompat(app, "test").apply {
@@ -78,8 +87,8 @@ class MainPagesRenderTest {
         constructions += construct<MediaModel> {
             on { controller } doReturn flowOf(mediaController)
             on { playbackState } doReturn MutableStateFlow(playbackState())
-            on { metadata } doReturn MutableStateFlow(metadata())
-            on { visualizer } doReturn flowOf(null)
+            on { metadata } doReturn currentMetadata
+            on { visualizer } doReturn flowOf(visualizer)
             on { playbackPosition } doReturn flowOf(POSITION)
             on { coverArt } doReturn MutableSharedFlow()
         }
@@ -110,10 +119,67 @@ class MainPagesRenderTest {
         setLocale(locale)
         browserState.value = BrowserModel.State().withContent(emptyList(), sources())
         render(locale, "now-playing", 0)
+        render(locale, "now-playing-info", 0, expanded = true)
+        currentMetadata.value = flacMetadata()
+        status = FLAC_STATUS
+        render(locale, "now-playing-info-flac", 0, expanded = true)
+        currentMetadata.value = metadata()
+        status = AY_STATUS
         render(locale, "playlist", 1)
         render(locale, "browser-sources", 2)
         browserState.value = BrowserModel.State().withContent(hvscPath(), hvscFolder())
         render(locale, "browser-folder", 2)
+    }
+
+    /**
+     * Visualizer gets back at least the height it had before the redesign while information is collapsed (default)
+     */
+    @Test
+    fun compactNowPlaying() {
+        val scenario = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = scenario.get()
+        // collapsed by default
+        assertEquals(false, waitInfoLoaded())
+        shadowOf(Looper.getMainLooper()).idle()
+        val density = activity.resources.displayMetrics.density
+        val visualizer = activity.findViewById<View>(R.id.visualizer)
+        assertEquals(false, activity.findViewById<View>(R.id.brief_main).isShown)
+        assertTrue("${visualizer.height / density}dp", visualizer.height / density >= OLD_VISUALIZER_HEIGHT_DP)
+        // every control of the bottom part has 48dp touch target
+        for (id in listOf(
+            R.id.controls_information,
+            R.id.controls_sequence_mode,
+            R.id.controls_prev,
+            R.id.controls_play_pause,
+            R.id.controls_next,
+            R.id.controls_track_mode,
+            R.id.controls_track_menu,
+            R.id.position_seek,
+        )) {
+            val view = activity.findViewById<View>(id)
+            assertTrue("$id", view.height >= 48 * density - 1 && view.width >= 48 * density - 1)
+        }
+        val bar = activity.findViewById<ViewGroup>(R.id.navigation_bar)
+        assertEquals(48 * density, bar.height.toFloat(), 1f)
+        // expanded on demand
+        setInfoExpanded(activity, true)
+        // and back, the state is persistent
+        setInfoExpanded(activity, false)
+        scenario.pause().stop().destroy()
+    }
+
+    @Test
+    @Config(qualifiers = "w915dp-h411dp-land-xxhdpi")
+    fun phoneLandscape() {
+        render("en", "landscape-now-playing", 0)
+        render("fr", "landscape-now-playing-info", 0, expanded = true)
+        val scenario = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = scenario.get()
+        setInfoExpanded(activity, false)
+        val density = activity.resources.displayMetrics.density
+        val visualizer = activity.findViewById<View>(R.id.visualizer)
+        assertTrue("${visualizer.height / density}dp", visualizer.height / density >= OLD_LANDSCAPE_VISUALIZER_HEIGHT_DP)
+        scenario.pause().stop().destroy()
     }
 
     @Test
@@ -165,19 +231,21 @@ class MainPagesRenderTest {
     @Config(qualifiers = "w1280dp-h800dp-land-xhdpi")
     fun tabletLandscape() {
         browserState.value = BrowserModel.State().withContent(emptyList(), sources())
+        render("fr", "tablet-info", 0, expanded = true)
         render("en", "tablet-playlist", 0)
         render("en", "tablet-browser", 1)
     }
 
     private fun setLocale(locale: String) = RuntimeEnvironment.setQualifiers(if (locale == "en") "+en-rUS" else "+$locale")
 
-    private fun render(locale: String, name: String, page: Int) {
+    private fun render(locale: String, name: String, page: Int, expanded: Boolean = false) {
         setLocale(locale)
         val scenario = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = scenario.get()
         val pager = activity.findViewById<ViewPager>(R.id.view_pager)
         pager.setCurrentItem(page, false)
         shadowOf(Looper.getMainLooper()).idle()
+        setInfoExpanded(activity, expanded)
         val root = activity.window.decorView
         root.measure(
             View.MeasureSpec.makeMeasureSpec(root.width, View.MeasureSpec.EXACTLY),
@@ -187,6 +255,7 @@ class MainPagesRenderTest {
         shadowOf(Looper.getMainLooper()).idle()
         assertEquals(page, pager.currentItem)
         assertTrue(root.width > 0)
+        dumpGeometry(activity, "$name-$locale")
         System.getenv("ZXTUNE_SCREENSHOTS")?.let { dir ->
             val bitmap = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
             root.draw(Canvas(bitmap))
@@ -195,7 +264,47 @@ class MainPagesRenderTest {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
             }
         }
+        // the state is persistent
+        setInfoExpanded(activity, false)
         scenario.pause().stop().destroy()
+    }
+
+    // stored state is read in background
+    private fun waitInfoLoaded(): Boolean {
+        repeat(200) {
+            shadowOf(Looper.getMainLooper()).idle()
+            NowPlayingInfo.isExpanded.value?.let { return it }
+            Thread.sleep(10)
+        }
+        throw AssertionError("information state is not loaded")
+    }
+
+    private fun setInfoExpanded(activity: MainActivity, expanded: Boolean) {
+        if (waitInfoLoaded() != expanded) {
+            assertTrue(activity.findViewById<View>(R.id.controls_information).performClick())
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        assertEquals(expanded, activity.findViewById<View>(R.id.brief_main).isShown)
+    }
+
+    private fun dumpGeometry(activity: MainActivity, name: String) {
+        val density = activity.resources.displayMetrics.density
+        val ids = listOf(
+            "visualizer" to R.id.visualizer,
+            "information" to R.id.information,
+            "seek" to R.id.seek_controls,
+            "controls" to R.id.playback_controls,
+            "mini" to R.id.mini_player,
+            "nav" to R.id.navigation_bar,
+            "toolbar" to R.id.main_top_panel,
+        )
+        val parts = ids.mapNotNull { (n, id) ->
+            activity.findViewById<View>(id)?.takeIf { it.isShown }?.let { v ->
+                val loc = IntArray(2).also { v.getLocationInWindow(it) }
+                "$n=${loc[1]}+${v.height}px(${(v.height / density).toInt()}dp)"
+            }
+        }
+        println("GEOMETRY $name ${parts.joinToString(" ")}")
     }
 
     private fun playbackState() = PlaybackStateCompat.Builder()
@@ -213,6 +322,20 @@ class MainPagesRenderTest {
         .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, ProviderClient.createUri(3).toString())
         .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, 324_000)
         .putLong("app.zxtune.metadata.LOOP_START", 48_000)
+        .build()
+
+    private fun flacMetadata() = MediaMetadataCompat.Builder()
+        .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, "Kokuu no Kiseki (Ys Origin OST)")
+        .putString(MediaMetadataCompat.METADATA_KEY_TITLE, "Kokuu no Kiseki (Ys Origin OST)")
+        .putString(ModuleAttributes.TYPE, "FLAC")
+        .putString(ModuleAttributes.CODEC, "FLAC")
+        .putLong(ModuleAttributes.SAMPLERATE, 44100)
+        .putLong(ModuleAttributes.SAMPLE_BITS, 16)
+        .putLong(ModuleAttributes.CHANNELS, 2)
+        .putLong(ModuleAttributes.BITRATE, 912_345)
+        .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI, "file:///music/ys_origin.flac")
+        .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, ProviderClient.createUri(4).toString())
+        .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, 201_000)
         .build()
 
     private fun playlist() = listOf(
@@ -287,5 +410,26 @@ class MainPagesRenderTest {
     companion object {
         private val LOCALES = listOf("en", "fr", "de", "ru")
         private val POSITION = TimeStamp.fromSeconds(67)
+
+        // measured before the redesign (6d543c5c, the same now playing layouts as 0469cac2^) with pager tabs 32,
+        // toolbar 44, title 40, scrubber 61.7, transport 56: 681.3dp on 411x915dp phone, 177.3dp on 915x411dp
+        private const val OLD_VISUALIZER_HEIGHT_DP = 681
+        private const val OLD_LANDSCAPE_VISUALIZER_HEIGHT_DP = 177
+
+        private val AY_STATUS = """
+            AY-3-8910 1.77MHz, 50Hz
+            Original driver: Tim Follin player (in-game)
+            Running on NebulaWeaveAY
+            scope: 3/3 ch, trigger 120us
+            output: 48000Hz buffer=160ms sync=timestamp
+            render: 640% realtime
+        """.trimIndent()
+
+        private val FLAC_STATUS = """
+            Original driver: unknown
+            Running on libFLAC
+            output: 48000Hz buffer=160ms sync=timestamp
+            render: 2400% realtime
+        """.trimIndent()
     }
 }

@@ -55,6 +55,11 @@ namespace Module
     // Use "${prefix} ${idx + 1}" format
     void SetChannels(StringView prefix, uint_t count);
 
+    // Sampled stream, zero values are not stored
+    void SetStreamFormat(StringView codec, uint_t samplerate, uint_t channels, uint_t bits = 0);
+    // Average over the whole stream, so container overhead is included
+    void SetBitrate(uint64_t bytes, Time::Milliseconds duration);
+
     // Sound
     void SetFadein(Time::Milliseconds fadein);
     void SetFadeout(Time::Milliseconds fadeout);

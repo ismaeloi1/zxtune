@@ -48,7 +48,7 @@
         <LinearLayout
                 android:id="@+id/navigation_bar"
                 android:layout_width="match_parent"
-                android:layout_height="@dimen/lhuna_nav_height"
+                android:layout_height="@dimen/lhuna_compact_nav_height"
                 android:background="@color/lhuna_surface_1"
                 android:orientation="horizontal">
 

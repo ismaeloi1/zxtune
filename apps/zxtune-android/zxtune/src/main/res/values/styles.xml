@@ -549,4 +549,29 @@
         <item name="android:layout_height">@dimen/lhuna_touch_target</item>
         <item name="android:minWidth">@dimen/lhuna_touch_target</item>
     </style>
+
+    <!-- compact layout -->
+    <!-- One line chips of collapsible now playing information -->
+    <style name="Lhuna.Chip.Small">
+        <item name="android:layout_height">@dimen/lhuna_compact_info_chip_height</item>
+        <item name="android:paddingLeft">@dimen/lhuna_space_s</item>
+        <item name="android:paddingRight">@dimen/lhuna_space_s</item>
+        <item name="android:layout_marginRight">@dimen/spacing_half</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:textSize">12sp</item>
+    </style>
+
+    <!-- Single transport row: every button is 48dp touch target -->
+    <style name="Button.Transport.Compact">
+        <item name="android:layout_width">@dimen/lhuna_touch_target</item>
+        <item name="android:layout_height">@dimen/lhuna_touch_target</item>
+        <item name="android:padding">@dimen/lhuna_compact_transport_icon_padding</item>
+    </style>
+
+    <!-- Equal free space between transport buttons -->
+    <style name="Lhuna.TransportGap" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">0dp</item>
+        <item name="android:layout_weight">1</item>
+    </style>
 </resources>
