@@ -172,7 +172,210 @@ namespace Parameters::ZXTune::Core
     //! Parameter name
     const auto CLOCKRATE = PREFIX + "clockrate"_id;
     //@}
-  }  // namespace FM
+
+    //! Yamaha FM chips of external players (VGM/S98 via libvgm), grouped by family. Applied while playing:
+    //! emulation changes restart the chips at the same position, output stage changes are applied in place.
+    //! Platform presets set the chip variant and the analog output stage of a real board, see
+    //! src/module/players/external/fm_output.cpp for references. Custom values are used with PRESET_CUSTOM only.
+    //! Output stage of the first family found in a tune (in the order below) is applied to the whole tune's output,
+    //! as the chips of a board share it (e.g. YM2612 and PSG of Mega Drive).
+
+    //@{
+    //! @name Output stage parameters common for all the families
+    //! Platform preset to use custom values
+    const IntType PRESET_CUSTOM = 0;
+    //! Low-pass filter cutoff in Hz, 0 to disable
+    const IntType LOWPASS_MIN = 0;
+    const IntType LOWPASS_MAX = 24000;
+    //! Low-pass filter order: 1 (6dB/oct, RC) or 2 (12dB/oct, Butterworth)
+    const IntType LOWPASS_ORDER_MIN = 1;
+    const IntType LOWPASS_ORDER_MAX = 2;
+    //! High-pass (output coupling capacitor) cutoff in Hz, 0 to keep DC bias of chip output
+    const IntType HIGHPASS_MIN = 0;
+    const IntType HIGHPASS_MAX = 200;
+    //! Stereo separation in percents: 0 - mono, 100 - as emulated
+    const IntType STEREO_MIN = 0;
+    const IntType STEREO_MAX = 100;
+    //@}
+
+    //! @brief YM2612/YM3438/YMF276 (OPN2): Mega Drive/Genesis, FM Towns
+    namespace OPN2
+    {
+      const auto PREFIX = FM::PREFIX + "opn2"_id;
+
+      //@{
+      //! @name Emulation core
+      const IntType CORE_NUKED = 0;
+      const IntType CORE_YMFM = 1;
+      const IntType CORE_GPGX = 2;
+      const IntType CORE_DEFAULT = CORE_NUKED;
+      const auto CORE = PREFIX + "core"_id;
+      //@}
+
+      //@{
+      //! @name Platform preset
+      const IntType PRESET_MEGADRIVE1 = 1;
+      const IntType PRESET_MEGADRIVE1_VA7 = 2;
+      const IntType PRESET_MEGADRIVE2 = 3;
+      const IntType PRESET_GENESIS3 = 4;
+      const IntType PRESET_YM3438 = 5;
+      const IntType PRESET_YMF276 = 6;
+      const IntType PRESET_DEFAULT = PRESET_MEGADRIVE1;
+      const auto PRESET = PREFIX + "preset"_id;
+      //@}
+
+      //@{
+      //! @name Custom preset
+      //! Chip variant, YM3438 is used anyway if tune requires it. Nuked and ymfm cores only
+      const IntType CHIP_YM2612 = 0;
+      const IntType CHIP_YM3438 = 1;
+      const IntType CHIP_YMF276 = 2;
+      const IntType CHIP_DEFAULT = CHIP_YM2612;
+      const auto CHIP = PREFIX + "chip"_id;
+      //! YM2612 DAC crossover distortion (ladder effect), 0/1. Nuked and ymfm cores only
+      const IntType LADDER_DEFAULT = 1;
+      const auto LADDER = PREFIX + "ladder"_id;
+      const IntType LOWPASS_DEFAULT = 3390;
+      const auto LOWPASS = PREFIX + "lowpass"_id;
+      const IntType LOWPASS_ORDER_DEFAULT = 1;
+      const auto LOWPASS_ORDER = PREFIX + "lowpass_order"_id;
+      const IntType HIGHPASS_DEFAULT = 5;
+      const auto HIGHPASS = PREFIX + "highpass"_id;
+      const IntType STEREO_DEFAULT = 100;
+      const auto STEREO = PREFIX + "stereo"_id;
+      //@}
+    }  // namespace OPN2
+
+    //! @brief YM2151 (OPM): arcade boards, Sharp X68000/X1
+    namespace OPM
+    {
+      const auto PREFIX = FM::PREFIX + "opm"_id;
+
+      //@{
+      //! @name Emulation core
+      const IntType CORE_NUKED = 0;
+      const IntType CORE_YMFM = 1;
+      const IntType CORE_MAME = 2;
+      const IntType CORE_DEFAULT = CORE_YMFM;
+      const auto CORE = PREFIX + "core"_id;
+      //@}
+
+      //@{
+      //! @name Platform preset
+      const IntType PRESET_YM3012 = 1;
+      const IntType PRESET_YM3014 = 2;
+      const IntType PRESET_DEFAULT = PRESET_YM3012;
+      const auto PRESET = PREFIX + "preset"_id;
+      //@}
+
+      //@{
+      //! @name Custom preset
+      const IntType LOWPASS_DEFAULT = 0;
+      const auto LOWPASS = PREFIX + "lowpass"_id;
+      const IntType LOWPASS_ORDER_DEFAULT = 2;
+      const auto LOWPASS_ORDER = PREFIX + "lowpass_order"_id;
+      const IntType HIGHPASS_DEFAULT = 0;
+      const auto HIGHPASS = PREFIX + "highpass"_id;
+      const IntType STEREO_DEFAULT = 100;
+      const auto STEREO = PREFIX + "stereo"_id;
+      //@}
+    }  // namespace OPM
+
+    //! @brief YM2203/YM2608/YM2610 (OPN/OPNA/OPNB): NEC PC-88/PC-98, Neo Geo, arcade boards
+    namespace OPN
+    {
+      const auto PREFIX = FM::PREFIX + "opn"_id;
+
+      //@{
+      //! @name Emulation core
+      const IntType CORE_YMFM = 0;
+      const IntType CORE_MAME = 1;
+      const IntType CORE_DEFAULT = CORE_YMFM;
+      const auto CORE = PREFIX + "core"_id;
+      //@}
+
+      //@{
+      //! @name Platform preset
+      const IntType PRESET_PC88_98 = 1;
+      const IntType PRESET_DEFAULT = PRESET_PC88_98;
+      const auto PRESET = PREFIX + "preset"_id;
+      //@}
+
+      //@{
+      //! @name Custom preset
+      const IntType LOWPASS_DEFAULT = 0;
+      const auto LOWPASS = PREFIX + "lowpass"_id;
+      const IntType LOWPASS_ORDER_DEFAULT = 2;
+      const auto LOWPASS_ORDER = PREFIX + "lowpass_order"_id;
+      const IntType HIGHPASS_DEFAULT = 0;
+      const auto HIGHPASS = PREFIX + "highpass"_id;
+      const IntType STEREO_DEFAULT = 100;
+      const auto STEREO = PREFIX + "stereo"_id;
+      //@}
+    }  // namespace OPN
+
+    //! @brief YM3526/Y8950/YM3812/YMF262 (OPL/OPL2/OPL3): AdLib and Sound Blaster cards, arcade boards, MSX
+    namespace OPL
+    {
+      const auto PREFIX = FM::PREFIX + "opl"_id;
+
+      //@{
+      //! @name Emulation core of YM3812 and YMF262 (also FM part of YMF278B), others are emulated by MAME only
+      const IntType CORE_NUKED = 0;
+      const IntType CORE_ADLIBEMU = 1;
+      const IntType CORE_MAME = 2;
+      const IntType CORE_DEFAULT = CORE_NUKED;
+      const auto CORE = PREFIX + "core"_id;
+      //@}
+
+      //@{
+      //! @name Card preset
+      const IntType PRESET_ADLIB = 1;
+      const IntType PRESET_SB2 = 2;
+      const IntType PRESET_SBPRO2 = 3;
+      const IntType PRESET_SB16 = 4;
+      const IntType PRESET_DEFAULT = PRESET_SB16;
+      const auto PRESET = PREFIX + "preset"_id;
+      //@}
+
+      //@{
+      //! @name Custom preset
+      const IntType LOWPASS_DEFAULT = 0;
+      const auto LOWPASS = PREFIX + "lowpass"_id;
+      const IntType LOWPASS_ORDER_DEFAULT = 1;
+      const auto LOWPASS_ORDER = PREFIX + "lowpass_order"_id;
+      const IntType HIGHPASS_DEFAULT = 0;
+      const auto HIGHPASS = PREFIX + "highpass"_id;
+      const IntType STEREO_DEFAULT = 100;
+      const auto STEREO = PREFIX + "stereo"_id;
+      //@}
+    }  // namespace OPL
+
+    //! @brief YM2413 (OPLL), VRC7: Sega Master System, MSX, Famicom
+    namespace OPLL
+    {
+      const auto PREFIX = FM::PREFIX + "opll"_id;
+
+      //@{
+      //! @name Emulation core
+      const IntType CORE_NUKED = 0;
+      const IntType CORE_EMU2413 = 1;
+      const IntType CORE_MAME = 2;
+      const IntType CORE_DEFAULT = CORE_NUKED;
+      const auto CORE = PREFIX + "core"_id;
+      //@}
+
+      //@{
+      //! @name Output stage, mono chip so no stereo setting
+      const IntType LOWPASS_DEFAULT = 0;
+      const auto LOWPASS = PREFIX + "lowpass"_id;
+      const IntType LOWPASS_ORDER_DEFAULT = 2;
+      const auto LOWPASS_ORDER = PREFIX + "lowpass_order"_id;
+      const IntType HIGHPASS_DEFAULT = 0;
+      const auto HIGHPASS = PREFIX + "highpass"_id;
+      //@}
+    }  // namespace OPLL
+  }    // namespace FM
 
   //! @brief SAA-related parameters namespace
   namespace SAA

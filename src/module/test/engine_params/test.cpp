@@ -171,6 +171,8 @@ int main(int argc, char** argv)
   const char* const SAA = "SAA1099/cop/axel.cop";
   const char* const TFM = "YM2203/tfe/disco.tfe";
   const char* const DAC = "DAC/ZX/chi/balala.chi";
+  const char* const MD = "Multi/vgm/EarthwormJim.vgm";
+  namespace OPN2 = Core::FM::OPN2;
   const std::vector<Case> cases = {
       {PT3, "aym.clockrate", Core::AYM::CLOCKRATE, 1750000, 1000000, {}},
       {PT3, "aym.type", Core::AYM::TYPE, 0, 1, {}},
@@ -186,6 +188,10 @@ int main(int argc, char** argv)
       {SAA, "saa.interpolation", Core::SAA::INTERPOLATION, 0, 2, {}},
       {TFM, "fm.clockrate", Core::FM::CLOCKRATE, 3500000, 1750000, {}},
       {DAC, "dac.interpolation", Core::DAC::INTERPOLATION, 0, 1, {}},
+      {MD, "fm.opn2.core", OPN2::CORE, OPN2::CORE_NUKED, OPN2::CORE_GPGX, {}},
+      {MD, "fm.opn2.preset", OPN2::PRESET, OPN2::PRESET_MEGADRIVE1, OPN2::PRESET_YM3438, {}},
+      {MD, "fm.opn2.ladder", OPN2::LADDER, 1, 0, {{OPN2::PRESET, Core::FM::PRESET_CUSTOM}, {OPN2::LOWPASS, 0}}},
+      {MD, "fm.opn2.lowpass", OPN2::LOWPASS, 0, 2000, {{OPN2::PRESET, Core::FM::PRESET_CUSTOM}}},
       {PT3, "sound.gain", SoundParams::GAIN, 100, 30, {}, true},
       {PT3, "sound.fadeout", SoundParams::FADEOUT, 0, 3, {}, true, true},
   };

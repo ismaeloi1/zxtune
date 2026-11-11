@@ -13,6 +13,7 @@
 #include "formats/chiptune/multidevice/sound98.h"
 #include "formats/chiptune/multidevice/videogamemusic.h"
 #include "module/players/duration.h"
+#include "module/players/external/fm_output.h"
 #include "module/players/external/videogamemusic.h"
 #include "module/players/properties_helper.h"
 #include "module/players/properties_meta.h"
@@ -29,7 +30,10 @@
 #include "error_tools.h"
 #include "make_ptr.h"
 
+#include "3rdparty/vgm/emu/EmuCores.h"
+#include "3rdparty/vgm/emu/SoundDevs.h"
 #include "3rdparty/vgm/emu/SoundEmu.h"
+#include "3rdparty/vgm/emu/cores/2612intf.h"
 #include "3rdparty/vgm/player/helper.h"
 #include "3rdparty/vgm/player/playera.hpp"
 #include "3rdparty/vgm/player/s98player.hpp"
@@ -38,7 +42,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <map>
+#include <optional>
 
 namespace Module::LibVGM
 {
@@ -217,6 +223,10 @@ namespace Module::LibVGM
         {
           addDevice(dev.devLink[lidx], dev.id, static_cast<int>(lidx));
         }
+        if (const auto family = GetFamily(dev.type); family && (!Family || *family < *Family))
+        {
+          Family = family;
+        }
       }
     }
 
@@ -283,9 +293,42 @@ namespace Module::LibVGM
       return TotalChannels;
     }
 
+    //! FM chips family which analog output stage is applied to tune
+    std::optional<FmOutput::Family> GetOutputFamily() const
+    {
+      return Family;
+    }
+
+  private:
+    static std::optional<FmOutput::Family> GetFamily(DEV_ID type)
+    {
+      switch (type)
+      {
+      case DEVID_YM2612:
+        return FmOutput::Family::OPN2;
+      case DEVID_YM2151:
+        return FmOutput::Family::OPM;
+      case DEVID_YM2203:
+      case DEVID_YM2608:
+      case DEVID_YM2610:
+        return FmOutput::Family::OPN;
+      case DEVID_YM3526:
+      case DEVID_Y8950:
+      case DEVID_YM3812:
+      case DEVID_YMF262:
+      case DEVID_YMF278B:
+        return FmOutput::Family::OPL;
+      case DEVID_YM2413:
+        return FmOutput::Family::OPLL;
+      default:
+        return {};
+      }
+    }
+
   private:
     std::vector<Device> Devices;
     uint_t TotalChannels = 0;
+    std::optional<FmOutput::Family> Family;
   };
 
   const Time::Milliseconds FRAME_DURATION(20);
@@ -305,6 +348,68 @@ namespace Module::LibVGM
       const auto frame_samples = uint_t(uint64_t(FRAME_DURATION.Get()) * samplerate / FRAME_DURATION.PER_SECOND);
       Require(0 == player.SetOutputSettings(samplerate, Sound::Sample::CHANNELS, Sound::Sample::BITS, frame_samples));
     }
+  }
+
+  UINT32 GetCoreId(int_t core, std::initializer_list<UINT32> ids)
+  {
+    return core >= 0 && static_cast<std::size_t>(core) < ids.size() ? *(ids.begin() + core) : 0;
+  }
+
+  //! Should be called after file is loaded, before player start
+  void ApplyEmulation(::PlayerA& player, const FmOutput::Emulation& emu)
+  {
+    namespace P = Parameters::ZXTune::Core::FM;
+    static_assert(P::OPN2::CORE_NUKED == 0 && P::OPN2::CORE_YMFM == 1 && P::OPN2::CORE_GPGX == 2);
+    static_assert(P::OPM::CORE_NUKED == 0 && P::OPM::CORE_YMFM == 1 && P::OPM::CORE_MAME == 2);
+    static_assert(P::OPN::CORE_YMFM == 0 && P::OPN::CORE_MAME == 1);
+    static_assert(P::OPL::CORE_NUKED == 0 && P::OPL::CORE_ADLIBEMU == 1 && P::OPL::CORE_MAME == 2);
+    static_assert(P::OPLL::CORE_NUKED == 0 && P::OPLL::CORE_EMU2413 == 1 && P::OPLL::CORE_MAME == 2);
+    auto* engine = player.GetPlayer();
+    // linked core is used for OPL4 FM part
+    const auto setup = [engine](DEV_ID type, UINT32 core, UINT32 linkedCore, std::optional<UINT32> coreOpts) {
+      for (UINT32 instance = 0; instance < 2; ++instance)
+      {
+        const auto id = PLR_DEV_ID(type, instance);
+        PLR_DEV_OPTS opts;
+        // device is not supported by player (e.g. YM2610 by S98)
+        if (0 != engine->GetDeviceOptions(id, opts))
+        {
+          return;
+        }
+        opts.emuCore[0] = core;
+        opts.emuCore[1] = linkedCore;
+        if (coreOpts)
+        {
+          opts.coreOpts = *coreOpts;
+        }
+        engine->SetDeviceOptions(id, opts);
+      }
+    };
+    // tune's request of YM3438 is applied by VGMPlayer anyway
+    UINT32 opn2Opts = OPT_YM2612_TYPE_OPN2;
+    if (emu.Opn2Chip == P::OPN2::CHIP_YMF276)
+    {
+      opn2Opts = OPT_YM2612_TYPE_OPN2C_ASIC | OPT_YM2612_TYPE_YMF276;
+    }
+    else if (emu.Opn2Chip == P::OPN2::CHIP_YM3438)
+    {
+      opn2Opts = OPT_YM2612_TYPE_OPN2C_ASIC;
+    }
+    else if (!emu.Opn2Ladder)
+    {
+      opn2Opts |= OPT_YM2612_NO_LADDER;
+    }
+    setup(DEVID_YM2612, GetCoreId(emu.Opn2Core, {FCC_NUKE, FCC_YMFM, FCC_GPGX}), 0, opn2Opts);
+    setup(DEVID_YM2151, GetCoreId(emu.OpmCore, {FCC_NUKE, FCC_YMFM, FCC_MAME}), 0, {});
+    const auto opnCore = GetCoreId(emu.OpnCore, {FCC_YMFM, FCC_MAME});
+    setup(DEVID_YM2203, opnCore, 0, {});
+    setup(DEVID_YM2608, opnCore, 0, {});
+    setup(DEVID_YM2610, opnCore, 0, {});
+    const auto oplCore = GetCoreId(emu.OplCore, {FCC_NUKE, FCC_ADLE, FCC_MAME});
+    setup(DEVID_YM3812, oplCore, 0, {});
+    setup(DEVID_YMF262, oplCore, 0, {});
+    setup(DEVID_YMF278B, 0, oplCore, {});
+    setup(DEVID_YM2413, GetCoreId(emu.OpllCore, {FCC_NUKE, FCC_EMU_, FCC_MAME}), 0, {});
   }
 
   static_assert(VoiceState::OPN_FM == DEVVOICE_KIND_OPN_FM && VoiceState::OPN_DAC == DEVVOICE_KIND_OPN_DAC
@@ -365,10 +470,12 @@ namespace Module::LibVGM
   class VoicesTap
   {
   public:
-    VoicesTap(const Model& tune, const ChannelsLayout& layout, uint_t samplerate, VoicesScope::Ptr scope)
+    VoicesTap(const Model& tune, const ChannelsLayout& layout, uint_t samplerate, const FmOutput::Emulation& emu,
+              VoicesScope::Ptr scope)
       : Tune(tune)
       , Layout(layout)
       , Samplerate(samplerate)
+      , Emu(emu)
       , Scope(std::move(scope))
     {}
 
@@ -471,12 +578,22 @@ namespace Module::LibVGM
     {
       Detach();
       const auto pos = main.GetCurPos(PLAYPOS_SAMPLE);
+      // chips are mixed with different volumes (e.g. FM and SSG parts of OPN), loudest native voices are kept as is
+      int maxVolume = 1;
+      for (const auto& src : Sources)
+      {
+        if (const auto* base = src.Native ? FindDevice(main, *src.Device) : nullptr)
+        {
+          maxVolume = std::max(maxVolume, GetVolume(*base));
+        }
+      }
       for (auto& src : Sources)
       {
         if (src.Native)
         {
           const auto* base = FindDevice(main, *src.Device);
           Require(base != nullptr);
+          src.Gain = float(GetVolume(*base)) / maxVolume;
           src.Chip = base->defInf.dataPtr;
           src.StateEvery = std::max<uint_t>(base->defInf.sampleRate / STATES_PER_SECOND, 1);
           src.ClearNative();
@@ -487,7 +604,7 @@ namespace Module::LibVGM
           src.Solos.clear();
           for (uint_t ch = 0; ch < src.Voices; ++ch)
           {
-            src.Solos.emplace_back(new Solo(Tune, Layout, *src.Device, ch, Samplerate));
+            src.Solos.emplace_back(new Solo(Tune, Layout, *src.Device, ch, Samplerate, Emu));
             src.Solos.back()->Seek(pos);
           }
         }
@@ -605,6 +722,11 @@ namespace Module::LibVGM
       return base;
     }
 
+    static int GetVolume(const VGM_BASEDEV& dev)
+    {
+      return (int(dev.resmpl.volumeL) + dev.resmpl.volumeR) / 2;
+    }
+
     static UINT32 GetClock(const std::vector<PLR_DEV_INFO>& infos, const ChannelsLayout::Device& dev)
     {
       for (const auto& info : infos)
@@ -638,12 +760,13 @@ namespace Module::LibVGM
     {
     public:
       Solo(const Model& tune, const ChannelsLayout& layout, const ChannelsLayout::Device& dev, uint_t channel,
-           uint_t samplerate)
+           uint_t samplerate, const FmOutput::Emulation& emu)
         : Loader(*tune.Data)
         , Player(tune.CreatePlayer())
       {
         SetupPlayer(*Player, samplerate);
         Require(0 == Player->LoadFile(Loader.Get()));
+        ApplyEmulation(*Player, emu);
         Player->Start();
         // mute everything except requested channel, disable emulation of unused devices
         auto opts = layout.MakeMuteOptions(~int64_t(0));
@@ -714,6 +837,8 @@ namespace Module::LibVGM
       DEVFUNC_GET_VOICES_STATE GetState = nullptr;
       void* Chip = nullptr;
       bool Seeking = false;
+      // relative mixing volume
+      float Gain = 1;
       // interleaved [count][Voices] samples at chip's native rate
       std::vector<int32_t> NativeSamples;
       // state snapshots taken each StateEvery native samples, interleaved [count][Voices]
@@ -780,7 +905,7 @@ namespace Module::LibVGM
               {
                 sum += NativeSamples[std::size_t(idx) * Voices + voice];
               }
-              dst[voice] = Clamp(static_cast<int32_t>(sum / int64_t(to - from)));
+              dst[voice] = Clamp(static_cast<int32_t>(Gain * sum / int64_t(to - from)));
             }
           }
         }
@@ -823,6 +948,7 @@ namespace Module::LibVGM
     const Model& Tune;
     const ChannelsLayout& Layout;
     const uint_t Samplerate;
+    const FmOutput::Emulation Emu;
     const VoicesScope::Ptr Scope;
     std::vector<Source> Sources;
     uint_t TotalVoices = 0;
@@ -836,18 +962,17 @@ namespace Module::LibVGM
   public:
     using RWPtr = std::shared_ptr<VGMEngine>;
 
-    VGMEngine(Model::Ptr tune, const Information& info, ChannelsLayout::Ptr channels, uint_t samplerate)
+    VGMEngine(Model::Ptr tune, const Information& info, ChannelsLayout::Ptr channels, uint_t samplerate,
+              const FmOutput::Settings& settings)
       : Tune(std::move(tune))
       , Channels(std::move(channels))
       , Samplerate(samplerate)
-      , Loader(*Tune->Data)
-      , Delegate(Tune->CreatePlayer())
+      , Settings(settings)
     {
-      SetupPlayer(*Delegate, samplerate);
-      Require(0 == Delegate->LoadFile(Loader.Get()));
-      Delegate->Start();
+      StartPlayer(Settings.Emu);
       TotalTicks = ToTicks(info.Duration);
       LoopTicks = ToTicks(info.LoopDuration);
+      ApplyOutputStage();
     }
 
     Time::AtMillisecond At() const
@@ -894,8 +1019,24 @@ namespace Module::LibVGM
       {
         Voices->Rendered(static_cast<uint_t>(result.size()));
       }
+      // voices are taken before board's filter, as chips outputs
+      Output.Process(result);
       CheckForWholeLoop();
       return result;
+    }
+
+    void SetSettings(const FmOutput::Settings& settings)
+    {
+      if (settings == Settings)
+      {
+        return;
+      }
+      if (settings.Emu != Settings.Emu)
+      {
+        Restart(settings.Emu);
+      }
+      Settings = settings;
+      ApplyOutputStage();
     }
 
     void Seek(Time::AtMillisecond request)
@@ -920,19 +1061,74 @@ namespace Module::LibVGM
     bool SetVoicesScope(VoicesScope::Ptr scope)
     {
       Voices.reset();
-      if (scope)
-      {
-        auto voices = std::make_unique<VoicesTap>(*Tune, *Channels, Samplerate, std::move(scope));
-        if (!voices->Init(*Delegate))
-        {
-          return false;
-        }
-        Voices = std::move(voices);
-      }
-      return true;
+      Scope.reset();
+      return !scope || InitVoices(std::move(scope), Settings.Emu);
     }
 
   private:
+    bool InitVoices(VoicesScope::Ptr scope, const FmOutput::Emulation& emu)
+    {
+      auto voices = std::make_unique<VoicesTap>(*Tune, *Channels, Samplerate, emu, scope);
+      if (!voices->Init(*Delegate))
+      {
+        return false;
+      }
+      Voices = std::move(voices);
+      Scope = std::move(scope);
+      return true;
+    }
+
+    //! @param pos sample to seek new player to
+    void StartPlayer(const FmOutput::Emulation& emu, UINT32 pos = 0)
+    {
+      auto loader = std::make_unique<LoaderAdapter>(*Tune->Data);
+      auto player = Tune->CreatePlayer();
+      SetupPlayer(*player, Samplerate);
+      Require(0 == player->LoadFile(loader->Get()));
+      ApplyEmulation(*player, emu);
+      player->Start();
+      Require(pos == 0 || 0 == player->Seek(PLAYPOS_SAMPLE, pos));
+      // current player is replaced only by working one, so it's kept on errors; player refers loader, so it should be
+      // destroyed first
+      Delegate.reset();
+      Loader = std::move(loader);
+      Delegate = std::move(player);
+    }
+
+    // Chips are created by player start only, so emulation changes require new player at the same position
+    void Restart(const FmOutput::Emulation& emu)
+    {
+      const auto pos = Delegate->GetCurPos(PLAYPOS_SAMPLE);
+      // detach from chips being destroyed
+      Voices.reset();
+      auto scope = std::move(Scope);
+      std::exception_ptr error;
+      try
+      {
+        StartPlayer(emu, pos);
+        Channels->ApplyMuteMask(MuteMask, *Delegate);
+      }
+      catch (const std::exception&)
+      {
+        error = std::current_exception();
+      }
+      if (scope)
+      {
+        // previous player is kept on error
+        InitVoices(std::move(scope), error ? Settings.Emu : emu);
+      }
+      if (error)
+      {
+        std::rethrow_exception(error);
+      }
+    }
+
+    void ApplyOutputStage()
+    {
+      const auto family = Channels->GetOutputFamily();
+      Output.SetStage(family ? Settings.GetStage(*family) : FmOutput::Stage(), Delegate->GetSampleRate());
+    }
+
     void UpdateVoicesTap()
     {
       if (!Voices)
@@ -1003,12 +1199,15 @@ namespace Module::LibVGM
     const Model::Ptr Tune;
     const ChannelsLayout::Ptr Channels;
     const uint_t Samplerate;
-    LoaderAdapter Loader;
+    FmOutput::Settings Settings;
+    std::unique_ptr<LoaderAdapter> Loader;
     PlayerPtr Delegate;
+    FmOutput::Filter Output;
     uint_t TotalTicks = 0;
     uint_t LoopTicks = 0;
     uint_t WholeLoopCount = 0;
     int64_t MuteMask = 0;
+    VoicesScope::Ptr Scope;
     std::unique_ptr<VoicesTap> Voices;
   };
 
@@ -1019,7 +1218,7 @@ namespace Module::LibVGM
   public:
     Renderer(Model::Ptr tune, const Information& info, ChannelsLayout::Ptr channels, uint_t samplerate,
              Parameters::Accessor::Ptr params)
-      : Engine(std::move(tune), info, std::move(channels), samplerate)
+      : Engine(std::move(tune), info, std::move(channels), samplerate, FmOutput::ReadSettings(*params))
       , Params(std::move(params))
     {}
 
@@ -1085,6 +1284,14 @@ namespace Module::LibVGM
         using namespace Parameters::ZXTune::Core;
         const auto mask = Parameters::GetInteger(*Params, CHANNELS_MASK, CHANNELS_MASK_DEFAULT);
         Engine.MuteChannels(mask);
+        try
+        {
+          Engine.SetSettings(FmOutput::ReadSettings(*Params));
+        }
+        catch (const std::exception& e)
+        {
+          Dbg("Failed to apply FM settings: {}", e.what());
+        }
       }
     }
 
