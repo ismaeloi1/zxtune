@@ -153,8 +153,10 @@ namespace Parameters
         {
           return Update(lower->second, value);
         }
+        // new value is a change even if equal to default-constructed one (e.g. integer 0)
         const auto it = Storage.emplace_hint(lower, name, T{});
-        return Update(it->second, value);
+        Update(it->second, value);
+        return true;
       }
 
     private:

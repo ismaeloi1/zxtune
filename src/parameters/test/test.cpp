@@ -318,6 +318,15 @@ namespace
       TestFind(*cont, "bin", noData);
     }
     Test("final version", cont->Version(), 14u);
+
+    std::cout << "Insert of default-like values" << std::endl;
+    cont->SetValue("zero", Parameters::IntType(0));
+    Test("version", cont->Version(), 15u);
+    cont->SetValue("empty", StringView());
+    Test("version", cont->Version(), 16u);
+    cont->SetValue("zero", Parameters::IntType(0));
+    cont->SetValue("empty", StringView());
+    Test("unchanged version", cont->Version(), 16u);
   }
 }  // namespace
 
