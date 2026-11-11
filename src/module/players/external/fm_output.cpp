@@ -14,7 +14,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numbers>
+
+// NDK libc++ has no <numbers>
+constexpr double PI = 3.14159265358979323846;
+constexpr double SQRT2 = 1.41421356237309504880;
 
 namespace Module::FmOutput
 {
@@ -217,7 +220,7 @@ namespace Module::FmOutput
     HR = 0;
     if (Highpass)
     {
-      const auto k = std::tan(std::numbers::pi * stage.Highpass / samplerate);
+      const auto k = std::tan(PI * stage.Highpass / samplerate);
       HG = 1 / (1 + k);
       HR = (1 - k) / (1 + k);
     }
@@ -225,7 +228,7 @@ namespace Module::FmOutput
     B1 = B2 = A1 = A2 = 0;
     if (Lowpass)
     {
-      const auto k = std::tan(std::numbers::pi * stage.Lowpass / samplerate);
+      const auto k = std::tan(PI * stage.Lowpass / samplerate);
       if (stage.Order == 1)
       {
         // Analog RC magnitude is matched at DC, cutoff and Nyquist frequencies (as in M. Vicanek, "Matched One-Pole
@@ -233,7 +236,7 @@ namespace Module::FmOutput
         // near Nyquist frequency. Pole is found by bisection, zero is defined by DC and Nyquist gains.
         const auto ratio = samplerate / (2.0 * stage.Lowpass);
         const auto nyquistGain = 1 / std::sqrt(1 + ratio * ratio);
-        const auto wc = 2 * std::numbers::pi * stage.Lowpass / samplerate;
+        const auto wc = 2 * PI * stage.Lowpass / samplerate;
         const auto gain2 = [nyquistGain, wc](double pole) {
           const auto b0 = ((1 - pole) + nyquistGain * (1 + pole)) / 2;
           const auto b1 = ((1 - pole) - nyquistGain * (1 + pole)) / 2;
@@ -255,7 +258,7 @@ namespace Module::FmOutput
       else
       {
         // Butterworth, bilinear transform with prewarping, so cutoff frequency is exact
-        const auto q = std::numbers::sqrt2 / 2;
+        const auto q = SQRT2 / 2;
         const auto norm = 1 / (1 + k / q + k * k);
         B0 = k * k * norm;
         B1 = 2 * B0;
@@ -314,7 +317,7 @@ namespace Module::FmOutput
   double Filter::GetResponse(double freq) const
   {
     // H(z) at z = exp(jw)
-    const auto w = 2 * std::numbers::pi * freq / std::max<uint_t>(Samplerate, 1);
+    const auto w = 2 * PI * freq / std::max<uint_t>(Samplerate, 1);
     const auto c1 = std::cos(w);
     const auto s1 = std::sin(w);
     double mag2 = 1;
