@@ -2569,11 +2569,11 @@ void ym2203_update_one(void *chip, UINT32 length, DEV_SMPL **buffer)
 
 		if (F2203->voicesCb)
 		{
-			/* channels outputs before mixing, single operator is in 14-bit range */
+			/* channels outputs before mixing, mono output to both sides, so sum is at the scale of mixed output */
 			INT32 voices[3];
-			voices[0] = OPN->out_fm[0] << 1;
-			voices[1] = OPN->out_fm[1] << 1;
-			voices[2] = OPN->out_fm[2] << 1;
+			voices[0] = OPN->out_fm[0] << 2;
+			voices[1] = OPN->out_fm[1] << 2;
+			voices[2] = OPN->out_fm[2] << 2;
 			F2203->voicesCb(F2203->voicesParam, 3, voices);
 		}
 

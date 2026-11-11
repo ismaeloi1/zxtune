@@ -1950,9 +1950,10 @@ void ADLIBEMU(getsample)(void *chip, UINT32 numsamples, DEV_SMPL** sndptr)
 			Bitu ch;
 			for (i=0;i<endsamples;i++)
 			{
-				// single operator output is in -4096..4096 range, rhythm channels are doubled
+				// single operator output is in -4096..4096 range, rhythm channels are doubled;
+				// sum of channels is at the scale of mixed output
 				for (ch = 0; ch < NUM_CHANNELS + 5; ch ++)
-					voices[ch] = OPL->voicebuf[ch][i] * 4 * OPL->master_vol_l >> 12;
+					voices[ch] = OPL->voicebuf[ch][i] * 2 * OPL->master_vol_l >> 12;
 				OPL->voicesCb(OPL->voicesParam, NUM_CHANNELS + 5, voices);
 			}
 		}

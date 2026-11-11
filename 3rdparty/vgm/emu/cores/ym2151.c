@@ -1994,8 +1994,11 @@ static void ym2151_update_one(void *chip, UINT32 length, DEV_SMPL **buffers)
 
 		if (PSG->voicesCb)
 		{
-			/* channels outputs before panning */
-			PSG->voicesCb(PSG->voicesParam, 8, PSG->chanout);
+			/* channels outputs at the scale of mixed output of the both sides */
+			INT32 voices[8];
+			for(ch=0; ch<8; ch++)
+				voices[ch] = PSG->chanout[ch] * 2 * ((PSG->pan[2*ch] ? 1 : 0) + (PSG->pan[2*ch+1] ? 1 : 0));
+			PSG->voicesCb(PSG->voicesParam, 8, voices);
 		}
 
 		advance(PSG);
