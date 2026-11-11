@@ -256,6 +256,7 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
             }
             TriggerPresetsBinding.bind(this)
             SidEngineBinding.bind(this)
+            FmPresetsBinding.bind(this)
         }
 
         override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -453,6 +454,11 @@ class ScopeSettingsDialog : AppCompatDialogFragment() {
             EmulationContext.SAA -> R.string.scope_settings_chip_saa
             EmulationContext.MT32 -> R.string.scope_settings_chip_mt32
             EmulationContext.SID -> R.string.scope_settings_chip_sid
+            EmulationContext.FM_OPN2 -> R.string.scope_settings_chip_opn2
+            EmulationContext.FM_OPM -> R.string.scope_settings_chip_opm
+            EmulationContext.FM_OPN -> R.string.scope_settings_chip_opn
+            EmulationContext.FM_OPL -> R.string.scope_settings_chip_opl
+            EmulationContext.FM_OPLL -> R.string.scope_settings_chip_opll
             else -> null
         }?.let { ctx.getString(it) } ?: category.title
 

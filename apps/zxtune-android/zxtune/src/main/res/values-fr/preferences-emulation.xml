@@ -183,4 +183,69 @@
         <item>Normale (la plupart des 6581)</item>
         <item>Forte (puces à impulsion+dent de scie forte)</item>
     </string-array>
+    <string name="pref_zxtune_fm_core_title">Cœur d\'émulation</string>
+    <string name="pref_zxtune_fm_preset_title">Plateforme</string>
+    <string name="pref_zxtune_fm_preset_custom">Personnalisé</string>
+    <string name="pref_zxtune_fm_chip_title">Puce</string>
+    <string name="pref_zxtune_fm_ladder_title">Effet d\'escalier du DAC</string>
+    <string name="pref_zxtune_fm_ladder_summary">Distorsion de croisement du YM2612 discret, audible sur les sons faibles (cœurs Nuked et ymfm)</string>
+    <string name="pref_zxtune_fm_lowpass_title">Filtre passe-bas</string>
+    <string name="pref_zxtune_fm_lowpass_summary">Coupure du filtre de la carte, 0 le désactive</string>
+    <string name="pref_zxtune_fm_lowpass_order_title">Pente du passe-bas</string>
+    <string name="pref_zxtune_fm_highpass_title">Blocage du continu</string>
+    <string name="pref_zxtune_fm_highpass_summary">Coupure des condensateurs de sortie, 0 garde la composante continue de la puce</string>
+    <string name="pref_zxtune_fm_stereo_title">Largeur stéréo</string>
+    <string name="pref_zxtune_fm_response_title">Réponse de sortie</string>
+    <string name="pref_zxtune_fm_response_lowpass">passe-bas %1$d Hz, %2$d dB/oct</string>
+    <string name="pref_zxtune_fm_response_highpass">passe-haut %d Hz</string>
+    <string name="pref_zxtune_fm_response_flat">non filtrée</string>
+    <string-array name="pref_zxtune_fm_opn2_core_entries">
+        <item>Nuked (précis, CPU élevé)</item>
+        <item>ymfm (MAME)</item>
+        <item>GPGX (rapide)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opn2_preset_entries">
+        <item>Mega Drive modèle 1 (VA0-VA6, YM2612)</item>
+        <item>Mega Drive modèle 1 VA7 (YM3438)</item>
+        <item>Mega Drive modèle 2 (YM3438)</item>
+        <item>Genesis 3 (YM3438)</item>
+        <item>YM3438 sans filtre</item>
+        <item>YMF276 sans filtre</item>
+        <item>@string/pref_zxtune_fm_preset_custom</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opm_core_entries">
+        <item>Nuked (précis, CPU très élevé)</item>
+        <item>ymfm (MAME)</item>
+        <item>MAME (ancien, rapide)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opm_preset_entries">
+        <item>YM3012 (DAC stéréo : X68000, arcade)</item>
+        <item>YM3014 (DAC mono)</item>
+        <item>@string/pref_zxtune_fm_preset_custom</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opn_core_entries">
+        <item>ymfm (MAME)</item>
+        <item>MAME (ancien)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opn_preset_entries">
+        <item>PC-88/PC-98</item>
+        <item>@string/pref_zxtune_fm_preset_custom</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opl_core_entries">
+        <item>Nuked (précis)</item>
+        <item>AdLibEmu (rapide)</item>
+        <item>MAME (rapide)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opl_preset_entries">
+        <item>AdLib (mono)</item>
+        <item>Sound Blaster 1.x/2.0</item>
+        <item>Sound Blaster Pro 1/2</item>
+        <item>Sound Blaster 16</item>
+        <item>@string/pref_zxtune_fm_preset_custom</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opll_core_entries">
+        <item>Nuked (précis)</item>
+        <item>EMU2413 (rapide)</item>
+        <item>MAME (rapide)</item>
+    </string-array>
 </resources>

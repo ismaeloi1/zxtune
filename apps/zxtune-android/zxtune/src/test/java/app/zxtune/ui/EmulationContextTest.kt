@@ -34,8 +34,22 @@ class EmulationContextTest {
         assertEquals(setOf("aym"), chips("", listOf("YM2149F/1", "YM2149F/2"), "2xYM2149F ABC"))
         assertEquals(setOf("fm"), chips("", listOf("YM2203", "YM2203"), "TurboFM, 2xYM2203"))
         assertEquals(setOf("mt32"), chips("", listOf("Partials 1-8"), "MT-32 ROMs, Munt 2.8.3"))
-        // libvgm names of the same chips
-        assertEquals(emptySet<String>(), chips("VGM", listOf("AY8910", "YM2203"), "AY8910, YM2203"))
+        // libvgm names of the same chips: no zxtune's AY options, but Yamaha FM family ones
+        assertEquals(setOf("fm.opn"), chips("VGM", listOf("AY8910", "YM2203"), "AY8910, YM2203"))
+    }
+
+    @Test
+    fun `FM families by libvgm chips`() {
+        assertEquals(setOf("fm.opn2"), chips("VGM", listOf("SN76496", "YM2612"), "SEGA PSG MAME 3.58MHz, YM2612 Nuked OPN2 7.67MHz"))
+        assertEquals(setOf("fm.opm"), chips("VGM", listOf("YM2151"), "YM2151 ymfm 3.58MHz"))
+        assertEquals(setOf("fm.opn"), chips("S98", listOf("YM2608", "AY8910"), "YM2608 ymfm 7.99MHz"))
+        assertEquals(setOf("fm.opn"), chips("VGM", listOf("YM2610B"), ""))
+        assertEquals(setOf("fm.opl"), chips("VGM", listOf("YM3812"), "YM3812 Nuked OPL3 3.58MHz"))
+        assertEquals(setOf("fm.opl"), chips("VGM", listOf("YMF262"), ""))
+        assertEquals(setOf("fm.opll"), chips("VGM", listOf("YM2413"), "YM2413 Nuked OPLL 3.58MHz"))
+        assertEquals(setOf("fm.opn2", "fm.opm"), chips("VGM", listOf("YM2612", "YM2151"), ""))
+        // TurboFM is not libvgm
+        assertEquals(setOf("fm"), chips("TFC", listOf("YM2203", "YM2203"), "TurboFM, 2xYM2203"))
     }
 
     @Test
@@ -65,6 +79,9 @@ class EmulationContextTest {
             "general",
             EmulationContext.categoryOf(listOf("zxtune.core.plugins.default_duration", "zxtune.sound.gain"))
         )
+        assertEquals("fm", EmulationContext.categoryOf(listOf("zxtune.core.fm.clockrate")))
+        assertEquals("fm.opn2", EmulationContext.categoryOf(listOf("zxtune.core.fm.opn2.core", "zxtune.core.fm.opn2.preset")))
+        assertEquals("fm.opll", EmulationContext.categoryOf(listOf("zxtune.core.fm.opll.lowpass")))
         assertEquals(null, EmulationContext.categoryOf(emptyList()))
     }
 
@@ -76,6 +93,7 @@ class EmulationContextTest {
             "zxtune.core.fm.clockrate", "zxtune.core.saa.clockrate", "zxtune.core.dac.interpolation",
             "zxtune.core.sid.engine", "zxtune.core.sid.model", "zxtune.core.sid.clock", "zxtune.core.sid.filter_bias",
             "zxtune.core.mt32.model",
+            "zxtune.core.fm.opn2.core", "zxtune.core.fm.opn2.preset", "zxtune.core.fm.opl.lowpass", "zxtune.core.fm.opm.stereo",
         )) {
             assertTrue(key, EmulationContext.isAppliedLive(key))
         }

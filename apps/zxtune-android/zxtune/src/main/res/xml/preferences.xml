@@ -129,6 +129,284 @@
                 android:title="@string/pref_zxtune_fm_clockrate_title"
                 app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
+    <!-- fm.opn2, see app.zxtune.ui.FmPresets -->
+    <PreferenceCategory android:title="@string/pref_zxtune_fm_opn2_title">
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="@string/pref_zxtune_fm_opn2_core_default"
+                android:entries="@array/pref_zxtune_fm_opn2_core_entries"
+                android:entryValues="@array/pref_zxtune_fm_opn2_core_values"
+                android:key="zxtune.core.fm.opn2.core"
+                android:title="@string/pref_zxtune_fm_core_title" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_fm_opn2_preset_default"
+                android:entries="@array/pref_zxtune_fm_opn2_preset_entries"
+                android:entryValues="@array/pref_zxtune_fm_opn2_preset_values"
+                android:key="zxtune.core.fm.opn2.preset"
+                android:title="@string/pref_zxtune_fm_preset_title"
+                app:useSimpleSummaryProvider="true" />
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="0"
+                android:entries="@array/pref_zxtune_fm_opn2_chip_entries"
+                android:entryValues="@array/pref_zxtune_fm_opn2_chip_values"
+                android:key="zxtune.core.fm.opn2.chip"
+                android:title="@string/pref_zxtune_fm_chip_title" />
+        <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:key="zxtune.core.fm.opn2.ladder"
+                android:summary="@string/pref_zxtune_fm_ladder_summary"
+                android:title="@string/pref_zxtune_fm_ladder_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="3390"
+                android:key="zxtune.core.fm.opn2.lowpass"
+                android:max="24000"
+                android:summary="@string/pref_zxtune_fm_lowpass_summary"
+                android:title="@string/pref_zxtune_fm_lowpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="1"
+                android:entries="@array/pref_zxtune_fm_lowpass_order_entries"
+                android:entryValues="@array/pref_zxtune_fm_lowpass_order_values"
+                android:key="zxtune.core.fm.opn2.lowpass_order"
+                android:title="@string/pref_zxtune_fm_lowpass_order_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="5"
+                android:key="zxtune.core.fm.opn2.highpass"
+                android:max="200"
+                android:summary="@string/pref_zxtune_fm_highpass_summary"
+                android:title="@string/pref_zxtune_fm_highpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="100"
+                android:key="zxtune.core.fm.opn2.stereo"
+                android:max="100"
+                android:title="@string/pref_zxtune_fm_stereo_title"
+                app:valueFormat="@string/pref_value_percent"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.FmResponsePreference
+                android:key="ui.fm.opn2.response"
+                android:persistent="false"
+                android:selectable="false"
+                android:title="@string/pref_zxtune_fm_response_title" />
+    </PreferenceCategory>
+    <!-- fm.opm, see app.zxtune.ui.FmPresets -->
+    <PreferenceCategory android:title="@string/pref_zxtune_fm_opm_title">
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="@string/pref_zxtune_fm_opm_core_default"
+                android:entries="@array/pref_zxtune_fm_opm_core_entries"
+                android:entryValues="@array/pref_zxtune_fm_opm_core_values"
+                android:key="zxtune.core.fm.opm.core"
+                android:title="@string/pref_zxtune_fm_core_title" />
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="@string/pref_zxtune_fm_opm_preset_default"
+                android:entries="@array/pref_zxtune_fm_opm_preset_entries"
+                android:entryValues="@array/pref_zxtune_fm_opm_preset_values"
+                android:key="zxtune.core.fm.opm.preset"
+                android:title="@string/pref_zxtune_fm_preset_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.core.fm.opm.lowpass"
+                android:max="24000"
+                android:summary="@string/pref_zxtune_fm_lowpass_summary"
+                android:title="@string/pref_zxtune_fm_lowpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="2"
+                android:entries="@array/pref_zxtune_fm_lowpass_order_entries"
+                android:entryValues="@array/pref_zxtune_fm_lowpass_order_values"
+                android:key="zxtune.core.fm.opm.lowpass_order"
+                android:title="@string/pref_zxtune_fm_lowpass_order_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.core.fm.opm.highpass"
+                android:max="200"
+                android:summary="@string/pref_zxtune_fm_highpass_summary"
+                android:title="@string/pref_zxtune_fm_highpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="100"
+                android:key="zxtune.core.fm.opm.stereo"
+                android:max="100"
+                android:title="@string/pref_zxtune_fm_stereo_title"
+                app:valueFormat="@string/pref_value_percent"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.FmResponsePreference
+                android:key="ui.fm.opm.response"
+                android:persistent="false"
+                android:selectable="false"
+                android:title="@string/pref_zxtune_fm_response_title" />
+    </PreferenceCategory>
+    <!-- fm.opn, see app.zxtune.ui.FmPresets -->
+    <PreferenceCategory android:title="@string/pref_zxtune_fm_opn_title">
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="@string/pref_zxtune_fm_opn_core_default"
+                android:entries="@array/pref_zxtune_fm_opn_core_entries"
+                android:entryValues="@array/pref_zxtune_fm_opn_core_values"
+                android:key="zxtune.core.fm.opn.core"
+                android:title="@string/pref_zxtune_fm_core_title" />
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="@string/pref_zxtune_fm_opn_preset_default"
+                android:entries="@array/pref_zxtune_fm_opn_preset_entries"
+                android:entryValues="@array/pref_zxtune_fm_opn_preset_values"
+                android:key="zxtune.core.fm.opn.preset"
+                android:title="@string/pref_zxtune_fm_preset_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.core.fm.opn.lowpass"
+                android:max="24000"
+                android:summary="@string/pref_zxtune_fm_lowpass_summary"
+                android:title="@string/pref_zxtune_fm_lowpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="2"
+                android:entries="@array/pref_zxtune_fm_lowpass_order_entries"
+                android:entryValues="@array/pref_zxtune_fm_lowpass_order_values"
+                android:key="zxtune.core.fm.opn.lowpass_order"
+                android:title="@string/pref_zxtune_fm_lowpass_order_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.core.fm.opn.highpass"
+                android:max="200"
+                android:summary="@string/pref_zxtune_fm_highpass_summary"
+                android:title="@string/pref_zxtune_fm_highpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="100"
+                android:key="zxtune.core.fm.opn.stereo"
+                android:max="100"
+                android:title="@string/pref_zxtune_fm_stereo_title"
+                app:valueFormat="@string/pref_value_percent"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.FmResponsePreference
+                android:key="ui.fm.opn.response"
+                android:persistent="false"
+                android:selectable="false"
+                android:title="@string/pref_zxtune_fm_response_title" />
+    </PreferenceCategory>
+    <!-- fm.opl, see app.zxtune.ui.FmPresets -->
+    <PreferenceCategory android:title="@string/pref_zxtune_fm_opl_title">
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="@string/pref_zxtune_fm_opl_core_default"
+                android:entries="@array/pref_zxtune_fm_opl_core_entries"
+                android:entryValues="@array/pref_zxtune_fm_opl_core_values"
+                android:key="zxtune.core.fm.opl.core"
+                android:title="@string/pref_zxtune_fm_core_title" />
+        <DropDownPreference
+                android:defaultValue="@string/pref_zxtune_fm_opl_preset_default"
+                android:entries="@array/pref_zxtune_fm_opl_preset_entries"
+                android:entryValues="@array/pref_zxtune_fm_opl_preset_values"
+                android:key="zxtune.core.fm.opl.preset"
+                android:title="@string/pref_zxtune_fm_preset_title"
+                app:useSimpleSummaryProvider="true" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.core.fm.opl.lowpass"
+                android:max="24000"
+                android:summary="@string/pref_zxtune_fm_lowpass_summary"
+                android:title="@string/pref_zxtune_fm_lowpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="1"
+                android:entries="@array/pref_zxtune_fm_lowpass_order_entries"
+                android:entryValues="@array/pref_zxtune_fm_lowpass_order_values"
+                android:key="zxtune.core.fm.opl.lowpass_order"
+                android:title="@string/pref_zxtune_fm_lowpass_order_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.core.fm.opl.highpass"
+                android:max="200"
+                android:summary="@string/pref_zxtune_fm_highpass_summary"
+                android:title="@string/pref_zxtune_fm_highpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="100"
+                android:key="zxtune.core.fm.opl.stereo"
+                android:max="100"
+                android:title="@string/pref_zxtune_fm_stereo_title"
+                app:valueFormat="@string/pref_value_percent"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.FmResponsePreference
+                android:key="ui.fm.opl.response"
+                android:persistent="false"
+                android:selectable="false"
+                android:title="@string/pref_zxtune_fm_response_title" />
+    </PreferenceCategory>
+    <!-- fm.opll, see app.zxtune.ui.FmPresets -->
+    <PreferenceCategory android:title="@string/pref_zxtune_fm_opll_title">
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="@string/pref_zxtune_fm_opll_core_default"
+                android:entries="@array/pref_zxtune_fm_opll_core_entries"
+                android:entryValues="@array/pref_zxtune_fm_opll_core_values"
+                android:key="zxtune.core.fm.opll.core"
+                android:title="@string/pref_zxtune_fm_core_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.core.fm.opll.lowpass"
+                android:max="24000"
+                android:summary="@string/pref_zxtune_fm_lowpass_summary"
+                android:title="@string/pref_zxtune_fm_lowpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:seekBarIncrement="10"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="2"
+                android:entries="@array/pref_zxtune_fm_lowpass_order_entries"
+                android:entryValues="@array/pref_zxtune_fm_lowpass_order_values"
+                android:key="zxtune.core.fm.opll.lowpass_order"
+                android:title="@string/pref_zxtune_fm_lowpass_order_title" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="0"
+                android:key="zxtune.core.fm.opll.highpass"
+                android:max="200"
+                android:summary="@string/pref_zxtune_fm_highpass_summary"
+                android:title="@string/pref_zxtune_fm_highpass_title"
+                app:valueFormat="@string/pref_value_hz"
+                app:min="0"
+                app:showSeekBarValue="true"
+                app:updatesContinuously="true" />
+        <app.zxtune.ui.FmResponsePreference
+                android:key="ui.fm.opll.response"
+                android:persistent="false"
+                android:selectable="false"
+                android:title="@string/pref_zxtune_fm_response_title" />
+    </PreferenceCategory>
     <!-- dac -->
     <PreferenceCategory app:title="@string/pref_zxtune_dac_title">
         <SwitchPreferenceCompat

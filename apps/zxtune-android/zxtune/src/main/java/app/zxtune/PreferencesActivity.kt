@@ -27,6 +27,7 @@ import app.zxtune.preferences.Preferences
 import app.zxtune.preferences.VulkanDriver
 import app.zxtune.rescue.RescueActivity
 import app.zxtune.ui.CarDisclaimerDialog
+import app.zxtune.ui.FmPresetsBinding
 import app.zxtune.ui.SidEngineBinding
 import app.zxtune.ui.TriggerPresetsBinding
 import app.zxtune.ui.settings.SettingsCards
@@ -136,6 +137,7 @@ class PreferencesActivity :
             setupVulkanDriverPreferences()
             TriggerPresetsBinding.bind(this)
             SidEngineBinding.bind(this)
+            FmPresetsBinding.bind(this)
             findPreference<Preference>(RESCUE_KEY)?.setOnPreferenceClickListener {
                 startActivity(RescueActivity.createIntent(requireContext()))
                 true

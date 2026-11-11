@@ -14,6 +14,11 @@
     <string name="scope_settings_chip_saa" translatable="false">SAA1099</string>
     <string name="scope_settings_chip_mt32" translatable="false">MT-32</string>
     <string name="scope_settings_chip_sid" translatable="false">SID</string>
+    <string name="scope_settings_chip_opn2" translatable="false">OPN2</string>
+    <string name="scope_settings_chip_opm" translatable="false">OPM</string>
+    <string name="scope_settings_chip_opn" translatable="false">OPN</string>
+    <string name="scope_settings_chip_opl" translatable="false">OPL</string>
+    <string name="scope_settings_chip_opll" translatable="false">OPLL</string>
     <!-- filter response view of oscilloscope, see FilterScene -->
     <string name="scope_filter_title">%1$s - Filter</string>
     <string name="scope_filter_resonance">Res</string>

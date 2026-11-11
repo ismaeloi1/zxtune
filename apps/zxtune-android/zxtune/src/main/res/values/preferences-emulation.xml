@@ -143,6 +143,159 @@
     </string-array>
     <string name="pref_zxtune_fm_clockrate_default" translatable="false">3500000</string>
 
+    <!-- Yamaha FM chips of VGM/S98 (zxtune.core.fm.<family>.*), see app.zxtune.ui.FmPresets -->
+    <string name="pref_zxtune_fm_opn2_title" translatable="false">YM2612/YM3438 (OPN2)</string>
+    <string name="pref_zxtune_fm_opm_title" translatable="false">YM2151 (OPM)</string>
+    <string name="pref_zxtune_fm_opn_title" translatable="false">YM2203/YM2608/YM2610 (OPN)</string>
+    <string name="pref_zxtune_fm_opl_title" translatable="false">YM3812/YMF262 (OPL)</string>
+    <string name="pref_zxtune_fm_opll_title" translatable="false">YM2413 (OPLL)</string>
+    <string name="pref_zxtune_fm_core_title">Emulation core</string>
+    <string name="pref_zxtune_fm_preset_title">Platform</string>
+    <string name="pref_zxtune_fm_preset_custom">Custom</string>
+    <string name="pref_zxtune_fm_chip_title">Chip</string>
+    <string name="pref_zxtune_fm_ladder_title">DAC ladder effect</string>
+    <string name="pref_zxtune_fm_ladder_summary">Crossover distortion of discrete YM2612, audible on quiet sounds (Nuked and ymfm cores)</string>
+    <string name="pref_zxtune_fm_lowpass_title">Low-pass filter</string>
+    <string name="pref_zxtune_fm_lowpass_summary">Cutoff of the board filter, 0 is off</string>
+    <string name="pref_zxtune_fm_lowpass_order_title">Low-pass slope</string>
+    <string name="pref_zxtune_fm_highpass_title">DC blocking</string>
+    <string name="pref_zxtune_fm_highpass_summary">Cutoff of output capacitors, 0 keeps DC bias of the chip</string>
+    <string name="pref_zxtune_fm_stereo_title">Stereo width</string>
+    <string name="pref_zxtune_fm_response_title">Output response</string>
+    <string name="pref_zxtune_fm_response_lowpass">low-pass %1$d Hz, %2$d dB/oct</string>
+    <string name="pref_zxtune_fm_response_highpass">high-pass %d Hz</string>
+    <string name="pref_zxtune_fm_response_flat">not filtered</string>
+    <string-array name="pref_zxtune_fm_lowpass_order_entries" translatable="false">
+        <item>6 dB/oct</item>
+        <item>12 dB/oct</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_lowpass_order_values" translatable="false">
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <!-- zxtune.core.fm.opn2.* -->
+    <string-array name="pref_zxtune_fm_opn2_core_entries">
+        <item>Nuked (accurate, high CPU usage)</item>
+        <item>ymfm (MAME)</item>
+        <item>GPGX (fast)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opn2_core_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opn2_core_default" translatable="false">0</string>
+    <string-array name="pref_zxtune_fm_opn2_preset_entries">
+        <item>Mega Drive model 1 (VA0-VA6, YM2612)</item>
+        <item>Mega Drive model 1 VA7 (YM3438)</item>
+        <item>Mega Drive model 2 (YM3438)</item>
+        <item>Genesis 3 (YM3438)</item>
+        <item>YM3438 without filter</item>
+        <item>YMF276 without filter</item>
+        <item>@string/pref_zxtune_fm_preset_custom</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opn2_preset_values" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>0</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opn2_preset_default" translatable="false">1</string>
+    <string-array name="pref_zxtune_fm_opn2_chip_entries" translatable="false">
+        <item>YM2612</item>
+        <item>YM3438</item>
+        <item>YMF276</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opn2_chip_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <!-- zxtune.core.fm.opm.* -->
+    <string-array name="pref_zxtune_fm_opm_core_entries">
+        <item>Nuked (accurate, very high CPU usage)</item>
+        <item>ymfm (MAME)</item>
+        <item>MAME (legacy, fast)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opm_core_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opm_core_default" translatable="false">1</string>
+    <string-array name="pref_zxtune_fm_opm_preset_entries">
+        <item>YM3012 (stereo DAC: X68000, arcade)</item>
+        <item>YM3014 (mono DAC)</item>
+        <item>@string/pref_zxtune_fm_preset_custom</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opm_preset_values" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>0</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opm_preset_default" translatable="false">1</string>
+    <!-- zxtune.core.fm.opn.* -->
+    <string-array name="pref_zxtune_fm_opn_core_entries">
+        <item>ymfm (MAME)</item>
+        <item>MAME (legacy)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opn_core_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opn_core_default" translatable="false">0</string>
+    <string-array name="pref_zxtune_fm_opn_preset_entries">
+        <item>PC-88/PC-98</item>
+        <item>@string/pref_zxtune_fm_preset_custom</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opn_preset_values" translatable="false">
+        <item>1</item>
+        <item>0</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opn_preset_default" translatable="false">1</string>
+    <!-- zxtune.core.fm.opl.* -->
+    <string-array name="pref_zxtune_fm_opl_core_entries">
+        <item>Nuked (accurate)</item>
+        <item>AdLibEmu (fast)</item>
+        <item>MAME (fast)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opl_core_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opl_core_default" translatable="false">0</string>
+    <string-array name="pref_zxtune_fm_opl_preset_entries">
+        <item>AdLib (mono)</item>
+        <item>Sound Blaster 1.x/2.0</item>
+        <item>Sound Blaster Pro 1/2</item>
+        <item>Sound Blaster 16</item>
+        <item>@string/pref_zxtune_fm_preset_custom</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opl_preset_values" translatable="false">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>0</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opl_preset_default" translatable="false">4</string>
+    <!-- zxtune.core.fm.opll.* -->
+    <string-array name="pref_zxtune_fm_opll_core_entries">
+        <item>Nuked (accurate)</item>
+        <item>EMU2413 (fast)</item>
+        <item>MAME (fast)</item>
+    </string-array>
+    <string-array name="pref_zxtune_fm_opll_core_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+    <string name="pref_zxtune_fm_opll_core_default" translatable="false">0</string>
+
     <!-- dac -->
     <string name="pref_zxtune_dac_title">Digital samples</string>
     <!-- zxtune.core.dac.interpolation -->

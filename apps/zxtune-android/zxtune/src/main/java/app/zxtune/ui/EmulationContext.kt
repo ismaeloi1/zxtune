@@ -27,6 +27,13 @@ class EmulationContext(val chips: Set<String>, val names: List<String>) {
         const val MT32 = "mt32"
         const val SID = "sid"
 
+        // Yamaha FM chips of libvgm, see FmPresets
+        const val FM_OPN2 = "fm.opn2"
+        const val FM_OPM = "fm.opm"
+        const val FM_OPN = "fm.opn"
+        const val FM_OPL = "fm.opl"
+        const val FM_OPLL = "fm.opll"
+
         // Settings of playback, not of chips (gain, fading, durations): zxtune.sound.* and zxtune.core.plugins.*
         const val GENERAL = "general"
 
@@ -91,14 +98,30 @@ class EmulationContext(val chips: Set<String>, val names: List<String>) {
         }
 
         // Names are given by zxtune's own chips emulation, libvgm/gme names differ (e.g. AY8910), so options of
-        // zxtune's chips are not offered for them
+        // zxtune's chips are not offered for them. Yamaha FM chips names of libvgm select families settings, the same
+        // names of TurboFM chips are not.
         private fun detectLive(groups: List<String>, description: String) = HashSet<String>().apply {
             val all = groups + description
             if (all.any { it.contains("AY-3-8910") || it.contains("YM2149F") }) add(AYM)
-            if (description.contains("TurboFM")) add(FM)
+            if (description.contains("TurboFM")) {
+                add(FM)
+            } else {
+                for ((family, chips) in FM_FAMILIES) {
+                    if (all.any { name -> chips.any { name.contains(it) } }) add(family)
+                }
+            }
             if (groups.any { it.startsWith("SID") } || description.contains("MOS")) add(SID)
             if (description.contains("Munt")) add(MT32)
         }
+
+        // libvgm devices names, see 3rdparty/vgm/emu/cores/*intf.c
+        private val FM_FAMILIES = listOf(
+            FM_OPN2 to listOf("YM2612", "YM3438"),
+            FM_OPM to listOf("YM2151"),
+            FM_OPN to listOf("YM2203", "YM2608", "YM2610"),
+            FM_OPL to listOf("YM3526", "Y8950", "YM3812", "YMF262", "YMF278"),
+            FM_OPLL to listOf("YM2413", "VRC7"),
+        )
 
         /**
          * Category id by preferences keys of category
@@ -109,7 +132,9 @@ class EmulationContext(val chips: Set<String>, val names: List<String>) {
                     continue
                 }
                 if (key.startsWith(CORE_PREFIX)) {
-                    return key.removePrefix(CORE_PREFIX).substringBefore('.')
+                    val path = key.removePrefix(CORE_PREFIX).split('.')
+                    // families of FM chips (zxtune.core.fm.<family>.*) have own categories
+                    return if (path.size > 2 && path[0] == FM) "$FM.${path[1]}" else path[0]
                 }
             }
             return GENERAL.takeIf { keys.any { it.startsWith(SOUND_PREFIX) || it.startsWith(PLUGINS_PREFIX) } }
