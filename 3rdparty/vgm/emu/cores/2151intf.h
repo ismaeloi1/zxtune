@@ -7,6 +7,7 @@
 // undefine one of the variables to disable the cores
 #define EC_YM2151_MAME		// enable YM2151 core from MAME
 #define EC_YM2151_NUKED		// enable Nuked OPM
+#define EC_YM2151_YMFM		// enable ymfm OPM (zxtune extension)
 #endif
 
 

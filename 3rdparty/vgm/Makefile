@@ -54,6 +54,9 @@ source_files += $(addprefix utils/,DataLoader StrUtils-CPConv_Stub)
 
 source_files := $(addsuffix .c,$(source_files))
 
+# zxtune: ymfm cores
+source_files += $(addprefix emu/cores/,ymfmintf.cpp ymfmintf_opm.cpp $(addprefix ymfm/,ymfm_adpcm.cpp ymfm_ssg.cpp))
+
 source_files += $(addprefix player/,playera.cpp playerbase.cpp s98player.cpp vgmplayer.cpp vgmplayer_cmdhandler.cpp helper.c dblk_compr.c)
 
 defines += HAVE_STDINT_H VGM_LITTLE_ENDIAN

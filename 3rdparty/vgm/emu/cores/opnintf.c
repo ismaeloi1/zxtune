@@ -17,6 +17,7 @@
 #include "opnintf.h"
 #include "fmopn.h"
 #include "ayintf.h"	// for constants and AY8910_CFG struct
+#include "ymfmintf.h"	// zxtune: ymfm cores
 
 
 #define LINKDEV_SSG	0x00
@@ -108,6 +109,7 @@ const DEV_DECL sndDev_YM2203 =
 	DeviceLinkIDs_OPN,
 	{	// cores
 		&devDef_MAME_2203,
+		&devDef_YM2203_YMFM,
 		NULL
 	}
 };
@@ -175,6 +177,7 @@ const DEV_DECL sndDev_YM2608 =
 	DeviceLinkIDs_OPN,
 	{	// cores
 		&devDef_MAME_2608,
+		&devDef_YM2608_YMFM,
 		NULL
 	}
 };
@@ -266,6 +269,7 @@ const DEV_DECL sndDev_YM2610 =
 	DeviceLinkIDs_OPN,
 	{	// cores
 		&devDef_MAME_2610,
+		&devDef_YM2610_YMFM,
 		NULL
 	}
 };

@@ -9,6 +9,9 @@
 #ifdef EC_YM2151_NUKED
 #include "nukedopm.h"
 #endif
+#ifdef EC_YM2151_YMFM
+#include "ymfmintf.h"
+#endif
 
 
 static const char* DeviceName(const DEV_GEN_CFG* devCfg)
@@ -44,6 +47,9 @@ const DEV_DECL sndDev_YM2151 =
 #endif
 #ifdef EC_YM2151_NUKED
 		&devDef_YM2151_Nuked,
+#endif
+#ifdef EC_YM2151_YMFM
+		&devDef_YM2151_YMFM,
 #endif
 		NULL
 	}

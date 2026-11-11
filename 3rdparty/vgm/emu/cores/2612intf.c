@@ -19,6 +19,9 @@
 #ifdef EC_YM2612_NUKED
 #include "ym3438.h"
 #endif
+#ifdef EC_YM2612_YMFM
+#include "ymfmintf.h"
+#endif
 
 
 static void ym2612_gens_update(void* chip, UINT32 samples, DEV_SMPL** outputs);
@@ -155,6 +158,9 @@ const DEV_DECL sndDev_YM2612 =
 #endif
 #ifdef EC_YM2612_NUKED
 		&devDef_Nuked,
+#endif
+#ifdef EC_YM2612_YMFM
+		&devDef_YM2612_YMFM,
 #endif
 		NULL
 	}
