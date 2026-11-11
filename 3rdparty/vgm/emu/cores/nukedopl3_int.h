@@ -42,6 +42,7 @@ extern "C" {
 
 #include "../../stdtype.h"
 #include "../snddef.h"
+#include "../EmuStructs.h"
 #include "emutypes.h"
 
 #ifndef OPL_ENABLE_STEREOEXT
@@ -164,6 +165,12 @@ struct _opl3_chip {
     uint32_t muteMask;
     int32_t masterVolL;   // master volume left (.12 fixed point)
     int32_t masterVolR;   // master volume right
+
+    /* zxtune: per-channel output tap, OPL2 layout of channels (9 melodic, 5 rhythm) for YM3812 */
+    uint8_t opl2Layout;
+    DEVCB_VOICES voicesCb;
+    void *voicesParam;
+    int32_t voices[18 + 5];
 
 #ifdef NOPL_ENABLE_WRITEBUF
     uint64_t writebuf_samplecnt;

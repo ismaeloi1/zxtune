@@ -33,6 +33,8 @@ static DEVDEF_RWFUNC devFunc262_MAME[] =
 	{RWF_VOLUME | RWF_WRITE, DEVRW_VALUE, 0, ymf262_set_volume},
 	{RWF_VOLUME_LR | RWF_WRITE, DEVRW_VALUE, 0, ymf262_set_vol_lr},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, ymf262_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, ymf262_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, ymf262_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef262_MAME =
@@ -93,6 +95,8 @@ static DEVDEF_RWFUNC devFunc262_Nuked[] =
 	{RWF_VOLUME | RWF_WRITE, DEVRW_VALUE, 0, nukedopl3_set_volume},
 	{RWF_VOLUME_LR | RWF_WRITE, DEVRW_VALUE, 0, nukedopl3_set_vol_lr},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, nukedopl3_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, nukedopl3_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, nukedopl3_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef262_Nuked =

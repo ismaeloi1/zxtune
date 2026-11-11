@@ -28,6 +28,7 @@
 
 #include "../../stdtype.h"
 #include "../snddef.h"
+#include "../EmuStructs.h"
 #include "emutypes.h"
 
 #define RSM_FRAC 10
@@ -221,6 +222,11 @@ typedef struct {
     uint64_t writebuf_lasttime;
     opll_writebuf writebuf[OPLL_WRITEBUF_SIZE];
 
+    /* zxtune: per-channel output tap */
+    DEVCB_VOICES voicesCb;
+    void *voicesParam;
+    int32_t voice_acc[15];
+    int32_t voices[14];
 } opll_t;
 
 void NOPLL_Reset(opll_t *chip, uint32_t chip_type, uint32_t rate, uint32_t clock);

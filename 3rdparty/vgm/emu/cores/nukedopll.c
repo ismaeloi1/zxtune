@@ -39,12 +39,16 @@ static void nukedopll_shutdown(void *chip);
 static void nukedopll_reset_chip(void *chip);
 static void nukedopll_update(void *chip, UINT32 samples, DEV_SMPL **out);
 static void nukedopll_set_mute_mask(void *chip, UINT32 MuteMask);
+static void nukedopll_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+static UINT32 nukedopll_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 
 
 static DEVDEF_RWFUNC devFunc[] =
 {
 	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, nukedopll_write},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, nukedopll_set_mute_mask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, nukedopll_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, nukedopll_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 DEV_DEF devDef_YM2413_Nuked =
@@ -1197,6 +1201,14 @@ void NOPLL_WriteBuffered(opll_t* chip, uint32_t port, uint8_t data)
 
 #define OUTPUT_FACTOR 8
 
+/* channels (see mute mask) of melodic and rhythm outputs by cycle, 14 - none */
+static const uint8_t CYCLE_VOICE_M[18] = {
+    14, 6, 7, 8, 14, 14, 14, 0, 1, 2, 14, 14, 14, 3, 4, 5, 14, 14
+};
+static const uint8_t CYCLE_VOICE_R[18] = {
+    11, 9, 10, 12, 13, 11, 9, 14, 14, 14, 10, 12, 14, 14, 14, 14, 14, 13
+};
+
 static void OPLL_GenerateResampled(opll_t *chip, int32_t *buf)
 {
     uint32_t i;
@@ -1209,91 +1221,25 @@ static void OPLL_GenerateResampled(opll_t *chip, int32_t *buf)
         chip->oldsamples[0] = chip->samples[0];
         chip->oldsamples[1] = chip->samples[1];
         chip->samples[0] = chip->samples[1] = 0;
+        for (i = 0; i < 15; i++)
+            chip->voice_acc[i] = 0;
         for (i = 0; i < 18; i++)
         {
-            switch (chip->cycles)
-            {
-            case 1:
-                mute_m = chip->mute[6];
-                mute_r = chip->mute[9];
-                break;
-            case 2:
-                mute_m = chip->mute[7];
-                mute_r = chip->mute[10];
-                break;
-            case 3:
-                mute_m = chip->mute[8];
-                mute_r = chip->mute[12];
-                break;
-            case 4:
-                mute_m = 0;
-                mute_r = chip->mute[13];
-                break;
-            case 5:
-                mute_m = 0;
-                mute_r = chip->mute[11];
-                break;
-            case 6:
-                mute_m = 0;
-                mute_r = chip->mute[9];
-                break;
-            case 7:
-                mute_m = chip->mute[0];
-                mute_r = 0;
-                break;
-            case 8:
-                mute_m = chip->mute[1];
-                mute_r = 0;
-                break;
-            case 9:
-                mute_m = chip->mute[2];
-                mute_r = 0;
-                break;
-            case 10:
-                mute_m = 0;
-                mute_r = chip->mute[10];
-                break;
-            case 11:
-                mute_m = 0;
-                mute_r = chip->mute[12];
-                break;
-            case 12:
-                mute_m = 0;
-                mute_r = 0;
-                break;
-            case 13:
-                mute_m = chip->mute[3];
-                mute_r = 0;
-                break;
-            case 14:
-                mute_m = chip->mute[4];
-                mute_r = 0;
-                break;
-            case 15:
-                mute_m = chip->mute[5];
-                mute_r = 0;
-                break;
-            case 16:
-                mute_m = 0;
-                mute_r = 0;
-                break;
-            case 17:
-                mute_m = 0;
-                mute_r = chip->mute[13];
-                break;
-            default:
-                mute_m = 0;
-                mute_r = chip->mute[11];
-                break;
-            }
+            /* zxtune: channels of outputs by cycle, the same as for muting */
+            const uint32_t voice_m = CYCLE_VOICE_M[chip->cycles];
+            const uint32_t voice_r = CYCLE_VOICE_R[chip->cycles];
+            mute_m = voice_m < 14 ? chip->mute[voice_m] : 0;
+            mute_r = voice_r < 14 ? chip->mute[voice_r] : 0;
             NOPLL_Clock(chip, buffer);
             if (!mute_m)
             {
                 chip->samples[0] += buffer[0];
+                chip->voice_acc[voice_m] += buffer[0];
             }
             if (!mute_r)
             {
                 chip->samples[1] += buffer[1];
+                chip->voice_acc[voice_r] += buffer[1];
             }
 
             while (chip->writebuf[chip->writebuf_cur].time <= chip->writebuf_samplecnt)
@@ -1308,6 +1254,12 @@ static void OPLL_GenerateResampled(opll_t *chip, int32_t *buf)
                 chip->writebuf_cur = (chip->writebuf_cur + 1) % OPLL_WRITEBUF_SIZE;
             }
             chip->writebuf_samplecnt++;
+        }
+        if (chip->voicesCb)
+        {
+            /* both outputs are mixed into left and right, sum of channels is at the scale of mixed output */
+            for (i = 0; i < 14; i++)
+                chip->voices[i] = chip->voice_acc[i] * OUTPUT_FACTOR * 8;
         }
         chip->samples[0] *= OUTPUT_FACTOR;
         chip->samples[1] *= OUTPUT_FACTOR;
@@ -1364,15 +1316,21 @@ static void nukedopll_reset_chip(void *chipptr)
 	UINT8 chn;
 	DEV_DATA devData;
 	UINT32 mute;
+	DEVCB_VOICES voicesCb;
+	void* voicesParam;
 	
 	devData = chip->_devData;
 	mute = 0;
 	for (chn = 0; chn < 14; chn ++)
 		mute |= (chip->mute[chn] << chn);
 	
+	voicesCb = chip->voicesCb;
+	voicesParam = chip->voicesParam;
 	NOPLL_Reset(chip, chip->chip_type, chip->smplRate, chip->clock);
 	
 	chip->_devData = devData;
+	chip->voicesCb = voicesCb;
+	chip->voicesParam = voicesParam;
 	for (chn = 0; chn < 14; chn ++)
 		chip->mute[chn] = (mute >> chn) & 0x01;
 	
@@ -1390,9 +1348,88 @@ static void nukedopll_update(void *chipptr, UINT32 samples, DEV_SMPL **out)
 		OPLL_GenerateResampled(chip, buffer);
 		out[0][i] = buffer[0];
 		out[1][i] = buffer[1];
+		if (chip->voicesCb)
+			chip->voicesCb(chip->voicesParam, 14, chip->voices);
 	}
 	
 	return;
+}
+
+static void nukedopll_set_voices_cb(void *chipptr, DEVCB_VOICES cb, void* param)
+{
+	opll_t *chip = (opll_t *)chipptr;
+	chip->voicesCb = cb;
+	chip->voicesParam = param;
+}
+
+/* zxtune: voices state in the same format as EMU2413 core: level, frequency and key only */
+static void nukedopll_fill_voice(DEV_VOICE_STATE* state, const opll_t *chip, uint32_t ch, uint32_t carrier, uint32_t tl,
+	float freq, UINT8 flags)
+{
+	uint32_t slot;
+	uint32_t att = 127;
+	/* envelope state is stored by cycle, see OPLL_EnvelopeGenerate and OPLL_PreparePatch1 */
+	for (slot = 0; slot < 18; slot ++)
+	{
+		if (ch_offset[slot] == ch && (((slot + 1) / 3) & 1) == carrier)
+		{
+			att = chip->eg_level[slot] + (tl << 3);
+			break;
+		}
+	}
+	state->freq = freq;
+	/* 0.375dB per step */
+	state->level = att >= 127 ? -96.0f : -(float)(att * 0.375);
+	state->flags = flags | DEVVOICE_LEVEL;
+	state->kind = DEVVOICE_KIND_GENERIC;
+	memset(state->fields, 0, sizeof(state->fields));
+}
+
+static UINT32 nukedopll_get_voices_state(void *chipptr, UINT32 count, DEV_VOICE_STATE* states)
+{
+	/* BD, SD, TOM, CYM, HH channels, slots (carrier or not) and key bits */
+	static const uint8_t RHYTHM_CHANNELS[5] = {6, 7, 8, 8, 7};
+	static const uint8_t RHYTHM_CARRIERS[5] = {1, 1, 0, 1, 0};
+	static const uint8_t RHYTHM_KEYS[5] = {0x10, 0x08, 0x04, 0x02, 0x01};
+	opll_t *chip = (opll_t *)chipptr;
+	const uint8_t rhythm = (chip->rhythm & 0x20) != 0;
+	const double rate = chip->clock / 72.0;
+	float freqs[9];
+	uint32_t ch;
+	
+	for (ch = 0; ch < 9; ch ++)
+	{
+		/* fnote = fnum * rate * 2^(block-1) / 2^18 */
+		freqs[ch] = (float)(chip->fnum[ch] * rate * (1 << chip->block[ch]) / (double)(1 << 19));
+	}
+	for (ch = 0; ch < 9 && ch < count; ch ++)
+	{
+		if (rhythm && ch >= 6)
+		{
+			nukedopll_fill_voice(&states[ch], chip, ch, 1, chip->vol[ch], 0.0f, 0);
+			states[ch].level = -96.0f;
+		}
+		else
+		{
+			nukedopll_fill_voice(&states[ch], chip, ch, 1, chip->vol[ch], freqs[ch],
+				DEVVOICE_FREQ | (chip->kon[ch] ? DEVVOICE_KEYON : 0));
+		}
+	}
+	for (ch = 0; ch < 5 && 9 + ch < count; ch ++)
+	{
+		DEV_VOICE_STATE* state = &states[9 + ch];
+		const uint32_t chan = RHYTHM_CHANNELS[ch];
+		/* modulators of rhythm instruments use instrument field as volume */
+		const uint32_t tl = RHYTHM_CARRIERS[ch] ? chip->vol[chan] : chip->inst[chan];
+		const uint8_t keyOn = (rhythm && (chip->rhythm & RHYTHM_KEYS[ch])) ? DEVVOICE_KEYON : 0;
+		if (ch == 0 || ch == 2)
+			nukedopll_fill_voice(state, chip, chan, RHYTHM_CARRIERS[ch], tl, freqs[chan], DEVVOICE_FREQ | keyOn);
+		else
+			nukedopll_fill_voice(state, chip, chan, RHYTHM_CARRIERS[ch], tl, 0.0f, DEVVOICE_NOISE | keyOn);
+		if (! rhythm)
+			state->level = -96.0f;
+	}
+	return 14;
 }
 
 static const uint32_t MUTE_MASK_MAP[14] = {

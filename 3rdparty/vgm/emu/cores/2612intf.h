@@ -20,9 +20,11 @@
 #define OPT_YM2612_TYPE_OPN2		0x00	// [Nuked OPN2] emulate YM2612
 #define OPT_YM2612_TYPE_OPN2C_ASIC	0x10	// [Nuked OPN2] emulate ASIC YM3438
 #define OPT_YM2612_TYPE_OPN2C_DISC	0x20	// [Nuked OPN2] emulate Discrete YM3438
+#define OPT_YM2612_NO_LADDER		0x40	// [Nuked OPN2] YM2612 modes without DAC crossover distortion (ladder effect)
 #define OPT_YM2612_LEGACY_MODE		0x80	// [GPGX core] simulate behaviour of older emulation cores
 											// not recommended, but required for playing GYM files
 											// (default: disabled)
+#define OPT_YM2612_TYPE_YMF276		0x100	// [Nuked OPN2] YMF276: YM3438 with 14-bit digital output to external DAC
 
 // default option bitmask: 0x00
 

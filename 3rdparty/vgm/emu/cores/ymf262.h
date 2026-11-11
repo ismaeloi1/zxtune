@@ -2,6 +2,7 @@
 #define __YMF262_H__
 
 #include "../../stdtype.h"
+#include "../EmuStructs.h"
 
 typedef void (*OPL3_TIMERHANDLER)(void *param,UINT8 timer,UINT32 period);
 typedef void (*OPL3_IRQHANDLER)(void *param,UINT8 irq);
@@ -24,5 +25,7 @@ void ymf262_set_mute_mask(void *chip, UINT32 MuteMask);
 void ymf262_set_volume(void *chip, INT32 volume);
 void ymf262_set_vol_lr(void *chip, INT32 volLeft, INT32 volRight);
 void ymf262_set_log_cb(void* chip, DEVCB_LOG func, void* param);
+void ymf262_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param);
+UINT32 ymf262_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states);
 
 #endif	// __YMF262_H__

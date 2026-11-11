@@ -97,7 +97,9 @@ static DEVDEF_RWFUNC devFunc3812_Nuked[] =
 {
 	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, nukedopl3_write},
 	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, nukedopl3_read},
-	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, nukedopl3_set_mute_mask},
+	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, nukedopl3_set_mute_mask_opl2},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, nukedopl3_set_voices_cb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, nukedopl3_get_voices_state},
 	{0x00, 0x00, 0, NULL}
 };
 static DEV_DEF devDef3812_Nuked =
@@ -110,7 +112,7 @@ static DEV_DEF devDef3812_Nuked =
 	nukedopl3_update,
 	
 	NULL,	// SetOptionBits
-	nukedopl3_set_mute_mask,
+	nukedopl3_set_mute_mask_opl2,
 	NULL,	// SetPanning
 	NULL,	// SetSampleRateChangeCallback
 	NULL,	// SetLoggingCallback
@@ -351,6 +353,7 @@ static UINT8 device_start_ym3812_nuked(const DEV_GEN_CFG* cfg, DEV_INFO* retDevI
 		return 0xFF;
 	
 	nukedopl3_set_volume(chip, 0x10000);
+	nukedopl3_set_opl2_layout(chip);
 	nukedopl3_set_mute_mask(chip, 0x000000);
 	
 	devData = (DEV_DATA*)chip;

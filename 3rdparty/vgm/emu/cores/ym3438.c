@@ -36,6 +36,7 @@
 #include "../snddef.h"
 #include "ym3438.h"
 #include "ym3438_int.h"
+#include "2612intf.h"
 
 // superctr's MegaDrive model 1 filter
 #define FILTER_CUTOFF 0.512331301282628 // 5894Hz  single pole IIR low pass
@@ -935,11 +936,23 @@ static void NOPN2_ChGenerate(ym3438_t *chip)
     }
     if (fm_algorithm[op][5][chip->connect[channel]] && !test_dac)
     {
-        add += chip->fm_out[slot] >> 5;
+        /* zxtune: YMF276 accumulates full 14-bit operators outputs (see ymfm::ymf276) */
+        add += chip->ymf276 ? chip->fm_out[slot] : (chip->fm_out[slot] >> 5);
     }
     sum = acc + add;
     /* Clamp */
-    if (sum > 255)
+    if (chip->ymf276)
+    {
+        if (sum > 8191)
+        {
+            sum = 8191;
+        }
+        else if (sum < -8192)
+        {
+            sum = -8192;
+        }
+    }
+    else if (sum > 255)
     {
         sum = 255;
     }
@@ -985,6 +998,10 @@ static void NOPN2_ChOutput(ym3438_t *chip)
     {
         out = (Bit16s)chip->dacdata;
         out = SIGN_EXTEND(8, out);
+        if (chip->ymf276)
+        {
+            out *= 32;
+        }
     }
     else
     {
@@ -998,7 +1015,12 @@ static void NOPN2_ChOutput(ym3438_t *chip)
         out_en = ((cycles & 3) == 3) || test_dac;
         /* YM2612 DAC emulation(not verified) */
         sign = out >> 8;
-        if (out >= 0)
+        if (chip->no_ladder)
+        {
+            /* zxtune: the same multiplexing without crossover offset of discrete DAC */
+            sign = 0;
+        }
+        else if (out >= 0)
         {
             out++;
             sign++;
@@ -1481,7 +1503,13 @@ void NOPN2_WriteBuffered(ym3438_t *chip, UINT8 port, UINT8 data)
 
 void nukedopn2_write(void *chip, UINT8 port, UINT8 data)
 {
-    NOPN2_WriteBuffered((ym3438_t *)chip, port, data);
+    ym3438_t* opn2 = (ym3438_t*)chip;
+    /* zxtune: registers copy for voices state, chip keeps only decoded values */
+    if (port & 1)
+        opn2->regs[((port & 2) << 7) | opn2->reg_latch[(port >> 1) & 1]] = data;
+    else
+        opn2->reg_latch[(port >> 1) & 1] = data;
+    NOPN2_WriteBuffered(opn2, port, data);
 }
 
 UINT8 nukedopn2_read(void *chip, UINT8 port)
@@ -1494,43 +1522,49 @@ void NOPN2_GenerateResampled(ym3438_t *chip, Bit32s *buf)
     Bit32u i;
     Bit32s buffer[2];
     Bit32u mute;
+    Bit32u voice;
     
     while (chip->samplecnt >= chip->rateratio)
     {
         chip->oldsamples[0] = chip->samples[0];
         chip->oldsamples[1] = chip->samples[1];
         chip->samples[0] = chip->samples[1] = 0;
+        for (i = 0; i < 7; i++)
+            chip->voice_acc[i] = 0;
         for (i = 0; i < 24; i++)
         {
             switch (chip->cycles >> 2)
             {
             case 0: // Ch 2
-                mute = chip->mute[1];
+                voice = 1;
                 break;
             case 1: // Ch 6, DAC
-                mute = chip->mute[5 + chip->dacen];
+                voice = 5 + chip->dacen;
                 break;
             case 2: // Ch 4
-                mute = chip->mute[3];
+                voice = 3;
                 break;
             case 3: // Ch 1
-                mute = chip->mute[0];
+                voice = 0;
                 break;
             case 4: // Ch 5
-                mute = chip->mute[4];
+                voice = 4;
                 break;
             case 5: // Ch 3
-                mute = chip->mute[2];
+                voice = 2;
                 break;
             default:
-                mute = 0;
+                voice = 7;
                 break;
             }
+            mute = voice < 7 ? chip->mute[voice] : 0;
             NOPN2_Clock(chip, buffer);
             if (!mute)
             {
                 chip->samples[0] += buffer[0];
                 chip->samples[1] += buffer[1];
+                if (voice < 7)
+                    chip->voice_acc[voice] += buffer[0] + buffer[1];
             }
 
             while (chip->writebuf[chip->writebuf_cur].time <= chip->writebuf_samplecnt)
@@ -1546,7 +1580,19 @@ void NOPN2_GenerateResampled(ym3438_t *chip, Bit32s *buf)
             }
             chip->writebuf_samplecnt++;
         }
-        if(!chip->use_filter)
+        if (chip->voicesCb)
+        {
+            /* zxtune: channels of the last chip sample, as resampling is not required for oscilloscope */
+            for (i = 0; i < 7; i++)
+                chip->voices[i] = chip->ymf276 ? chip->voice_acc[i] * 11 / 16 : chip->voice_acc[i] * 22;
+        }
+        if (chip->ymf276)
+        {
+            /* zxtune: the same level as 9-bit DAC */
+            chip->samples[0] = chip->samples[0] * 11 / 32;
+            chip->samples[1] = chip->samples[1] * 11 / 32;
+        }
+        else if(!chip->use_filter)
         {
             chip->samples[0] *= 11;
             chip->samples[1] *= 11;
@@ -1579,6 +1625,8 @@ void nukedopn2_update(void *chip, UINT32 numsamples, DEV_SMPL **sndptr)
         NOPN2_GenerateResampled(opn2, buffer);
         *smpl++ = buffer[0];
         *smpr++ = buffer[1];
+        if (opn2->voicesCb)
+            opn2->voicesCb(opn2->voicesParam, 7, opn2->voices);
     }
 }
 
@@ -1601,6 +1649,8 @@ void nukedopn2_set_options(void *chip, UINT32 flags)
         NOPN2_SetChipType(opn2, ym3438_mode_ym2612 | 0x10);
         break;
     }
+    opn2->no_ladder = (flags & OPT_YM2612_NO_LADDER) != 0;
+    opn2->ymf276 = (flags & OPT_YM2612_TYPE_YMF276) != 0;
 }
 
 void nukedopn2_set_mute_mask(void *chip, UINT32 mute)
@@ -1640,6 +1690,10 @@ void nukedopn2_reset_chip(void *chip)
     UINT32 mute;
     Bit32u type;
     Bit32u filter;
+    Bit32u noLadder;
+    Bit32u ymf276;
+    DEVCB_VOICES voicesCb;
+    void* voicesParam;
     
     devData = opn2->_devData;
     mute = 0;
@@ -1647,6 +1701,10 @@ void nukedopn2_reset_chip(void *chip)
         mute |= (opn2->mute[i] << i);
     type = opn2->chip_type;
     filter = opn2->use_filter;
+    noLadder = opn2->no_ladder;
+    ymf276 = opn2->ymf276;
+    voicesCb = opn2->voicesCb;
+    voicesParam = opn2->voicesParam;
     
     NOPN2_Reset(opn2, opn2->clock, opn2->smplRate);
     
@@ -1654,4 +1712,131 @@ void nukedopn2_reset_chip(void *chip)
     nukedopn2_set_mute_mask(opn2, mute);
     opn2->chip_type = type;
     opn2->use_filter = filter;
+    opn2->no_ladder = noLadder;
+    opn2->ymf276 = ymf276;
+    opn2->voicesCb = voicesCb;
+    opn2->voicesParam = voicesParam;
+}
+
+void nukedopn2_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+    ym3438_t* opn2 = (ym3438_t*)chip;
+    opn2->voicesCb = cb;
+    opn2->voicesParam = param;
+}
+
+/* zxtune: voices state in the same format as MAME/GPGX core (see fmopn.c) */
+static UINT8 nukedopn2_level_field(Bit32u att)
+{
+    if (att > 0x3ff)
+        att = 0x3ff;
+    return (UINT8)(255 - att * 255 / 0x3ff);
+}
+
+static void nukedopn2_fill_voice(const ym3438_t* chip, UINT32 ch, DEV_VOICE_STATE* state)
+{
+    /* carriers per algorithm in OP1..OP4 order */
+    static const UINT8 CARRIERS[8] = {0x08, 0x08, 0x08, 0x08, 0x0a, 0x0e, 0x0e, 0x0f};
+    /* operators registers offsets in OP1..OP4 order */
+    static const UINT8 OP_REGS[4] = {0x00, 0x08, 0x04, 0x0c};
+    /* eg_num_attack, decay, sustain, release to DEVVOICE stages */
+    static const UINT8 STAGES[4] = {1, 2, 3, 4};
+    const UINT32 port = ch < 3 ? 0 : 1;
+    const UINT32 local = ch % 3;
+    const Bit8u* regs = chip->regs + port * 0x100;
+    const Bit8u* regs0 = chip->regs;
+    const double rate = chip->clock / 144.0;
+    const UINT32 egRate = (chip->clock + 216) / 432;
+    const UINT32 fnum = chip->fnum[ch];
+    const UINT32 block = chip->block[ch];
+    UINT32 minAtt = 0x3ff;
+    UINT8 keyOn = 0;
+    UINT8 op;
+
+    memset(state->fields, 0, sizeof(state->fields));
+    for (op = 0; op < 4; op ++)
+    {
+        const UINT32 r = local + OP_REGS[op];
+        /* see op_offset table */
+        const UINT32 slot = ((OP_REGS[op] & 4) ? 6 : 0) + port * 3 + local + ((OP_REGS[op] & 8) ? 12 : 0);
+        const UINT32 eg = chip->eg_level[slot];
+        const UINT32 att = eg + (chip->tl[slot] << 3);
+        const UINT8 kon = chip->mode_kon[slot];
+        UINT8* out = &state->fields[DEVVOICE_FM_OPS + op * DEVVOICE_FM_OP_SIZE];
+        UINT8 stage = chip->eg_state[slot] < 4 ? STAGES[chip->eg_state[slot]] : 0;
+
+        if (stage == 4 && eg >= 0x3f0)
+            stage = 0;
+        state->fields[2 + op] = nukedopn2_level_field(att);
+        state->fields[DEVVOICE_FM_EG + op] = nukedopn2_level_field(eg);
+        if (kon)
+            state->fields[10] |= 1 << op;
+        if (CARRIERS[chip->connect[ch] & 7] & (1 << op))
+        {
+            if (kon)
+                keyOn = 1;
+            if (att < minAtt)
+                minAtt = att;
+        }
+        out[DEVVOICE_FM_OP_MUL] = regs[0x30 + r] & 0x0f;
+        out[DEVVOICE_FM_OP_TL] = regs[0x40 + r] & 0x7f;
+        out[DEVVOICE_FM_OP_AR] = regs[0x50 + r] & 0x1f;
+        out[DEVVOICE_FM_OP_DR] = regs[0x60 + r] & 0x1f;
+        out[DEVVOICE_FM_OP_SR] = (regs[0x70 + r] & 0x1f) | ((regs[0x50 + r] >> 6) << 5);
+        out[DEVVOICE_FM_OP_SLRR] = (regs[0x80 + r] >> 4) | ((regs[0x80 + r] & 0x0f) << 4);
+        out[DEVVOICE_FM_OP_FLAGS] = stage | ((regs[0x60 + r] & 0x80) ? DEVVOICE_FM_OPF_AM : 0);
+        out[DEVVOICE_FM_OP_EXTRA] = ((regs[0x30 + r] >> 4) & 7) | ((regs[0x90 + r] & 0x0f) << 3);
+    }
+    if (minAtt > 0x3ff)
+        minAtt = 0x3ff;
+    /* fnote = fnum * rate * 2^(block-1) / 2^20 */
+    state->freq = (float)(fnum * rate * (1 << block) / (double)(1 << 21));
+    /* 10-bit attenuation, 0.09375dB per step */
+    state->level = -(float)(minAtt * (96.0 / 1024));
+    state->flags = DEVVOICE_FREQ | DEVVOICE_LEVEL | (keyOn ? DEVVOICE_KEYON : 0);
+    state->kind = DEVVOICE_KIND_OPN_FM;
+    state->fields[0] = chip->connect[ch] & 7;
+    state->fields[1] = chip->fb[ch] & 7;
+    state->fields[6] = CARRIERS[chip->connect[ch] & 7];
+    state->fields[7] = (UINT8)((chip->pan_l[ch] << 1) | chip->pan_r[ch]);
+    state->fields[8] = chip->ams[ch];
+    state->fields[9] = chip->pms[ch];
+    state->fields[11] = (UINT8)block;
+    state->fields[DEVVOICE_FM_FNUM] = (UINT8)(fnum & 0xff);
+    state->fields[DEVVOICE_FM_FNUM + 1] = (UINT8)(fnum >> 8);
+    state->fields[DEVVOICE_FM_GLOBAL] = (UINT8)((regs0[0x22] & 0x0f) | (chip->mode_ch3 == 1 ? 0x10 : 0)
+        | (chip->mode_ch3 == 2 ? 0x20 : 0) | (chip->dacen ? 0x40 : 0));
+    state->fields[DEVVOICE_FM_CHIP] = DEVVOICE_FM_CHIP_OPN2;
+    state->fields[DEVVOICE_FM_EG_RATE] = (UINT8)(egRate & 0xff);
+    state->fields[DEVVOICE_FM_EG_RATE + 1] = (UINT8)(egRate >> 8);
+    state->fields[DEVVOICE_FM_TIMER_A] = (UINT8)(chip->timer_a_reg & 0xff);
+    state->fields[DEVVOICE_FM_TIMER_A + 1] = (UINT8)((chip->timer_a_reg >> 8) & 3);
+}
+
+UINT32 nukedopn2_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+    ym3438_t* opn2 = (ym3438_t*)chip;
+    UINT32 ch;
+
+    for (ch = 0; ch < 6 && ch < count; ch ++)
+    {
+        nukedopn2_fill_voice(opn2, ch, &states[ch]);
+        if (ch == 5 && opn2->dacen)
+        {
+            states[ch].flags = 0;
+            states[ch].level = -96.0f;
+        }
+    }
+    if (count > 6)
+    {
+        /* DAC: audio only */
+        states[6].freq = 0.0f;
+        states[6].level = 0.0f;
+        states[6].flags = opn2->dacen ? DEVVOICE_KEYON : 0;
+        states[6].kind = DEVVOICE_KIND_OPN_DAC;
+        memset(states[6].fields, 0, sizeof(states[6].fields));
+        states[6].fields[0] = opn2->dacen;
+        states[6].fields[1] = (UINT8)(((opn2->dacdata >> 1) & 0xff) ^ 0x80);
+    }
+    return 7;
 }

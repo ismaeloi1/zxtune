@@ -1146,6 +1146,45 @@ INLINE void NOPL3_ProcessSlot(opl3_slot *slot)
     OPL3_SlotGenerate(slot);
 }
 
+/* zxtune: channels outputs as mixed to left output (both for OPL2 mode), in L+R scale */
+static void NOPL3_TapVoices(opl3_chip *chip)
+{
+    const uint8_t rhythm = (chip->rhy & 0x20) != 0;
+    const uint8_t rhythmBase = chip->opl2Layout ? 9 : 18;
+    uint8_t ii;
+
+    for (ii = 0; ii < 18; ii++)
+    {
+        const opl3_channel *channel = &chip->channel[ii];
+        const int16_t * const *out = channel->out;
+        int32_t accm;
+        if (channel->muted || (rhythm && ii >= 6 && ii < 9))
+            accm = 0;
+        else
+            accm = *out[0] + *out[1] + *out[2] + *out[3];
+        accm *= (channel->cha ? 1 : 0) + (channel->chb ? 1 : 0);
+        if (ii < rhythmBase)
+            chip->voices[ii] = accm;
+    }
+    if (rhythm)
+    {
+        /* see OPL3_RhythmSetupAlg, muted ones are connected to zero */
+        const opl3_channel *ch6 = &chip->channel[6];
+        const opl3_channel *ch7 = &chip->channel[7];
+        const opl3_channel *ch8 = &chip->channel[8];
+        chip->voices[rhythmBase + 0] = (*ch6->out[0] + *ch6->out[1]) * ((ch6->cha ? 1 : 0) + (ch6->chb ? 1 : 0));
+        chip->voices[rhythmBase + 1] = (*ch7->out[2] + *ch7->out[3]) * ((ch7->cha ? 1 : 0) + (ch7->chb ? 1 : 0));
+        chip->voices[rhythmBase + 2] = (*ch8->out[0] + *ch8->out[1]) * ((ch8->cha ? 1 : 0) + (ch8->chb ? 1 : 0));
+        chip->voices[rhythmBase + 3] = (*ch8->out[2] + *ch8->out[3]) * ((ch8->cha ? 1 : 0) + (ch8->chb ? 1 : 0));
+        chip->voices[rhythmBase + 4] = (*ch7->out[0] + *ch7->out[1]) * ((ch7->cha ? 1 : 0) + (ch7->chb ? 1 : 0));
+    }
+    else
+    {
+        for (ii = 0; ii < 5; ii++)
+            chip->voices[rhythmBase + ii] = 0;
+    }
+}
+
 void NOPL3_Generate4Ch(opl3_chip *chip, int32_t *buf4)
 {
     opl3_channel *channel;
@@ -1186,6 +1225,8 @@ void NOPL3_Generate4Ch(opl3_chip *chip, int32_t *buf4)
     }
     chip->mixbuff[0] = mix[0];
     chip->mixbuff[2] = mix[1];
+    if (chip->voicesCb)
+        NOPL3_TapVoices(chip);
 
 #if OPL_QUIRK_CHANNELSAMPLEDELAY
     for (ii = 15; ii < 18; ii++)
@@ -1748,7 +1789,217 @@ void nukedopl3_update(void *chip, UINT32 samples, DEV_SMPL **out)
 		NOPL3_GenerateResampled(opl3, buffers);
 		out[0][i] = (buffers[0] * opl3->masterVolL) >> 12;
 		out[1][i] = (buffers[1] * opl3->masterVolR) >> 12;
+		if (opl3->voicesCb)
+		{
+			const UINT32 count = opl3->opl2Layout ? 9 + 5 : 18 + 5;
+			INT32 voices[18 + 5];
+			UINT32 ch;
+			for (ch = 0; ch < count; ch ++)
+				voices[ch] = (opl3->voices[ch] * opl3->masterVolL) >> 12;
+			opl3->voicesCb(opl3->voicesParam, count, voices);
+		}
 	}
+}
+
+void nukedopl3_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	opl3_chip* opl3 = (opl3_chip*)chip;
+	opl3->voicesCb = cb;
+	opl3->voicesParam = param;
+}
+
+void nukedopl3_set_opl2_layout(void *chip)
+{
+	opl3_chip* opl3 = (opl3_chip*)chip;
+	opl3->opl2Layout = 1;
+}
+
+void nukedopl3_set_mute_mask_opl2(void *chip, UINT32 MuteMask)
+{
+	// rhythm channels follow 9 melodic ones in YM3812 layout
+	nukedopl3_set_mute_mask(chip, (MuteMask & 0x1ff) | ((MuteMask >> 9) & 0x1f) << 18);
+}
+
+// zxtune: voices state in the same format as AdLibEmu core (see adlibemu_opl_inc.c)
+static UINT8 nukedopl3_level_field(uint32_t att)
+{
+	if (att > 0x1ff)
+		att = 0x1ff;
+	return (UINT8)(255 - att * 255 / 0x1ff);
+}
+
+// 9-bit attenuation of slot output (with total level, key scale and tremolo), 0.1875dB per step
+static uint32_t nukedopl3_slot_att(const opl3_slot *slot)
+{
+	return slot->eg_out > 0x1ff ? 0x1ff : slot->eg_out;
+}
+
+static float nukedopl3_att_db(uint32_t att)
+{
+	return att >= 0x1ff ? -96.0f : -(float)(att * (96.0 / 512));
+}
+
+static void nukedopl3_fill_fm_fields(const opl3_chip *chip, DEV_VOICE_STATE* state, const opl3_channel *channel,
+	const opl3_slot* const* slots, UINT8 ops)
+{
+	// envelope_gen_num_attack, decay, sustain, release to DEVVOICE stages
+	static const UINT8 STAGES[4] = {1, 2, 3, 4};
+	const UINT32 egRate = (chip->clock + 144) / 288;
+	UINT8 global = ((chip->rhy & 0x20) ? 0x01 : 0) | (chip->tremoloshift == 2 ? 0x02 : 0)
+		| (chip->vibshift == 0 ? 0x04 : 0) | (chip->nts ? 0x20 : 0);
+	UINT8 connections = 0;
+	UINT8 op;
+
+	for (op = 0; op < ops; op ++)
+	{
+		const opl3_slot* slot = slots[op];
+		UINT8* out = &state->fields[DEVVOICE_FM_OPS + op * DEVVOICE_FM_OP_SIZE];
+		UINT8 stage = slot->eg_gen < 4 ? STAGES[slot->eg_gen] : 0;
+
+		if (stage == 4 && slot->eg_rout >= 0x1ff)
+			stage = 0;
+		out[DEVVOICE_FM_OP_MUL] = slot->reg_mult & 0x0f;
+		out[DEVVOICE_FM_OP_TL] = slot->reg_tl & 0x3f;
+		out[DEVVOICE_FM_OP_AR] = slot->reg_ar & 0x0f;
+		out[DEVVOICE_FM_OP_DR] = slot->reg_dr & 0x0f;
+		out[DEVVOICE_FM_OP_SR] = slot->reg_ksl & 3;
+		out[DEVVOICE_FM_OP_SLRR] = (slot->reg_sl & 0x0f) | ((slot->reg_rr & 0x0f) << 4);
+		out[DEVVOICE_FM_OP_FLAGS] = stage
+			| (slot->trem != (const uint8_t*)&zeromod ? DEVVOICE_FM_OPF_AM : 0) | (slot->reg_vib ? DEVVOICE_FM_OPF_VIB : 0)
+			| (slot->reg_type ? DEVVOICE_FM_OPF_EGT : 0) | (slot->reg_ksr ? DEVVOICE_FM_OPF_KSR : 0);
+		out[DEVVOICE_FM_OP_EXTRA] = slot->reg_wf & 7;
+		state->fields[DEVVOICE_FM_EG + op] = nukedopl3_level_field(slot->eg_rout);
+	}
+	state->fields[DEVVOICE_FM_FNUM] = (UINT8)(channel->f_num & 0xff);
+	state->fields[DEVVOICE_FM_FNUM + 1] = (UINT8)((channel->f_num >> 8) | ((channel->block & 7) << 4));
+	for (op = 0; op < 3; op ++)
+	{
+		if (chip->channel[op].chtype == ch_4op)
+			connections |= 1 << op;
+		if (chip->channel[9 + op].chtype == ch_4op)
+			connections |= 8 << op;
+	}
+	if (chip->opl2Layout)
+	{
+		state->fields[DEVVOICE_FM_CHIP] = DEVVOICE_FM_CHIP_OPL2;
+	}
+	else
+	{
+		if (chip->newm)
+			global |= 0x08;
+		state->fields[DEVVOICE_FM_GLOBAL2] = connections;
+		state->fields[DEVVOICE_FM_CHIP] = DEVVOICE_FM_CHIP_OPL3;
+	}
+	state->fields[DEVVOICE_FM_GLOBAL] = global;
+	state->fields[DEVVOICE_FM_EG_RATE] = (UINT8)(egRate & 0xff);
+	state->fields[DEVVOICE_FM_EG_RATE + 1] = (UINT8)(egRate >> 8);
+}
+
+static void nukedopl3_fill_generic(DEV_VOICE_STATE* state, float level, float freq, UINT8 flags)
+{
+	memset(state->fields, 0, sizeof(state->fields));
+	state->kind = DEVVOICE_KIND_GENERIC;
+	state->level = level;
+	state->freq = freq;
+	state->flags = flags | DEVVOICE_LEVEL;
+}
+
+UINT32 nukedopl3_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	// BD, SD, TT, CY, HH as slots of channels 6..8 and key bits
+	static const UINT8 RHYTHM_CHANNELS[5] = {6, 7, 8, 8, 7};
+	static const UINT8 RHYTHM_SLOTS[5] = {1, 1, 0, 1, 0};
+	static const UINT8 RHYTHM_KEYS[5] = {0x10, 0x08, 0x04, 0x02, 0x01};
+	opl3_chip* opl3 = (opl3_chip*)chip;
+	const UINT32 channels = opl3->opl2Layout ? 9 : 18;
+	const uint8_t isRhythm = (opl3->rhy & 0x20) != 0;
+	const double rate = opl3->clock / 288.0;
+	float freqs[18];
+	UINT32 ch;
+
+	for (ch = 0; ch < 18; ch ++)
+	{
+		const opl3_channel* channel = &opl3->channel[ch];
+		// f = fnum * fsam * 2^block / 2^20
+		freqs[ch] = (float)(channel->f_num * rate * (1 << channel->block) / (double)(1 << 20));
+	}
+	for (ch = 0; ch < channels && ch < count; ch ++)
+	{
+		const opl3_channel* channel = &opl3->channel[ch];
+		const UINT8 keyOn = (channel->slotz[0]->key & egk_norm) || (channel->slotz[1]->key & egk_norm);
+		const UINT8 pan = opl3->newm ? (UINT8)((channel->cha ? 2 : 0) | (channel->chb ? 1 : 0)) : 3;
+		DEV_VOICE_STATE* state = &states[ch];
+
+		if ((isRhythm && ch >= 6 && ch < 9) || channel->chtype == ch_4op2)
+		{
+			// rhythm or operators of 4 operators channel ch-3
+			nukedopl3_fill_generic(state, -96.0f, 0.0f, 0);
+			continue;
+		}
+		if (channel->chtype == ch_4op)
+		{
+			const opl3_channel* pair = channel->pair;
+			const opl3_slot* slots[4] = {channel->slotz[0], channel->slotz[1], pair->slotz[0], pair->slotz[1]};
+			const UINT8 alg = (channel->con & 1) | ((pair->con & 1) << 1);
+			// carriers of algorithms in OP1..OP4 order
+			static const UINT8 CARRIERS[4] = {0x08, 0x09, 0x0a, 0x0d};
+			uint32_t minAtt = 0x1ff;
+			UINT8 op;
+			for (op = 0; op < 4; op ++)
+			{
+				if ((CARRIERS[alg] & (1 << op)) && nukedopl3_slot_att(slots[op]) < minAtt)
+					minAtt = nukedopl3_slot_att(slots[op]);
+			}
+			nukedopl3_fill_generic(state, nukedopl3_att_db(minAtt), freqs[ch], DEVVOICE_FREQ | (keyOn ? DEVVOICE_KEYON : 0));
+			state->kind = DEVVOICE_KIND_OPL_4OP;
+			state->fields[0] = alg;
+			state->fields[1] = channel->fb & 7;
+			for (op = 0; op < 4; op ++)
+			{
+				state->fields[2 + op] = nukedopl3_level_field(nukedopl3_slot_att(slots[op]));
+				state->fields[6 + op] = slots[op]->reg_wf & 7;
+			}
+			state->fields[10] = keyOn;
+			state->fields[11] = pan;
+			nukedopl3_fill_fm_fields(opl3, state, channel, slots, 4);
+			continue;
+		}
+		{
+			const opl3_slot* slots[2] = {channel->slotz[0], channel->slotz[1]};
+			uint32_t minAtt = nukedopl3_slot_att(slots[1]);
+			if ((channel->con & 1) && nukedopl3_slot_att(slots[0]) < minAtt)
+				minAtt = nukedopl3_slot_att(slots[0]);	// additive synthesis
+			nukedopl3_fill_generic(state, nukedopl3_att_db(minAtt), freqs[ch], DEVVOICE_FREQ | (keyOn ? DEVVOICE_KEYON : 0));
+			state->kind = DEVVOICE_KIND_OPL_2OP;
+			state->fields[0] = channel->con & 1;
+			state->fields[1] = channel->fb & 7;
+			state->fields[2] = nukedopl3_level_field(nukedopl3_slot_att(slots[0]));
+			state->fields[3] = nukedopl3_level_field(nukedopl3_slot_att(slots[1]));
+			state->fields[4] = slots[0]->reg_wf & 7;
+			state->fields[5] = slots[1]->reg_wf & 7;
+			state->fields[6] = keyOn;
+			state->fields[7] = pan;
+			state->fields[8] = channel->block & 7;
+			nukedopl3_fill_fm_fields(opl3, state, channel, slots, 2);
+		}
+	}
+	for (ch = 0; ch < 5 && channels + ch < count; ch ++)
+	{
+		DEV_VOICE_STATE* state = &states[channels + ch];
+		const opl3_slot* slot = opl3->channel[RHYTHM_CHANNELS[ch]].slotz[RHYTHM_SLOTS[ch]];
+		const UINT8 keyOn = (isRhythm && (opl3->rhy & RHYTHM_KEYS[ch])) ? DEVVOICE_KEYON : 0;
+		const float level = isRhythm ? nukedopl3_att_db(nukedopl3_slot_att(slot)) : -96.0f;
+		if (ch == 0 || ch == 2)
+			nukedopl3_fill_generic(state, level, isRhythm ? freqs[RHYTHM_CHANNELS[ch]] : 0.0f, (isRhythm ? DEVVOICE_FREQ : 0) | keyOn);
+		else
+			nukedopl3_fill_generic(state, level, 0.0f, (isRhythm ? DEVVOICE_NOISE : 0) | keyOn);
+		state->kind = DEVVOICE_KIND_OPL_RHYTHM;
+		state->fields[0] = (UINT8)ch;
+		state->fields[1] = isRhythm ? nukedopl3_level_field(nukedopl3_slot_att(slot)) : 0;
+		state->fields[2] = keyOn != 0;
+		state->fields[3] = isRhythm;
+	}
+	return channels + 5;
 }
 
 void nukedopl3_set_mute_mask(void *chip, UINT32 MuteMask)

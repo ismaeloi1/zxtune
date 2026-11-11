@@ -30,6 +30,7 @@
 
 #include "../../stdtype.h"
 #include "../snddef.h"
+#include "../EmuStructs.h"
 #include "emutypes.h"
 
 #ifdef __cplusplus
@@ -281,6 +282,15 @@ typedef struct {
     uint32_t writebuf_last;
     uint64_t writebuf_lasttime;
     opm_writebuf writebuf[OPN_WRITEBUF_SIZE];
+
+    /* zxtune: per-channel output tap and registers for voices state */
+    DEVCB_VOICES voicesCb;
+    void *voicesParam;
+    int32_t voice_acc[8];
+    uint32_t op_mix_channel;
+    int32_t voices[8];
+    uint8_t regs[0x100];
+    uint8_t reg_latch;
 } opm_t;
 
 void NOPM_Clock(opm_t *chip, int32_t *output, uint8_t *sh1, uint8_t *sh2, uint8_t *so);

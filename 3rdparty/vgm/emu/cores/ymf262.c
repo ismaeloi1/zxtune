@@ -201,6 +201,9 @@ typedef struct
 	UINT8   MuteSpc[5];             /* for the 5 Rhythm Channels */
 
 	signed int chanout[18];         /* 18 channels */
+	signed int rhythmout[5];        /* zxtune: BD, SD, TT, CY, HH as mixed into chanout */
+	DEVCB_VOICES voicesCb;          /* zxtune: per-channel output tap */
+	void* voicesParam;
 	signed int phase_modulation;    /* phase modulation input (SLOT 2) */
 	signed int phase_modulation2;   /* phase modulation input (SLOT 3 in 4 operator channels) */
 
@@ -989,7 +992,12 @@ INLINE void chan_calc_rhythm( OPL3 *chip, OPL3_CH *CH, unsigned int noise )
 	SLOT++;
 	env = volume_calc(SLOT);
 	if( env < ENV_QUIET && ! chip->MuteSpc[0] )
-		chanout[6] += op_calc(SLOT->Cnt, env, chip->phase_modulation, SLOT->wavetable) * 2;
+		{
+		/* zxtune: rhythm instruments are mixed into channels, but tapped separately */
+		const signed int out = op_calc(SLOT->Cnt, env, chip->phase_modulation, SLOT->wavetable) * 2;
+		chanout[6] += out;
+		chip->rhythmout[0] += out;
+	}
 
 
 	/* Phase generation is based on: */
@@ -1056,7 +1064,9 @@ INLINE void chan_calc_rhythm( OPL3 *chip, OPL3_CH *CH, unsigned int noise )
 				phase = 0xd0>>2;
 		}
 
-		chanout[7] += op_calc(phase<<FREQ_SH, env, 0, SLOT7_1->wavetable) * 2;
+		const signed int out = op_calc(phase<<FREQ_SH, env, 0, SLOT7_1->wavetable) * 2;
+		chanout[7] += out;
+		chip->rhythmout[4] += out;
 	}
 
 	/* Snare Drum (verified on real YM3812) */
@@ -1077,13 +1087,19 @@ INLINE void chan_calc_rhythm( OPL3 *chip, OPL3_CH *CH, unsigned int noise )
 		if (noise)
 			phase ^= 0x100;
 
-		chanout[7] += op_calc(phase<<FREQ_SH, env, 0, SLOT7_2->wavetable) * 2;
+		const signed int out = op_calc(phase<<FREQ_SH, env, 0, SLOT7_2->wavetable) * 2;
+		chanout[7] += out;
+		chip->rhythmout[1] += out;
 	}
 
 	/* Tom Tom (verified on real YM3812) */
 	env = volume_calc(SLOT8_1);
 	if( env < ENV_QUIET && ! chip->MuteSpc[2] )
-		chanout[8] += op_calc(SLOT8_1->Cnt, env, 0, SLOT8_1->wavetable) * 2;
+	{
+		const signed int out = op_calc(SLOT8_1->Cnt, env, 0, SLOT8_1->wavetable) * 2;
+		chanout[8] += out;
+		chip->rhythmout[2] += out;
+	}
 
 	/* Top Cymbal (verified on real YM3812) */
 	env = volume_calc(SLOT8_2);
@@ -1110,7 +1126,9 @@ INLINE void chan_calc_rhythm( OPL3 *chip, OPL3_CH *CH, unsigned int noise )
 		if (res2)
 			phase = 0x300;
 
-		chanout[8] += op_calc(phase<<FREQ_SH, env, 0, SLOT8_2->wavetable) * 2;
+		const signed int out = op_calc(phase<<FREQ_SH, env, 0, SLOT8_2->wavetable) * 2;
+		chanout[8] += out;
+		chip->rhythmout[3] += out;
 	}
 
 }
@@ -2493,6 +2511,98 @@ void ymf262_set_vol_lr(void *chip, INT32 volLeft, INT32 volRight)
 ** '**buffers' is table of 4 pointers to the buffers: CH.A, CH.B, CH.C and CH.D
 ** 'length' is the number of samples that should be generated
 */
+/* zxtune: channels outputs in L+R scale, rhythm instruments separately */
+static void ymf262_feed_voices(OPL3 *chip, UINT8 rhythm)
+{
+	/* BD, SD, TT, CY, HH channels */
+	static const UINT8 RHYTHM_CHANNELS[5] = {6, 7, 8, 8, 7};
+	INT32 voices[18 + 5];
+	int chn;
+	for (chn = 0; chn < 18 + 5; chn ++)
+	{
+		const int src = chn < 18 ? chn : RHYTHM_CHANNELS[chn - 18];
+		const UINT32* pan = &chip->pan[src * 4];
+		signed int out;
+		if (chn < 18)
+			out = (rhythm && chn >= 6 && chn < 9) ? 0 : chip->chanout[chn];
+		else
+			out = rhythm ? chip->rhythmout[chn - 18] : 0;
+		out = (out & pan[0]) + (out & pan[1]) + (out & pan[2]) + (out & pan[3]);
+		voices[chn] = (out * chip->masterVolL) >> 12;
+	}
+	chip->voicesCb(chip->voicesParam, 18 + 5, voices);
+}
+
+void ymf262_set_voices_cb(void *chip, DEVCB_VOICES cb, void* param)
+{
+	OPL3 *opl3 = (OPL3 *)chip;
+	opl3->voicesCb = cb;
+	opl3->voicesParam = param;
+}
+
+static void ymf262_fill_voice(DEV_VOICE_STATE* state, const OPL3_SLOT* slot, float freq, UINT8 flags)
+{
+	/* 0.1875dB per step of TL << 2 */
+	INT32 att = slot->volume + slot->TLL;
+	if (att > MAX_ATT_INDEX)
+		att = MAX_ATT_INDEX;
+	state->freq = freq;
+	state->level = att >= MAX_ATT_INDEX ? -96.0f : -(float)(att * 0.1875);
+	state->flags = flags | DEVVOICE_LEVEL;
+	state->kind = DEVVOICE_KIND_GENERIC;
+	memset(state->fields, 0, sizeof(state->fields));
+}
+
+/* zxtune: level, frequency and key only */
+UINT32 ymf262_get_voices_state(void *chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	/* BD, SD, TT, CY, HH slots and key bits */
+	static const UINT8 RHYTHM_CHANNELS[5] = {6, 7, 8, 8, 7};
+	static const UINT8 RHYTHM_SLOTS[5] = {SLOT2, SLOT2, SLOT1, SLOT2, SLOT1};
+	static const UINT8 RHYTHM_KEYS[5] = {0x10, 0x08, 0x04, 0x02, 0x01};
+	OPL3 *opl3 = (OPL3 *)chip;
+	const UINT8 rhythm = (opl3->rhythm & 0x20) != 0;
+	float freqs[18];
+	UINT32 ch;
+
+	for (ch = 0; ch < 18; ch ++)
+	{
+		const UINT32 fnum = opl3->P_CH[ch].block_fnum & 0x3ff;
+		const UINT32 block = (opl3->P_CH[ch].block_fnum >> 10) & 7;
+		/* f = fnum * fsam * 2^block / 2^20 */
+		freqs[ch] = (float)(fnum * (opl3->clock / 288.0) * (1 << block) / (double)(1 << 20));
+	}
+	for (ch = 0; ch < 18 && ch < count; ch ++)
+	{
+		const OPL3_CH* CH = &opl3->P_CH[ch];
+		/* operators of 4 operators channels 0..2, 9..11 */
+		const UINT8 attached = (ch % 9) >= 3 && (ch % 9) < 6 && opl3->P_CH[ch - 3].extended;
+		const OPL3_SLOT* carrier = CH->extended ? &opl3->P_CH[ch + 3].SLOT[SLOT2] : &CH->SLOT[SLOT2];
+		const UINT8 keyOn = CH->SLOT[SLOT2].key ? DEVVOICE_KEYON : 0;
+		if (attached || (rhythm && ch >= 6 && ch < 9))
+		{
+			ymf262_fill_voice(&states[ch], carrier, 0.0f, 0);
+			states[ch].level = -96.0f;
+		}
+		else
+			ymf262_fill_voice(&states[ch], carrier, freqs[ch], DEVVOICE_FREQ | keyOn);
+	}
+	for (ch = 0; ch < 5 && 18 + ch < count; ch ++)
+	{
+		DEV_VOICE_STATE* state = &states[18 + ch];
+		const UINT8 chan = RHYTHM_CHANNELS[ch];
+		const UINT8 keyOn = (rhythm && (opl3->rhythm & RHYTHM_KEYS[ch])) ? DEVVOICE_KEYON : 0;
+		const OPL3_SLOT* slot = &opl3->P_CH[chan].SLOT[RHYTHM_SLOTS[ch]];
+		if (ch == 0 || ch == 2)
+			ymf262_fill_voice(state, slot, freqs[chan], DEVVOICE_FREQ | keyOn);
+		else
+			ymf262_fill_voice(state, slot, 0.0f, DEVVOICE_NOISE | keyOn);
+		if (! rhythm)
+			state->level = -96.0f;
+	}
+	return 18 + 5;
+}
+
 void ymf262_update_one(void *_chip, UINT32 length, DEV_SMPL **buffers)
 {
 	OPL3        *chip  = (OPL3 *)_chip;
@@ -2529,6 +2639,7 @@ void ymf262_update_one(void *_chip, UINT32 length, DEV_SMPL **buffers)
 
 		/* clear channel outputs */
 		memset(chip->chanout, 0, sizeof(chip->chanout));
+		memset(chip->rhythmout, 0, sizeof(chip->rhythmout));
 
 		/* register set #1 */
 		chan_calc(chip, &chip->P_CH[0]);            /* extended 4op ch#0 part 1 or 2op ch#0 */
@@ -2603,6 +2714,8 @@ void ymf262_update_one(void *_chip, UINT32 length, DEV_SMPL **buffers)
 		/* store to sound buffer */
 		ch_a[i] = ((a+c) * chip->masterVolL) >> 12;
 		ch_b[i] = ((b+d) * chip->masterVolR) >> 12;
+		if (chip->voicesCb)
+			ymf262_feed_voices(chip, rhythm);
 
 		advance(chip);
 	}

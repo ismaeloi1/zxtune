@@ -39,6 +39,7 @@ extern "C" {
 
 #include "../../stdtype.h"
 #include "../snddef.h"
+#include "../EmuStructs.h"
 
 #define RSM_FRAC 10
 #define NOPN_WRITEBUF_SIZE 2048
@@ -224,6 +225,15 @@ typedef struct
     Bit32u writebuf_last;
     Bit64u writebuf_lasttime;
     opn2_writebuf writebuf[NOPN_WRITEBUF_SIZE];
+    /* zxtune: per-channel output tap and registers for voices state */
+    Bit32u no_ladder;
+    Bit32u ymf276;
+    DEVCB_VOICES voicesCb;
+    void *voicesParam;
+    Bit32s voice_acc[7];
+    Bit32s voices[7];
+    Bit8u regs[0x200];
+    Bit8u reg_latch[2];
 } ym3438_t;
 
 void NOPN2_Reset(ym3438_t *chip, Bit32u clock, Bit32u rate);
