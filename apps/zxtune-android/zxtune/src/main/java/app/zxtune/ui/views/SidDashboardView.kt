@@ -25,6 +25,7 @@ import app.zxtune.playback.ChipGauges
 import app.zxtune.playback.ChipState
 import app.zxtune.playback.FrameResult
 import app.zxtune.playback.GaugesData
+import app.zxtune.playback.StatusHeader
 import app.zxtune.playback.Visualizer
 import app.zxtune.playback.VoiceGauges
 import app.zxtune.playback.VoicesLayout
@@ -89,6 +90,29 @@ class SidDashboardView @JvmOverloads constructor(
     var waveWindowMs by exchange::waveWindowMs
     private var statsProvider: (() -> String)? = null
 
+    /**
+     * Lines of status describing the tune (emulation, original driver, engine, timing), false if they are displayed
+     * elsewhere, e.g. in now playing information
+     */
+    var showInfo = true
+        set(value) {
+            if (field != value) {
+                field = value
+                textLinesChanged()
+            }
+        }
+
+    /**
+     * Diagnostics lines: oscilloscope feed, sound output, rendering
+     */
+    var showStatistics = true
+        set(value) {
+            if (field != value) {
+                field = value
+                textLinesChanged()
+            }
+        }
+
     // Status is requested on background thread to keep UI responsive, binder calls may take time
     private val executor = Executors.newSingleThreadExecutor()
     private val requestPending = AtomicBoolean(false)
@@ -105,6 +129,11 @@ class SidDashboardView @JvmOverloads constructor(
     private var statusSource = ""
     private var statsSource = ""
     private val textLines = ArrayList<String>()
+    private var textLinesDirty = false
+
+    @androidx.annotation.VisibleForTesting
+    internal val displayedLines: List<String>
+        get() = textLines
 
     // static part of picture, see [Pass]
     private var pass = Pass.ALL
@@ -461,14 +490,24 @@ class SidDashboardView @JvmOverloads constructor(
     private fun updateTextLines() {
         val stats = statsProvider?.invoke() ?: ""
         val currentStatus = status
-        if (currentStatus === statusSource && stats === statsSource) {
+        if (currentStatus === statusSource && stats === statsSource && !textLinesDirty) {
             return
         }
+        textLinesDirty = false
         statusSource = currentStatus
         statsSource = stats
         textLines.clear()
-        currentStatus.lines().filterTo(textLines) { it.isNotBlank() }
-        stats.lines().filterTo(textLines) { it.isNotBlank() }
+        currentStatus.lines().filterTo(textLines) {
+            it.isNotBlank() && if (StatusHeader.isStatistics(it)) showStatistics else showInfo
+        }
+        if (showStatistics) {
+            stats.lines().filterTo(textLines) { it.isNotBlank() }
+        }
+    }
+
+    private fun textLinesChanged() {
+        textLinesDirty = true
+        invalidate()
     }
 
     override fun onDraw(canvas: Canvas) {

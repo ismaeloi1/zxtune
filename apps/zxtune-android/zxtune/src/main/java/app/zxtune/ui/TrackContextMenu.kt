@@ -16,7 +16,7 @@ import app.zxtune.ui.utils.item
 import app.zxtune.utils.ifNotNulls
 
 /**
- * Actions on the playing track, shown from now playing title block
+ * Actions on the playing track, shown from now playing transport row
  */
 internal class TrackContextMenu(private val ctx: FragmentActivity, anchor: View) {
     private val popup by lazy {

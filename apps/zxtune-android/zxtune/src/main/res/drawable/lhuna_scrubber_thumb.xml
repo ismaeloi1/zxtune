@@ -4,8 +4,8 @@
     <item android:state_pressed="true">
         <shape android:shape="oval">
             <size
-                    android:width="@dimen/lhuna_scrubber_thumb_pressed"
-                    android:height="@dimen/lhuna_scrubber_thumb_pressed" />
+                    android:width="@dimen/lhuna_compact_scrubber_thumb_pressed"
+                    android:height="@dimen/lhuna_compact_scrubber_thumb_pressed" />
             <solid android:color="@color/lhuna_text_1" />
             <stroke
                     android:width="3dp"
@@ -15,8 +15,8 @@
     <item>
         <shape android:shape="oval">
             <size
-                    android:width="@dimen/lhuna_scrubber_thumb"
-                    android:height="@dimen/lhuna_scrubber_thumb" />
+                    android:width="@dimen/lhuna_compact_scrubber_thumb"
+                    android:height="@dimen/lhuna_compact_scrubber_thumb" />
             <solid android:color="@color/lhuna_text_1" />
         </shape>
     </item>

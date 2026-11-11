@@ -156,6 +156,11 @@
     <PreferenceCategory android:title="@string/pref_main_screen_title">
         <SwitchPreferenceCompat
                 android:defaultValue="false"
+                android:key="ui.brief.expanded"
+                android:summary="@string/pref_main_screen_show_information_summary"
+                android:title="@string/pref_main_screen_show_information_title" />
+        <SwitchPreferenceCompat
+                android:defaultValue="false"
                 android:key="ui.brief.show_author"
                 android:summary="@string/pref_main_screen_show_author_summary"
                 android:title="@string/pref_main_screen_show_author_title" />

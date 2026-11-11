@@ -1,19 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Persistent mini player above bottom navigation, tap opens now playing page -->
+<!-- Slim persistent mini player above bottom navigation, tap opens now playing page -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
         xmlns:tools="http://schemas.android.com/tools"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingLeft="@dimen/spacing_full"
-        android:paddingTop="@dimen/spacing_half"
         android:paddingRight="@dimen/spacing_full"
-        android:paddingBottom="@dimen/spacing_full"
+        android:paddingBottom="@dimen/spacing_half"
         tools:ignore="RtlHardcoded">
 
     <FrameLayout
             android:id="@+id/mini_player_card"
             android:layout_width="match_parent"
-            android:layout_height="@dimen/lhuna_mini_player_height"
+            android:layout_height="@dimen/lhuna_compact_mini_player_height"
             android:background="@drawable/lhuna_mini_player_background"
             android:clickable="true"
             android:contentDescription="@string/mini_player_open"
@@ -25,19 +24,21 @@
                 android:layout_height="match_parent"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingLeft="@dimen/lhuna_space_m"
-                android:paddingRight="@dimen/spacing_full">
+                android:paddingLeft="@dimen/spacing_full">
 
             <TextView
                     android:id="@+id/mini_player_badge"
                     style="@style/Lhuna.Badge"
+                    android:layout_width="@dimen/lhuna_compact_mini_badge_size"
+                    android:layout_height="@dimen/lhuna_compact_mini_badge_size"
+                    android:textSize="10sp"
                     android:importantForAccessibility="no"
                     tools:text="SID" />
 
             <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginLeft="@dimen/lhuna_space_m"
+                    android:layout_marginLeft="@dimen/lhuna_space_s"
                     android:layout_marginRight="@dimen/spacing_half"
                     android:layout_weight="1"
                     android:orientation="vertical">
@@ -48,6 +49,7 @@
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:singleLine="true"
+                        android:includeFontPadding="false"
                         android:textAppearance="@style/TextAppearance.Lhuna.Title"
                         tools:text="@tools:sample/lorem/random" />
 
@@ -57,7 +59,9 @@
                         android:layout_height="wrap_content"
                         android:ellipsize="end"
                         android:singleLine="true"
+                        android:includeFontPadding="false"
                         android:textAppearance="@style/TextAppearance.Lhuna.Body.Secondary"
+                        android:textSize="12sp"
                         tools:text="@tools:sample/full_names" />
             </LinearLayout>
 
@@ -70,7 +74,8 @@
             <ImageView
                     android:id="@+id/mini_player_play_pause"
                     style="@style/Button.Play"
-                    android:layout_marginLeft="@dimen/spacing_half"
+                    android:background="@drawable/lhuna_play_background_inset"
+                    android:padding="@dimen/lhuna_space_m"
                     android:contentDescription="@string/playback_play"
                     android:src="@drawable/ic_play" />
         </LinearLayout>

@@ -100,7 +100,7 @@ class PositionBarsDrawable(ctx: Context) : Drawable() {
         private const val BAR_WIDTH_DP = 3f
         private const val BAR_GAP_DP = 2.5f
         private const val MARKER_WIDTH_DP = 2.5f
-        private const val BAR_HEIGHT = 0.6f
+        private const val BAR_HEIGHT = 0.8f
         private const val MUTED_ALPHA = 0x80
 
         // violet is more saturated than the muted gray, so less alpha keeps the same weight

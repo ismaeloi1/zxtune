@@ -391,6 +391,22 @@ class ChipDashboardRenderTest {
         assertTrue(visibleCaptions(view.voiceGrid).toString(), visibleCaptions(view.voiceGrid).size >= 7)
     }
 
+    // tune description is in now playing information, diagnostics are kept
+    @Test
+    fun sidNowPlaying() {
+        val full = renderSid("sidcells-fullscreen", 1)
+        val view = SidDashboardView(ApplicationProvider.getApplicationContext()).apply {
+            showInfo = false
+            setGaugesData(makeSidData(1, sidRegs), 1, sidStatus(1))
+        }
+        render("sidcells-now-playing", view, 1080, 1700)
+        assertEquals(6, full.displayedLines.size)
+        assertEquals(listOf("scope:", "output:", "render:", "gpu:"), view.displayedLines.map { it.substringBefore(' ') })
+        view.showStatistics = false
+        render("sidcells-now-playing-nostats", view, 1080, 1700)
+        assertEquals(emptyList<String>(), view.displayedLines)
+    }
+
     @Test
     fun sidSmall() {
         val view = renderSid("sidcells-small", 1, 720, 1500)

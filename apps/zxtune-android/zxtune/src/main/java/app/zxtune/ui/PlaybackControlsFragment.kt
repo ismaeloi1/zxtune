@@ -17,6 +17,7 @@ import app.zxtune.R
 import app.zxtune.device.media.MediaModel
 import app.zxtune.ui.utils.UiUtils
 import app.zxtune.ui.utils.whenLifecycleStarted
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class PlaybackControlsFragment : Fragment() {
@@ -37,7 +38,29 @@ class PlaybackControlsFragment : Fragment() {
         )
         val shuffle = ShuffleModeControl(view)
         val looping = RepeatModeControl(view)
+        val menu = TrackContextMenu(requireActivity(), view.findViewById(R.id.controls_track_menu))
+        val info = NowPlayingInfo
+        val infoToggle = view.findViewById<View>(R.id.controls_information).apply {
+            setOnClickListener { info.toggle(it.context) }
+        }
         viewLifecycleOwner.whenLifecycleStarted {
+            launch {
+                combine(controller, metadata) { ctrl, meta ->
+                    menu.bind(ctrl, meta)
+                }.collect {}
+            }
+            launch {
+                info.isExpanded.collect { expanded ->
+                    infoToggle.run {
+                        isActivated = expanded == true
+                        // chevron up expands the block above, down collapses it
+                        rotation = if (expanded == true) 180f else 0f
+                        contentDescription = getString(
+                            if (expanded == true) R.string.track_information_hide else R.string.track_information_show
+                        )
+                    }
+                }
+            }
             launch {
                 controller.collect { controller ->
                     UiUtils.setViewEnabled(view, controller != null)

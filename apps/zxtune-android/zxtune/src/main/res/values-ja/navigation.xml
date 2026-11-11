@@ -14,4 +14,6 @@
     <string name="playback_repeat">トラックをリピート</string>
     <string name="track_actions">トラックの操作</string>
     <string name="track_details">トラックの詳細</string>
+    <string name="track_information_show">トラック情報を表示</string>
+    <string name="track_information_hide">トラック情報を隠す</string>
 </resources>

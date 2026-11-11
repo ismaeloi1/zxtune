@@ -14,4 +14,6 @@
     <string name="playback_repeat">Repetir pista</string>
     <string name="track_actions">Acciones de pista</string>
     <string name="track_details">Detalles de pista</string>
+    <string name="track_information_show">Mostrar información de la pista</string>
+    <string name="track_information_hide">Ocultar información de la pista</string>
 </resources>

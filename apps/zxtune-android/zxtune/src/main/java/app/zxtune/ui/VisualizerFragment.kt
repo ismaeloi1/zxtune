@@ -74,6 +74,8 @@ class VisualizerFragment : Fragment() {
         }
         dashboard = view.findViewById<SidDashboardView>(R.id.dashboard).also {
             it.attachTo(oscilloscope)
+            // tune description lines are in collapsible now playing information instead
+            it.showInfo = false
         }
         val oscilloscopePanel = view.findViewById<View>(R.id.oscilloscope_panel)
         val coverArtView = view.findViewById<ImageView>(R.id.coverart)
