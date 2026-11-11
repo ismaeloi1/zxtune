@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="information_format">Формат</string>
+    <string name="information_codec">Кодек</string>
+    <string name="information_samplerate">Частота дискретизации</string>
+    <string name="information_sample_bits">Разрядность</string>
+    <string name="information_channels">Каналы</string>
+    <string name="information_bitrate">Битрейт</string>
+    <string name="information_playback">Воспроизведение</string>
+    <string name="info_channels_mono">моно</string>
+    <string name="info_channels_stereo">стерео</string>
+    <string name="info_channels_count">%d кан.</string>
+    <string name="info_sample_bits">%d бит</string>
+    <string name="info_sample_bits_float">%d бит float</string>
+</resources>
