@@ -364,7 +364,7 @@ struct _scsp_state
 static const float SDLT[8]={-1000000.0f,-36.0f,-30.0f,-24.0f,-18.0f,-12.0f,-6.0f,0.0f};
 
 
-static UINT8 BypassDSP = 0x01;
+static UINT8 BypassDSP = 0x00;
 
 static int Get_AR(scsp_state *scsp,int base,int R)
 {

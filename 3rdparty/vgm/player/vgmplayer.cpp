@@ -181,7 +181,7 @@ VGMPlayer::VGMPlayer() :
 			else if (devID == DEVID_NES_APU)
 				devOpts.coreOpts = 0x01B7;
 			else if (devID == DEVID_SCSP)
-				devOpts.coreOpts = OPT_SCSP_BYPASS_DSP;
+				devOpts.coreOpts = 0;	// effects DSP (reverb) is enabled, sound of the real hardware
 			_devOptMap[devID][chipID] = optID;
 			_optDevMap[optID] = (size_t)-1;
 		}
