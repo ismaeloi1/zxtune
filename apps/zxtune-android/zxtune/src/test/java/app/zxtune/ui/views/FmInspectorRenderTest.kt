@@ -381,43 +381,48 @@ class FmInspectorRenderTest {
      */
     @Test
     fun readoutsSequence() {
-        val view = SidDashboardView(ApplicationProvider.getApplicationContext())
-        // the same layout for all the frames, else inspector is closed as for other tune
-        val layout = VoicesLayout.parse(MEGADRIVE)
-        view.setVoicesData(layout, makeData(megaDriveVoices), megaDriveVoices.size, "Emulation description")
-        view.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1210, View.MeasureSpec.EXACTLY))
-        view.layout(0, 0, 1080, 1210)
-        assertTrue(view.openFmInspector(4))
-        val bitmap = Bitmap.createBitmap(1080, 1210, Bitmap.Config.ARGB_8888)
-        val histories = ArrayList<ArrayList<String>>()
-        for (frame in 0 until 180) {
-            val t = Math.floor(frame / 60.0 * 50) / 50
-            val voices = megaDriveVoices.mapIndexed { idx, voice ->
-                if (idx != 4) {
-                    voice
-                } else {
-                    val hz = 82.4f * Math.pow(2.0, 0.7 * sin(2 * Math.PI * 6 * t) / 12).toFloat()
-                    Voice(voice.kind, voice.fields, hz, (-8 + 5 * sin(2 * Math.PI * 3 * t)).toFloat(), voice.flags)
+        RealtimeReadout.isAveraged = true
+        try {
+            val view = SidDashboardView(ApplicationProvider.getApplicationContext())
+            // the same layout for all the frames, else inspector is closed as for other tune
+            val layout = VoicesLayout.parse(MEGADRIVE)
+            view.setVoicesData(layout, makeData(megaDriveVoices), megaDriveVoices.size, "Emulation description")
+            view.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(1210, View.MeasureSpec.EXACTLY))
+            view.layout(0, 0, 1080, 1210)
+            assertTrue(view.openFmInspector(4))
+            val bitmap = Bitmap.createBitmap(1080, 1210, Bitmap.Config.ARGB_8888)
+            val histories = ArrayList<ArrayList<String>>()
+            for (frame in 0 until 180) {
+                val t = Math.floor(frame / 60.0 * 50) / 50
+                val voices = megaDriveVoices.mapIndexed { idx, voice ->
+                    if (idx != 4) {
+                        voice
+                    } else {
+                        val hz = 82.4f * Math.pow(2.0, 0.7 * sin(2 * Math.PI * 6 * t) / 12).toFloat()
+                        Voice(voice.kind, voice.fields, hz, (-8 + 5 * sin(2 * Math.PI * 3 * t)).toFloat(), voice.flags)
+                    }
+                }
+                view.setVoicesData(layout, makeData(voices), voices.size, "Emulation description")
+                view.testFrameNanos = 1_000_000_000L + frame * 1_000_000_000L / 60
+                bitmap.eraseColor(0)
+                view.draw(Canvas(bitmap))
+                view.fmInspectorTexts().forEachIndexed { idx, text ->
+                    if (histories.size <= idx) histories.add(ArrayList())
+                    if (histories[idx].lastOrNull() != text) histories[idx].add(text)
                 }
             }
-            view.setVoicesData(layout, makeData(voices), voices.size, "Emulation description")
-            view.testFrameNanos = 1_000_000_000L + frame * 1_000_000_000L / 60
-            bitmap.eraseColor(0)
-            view.draw(Canvas(bitmap))
-            view.fmInspectorTexts().forEachIndexed { idx, text ->
-                if (histories.size <= idx) histories.add(ArrayList())
-                if (histories[idx].lastOrNull() != text) histories[idx].add(text)
+            System.getenv("ZXTUNE_SCREENSHOTS")?.let { dir ->
+                File(dir, "fm-megadrive-inspector-vibrato.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             }
+            for (history in histories) {
+                assertTrue(history.toString(), history.size <= 1 + 4 * 3 + 1)
+            }
+            assertEquals(listOf("E2"), histories[0])
+            assertTrue(histories[1].toString(), Regex("8\\d\\.\\d\\d…8\\d\\.\\d\\d Hz|7\\d\\.\\d\\d…8\\d\\.\\d\\d Hz").matches(histories[1].last()))
+            assertTrue(histories[2].toString(), histories[2].last().contains('…'))
+        } finally {
+            RealtimeReadout.isAveraged = false
         }
-        System.getenv("ZXTUNE_SCREENSHOTS")?.let { dir ->
-            File(dir, "fm-megadrive-inspector-vibrato.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
-        }
-        for (history in histories) {
-            assertTrue(history.toString(), history.size <= 1 + 4 * 3 + 1)
-        }
-        assertEquals(listOf("E2"), histories[0])
-        assertTrue(histories[1].toString(), Regex("8\\d\\.\\d\\d…8\\d\\.\\d\\d Hz|7\\d\\.\\d\\d…8\\d\\.\\d\\d Hz").matches(histories[1].last()))
-        assertTrue(histories[2].toString(), histories[2].last().contains('…'))
     }
 
     @Test

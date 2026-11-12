@@ -8,8 +8,10 @@ import kotlin.math.log2
 import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -17,6 +19,16 @@ import org.junit.Test
  * refreshed a few times per second at most, show the swept range while modulated and the exact value otherwise.
  */
 class DashboardReadoutsTest {
+    // averaged presentation is optional, real time is default
+    @Before
+    fun averaged() {
+        RealtimeReadout.isAveraged = true
+    }
+
+    @After
+    fun realtime() {
+        RealtimeReadout.isAveraged = false
+    }
 
     // Distinct consecutive texts of a cell
     private class History {

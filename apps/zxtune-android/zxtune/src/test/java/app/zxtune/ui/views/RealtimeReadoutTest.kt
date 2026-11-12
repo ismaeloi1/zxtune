@@ -3,15 +3,27 @@ package app.zxtune.ui.views
 import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sin
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
  * Texts of values written by player at each tick are stable and readable at display rate
  */
 class RealtimeReadoutTest {
+    // averaged presentation is optional, real time is default
+    @Before
+    fun averaged() {
+        RealtimeReadout.isAveraged = true
+    }
+
+    @After
+    fun realtime() {
+        RealtimeReadout.isAveraged = false
+    }
 
     private fun cutoffReadout() = RealtimeReadout(deadband = 1.0 / 24, modulationSpread = 1.0 / 6, isLogarithmic = true)
 
@@ -121,5 +133,20 @@ class RealtimeReadoutTest {
         // 0.5s after modulation is stopped: held for 0.3s, then decayed
         assertTrue("${range.low[0]}..${range.high[0]}", range.high[0] < 6 && range.low[0] > -6)
         assertTrue(range.isVisible(0, 0.5))
+    }
+
+    @Test
+    fun `real time by default`() {
+        RealtimeReadout.isAveraged = false
+        val readout = RealtimeReadout(deadband = 0.5, modulationSpread = 10.0)
+        val note = NoteReadout()
+        for (frame in 0 until 10) {
+            val value = frame * 3.0
+            readout.update(value, (frame + 1) * 8_000_000L)
+            note.update(440.0 * Math.pow(2.0, frame / 12.0), (frame + 1) * 8_000_000L)
+            assertEquals(value, readout.value, 0.0)
+            assertFalse(readout.isModulated)
+            assertEquals(57 + frame, note.note)
+        }
     }
 }

@@ -16,6 +16,7 @@ import kotlin.math.roundToInt
  * practice of measuring instruments and audio meters is applied, with separate paths for graphics and texts:
  * - graphics show the exact state of the heard moment (smoothing would show values that never existed and lag behind
  *   the sound), readability comes from persistence: recent states are drawn fading as phosphor of oscilloscope;
+ * Texts show exact values of each frame by default ([RealtimeReadout.isAveraged] is false, user's choice), otherwise:
  * - numbers are refreshed a few times per second as by digital instruments (2-5Hz), show robust statistic of recent
  *   window (median) with hysteresis, and a range instead of flickering number while value is modulated, as
  *   modulation displays of synthesizers (Vital, Serum) show the swept zone ([RealtimeReadout]);
@@ -69,6 +70,11 @@ class RealtimeReadout(
     fun push(sample: Double, nanos: Long): Boolean {
         if (sample.isNaN()) {
             return false
+        }
+        if (!isAveraged) {
+            // real time: exact value of the displayed frame
+            lastRefresh = nanos
+            return show(sample, sample, sample)
         }
         times[head] = nanos
         values[head] = sample
@@ -190,6 +196,13 @@ class RealtimeReadout(
     }
 
     companion object {
+        /**
+         * Texts show exact values of each frame by user's choice; rate limited median/range presentation is kept
+         * switchable for experiments
+         */
+        @JvmField
+        var isAveraged = false
+
         // half second at 144Hz with some margin
         private const val CAPACITY = 128
 
@@ -230,6 +243,11 @@ class NoteReadout(private val marginCents: Double = 20.0, private val holdSecond
         }
         val semitones = semitonesOf(hz)
         val nearest = semitones.roundToInt()
+        if (!RealtimeReadout.isAveraged) {
+            // real time: nearest note of each frame
+            candidate = NONE
+            return set(nearest)
+        }
         if (note == NONE) {
             candidate = NONE
             return set(nearest)

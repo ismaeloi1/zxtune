@@ -569,11 +569,11 @@ class ChipDashboardRenderTest {
             File(dir).mkdirs()
             File(dir, "sidcells-filmstrip.png").outputStream().use { strip.compress(Bitmap.CompressFormat.PNG, 100, it) }
         }
-        // vibrato is shown as swept range refreshed at most 4 times per second, while the note is kept
-        assertTrue(pitches.toString(), pitches.size in 2..9)
-        assertTrue(pitches.toString(), pitches.any { it.contains('…') })
-        assertEquals(setOf("C5"), notes)
-        assertTrue(pulses.toString(), pulses.size in 3..9)
+        // texts show exact value of each frame: vibrato is seen as changing pitch, never as range
+        assertTrue(pitches.toString(), pitches.size > 4)
+        assertTrue(pitches.toString(), pitches.none { it.contains('…') })
+        assertTrue(notes.toString(), "C5" in notes)
+        assertTrue(pulses.toString(), pulses.size > 4)
     }
 
     // triangle with vibrato on V1 (+-70 cents), pulse width sweep and hard restarts on V2, release on V3, cutoff sweep

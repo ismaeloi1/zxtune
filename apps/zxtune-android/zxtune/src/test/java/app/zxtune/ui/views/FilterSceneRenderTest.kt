@@ -174,8 +174,8 @@ class FilterSceneRenderTest {
         val segments = (0 until result.shapes.count).count { result.shapes.data[it * ScopeShapes.FLOATS] == ScopeShapes.SEGMENT }
         assertTrue("fills=$fills", fills > 100)
         assertTrue("segments=$segments", segments > 400)
-        // texts are refreshed a few times per second at most
-        assertTrue("texts=${texts.size} $changes", texts.size <= 6)
+        // texts follow the swept cutoff at each frame
+        assertTrue("texts=${texts.size} $changes", texts.size > 6)
     }
 
     // texts of frame are identified by their glyphs, positions are excluded
