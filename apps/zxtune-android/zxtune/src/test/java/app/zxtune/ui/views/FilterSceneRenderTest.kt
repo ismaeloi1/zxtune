@@ -148,11 +148,10 @@ class FilterSceneRenderTest {
         )
     }
 
-    // Per tick cutoff sweep with vibrato of voice: persistence and swept zone are drawn, texts are stable
+    // Per tick cutoff sweep with vibrato of voice: persistence and swept zone are drawn, no value is written
     @Test
     fun `sweep persistence`() {
-        val texts = HashSet<String>()
-        val changes = ArrayList<String>()
+        var glyphs = 0
         val result = render("sweep", listOf(lowpass)) { scene, layout, shapes ->
             val data = gauges(listOf(lowpass))
             val fps = 120
@@ -163,10 +162,7 @@ class FilterSceneRenderTest {
                 val vibrato = 246.9 * 2.0.pow(0.3 / 12 * sin(2 * PI * 6 * tick))
                 fill(data, listOf(Chip(cutoff, 1, 13, 0b101, listOf(Voice(82.4), Voice(vibrato), Voice(1975.5, 0x81)))))
                 scene.build(layout, data, 1, "PAL, MOS6581", (time * 1e9).toLong() + 1, true, shapes)
-                val glyphs = glyphsOf(shapes)
-                if (texts.add(glyphs)) {
-                    changes.add("$frame:${glyphs.count { it == ';' }}")
-                }
+                glyphs += (0 until shapes.count).count { shapes.data[it * ScopeShapes.FLOATS] == ScopeShapes.GLYPH }
             }
         }
         // the last frame has fading previous curves and swept zone
@@ -174,17 +170,7 @@ class FilterSceneRenderTest {
         val segments = (0 until result.shapes.count).count { result.shapes.data[it * ScopeShapes.FLOATS] == ScopeShapes.SEGMENT }
         assertTrue("fills=$fills", fills > 100)
         assertTrue("segments=$segments", segments > 400)
-        // texts follow the swept cutoff at each frame
-        assertTrue("texts=${texts.size} $changes", texts.size > 6)
-    }
-
-    // texts of frame are identified by their glyphs, positions are excluded
-    private fun glyphsOf(shapes: ScopeShapes) = buildString {
-        for (idx in 0 until shapes.count) {
-            val base = idx * ScopeShapes.FLOATS
-            if (shapes.data[base] == ScopeShapes.GLYPH) {
-                append(shapes.data[base + 8]).append(',').append(shapes.data[base + 9]).append(';')
-            }
-        }
+        // response is shown by graphics only
+        assertEquals(0, glyphs)
     }
 }

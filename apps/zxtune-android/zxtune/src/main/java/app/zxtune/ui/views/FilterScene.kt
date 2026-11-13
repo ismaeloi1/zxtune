@@ -140,7 +140,7 @@ internal class FilterLayout private constructor(
     // space for peak marker above plot
     fun plotTop(lane: Int) = laneTop[lane] + band + PEAK_PADDING_DP * density
 
-    // space for notes ruler and cutoff tag at frequency axis
+    // space for notes ruler under frequency axis
     fun plotBottom(lane: Int) = laneBottom[lane] - (smallSize * TAG_HEIGHT_TO_SIZE + 2 * density)
 
     fun hzToX(lane: Int, hz: Double): Float {
@@ -159,24 +159,6 @@ internal class FilterLayout private constructor(
     fun titleEnd(lane: Int) = left(lane) + textPadding + if (labelSize > 0) labelPaint.measureText(titles[lane]) else 0f
 
     fun titleBaseline(lane: Int) = laneTop[lane] + textPadding / 2 - labelPaint.ascent()
-
-    /**
-     * Static labels are not covered by tags
-     */
-    fun reserveLabels(lane: Int, tags: TagLayout) {
-        val bottom = plotBottom(lane)
-        val height = smallPaint.descent() - smallPaint.ascent()
-        for (idx in DECADES.indices) {
-            val x = hzToX(lane, DECADES[idx]) + 3 * density
-            tags.reserve(x, bottom - height - density, x + smallPaint.measureText(DECADE_LABELS[idx]), bottom)
-        }
-        val y = dbToY(lane, 0.0)
-        val r = right(lane)
-        tags.reserve(r - smallPaint.measureText(ZERO_DB) - 2 * density, y - height - density, r, y)
-    }
-
-    /** Height of cutoff tag at frequency axis */
-    val tagHeight = smallSize * TAG_HEIGHT_TO_SIZE
 
     /**
      * Oscilloscope channel of chip's voice, -1 if not displayed
@@ -369,9 +351,8 @@ internal class FilterLayout private constructor(
  * Per frame shapes of filter view by chips registers at currently heard moment (the same gauges as of dashboard and
  * oscilloscope). Graphics show the exact state, recent states are drawn fading as phosphor persistence, and the swept
  * zone of the last moments is drawn as faint band (see [ModulationRange]), so sweeps and per-note jumps are readable
- * without lag or values that never existed. Values are tags attached to what they describe: cutoff at frequency axis
- * under its marker, resonance at the peak, voices by their markers; their digits and notes are guarded by
- * [RealtimeReadout] and [NoteReadout]. Used on rendering thread only, doesn't allocate per frame.
+ * without lag or values that never existed. Values are not written: the response is shown by graphics only (curve,
+ * cutoff marker, voices markers). Used on rendering thread only, doesn't allocate per frame.
  */
 internal class FilterScene(private val res: FilterResources) {
 
@@ -395,7 +376,6 @@ internal class FilterScene(private val res: FilterResources) {
     private val pointsY = FloatArray(MAX_POINTS)
     private val pointsDb = DoubleArray(MAX_POINTS)
     private val bandDb = DoubleArray(MAX_POINTS)
-    private val line = TextLine()
 
     private class Lane {
         // states of the last moments, the last one is current
@@ -411,25 +391,15 @@ internal class FilterScene(private val res: FilterResources) {
 
         val band = ModulationRange(MAX_POINTS)
 
-        val cutoffText = RealtimeReadout(deadband = 1.0 / 24, modulationSpread = 1.0 / 4, isLogarithmic = true)
-        val resonanceText = RealtimeReadout(deadband = 0.5, modulationSpread = 2.5)
-        val notes = Array(VOICES) { NoteReadout() }
-        val gains = Array(VOICES) { RealtimeReadout(deadband = 1.0, modulationSpread = 6.0) }
-
         fun last() = (head - 1 + HISTORY) % HISTORY
 
         fun reset() {
             size = 0
             band.clear()
-            cutoffText.reset()
-            resonanceText.reset()
-            gains.forEach { it.reset() }
         }
     }
 
     private val lanes = Array(FilterLayout.MAX_LANES) { Lane() }
-    private val tags = TagLayout(TAGS, FilterLayout.MAX_LANES * TAG_KEYS)
-    private val widths = FloatArray(2)
     private var lastLayout: FilterLayout? = null
 
     /**
@@ -458,7 +428,7 @@ internal class FilterScene(private val res: FilterResources) {
             val chip = chips[lane]
             val state = lanes[lane]
             record(state, chip, emulated, nanos)
-            drawLane(layout, lane, state, chip, nanos, isLive, shapes)
+            drawLane(layout, lane, state, chip, nanos, shapes)
         }
     }
 
@@ -534,34 +504,18 @@ internal class FilterScene(private val res: FilterResources) {
     private val voiceDb = DoubleArray(VOICES)
     private val voiceOn = BooleanArray(VOICES)
 
-    private fun drawLane(layout: FilterLayout, lane: Int, state: Lane, chip: ChipState, nanos: Long, isLive: Boolean, shapes: ScopeShapes) {
+    private fun drawLane(layout: FilterLayout, lane: Int, state: Lane, chip: ChipState, nanos: Long, shapes: ScopeShapes) {
         val current = state.last()
         val mode = state.mode[current]
         val fc = state.cutoff[current]
         val invQ = state.inverseQ[current]
-        drawCaption(layout, lane, mode, shapes)
         if (mode != 0) {
             drawBand(layout, lane, state, mode, fc, invQ, nanos, shapes)
             drawPersistence(layout, lane, state, nanos, shapes)
             drawCurve(layout, lane, mode, fc, invQ, shapes)
         }
-        tags.begin(layout.left(lane), layout.plotTop(lane), layout.right(lane), layout.plotBottom(lane))
-        layout.reserveLabels(lane, tags)
-        drawCutoff(layout, lane, state, chip, mode, fc, invQ, nanos, isLive, shapes)
-        drawVoices(layout, lane, state, chip, nanos, isLive, shapes)
-    }
-
-    // "SID 1 - Filter · Low-pass": mode is not a moving value, so it's in the title
-    private fun drawCaption(layout: FilterLayout, lane: Int, mode: Int, shapes: ScopeShapes) {
-        if (layout.labelSize <= 0) {
-            return
-        }
-        line.clear().append(SEPARATOR).append(res.modes[mode])
-        val x = layout.titleEnd(lane)
-        if (x + layout.atlas.width(FilterLayout.LABEL, line.chars, line.length) > layout.right(lane)) {
-            return
-        }
-        layout.atlas.draw(shapes, FilterLayout.LABEL, line.chars, line.length, layout.titleEnd(lane), layout.titleBaseline(lane), Color.WHITE, CAPTION_ALPHA)
+        drawCutoff(layout, lane, mode, fc, invQ, shapes)
+        drawVoices(layout, lane, state, chip, shapes)
     }
 
     private fun response(mode: Int, hz: Double, fc: Double, invQ: Double) = SidFilterModel.responseDb(mode, hz, fc, invQ)
@@ -678,101 +632,11 @@ internal class FilterScene(private val res: FilterResources) {
     }
 
     // Marker from axis to curve with tag at axis (the position itself is the readout), resonance tag at the peak
-    private fun drawCutoff(
-        layout: FilterLayout,
-        lane: Int,
-        state: Lane,
-        chip: ChipState,
-        mode: Int,
-        fc: Double,
-        invQ: Double,
-        nanos: Long,
-        isLive: Boolean,
-        shapes: ScopeShapes,
-    ) {
-        val density = layout.density
+    // cutoff marker from frequency axis to the peak
+    private fun drawCutoff(layout: FilterLayout, lane: Int, mode: Int, fc: Double, invQ: Double, shapes: ScopeShapes) {
         val x = layout.hzToX(lane, fc)
-        val bottom = layout.plotBottom(lane)
         val peakDb = if (mode == 0) FilterLayout.MIN_DB else response(mode, fc, fc, invQ)
-        val peakY = layout.dbToY(lane, peakDb)
-        shapes.line(x, bottom, x, peakY, MARKER_LINE_DP * density, Color.WHITE, MARKER_ALPHA)
-        if (isLive) state.cutoffText.push(fc, nanos) else state.cutoffText.snap(fc)
-        if (isLive) state.resonanceText.push(chip.resonance.toDouble(), nanos) else state.resonanceText.snap(chip.resonance.toDouble())
-        val atlas = layout.atlas
-        // cutoff tag in pill at axis, over decades labels
-        line.clear()
-        val text = state.cutoffText
-        if (text.isModulated) {
-            // the same unit for both
-            val kHz = text.high >= 1000
-            appendFrequency(text.low, false, kHz)
-            line.append(RANGE)
-            appendFrequency(text.high, true, kHz)
-        } else {
-            appendFrequency(text.value, true, text.value >= 1000)
-            val note = NoteReadout.semitonesOf(text.value).roundToInt()
-            if (note in 0..131) {
-                line.append(' ').append(ChipWidgets.NOTE_NAMES[note % 12]).append(note / 12)
-            }
-        }
-        val w = atlas.width(FilterLayout.SMALL, line.chars, line.length)
-        val h = layout.tagHeight
-        val pad = TAG_PADDING_DP * density
-        val tagLeft = (x - w / 2).coerceIn(layout.left(lane) + pad, layout.right(lane) - w - pad)
-        val tagTop = bottom + 1 * density
-        shapes.line(tagLeft, tagTop + h / 2, tagLeft + w, tagTop + h / 2, h, Color.BLACK, PILL_ALPHA)
-        val baseline = tagTop + (h - atlas.ascent(FilterLayout.SMALL) - atlas.descent(FilterLayout.SMALL)) / 2
-        atlas.draw(shapes, FilterLayout.SMALL, line.chars, line.length, tagLeft, baseline, Color.WHITE, TAG_ALPHA)
-        if (mode == 0) {
-            return
-        }
-        // resonance tag by the peak
-        line.clear().append(res.resonance).append(' ')
-        val resonance = state.resonanceText
-        line.append(percent(resonance.low))
-        if (resonance.isModulated) {
-            line.append(RANGE).append(percent(resonance.high))
-        }
-        line.append('%')
-        val rw = atlas.width(FilterLayout.SMALL, line.chars, line.length)
-        val rh = atlas.descent(FilterLayout.SMALL) - atlas.ascent(FilterLayout.SMALL)
-        widths[0] = rw
-        val idx = tags.placeStable(lane * TAG_KEYS + RESONANCE_KEY, x, peakY, widths, 1, rh, TAG_GAP_DP * density, if (isLive) nanos else 0L, TagLayout.ABOVE)
-        if (idx < 0) {
-            return
-        }
-        pill(idx, shapes)
-        atlas.draw(shapes, FilterLayout.SMALL, line.chars, line.length, tags.left(idx), tags.bottom(idx) - atlas.descent(FilterLayout.SMALL), Color.WHITE, CAPTION_ALPHA)
-    }
-
-    // tags stay readable over curves, as value tags of equalizers
-    private fun pill(idx: Int, shapes: ScopeShapes) {
-        val h = tags.bottom(idx) - tags.top(idx)
-        val y = (tags.top(idx) + tags.bottom(idx)) / 2
-        shapes.line(tags.left(idx), y, tags.right(idx), y, h, Color.BLACK, PILL_ALPHA)
-    }
-
-    private fun percent(reg: Double) = (reg * 100 / 15).roundToInt()
-
-    private fun appendFrequency(hz: Double, withUnit: Boolean, kHz: Boolean) {
-        val rounded = SidDescription.roundCutoff(hz.toFloat())
-        if (!kHz) {
-            line.append(rounded)
-            if (withUnit) line.append(" Hz")
-        } else {
-            // 0.33, 1.7, 12
-            val hundredths = (rounded + 5) / 10
-            if (hundredths < 100) {
-                line.append(0).append(res.decimalSeparator).append(hundredths / 10).append(hundredths % 10)
-            } else {
-                val tenths = (rounded + 50) / 100
-                line.append(tenths / 10)
-                if (tenths < 100) {
-                    line.append(res.decimalSeparator).append(tenths % 10)
-                }
-            }
-            if (withUnit) line.append(" kHz")
-        }
+        shapes.line(x, layout.plotBottom(lane), x, layout.dbToY(lane, peakDb), MARKER_LINE_DP * layout.density, Color.WHITE, MARKER_ALPHA)
     }
 
     private enum class Routing { OFF, DIRECT, FILTERED }
@@ -798,123 +662,33 @@ internal class FilterScene(private val res: FilterResources) {
     }
 
     // Small markers on the curve: disc of filtered voice at its gain, ring of direct one at unity gain, with tick at
-    // frequency axis and tag "V1 E2 −12 dB" in voice's color
-    private fun drawVoices(layout: FilterLayout, lane: Int, state: Lane, chip: ChipState, nanos: Long, isLive: Boolean, shapes: ScopeShapes) {
+    // frequency axis, in voice's color
+    private fun drawVoices(layout: FilterLayout, lane: Int, state: Lane, chip: ChipState, shapes: ScopeShapes) {
         val density = layout.density
         val bottom = layout.plotBottom(lane)
         val current = state.last()
         val mode = state.mode[current]
-        val atlas = layout.atlas
         for (voice in 0 until VOICES) {
             val pos = current * VOICES + voice
             val routing = routing(chip, voice, mode)
             if (!state.voiceOn[pos] || routing == Routing.OFF) {
-                state.gains[voice].reset()
-                tags.forget(lane * TAG_KEYS + voice)
                 continue
             }
-            val hz = state.voiceHz[pos]
-            val db = state.voiceDb[pos]
-            val x = layout.hzToX(lane, hz)
-            val y = layout.dbToY(lane, db)
+            val x = layout.hzToX(lane, state.voiceHz[pos])
+            val y = layout.dbToY(lane, state.voiceDb[pos])
             val color = res.voiceColors[voice]
             // louder voices are more visible
             val alpha = 0.5f + 0.5f * chip.envelope(voice) / 255f
             shapes.line(x, bottom - TICK_DP * density, x, bottom, 1.5f * density, color, alpha)
             val filtered = routing == Routing.FILTERED
             shapes.circle(x, y, MARKER_RADIUS_DP * density, if (filtered) 0f else 1.5f * density, color, alpha)
-            val isNoise = chip.control(voice) and 0x80 != 0
-            val note = state.notes[voice]
-            if (isLive) note.push(hz, nanos) else note.snap(hz)
-            val gain = state.gains[voice]
-            if (filtered) {
-                if (isLive) gain.push(db, nanos) else gain.snap(db)
-            } else {
-                gain.reset()
-            }
-            line.clear().append('V').append(voice + 1)
-            widths[1] = atlas.width(FilterLayout.SMALL, line.chars, line.length)
-            line.append(' ')
-            if (isNoise) {
-                line.append(res.noise)
-            } else if (note.note in 0..131) {
-                line.append(ChipWidgets.NOTE_NAMES[note.note % 12]).append(note.note / 12)
-            }
-            if (filtered) {
-                line.append(' ')
-                appendGain(gain)
-            }
-            // tag by marker, its name only in narrow space, else nothing
-            val h = atlas.descent(FilterLayout.SMALL) - atlas.ascent(FilterLayout.SMALL)
-            val gap = (MARKER_RADIUS_DP + 3) * density
-            val key = lane * TAG_KEYS + voice
-            widths[0] = atlas.width(FilterLayout.SMALL, line.chars, line.length)
-            val idx = tags.placeStable(key, x, y, widths, 2, h, gap, if (isLive) nanos else 0L)
-            if (tags.form(key) == 1) {
-                line.clear().append('V').append(voice + 1)
-            }
-            if (idx >= 0) {
-                pill(idx, shapes)
-                atlas.draw(shapes, FilterLayout.SMALL, line.chars, line.length, tags.left(idx), tags.bottom(idx) - atlas.descent(FilterLayout.SMALL), color, alpha)
-            }
-            drawRouting(layout, lane, voice, filtered, gain, color, shapes)
-        }
-    }
-
-    private fun appendGain(gain: RealtimeReadout) {
-        appendDb(if (gain.isModulated) gain.low else gain.value)
-        if (gain.isModulated) {
-            line.append(RANGE)
-            appendDb(gain.high)
-        }
-        line.append(" dB")
-    }
-
-    private fun appendDb(db: Double) {
-        val rounded = db.roundToInt()
-        when {
-            db <= SidFilterModel.MIN_DB + 1 -> line.append(TextLine.MINUS).append('∞')
-            rounded > 0 -> line.append('+').append(rounded)
-            else -> line.append(rounded)
-        }
-    }
-
-    // routing tag at the right of oscilloscope lane's title: "filtered −3 dB" or "direct"
-    private fun drawRouting(layout: FilterLayout, lane: Int, voice: Int, filtered: Boolean, gain: RealtimeReadout, color: Int, shapes: ScopeShapes) {
-        val chan = layout.channelOf(lane, voice)
-        if (chan < 0 || !layout.hasWavesLabels) {
-            return
-        }
-        val atlas = layout.atlas
-        val space = layout.wavesRight(chan) - layout.wavesTitleEnd(chan)
-        // full form, then gain only if lane is narrow
-        for (pass in 0..1) {
-            val full = pass == 0
-            line.clear()
-            if (filtered) {
-                if (full) line.append(res.filtered).append(' ')
-                appendGain(gain)
-            } else {
-                line.append(res.direct)
-            }
-            val w = atlas.width(FilterLayout.WAVES_LABEL, line.chars, line.length)
-            if (w <= space) {
-                atlas.draw(shapes, FilterLayout.WAVES_LABEL, line.chars, line.length, layout.wavesRight(chan) - w, layout.wavesBaseline(chan), color, 1f)
-                return
-            }
         }
     }
 
     companion object {
         private const val VOICES = 3
         private const val HISTORY = 12
-        private const val TAGS = 16
-        private const val TAG_KEYS = 4
-        private const val RESONANCE_KEY = 3
-        private const val SEPARATOR = " · "
 
-        // the same range mark as dashboard texts, en dash would be confused with minus of gains
-        private const val RANGE = '…'
         private const val MAX_POINTS = 2048
 
         private const val CURVE_STEP_DP = 1.5f
@@ -933,16 +707,10 @@ internal class FilterScene(private val res: FilterResources) {
         private const val PERSISTENCE_SECONDS = 0.2
         private const val MIN_ALPHA = 0.02f
         private const val GHOST_RADIUS_DP = 2.5f
-        private const val CAPTION_ALPHA = 0.6f
-        private const val TAG_ALPHA = 0.85f
 
-        // opaque, so traces and curves under tags don't reduce contrast of text
-        private const val PILL_ALPHA = 1f
         private const val MARKER_ALPHA = 0.3f
         private const val MARKER_LINE_DP = 1f
         private const val MARKER_RADIUS_DP = 3.5f
         private const val TICK_DP = 5f
-        private const val TAG_GAP_DP = 4f
-        private const val TAG_PADDING_DP = 2f
     }
 }
