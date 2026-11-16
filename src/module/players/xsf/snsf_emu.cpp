@@ -82,8 +82,9 @@ namespace Module::SNSF
     return base + addr;
   }
 
-  Emulator::Emulator(const Cartridge& cart)
+  Emulator::Emulator(const Cartridge& cart, bool useAres)
     : Cart(cart)
+    , Ares(useAres ? new ::AresSpc() : nullptr)
   {
     Require(!Cart.Rom.empty() && (Cart.Rom.size() % (1 << PAGE_BITS)) == 0);
     DetectMapping();
@@ -245,6 +246,10 @@ namespace Module::SNSF
     }
 
     Spc.reset();
+    if (Ares)
+    {
+      Ares->reset();
+    }
     MasterClockRate = Pal ? PAL_MASTER_CLOCK : NTSC_MASTER_CLOCK;
     SpcFrameStart = 0;
     SpcFraction = 0;
@@ -290,7 +295,10 @@ namespace Module::SNSF
 
   uint_t Emulator::RunFrame(::SNES_SPC::sample_t* target, uint_t maxSamples)
   {
-    Spc.set_output(target, static_cast<int>(maxSamples * 2));
+    if (!Ares)
+    {
+      Spc.set_output(target, static_cast<int>(maxSamples * 2));
+    }
     // NTSC non-interlaced odd frames have one dot shorter line 240. Unlike snes9x, PAL frames are not affected (as in
     // bsnes), so PAL tempo differs by ~5ppm.
     ShortLine = OddField && !Pal;
@@ -314,7 +322,14 @@ namespace Module::SNSF
     }
     const auto total = uint64_t(Clock - SpcFrameStart) * SPC_CLOCK + SpcFraction;
     const auto spcClocks = total / MasterClockRate;
-    Spc.end_frame(static_cast<int>(spcClocks));
+    if (Ares)
+    {
+      Ares->end_frame(static_cast<int>(spcClocks));
+    }
+    else
+    {
+      Spc.end_frame(static_cast<int>(spcClocks));
+    }
     SpcFraction = total - spcClocks * MasterClockRate;
     // SPC frame ends exactly at current clock, so the next one starts here
     Clock -= frameClocks;
@@ -327,7 +342,7 @@ namespace Module::SNSF
     ShortLine = false;
     UpdateNextEvent();
     ProcessEvents();
-    return static_cast<uint_t>(Spc.sample_count() / 2);
+    return Ares ? static_cast<uint_t>(Ares->take(target, maxSamples)) : static_cast<uint_t>(Spc.sample_count() / 2);
   }
 
   int Emulator::SpcTime() const
@@ -508,7 +523,7 @@ namespace Module::SNSF
     default:
       if (reg >= 0x40 && reg < 0x80)
       {
-        return static_cast<uint8_t>(Spc.read_port(SpcTime(), reg & 3));
+        return static_cast<uint8_t>(Ares ? Ares->read_port(SpcTime(), reg & 3) : Spc.read_port(SpcTime(), reg & 3));
       }
       return Mdr;
     }
@@ -550,7 +565,14 @@ namespace Module::SNSF
     default:
       if (reg >= 0x40 && reg < 0x80)
       {
-        Spc.write_port(SpcTime(), reg & 3, data);
+        if (Ares)
+        {
+          Ares->write_port(SpcTime(), reg & 3, data);
+        }
+        else
+        {
+          Spc.write_port(SpcTime(), reg & 3, data);
+        }
       }
       break;
     }

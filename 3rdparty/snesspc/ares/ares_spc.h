@@ -25,6 +25,20 @@ public:
   // Resets emulation and loads SPC dump, returns false if it's truncated
   bool load_spc(const void* data, std::size_t size);
 
+  // Console mode: power on with boot ROM, main CPU talks via ports. Time is in DSP clocks (32 per sample)
+  // since the start of frame.
+  enum
+  {
+    clocks_per_sample = 32,
+  };
+  void reset();
+  int read_port(int time, int port);
+  void write_port(int time, int port, int data);
+  // Runs till the time and starts the next frame
+  void end_frame(int time);
+  // Moves up to maxFrames rendered stereo frames to out, returns their count
+  std::size_t take(int16_t* out, std::size_t maxFrames);
+
   // Clears echo region of RAM if echo is enabled, to avoid playing garbage of dump
   void clear_echo();
 

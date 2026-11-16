@@ -167,6 +167,7 @@ auto DSP::main() -> void {
     break;
   }
   phase = (phase + 1) & 31;
+  ++clocks;
 }
 
 auto DSP::sample(i16 left, i16 right) -> void {
@@ -198,6 +199,7 @@ auto DSP::power() -> void {
     voice[n].index = n << 4;
   }
   phase = 0;
+  clocks = 0;
   for(auto& v : voiceOutputs) v[0] = v[1] = 0;
 
   gaussianConstructTable();

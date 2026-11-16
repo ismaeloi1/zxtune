@@ -54,6 +54,15 @@ struct AresSpc::Machine
     Pending.clear();
   }
 
+  // instruction may pass the time, the rest is taken from the next range
+  void RunUntil(int time)
+  {
+    while (static_cast<s32>(Dsp.clocks) < time)
+    {
+      Smp.main();
+    }
+  }
+
   static void OnSample(void* param, s32 left, s32 right, const s32* voices)
   {
     auto* const self = static_cast<Machine*>(param);
@@ -155,6 +164,38 @@ bool AresSpc::load_spc(const void* data, std::size_t size)
     v._echo = v.echo;
   }
   return true;
+}
+
+void AresSpc::reset()
+{
+  M->Power();
+}
+
+int AresSpc::read_port(int time, int port)
+{
+  M->RunUntil(time);
+  return M->Smp.portRead(port);
+}
+
+void AresSpc::write_port(int time, int port, int data)
+{
+  M->RunUntil(time);
+  M->Smp.portWrite(port, data);
+}
+
+void AresSpc::end_frame(int time)
+{
+  M->RunUntil(time);
+  M->Dsp.clocks -= static_cast<u32>(time);
+}
+
+std::size_t AresSpc::take(int16_t* out, std::size_t maxFrames)
+{
+  auto& pending = M->Pending;
+  const auto frames = pending.size() / 2 < maxFrames ? pending.size() / 2 : maxFrames;
+  std::memcpy(out, pending.data(), frames * 2 * sizeof(*out));
+  pending.erase(pending.begin(), pending.begin() + static_cast<std::ptrdiff_t>(frames * 2));
+  return frames;
 }
 
 void AresSpc::clear_echo()

@@ -75,10 +75,28 @@ namespace Module::SNSF
       }
     };
 
-    explicit Engine(const Cartridge& cart)
-      : Emu(cart)
+    //! @param isAres S-SMP/S-DSP emulation of ares instead of snes_spc
+    Engine(const Cartridge& cart, bool isAres)
+      : Emu(cart, isAres)
     {
       Reset();
+    }
+
+    bool IsAres()
+    {
+      return Emu.GetAres() != nullptr;
+    }
+
+    void MuteVoices(int mask)
+    {
+      if (auto* const ares = Emu.GetAres())
+      {
+        ares->mute_voices(mask);
+      }
+      else
+      {
+        Emu.GetSpc().mute_voices(mask);
+      }
     }
 
     void Reset()
@@ -86,21 +104,28 @@ namespace Module::SNSF
       Emu.Reset();
       Filter.clear();
       Filter.set_gain(::SPC_Filter::gain_unit * 14 / 10);  // the same as for SPC files
-      Emu.GetSpc().mute_voices(Mask);
+      MuteVoices(Mask);
       Pending = 0;
     }
 
     void SetChannelsMask(int mask)
     {
       Mask = mask;
-      Emu.GetSpc().mute_voices(mask);
+      MuteVoices(mask);
     }
 
     void SetVoicesTarget(VoicesFrame* target)
     {
       Voices = target;
       SinceState = 0;
-      Emu.GetSpc().get_dsp().set_voices_func(target ? &OnVoices : nullptr, this);
+      if (auto* const ares = Emu.GetAres())
+      {
+        ares->set_voices_func(target ? &OnVoices : nullptr, this);
+      }
+      else
+      {
+        Emu.GetSpc().get_dsp().set_voices_func(target ? &OnVoices : nullptr, this);
+      }
     }
 
     // Whole frames are rendered to keep voices output in sync, so result size may differ from requested a bit.
@@ -150,7 +175,14 @@ namespace Module::SNSF
         self->SinceState = 0;
         frame.StatesPos.push_back(static_cast<uint_t>(frame.Samples.size() / VOICES));
         auto& states = frame.States.emplace_back();
-        self->VoicesState.Fill(self->Emu.GetSpc().get_dsp(), states);
+        if (const auto* const ares = self->Emu.GetAres())
+        {
+          self->VoicesState.Fill(*ares, states);
+        }
+        else
+        {
+          self->VoicesState.Fill(self->Emu.GetSpc().get_dsp(), states);
+        }
       }
     }
 
@@ -172,6 +204,13 @@ namespace Module::SNSF
     return static_cast<uint_t>(period.Get() * Emulator::SAMPLE_RATE / period.PER_SECOND);
   }
 
+  // the same setting as for SPC files, engine is selected for the whole playback of tune
+  bool IsAresEngine(const Parameters::Accessor& params)
+  {
+    using namespace Parameters::ZXTune::Core::SPC;
+    return ENGINE_ARES == Parameters::GetInteger(params, ENGINE, ENGINE_DEFAULT);
+  }
+
   class Renderer
     : public Module::Renderer
     , public VoicesScopeSource
@@ -180,7 +219,7 @@ namespace Module::SNSF
     Renderer(ModuleData::Ptr tune, Parameters::Accessor::Ptr params, uint_t samplerate)
       : Tune(std::move(tune))
       , Params(std::move(params))
-      , Core(MakePtr<Engine>(Tune->Cart))
+      , Core(MakePtr<Engine>(Tune->Cart, IsAresEngine(*Params)))
       , State(Tune->Meta->Duration)
       , Samplerate(samplerate)
       , Target(Sound::CreateResampler(Emulator::SAMPLE_RATE, samplerate))
@@ -198,7 +237,7 @@ namespace Module::SNSF
           group.Voices.emplace_back("Voice " + std::to_string(voice + 1));
         }
         Scope->SetVoicesGroups({group}, false);
-        Scope->SetDescription("S-DSP 32kHz, 65816 + snes_spc");
+        Scope->SetDescription(Core->IsAres() ? "S-DSP 32kHz, 65816 + ares" : "S-DSP 32kHz, 65816 + snes_spc");
       }
       UpdateVoicesTap();
       return true;

@@ -397,7 +397,7 @@
     <string name="pref_zxtune_sid_filter_title">Filter emulation</string>
     <integer name="pref_zxtune_sid_filter_default">1</integer>
     <!-- zxtune.core.spc.engine -->
-    <string name="pref_zxtune_spc_title">SNES (SPC)</string>
+    <string name="pref_zxtune_spc_title">SNES (SPC, SNSF)</string>
     <string name="pref_zxtune_spc_engine_title">Emulation engine</string>
     <string name="pref_zxtune_spc_engine_summary">ares: cycle accurate, plays stereo as the console. snes_spc: lighter, without phase inverted surround. Applied from the next track</string>
     <string-array name="pref_zxtune_spc_engine_entries" translatable="false">

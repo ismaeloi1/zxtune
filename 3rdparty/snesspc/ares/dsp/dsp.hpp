@@ -189,6 +189,8 @@ struct DSP {
 
   //standalone
   u32 phase = 0;
+  //clocks passed, 32 per sample
+  u32 clocks = 0;
   s32 voiceOutputs[Voices][2] = {};
 };
 

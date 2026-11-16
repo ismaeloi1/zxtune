@@ -12,7 +12,10 @@
 
 #include "types.h"
 
+#include "3rdparty/snesspc/ares/ares_spc.h"
 #include "3rdparty/snesspc/snes_spc/SNES_SPC.h"
+
+#include <memory>
 
 #include <array>
 #include <vector>
@@ -56,7 +59,8 @@ namespace Module::SNSF
   class Emulator
   {
   public:
-    explicit Emulator(const Cartridge& cart);
+    //! @param useAres cycle accurate S-SMP/S-DSP of ares instead of snes_spc
+    explicit Emulator(const Cartridge& cart, bool useAres = false);
 
     void Reset();
 
@@ -66,6 +70,12 @@ namespace Module::SNSF
     ::SNES_SPC& GetSpc()
     {
       return Spc;
+    }
+
+    // not null if used instead of snes_spc
+    ::AresSpc* GetAres()
+    {
+      return Ares.get();
     }
 
     bool IsPal() const
@@ -236,6 +246,7 @@ namespace Module::SNSF
 
     // apu
     ::SNES_SPC Spc;
+    std::unique_ptr<::AresSpc> Ares;
     uint_t MasterClockRate = 0;
     // master clock that matches zero time of current SPC frame and remainder of conversion
     uint_t SpcFrameStart = 0;
