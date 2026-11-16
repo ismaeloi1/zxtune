@@ -523,6 +523,23 @@ namespace Parameters::ZXTune::Core
     //@}
   }  // namespace SID
 
+  //! @brief SPC (S-SMP and S-DSP) related parameters namespace
+  namespace SPC
+  {
+    //! @brief Parameters#ZXTune#Core#SPC namespace prefix
+    const auto PREFIX = Core::PREFIX + "spc"_id;
+
+    //@{
+    //! @name Emulation engine
+    const IntType ENGINE_SNES_SPC = 0;
+    const IntType ENGINE_ARES = 1;
+    //! Default is ares
+    const IntType ENGINE_DEFAULT = ENGINE_ARES;
+    //! Parameter name
+    const auto ENGINE = PREFIX + "engine"_id;
+    //@}
+  }  // namespace SPC
+
   //! @brief MT-32 (Munt) related parameters namespace
   namespace MT32
   {

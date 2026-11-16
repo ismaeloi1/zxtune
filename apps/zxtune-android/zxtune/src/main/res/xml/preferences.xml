@@ -475,6 +475,16 @@
                 android:title="@string/pref_zxtune_mt32_voices_title"
                 app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
+    <!-- spc -->
+    <PreferenceCategory android:title="@string/pref_zxtune_spc_title">
+        <app.zxtune.ui.settings.SegmentedListPreference
+                android:defaultValue="@string/pref_zxtune_spc_engine_default"
+                android:entries="@array/pref_zxtune_spc_engine_entries"
+                android:entryValues="@array/pref_zxtune_spc_engine_values"
+                android:key="zxtune.core.spc.engine"
+                android:summary="@string/pref_zxtune_spc_engine_summary"
+                android:title="@string/pref_zxtune_spc_engine_title" />
+    </PreferenceCategory>
     <!-- sid -->
     <PreferenceCategory android:title="@string/pref_zxtune_sid_title">
         <app.zxtune.ui.settings.SegmentedListPreference

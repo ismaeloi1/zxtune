@@ -34,6 +34,7 @@
 #include "string_view.h"
 
 #include "3rdparty/snesspc/ares/ares_spc.h"
+#include "3rdparty/snesspc/snes_spc/SNES_SPC.h"
 #include "3rdparty/snesspc/snes_spc/SPC_Filter.h"
 
 #include <algorithm>
@@ -62,23 +63,55 @@ namespace Module::SPC
   public:
     using Ptr = std::unique_ptr<SPC>;
 
-    explicit SPC(Binary::View data)
+    //! @param isAres cycle accurate ares engine, else snes_spc
+    SPC(Binary::View data, bool isAres)
       : Data(data)
     {
+      if (isAres)
+      {
+        Ares = std::make_unique<::AresSpc>();
+      }
+      else
+      {
+        Blargg = std::make_unique<::SNES_SPC>();
+        Require(!Blargg->init());
+      }
       Reset();
+    }
+
+    bool IsAres() const
+    {
+      return !!Ares;
     }
 
     void Reset()
     {
-      Require(Spc.load_spc(Data.Start(), Data.Size()));
-      Spc.clear_echo();
+      if (Ares)
+      {
+        Require(Ares->load_spc(Data.Start(), Data.Size()));
+        Ares->clear_echo();
+      }
+      else
+      {
+        Blargg->reset();
+        Require(!Blargg->load_spc(Data.Start(), Data.Size()));
+        Blargg->clear_echo();
+        Blargg->disable_surround(true);
+      }
       Filter.clear();
       Filter.set_gain(static_cast<int>(::SPC_Filter::gain_unit * 1.4));  // as in GME
     }
 
     void SetChannelsMask(int mask)
     {
-      Spc.mute_voices(mask);
+      if (Ares)
+      {
+        Ares->mute_voices(mask);
+      }
+      else
+      {
+        Blargg->mute_voices(mask);
+      }
     }
 
     static const uint_t VOICES = ::AresSpc::voice_count;
@@ -106,7 +139,14 @@ namespace Module::SPC
     {
       Voices = target;
       SinceState = 0;
-      Spc.set_voices_func(target ? &OnVoices : nullptr, this);
+      if (Ares)
+      {
+        Ares->set_voices_func(target ? &OnVoices : nullptr, this);
+      }
+      else
+      {
+        Blargg->get_dsp().set_voices_func(target ? &OnVoices : nullptr, this);
+      }
     }
 
     Sound::Chunk Render(uint_t samples)
@@ -116,7 +156,14 @@ namespace Module::SPC
       Sound::Chunk result(samples);
       auto* const buffer = safe_ptr_cast<int16_t*>(result.data());
       const auto dataSize = static_cast<int>(samples * Sound::Sample::CHANNELS);
-      Spc.play(samples, buffer);
+      if (Ares)
+      {
+        Ares->play(samples, buffer);
+      }
+      else
+      {
+        Require(!Blargg->play(dataSize, buffer));
+      }
       Filter.run(buffer, dataSize);
       return result;
     }
@@ -125,25 +172,56 @@ namespace Module::SPC
     {
       auto* const voices = Voices;
       SetVoicesTarget(nullptr);
-      Spc.play(samples, nullptr);
+      if (Ares)
+      {
+        Ares->play(samples, nullptr);
+      }
+      else
+      {
+        Require(!Blargg->skip(static_cast<int>(samples * Sound::Sample::CHANNELS)));
+      }
       SetVoicesTarget(voices);
     }
 
-    using Snapshot = ::AresSpc;
+    // state of the used engine
+    struct Snapshot
+    {
+      std::unique_ptr<::AresSpc> Ares;
+      std::unique_ptr<::SNES_SPC> Blargg;
+    };
     // RAM and registers
     static const std::size_t SNAPSHOT_SIZE = 0x11000;
 
     std::unique_ptr<Snapshot> SaveState() const
     {
       auto result = std::make_unique<Snapshot>();
-      result->copy_state_from(Spc);
+      if (Ares)
+      {
+        result->Ares = std::make_unique<::AresSpc>();
+        result->Ares->copy_state_from(*Ares);
+      }
+      else
+      {
+        result->Blargg = std::make_unique<::SNES_SPC>();
+        Require(!result->Blargg->init());
+        result->Blargg->copy_state_from(*Blargg);
+      }
       return result;
     }
 
     // Filter is not affected, it's not run while skipping anyway
     void LoadState(const Snapshot& state)
     {
-      Spc.copy_state_from(state);
+      if (Ares)
+      {
+        Ares->copy_state_from(*state.Ares);
+      }
+      else
+      {
+        Blargg->copy_state_from(*state.Blargg);
+        // as after skip() to match the state after it exactly
+        Blargg->set_output(nullptr, 0);
+      }
     }
 
     void ClearFilter()
@@ -166,13 +244,21 @@ namespace Module::SPC
         self->SinceState = 0;
         frame.StatesPos.push_back(static_cast<uint_t>(frame.Samples.size() / VOICES));
         auto& states = frame.States.emplace_back();
-        self->VoicesState.Fill(self->Spc, states);
+        if (self->Ares)
+        {
+          self->VoicesState.Fill(*self->Ares, states);
+        }
+        else
+        {
+          self->VoicesState.Fill(self->Blargg->get_dsp(), states);
+        }
       }
     }
 
   private:
     const Binary::View Data;
-    ::AresSpc Spc;
+    std::unique_ptr<::AresSpc> Ares;
+    std::unique_ptr<::SNES_SPC> Blargg;
     ::SPC_Filter Filter;
     VoicesFrame* Voices = nullptr;
     uint_t SinceState = 0;
@@ -189,6 +275,13 @@ namespace Module::SPC
   // Restored state is fast-forwarded for up to this period initially
   const auto SNAPSHOTS_PERIOD = Time::Seconds(2);
 
+  // engine is selected for the whole playback of tune
+  bool IsAresEngine(const Parameters::Accessor& params)
+  {
+    using namespace Parameters::ZXTune::Core::SPC;
+    return ENGINE_ARES == Parameters::GetInteger(params, ENGINE, ENGINE_DEFAULT);
+  }
+
   class Renderer
     : public Module::Renderer
     , public VoicesScopeSource
@@ -197,7 +290,7 @@ namespace Module::SPC
     Renderer(Model::Ptr tune, Parameters::Accessor::Ptr params, uint_t samplerate)
       : Tune(std::move(tune))
       , Params(std::move(params))
-      , Engine(MakePtr<SPC>(*Tune->Data))
+      , Engine(MakePtr<SPC>(*Tune->Data, IsAresEngine(*Params)))
       , State(Tune->Duration)
       , Samplerate(samplerate)
       , Target(Sound::CreateResampler(::AresSpc::sample_rate, samplerate))
@@ -217,7 +310,7 @@ namespace Module::SPC
           group.Voices.emplace_back("Voice " + std::to_string(voice + 1));
         }
         Scope->SetVoicesGroups({group}, false);
-        Scope->SetDescription("S-DSP 32kHz, ares");
+        Scope->SetDescription(Engine->IsAres() ? "S-DSP 32kHz, ares" : "S-DSP 32kHz, snes_spc");
       }
       UpdateVoicesTap();
       return true;
