@@ -33,7 +33,7 @@
 #include "make_ptr.h"
 #include "string_view.h"
 
-#include "3rdparty/snesspc/snes_spc/SNES_SPC.h"
+#include "3rdparty/snesspc/ares/ares_spc.h"
 #include "3rdparty/snesspc/snes_spc/SPC_Filter.h"
 
 #include <algorithm>
@@ -65,16 +65,13 @@ namespace Module::SPC
     explicit SPC(Binary::View data)
       : Data(data)
     {
-      CheckError(Spc.init());
       Reset();
     }
 
     void Reset()
     {
-      Spc.reset();
-      CheckError(Spc.load_spc(Data.Start(), Data.Size()));
+      Require(Spc.load_spc(Data.Start(), Data.Size()));
       Spc.clear_echo();
-      Spc.disable_surround(true);
       Filter.clear();
       Filter.set_gain(static_cast<int>(::SPC_Filter::gain_unit * 1.4));  // as in GME
     }
@@ -84,9 +81,9 @@ namespace Module::SPC
       Spc.mute_voices(mask);
     }
 
-    static const uint_t VOICES = ::SPC_DSP::voice_count;
+    static const uint_t VOICES = ::AresSpc::voice_count;
     // state snapshots period in DSP samples, ~1ms
-    static const uint_t STATE_PERIOD = ::SNES_SPC::sample_rate / 1000;
+    static const uint_t STATE_PERIOD = ::AresSpc::sample_rate / 1000;
 
     struct VoicesFrame
     {
@@ -109,7 +106,7 @@ namespace Module::SPC
     {
       Voices = target;
       SinceState = 0;
-      Spc.get_dsp().set_voices_func(target ? &OnVoices : nullptr, this);
+      Spc.set_voices_func(target ? &OnVoices : nullptr, this);
     }
 
     Sound::Chunk Render(uint_t samples)
@@ -117,9 +114,9 @@ namespace Module::SPC
       static_assert(Sound::Sample::CHANNELS == 2, "Incompatible sound channels count");
       static_assert(Sound::Sample::BITS == 16, "Incompatible sound bits count");
       Sound::Chunk result(samples);
-      auto* const buffer = safe_ptr_cast<::SNES_SPC::sample_t*>(result.data());
+      auto* const buffer = safe_ptr_cast<int16_t*>(result.data());
       const auto dataSize = static_cast<int>(samples * Sound::Sample::CHANNELS);
-      CheckError(Spc.play(dataSize, buffer));
+      Spc.play(samples, buffer);
       Filter.run(buffer, dataSize);
       return result;
     }
@@ -128,16 +125,17 @@ namespace Module::SPC
     {
       auto* const voices = Voices;
       SetVoicesTarget(nullptr);
-      CheckError(Spc.skip(static_cast<int>(samples * Sound::Sample::CHANNELS)));
+      Spc.play(samples, nullptr);
       SetVoicesTarget(voices);
     }
 
-    using Snapshot = ::SNES_SPC;
+    using Snapshot = ::AresSpc;
+    // RAM and registers
+    static const std::size_t SNAPSHOT_SIZE = 0x11000;
 
     std::unique_ptr<Snapshot> SaveState() const
     {
       auto result = std::make_unique<Snapshot>();
-      CheckError(result->init());
       result->copy_state_from(Spc);
       return result;
     }
@@ -146,8 +144,6 @@ namespace Module::SPC
     void LoadState(const Snapshot& state)
     {
       Spc.copy_state_from(state);
-      // as after skip() to match the state after it exactly
-      Spc.set_output(nullptr, 0);
     }
 
     void ClearFilter()
@@ -156,11 +152,6 @@ namespace Module::SPC
     }
 
   private:
-    inline static void CheckError(::blargg_err_t err)
-    {
-      Require(!err);  // TODO: detalize
-    }
-
     static void OnVoices(void* data, const int* voices)
     {
       auto* const self = static_cast<SPC*>(data);
@@ -175,13 +166,13 @@ namespace Module::SPC
         self->SinceState = 0;
         frame.StatesPos.push_back(static_cast<uint_t>(frame.Samples.size() / VOICES));
         auto& states = frame.States.emplace_back();
-        self->VoicesState.Fill(self->Spc.get_dsp(), states);
+        self->VoicesState.Fill(self->Spc, states);
       }
     }
 
   private:
     const Binary::View Data;
-    ::SNES_SPC Spc;
+    ::AresSpc Spc;
     ::SPC_Filter Filter;
     VoicesFrame* Voices = nullptr;
     uint_t SinceState = 0;
@@ -192,7 +183,7 @@ namespace Module::SPC
 
   uint_t GetSamples(Time::Microseconds period)
   {
-    return period.Get() * ::SNES_SPC::sample_rate / period.PER_SECOND;
+    return period.Get() * ::AresSpc::sample_rate / period.PER_SECOND;
   }
 
   // Restored state is fast-forwarded for up to this period initially
@@ -209,8 +200,8 @@ namespace Module::SPC
       , Engine(MakePtr<SPC>(*Tune->Data))
       , State(Tune->Duration)
       , Samplerate(samplerate)
-      , Target(Sound::CreateResampler(::SNES_SPC::sample_rate, samplerate))
-      , Timeline(GetSamples(SNAPSHOTS_PERIOD), GetSamples(Tune->Duration), sizeof(SPC::Snapshot),
+      , Target(Sound::CreateResampler(::AresSpc::sample_rate, samplerate))
+      , Timeline(GetSamples(SNAPSHOTS_PERIOD), GetSamples(Tune->Duration), SPC::SNAPSHOT_SIZE,
                  GetSeekSnapshotsMemoryLimit(*Params))
     {}
 
@@ -226,7 +217,7 @@ namespace Module::SPC
           group.Voices.emplace_back("Voice " + std::to_string(voice + 1));
         }
         Scope->SetVoicesGroups({group}, false);
-        Scope->SetDescription("S-DSP 32kHz, snes_spc");
+        Scope->SetDescription("S-DSP 32kHz, ares");
       }
       UpdateVoicesTap();
       return true;
@@ -291,7 +282,7 @@ namespace Module::SPC
         Frame.Clear();
         for (auto& resampler : VoicesResamplers)
         {
-          resampler = Sound::CreateResampler(::SNES_SPC::sample_rate, Samplerate);
+          resampler = Sound::CreateResampler(::AresSpc::sample_rate, Samplerate);
         }
         VoicesTarget = &Frame;
       }
@@ -486,7 +477,7 @@ namespace Module::SPC
           props.SetSource(*container);
           props.SetPlatform(Platforms::SUPER_NINTENDO_ENTERTAINMENT_SYSTEM);
           // As in GME
-          props.SetChannels("DSP", ::SNES_SPC::voice_count);
+          props.SetChannels("DSP", ::AresSpc::voice_count);
 
           auto duration = dataBuilder.GetDuration();
           if (!duration.Get())

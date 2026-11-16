@@ -1,0 +1,10 @@
+S-SMP (SPC700) and S-DSP emulation of ares (https://github.com/ares-emulator/ares, ISC license, see LICENSE),
+commit 140c0a322aee6773936da4b6a43f3cf054a74e6a: ares/component/processor/spc700, ares/sfc/smp, ares/sfc/dsp.
+
+Changes to build it standalone, marked with "standalone" in sources:
+- nall types are replaced by nall_shim.hpp, nodes, debugger, disassembler and serialization are removed;
+- cothreads are replaced by direct clocking: SMP runs DSP clock by clock (DSP::main is one clock of 32 per sample);
+- STP/SLEEP instructions make single step per call;
+- timer 2 is reset on 0->1 transition of its enable bit as timers 0 and 1 (condition is inverted upstream);
+- per-voice outputs and voices muting in DSP;
+- ares_spc.h/.cpp: SPC files player.

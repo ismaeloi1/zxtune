@@ -29,7 +29,9 @@ namespace Module
   public:
     static const uint_t VOICES = ::SPC_DSP::voice_count;
 
-    void Fill(const ::SPC_DSP& dsp, std::array<VoiceState, VOICES>& states)
+    //! @param dsp ::SPC_DSP or compatible (registers, RAM and voices state)
+    template<class Dsp>
+    void Fill(const Dsp& dsp, std::array<VoiceState, VOICES>& states)
     {
       std::array<uint8_t, GLOBALS> globals = {};
       const uint8_t globalRegs[] = {::SPC_DSP::r_mvoll, ::SPC_DSP::r_mvolr, ::SPC_DSP::r_evoll, ::SPC_DSP::r_evolr,
@@ -52,7 +54,7 @@ namespace Module
       const auto rescan = (++Snapshots % RESCAN_PERIOD) == 0 ? (Snapshots / RESCAN_PERIOD) % VOICES : VOICES;
       for (uint_t idx = 0; idx < VOICES; ++idx)
       {
-        ::SPC_DSP::voice_state_t in;
+        typename Dsp::voice_state_t in;
         dsp.get_voice_state(idx, &in);
         auto& out = states[idx];
         out = VoiceState();
