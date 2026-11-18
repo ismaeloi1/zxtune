@@ -76,6 +76,10 @@ internal class ControlCallback(
             )
         } ?: Unit
 
+        MainService.CUSTOM_ACTION_PLAY_NEXT -> extra?.getParcelableArrayCompat<Uri>("uris")?.let {
+            svc.enqueue(Array(it.size) { idx -> it[idx] as Uri })
+        } ?: Unit
+
         StatusCallback.CUSTOM_ACTION_TOGGLE_SHUFFLE -> {
             ctrl.sequenceMode = if (ctrl.sequenceMode == PlaybackControl.SequenceMode.SHUFFLE) {
                 PlaybackControl.SequenceMode.ORDERED

@@ -60,6 +60,13 @@
 
     <Space style="@style/Lhuna.TransportGap" />
 
+    <!-- Favorites, add to playlist, play next -->
+    <ImageView
+            android:id="@+id/controls_playlist"
+            style="@style/Button.Icon"
+            android:contentDescription="@string/playlists_add_to"
+            android:src="@drawable/ic_playlist_add" />
+
     <ImageView
             android:id="@+id/controls_track_menu"
             style="@style/Button.Icon"

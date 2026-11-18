@@ -39,6 +39,8 @@ class PlaybackControlsFragment : Fragment() {
         val shuffle = ShuffleModeControl(view)
         val looping = RepeatModeControl(view)
         val menu = TrackContextMenu(requireActivity(), view.findViewById(R.id.controls_track_menu))
+        val playlistMenu =
+            TrackContextMenu(requireActivity(), view.findViewById(R.id.controls_playlist), R.menu.track_playlist)
         val info = NowPlayingInfo
         val infoToggle = view.findViewById<View>(R.id.controls_information).apply {
             setOnClickListener { info.toggle(it.context) }
@@ -47,6 +49,7 @@ class PlaybackControlsFragment : Fragment() {
             launch {
                 combine(controller, metadata) { ctrl, meta ->
                     menu.bind(ctrl, meta)
+                    playlistMenu.bind(ctrl, meta)
                 }.collect {}
             }
             launch {

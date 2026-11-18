@@ -20,4 +20,11 @@
   <string name="playlists_favorite_add">Add to favorites</string>
   <string name="playlists_favorite_remove">Remove from favorites</string>
   <string name="playlists_copy_suffix">%s (copy)</string>
+  <string name="playlists_default">Default playlist</string>
+  <string name="playlists_play_next">Play next</string>
+  <string name="playlists_queued">Play next: %d</string>
+  <string name="playlists_export">Export as M3U…</string>
+  <string name="playlists_import">Import M3U…</string>
+  <string name="playlists_imported">%1$d tracks imported into «%2$s»</string>
+  <string name="playlists_exported">Exported «%s»</string>
 </resources>

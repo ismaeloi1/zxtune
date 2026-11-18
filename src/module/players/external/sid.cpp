@@ -267,6 +267,12 @@ namespace Module::Sid
       }
     }
 
+    bool IsMultiSidMono() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return Get(MULTI_SID_MONO, MULTI_SID_MONO_DEFAULT) != 0;
+    }
+
     bool GetStrongPulseSaw() const
     {
       using namespace Parameters::ZXTune::Core::SID;
@@ -849,6 +855,15 @@ namespace Module::Sid
       const auto loops = State.LoopCount();
       const auto avail = State.ConsumeUpTo(FRAME_DURATION);
       auto result = Engine->Render(GetSamples(avail));
+      // the same level on both sides, so no chip becomes louder
+      if (Tune->getInfo()->sidChips() > 1 && SidParams->IsMultiSidMono())
+      {
+        for (auto& smp : result)
+        {
+          const auto mid = static_cast<Sound::Sample::Type>((int(smp.Left()) + int(smp.Right())) / 2);
+          smp = Sound::Sample(mid, mid);
+        }
+      }
       Samples += result.size();
       // emulation is not restarted on looping, so position does not correspond to emulated samples anymore
       InSync = InSync && loops == State.LoopCount();

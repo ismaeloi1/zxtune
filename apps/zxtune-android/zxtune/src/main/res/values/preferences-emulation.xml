@@ -659,4 +659,13 @@
         <item>0</item>
         <item>1</item>
     </string-array>
+    <string name="pref_zxtune_sid_multi_sid_mono_title">2SID/3SID output</string>
+    <string-array name="pref_zxtune_sid_multi_sid_mono_entries">
+        <item>Stereo (chips panned)</item>
+        <item>Mono</item>
+    </string-array>
+    <string-array name="pref_zxtune_sid_multi_sid_mono_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
 </resources>

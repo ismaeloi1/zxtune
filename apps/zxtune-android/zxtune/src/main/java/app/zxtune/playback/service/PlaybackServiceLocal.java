@@ -56,6 +56,10 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
     private final ExecutorService executor;
     private final CompositeCallback callbacks;
     private final NavigateCommand navigateCmd;
+    private final java.util.concurrent.ConcurrentLinkedQueue<Uri> queue =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
+    // iterator to continue after queued tracks
+    private final AtomicReference<Iterator> suspended = new AtomicReference<>(null);
     private final ActivateCommand activateCmd;
     private final DispatchedPlaybackControl playback;
     private final DispatchedSeekControl seek;
@@ -150,7 +154,42 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
     }
 
     public final void setNowPlaying(Uri uri) {
+        // explicit choice drops the return point of the queue, the queue itself is kept
+        suspended.set(null);
         activateCmd.schedulePlay(uri);
+    }
+
+    /**
+     * "Play next" queue as of AIMP/foobar2000: queued tracks are played before the next one of the
+     * current playlist or folder, then navigation continues from the track that was playing before
+     * them.
+     */
+    public final void enqueue(Uri[] uris) {
+        for (Uri uri : uris) {
+            queue.add(uri);
+        }
+    }
+
+    public final int getQueueSize() {
+        return queue.size();
+    }
+
+    public final void clearQueue() {
+        queue.clear();
+    }
+
+    private void playNext() {
+        final Uri queued = queue.poll();
+        if (queued != null) {
+            suspended.compareAndSet(null, iterator.get());
+            activateCmd.schedulePlay(queued);
+        } else {
+            final Iterator back = suspended.getAndSet(null);
+            if (back != null) {
+                iterator.set(back);
+            }
+            navigateCmd.scheduleNext();
+        }
     }
 
     private class ActivateCommand implements Command {
@@ -402,7 +441,7 @@ public class PlaybackServiceLocal implements PlaybackService, Releaseable {
 
         @Override
         public void next() {
-            navigateCmd.scheduleNext();
+            playNext();
         }
 
         @Override

@@ -284,6 +284,9 @@ class MainService : MediaBrowserServiceCompat() {
 
         val CUSTOM_ACTION_ADD_CURRENT = "$TAG.CUSTOM_ACTION_ADD_CURRENT"
         val CUSTOM_ACTION_ADD = "$TAG.CUSTOM_ACTION_ADD"
+
+        // "uris" are played after the current track, see PlaybackServiceLocal.enqueue
+        val CUSTOM_ACTION_PLAY_NEXT = "$TAG.CUSTOM_ACTION_PLAY_NEXT"
         val COMMAND_GET_CURRENT_PARAMETERS = "$TAG.COMMAND_GET_CURRENT_PARAMETERS"
         val COMMAND_SET_CURRENT_PARAMETERS = "$TAG.COMMAND_SET_CURRENT_PARAMETERS"
 

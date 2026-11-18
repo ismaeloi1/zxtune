@@ -520,6 +520,9 @@ namespace Parameters::ZXTune::Core
     //! chips (silent with pulse width over 50%), 1 - kept as in some chips (and reSID sampled tables), louder sound
     const IntType STRONG_PULSE_SAW_DEFAULT = 0;
     const auto STRONG_PULSE_SAW = PREFIX + "strong_pulse_saw"_id;
+    //! 2SID/3SID tunes: chips are panned by libsidplayfp (left, right, center), 1 - all of them mixed to center
+    const IntType MULTI_SID_MONO_DEFAULT = 0;
+    const auto MULTI_SID_MONO = PREFIX + "multi_sid_mono"_id;
     //@}
   }  // namespace SID
 

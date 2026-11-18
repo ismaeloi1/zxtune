@@ -248,4 +248,9 @@
         <item>EMU2413 (rapide)</item>
         <item>MAME (rapide)</item>
     </string-array>
+    <string name="pref_zxtune_sid_multi_sid_mono_title">Sortie 2SID/3SID</string>
+    <string-array name="pref_zxtune_sid_multi_sid_mono_entries">
+        <item>Stéréo (puces réparties)</item>
+        <item>Mono</item>
+    </string-array>
 </resources>

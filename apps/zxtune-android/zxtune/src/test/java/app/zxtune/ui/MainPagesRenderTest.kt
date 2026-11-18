@@ -153,6 +153,7 @@ class MainPagesRenderTest {
             R.id.controls_play_pause,
             R.id.controls_next,
             R.id.controls_track_mode,
+            R.id.controls_playlist,
             R.id.controls_track_menu,
             R.id.position_seek,
         )) {

@@ -602,6 +602,13 @@
                 android:key="zxtune.core.sid.strong_pulse_saw"
                 android:title="@string/pref_zxtune_sid_strong_pulse_saw_title"
                 app:useSimpleSummaryProvider="true" />
+        <DropDownPreference
+                android:defaultValue="0"
+                android:entries="@array/pref_zxtune_sid_multi_sid_mono_entries"
+                android:entryValues="@array/pref_zxtune_sid_multi_sid_mono_values"
+                android:key="zxtune.core.sid.multi_sid_mono"
+                android:title="@string/pref_zxtune_sid_multi_sid_mono_title"
+                app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <!-- android auto -->
     <PreferenceCategory android:title="@string/pref_car_title">

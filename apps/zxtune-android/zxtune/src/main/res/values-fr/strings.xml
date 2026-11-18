@@ -14,4 +14,16 @@
     <string name="playlists_favorite_add">Ajouter aux favoris</string>
     <string name="playlists_favorite_remove">Retirer des favoris</string>
     <string name="playlists_copy_suffix">%s (copie)</string>
+    <string name="playlists_default">Liste par défaut</string>
+    <string name="playlists_play_next">Jouer ensuite</string>
+    <string name="playlists_queued">Jouer ensuite : %d</string>
+    <string name="playlists_export">Exporter en M3U…</string>
+    <string name="playlists_import">Importer un M3U…</string>
+    <string name="playlists_imported">%1$d morceaux importés dans «%2$s»</string>
+    <string name="playlists_exported">«%s» exportée</string>
+    <plurals name="tracks">
+      <item quantity="one">%d morceau</item>
+      <item quantity="many">%d morceaux</item>
+      <item quantity="other">%d morceaux</item>
+    </plurals>
 </resources>

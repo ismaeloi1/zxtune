@@ -24,4 +24,10 @@
             android:title="@string/delete"
             app:iconTint="?colorControlNormal"
             app:showAsAction="always" />
+    <item
+            android:id="@+id/action_play_next"
+            android:icon="@drawable/ic_next"
+            android:title="@string/playlists_play_next"
+            app:iconTint="?colorControlNormal"
+            app:showAsAction="ifRoom" />
 </menu>

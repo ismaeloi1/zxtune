@@ -28,10 +28,15 @@ import kotlinx.coroutines.launch
 /**
  * Actions on the playing track, shown from now playing transport row
  */
-internal class TrackContextMenu(private val ctx: FragmentActivity, anchor: View) {
+internal class TrackContextMenu(
+    private val ctx: FragmentActivity,
+    anchor: View,
+    // track actions or playlist actions (favorites, add to playlist)
+    private val menuRes: Int = R.menu.track,
+) {
     private val popup by lazy {
         PopupMenu(anchor.context, anchor).apply {
-            menuInflater.inflate(R.menu.track, menu)
+            menuInflater.inflate(menuRes, menu)
             setForceShowIcon(true)
         }
     }
@@ -88,6 +93,18 @@ internal class TrackContextMenu(private val ctx: FragmentActivity, anchor: View)
         controller: MediaControllerCompat?,
         metadata: MediaMetadataCompat?,
     ) = with(menu) {
+        if (menuRes == R.menu.track_playlist) {
+            setupPlaylist(menu, controller, metadata)
+        } else {
+            setupTrack(menu, metadata)
+        }
+    }
+
+    private fun setupPlaylist(
+        menu: Menu,
+        controller: MediaControllerCompat?,
+        metadata: MediaMetadataCompat?,
+    ) = with(menu) {
         item(R.id.action_add).bindOnClick(ifNotNulls(
             controller?.transportControls,
             // any playing track, the current playlist one too (to another list)
@@ -104,6 +121,9 @@ internal class TrackContextMenu(private val ctx: FragmentActivity, anchor: View)
             }
         })
         setupFavorite(item(R.id.action_favorite), metadata)
+    }
+
+    private fun setupTrack(menu: Menu, metadata: MediaMetadataCompat?) = with(menu) {
         item(R.id.action_send).bindIntent(metadata?.let {
             SharingActivity.maybeCreateSendIntent(
                 ctx,

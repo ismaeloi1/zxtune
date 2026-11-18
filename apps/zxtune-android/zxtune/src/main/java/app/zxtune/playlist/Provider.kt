@@ -95,8 +95,13 @@ class Provider : ContentProvider() {
     } ?: db.updatePlaylistItems(values, selection, selectionArgs)
 
     override fun call(method: String, arg: String?, extras: Bundle?) = when {
-        method.startsWith(LISTS_PREFIX) -> callLists(method.removePrefix(LISTS_PREFIX), arg, extras).also {
-            resolver.notifyChange(PlaylistQuery.ALL, null)
+        method.startsWith(LISTS_PREFIX) -> method.removePrefix(LISTS_PREFIX).let { name ->
+            callLists(name, arg, extras).also {
+                // queries must not notify, else observers re-query endlessly
+                if (name !in QUERIES) {
+                    resolver.notifyChange(PlaylistQuery.ALL, null)
+                }
+            }
         }
 
         arg == null -> null
@@ -238,6 +243,7 @@ class Provider : ContentProvider() {
         private const val METHOD_SORT = "sort"
         const val LISTS_PREFIX = "lists."
         const val PARAM_LIST = "list"
+        private val QUERIES = setOf("all", "is_favorite", "favorites")
         private const val METHOD_MOVE = "move"
         private const val METHOD_SAVE = "save"
 

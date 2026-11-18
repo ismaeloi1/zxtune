@@ -17,6 +17,8 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
@@ -24,7 +26,9 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
+import androidx.core.os.bundleOf
 import androidx.core.view.MenuProvider
+import androidx.documentfile.provider.DocumentFile
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -33,17 +37,21 @@ import androidx.recyclerview.selection.SelectionPredicates
 import androidx.recyclerview.selection.SelectionTracker
 import androidx.recyclerview.selection.StorageStrategy
 import androidx.recyclerview.widget.RecyclerView
+import app.zxtune.MainService
 import app.zxtune.R
 import app.zxtune.device.media.MediaModel
 import app.zxtune.fs.provider.VfsProviderClient
 import app.zxtune.playlist.Item
+import app.zxtune.playlist.M3u
 import app.zxtune.playlist.ProviderClient
 import app.zxtune.ui.PersistentStorageSetupFragment
 import app.zxtune.ui.utils.DialogSheets
 import app.zxtune.ui.utils.SelectionUtils
 import app.zxtune.ui.utils.item
 import app.zxtune.ui.utils.whenLifecycleStarted
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PlaylistFragment : Fragment() {
     private lateinit var listing: RecyclerView
@@ -95,7 +103,7 @@ class PlaylistFragment : Fragment() {
             val active = lists.firstOrNull { it.isActive }
             PopupMenu(ctx, view).apply {
                 lists.forEachIndexed { idx, info ->
-                    menu.add(GROUP_LISTS, idx, idx, "${PlaylistsUi.displayName(ctx, info)}  ·  ${info.count}").apply {
+                    menu.add(GROUP_LISTS, idx, idx, PlaylistsUi.displayTitle(ctx, info)).apply {
                         isCheckable = true
                         isChecked = info.isActive
                         setOnMenuItemClickListener {
@@ -105,6 +113,10 @@ class PlaylistFragment : Fragment() {
                     }
                 }
                 menu.setGroupCheckable(GROUP_LISTS, true, true)
+                menu.add(GROUP_ACTIONS, 5, lists.size + 5, R.string.playlists_import).setOnMenuItemClickListener {
+                    importRequest.launch(arrayOf("audio/x-mpegurl", "audio/mpegurl", "application/vnd.apple.mpegurl", "*/*"))
+                    true
+                }
                 menu.add(GROUP_ACTIONS, 0, lists.size, R.string.playlists_new).setOnMenuItemClickListener {
                     PlaylistsUi.promptName(ctx, R.string.playlists_new, "") { name ->
                         lifecycleScope.launch { client.createList(name)?.let { client.switchList(it) } }
@@ -127,6 +139,10 @@ class PlaylistFragment : Fragment() {
                         }
                         true
                     }
+                    menu.add(GROUP_ACTIONS, 4, lists.size + 4, R.string.playlists_export).setOnMenuItemClickListener {
+                        exportRequest.launch("$name.m3u")
+                        true
+                    }
                     menu.add(GROUP_ACTIONS, 3, lists.size + 3, R.string.playlists_delete).setOnMenuItemClickListener {
                         deletionAlert(getString(R.string.playlists_delete_query, name)) {
                             lifecycleScope.launch { client.deleteList(current.id) }
@@ -138,9 +154,62 @@ class PlaylistFragment : Fragment() {
         }
     }
 
+    // displayed (current) list to M3U file chosen by user
+    private val exportRequest = registerForActivityResult(ActivityResultContracts.CreateDocument("audio/x-mpegurl")) { uri ->
+        uri ?: return@registerForActivityResult
+        val ctx = requireContext().applicationContext
+        lifecycleScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val items = ProviderClient.create(ctx).queryContent()?.map {
+                        Item(it.location, it.title, it.author, it.duration)
+                    } ?: emptyList()
+                    requireNotNull(ctx.contentResolver.openOutputStream(uri)).use { M3u.write(it, items) }
+                }
+            }.onSuccess {
+                Toast.makeText(ctx, ctx.getString(R.string.playlists_exported, uri.lastPathSegment ?: ""), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(ctx, it.message ?: it.toString(), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    // M3U file to new list named after it
+    private val importRequest = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        uri ?: return@registerForActivityResult
+        val ctx = requireContext().applicationContext
+        lifecycleScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    val items = requireNotNull(ctx.contentResolver.openInputStream(uri)).use { M3u.read(it) }
+                    val name = (DocumentFile.fromSingleUri(ctx, uri)?.name ?: "M3U").substringBeforeLast('.')
+                    val client = ProviderClient.create(ctx)
+                    val list = requireNotNull(client.createList(name))
+                    items.forEach { client.addItem(it, list) }
+                    client.switchList(list)
+                    items.size to name
+                }
+            }.onSuccess { (count, name) ->
+                Toast.makeText(ctx, ctx.getString(R.string.playlists_imported, count, name), Toast.LENGTH_SHORT).show()
+            }.onFailure {
+                Toast.makeText(ctx, it.message ?: it.toString(), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    // selected tracks are played after the current one
+    private fun playNext(ids: LongArray?) {
+        val uris = (ids ?: return).map { ProviderClient.createUri(it) }
+        mediaController?.transportControls?.sendCustomAction(
+            MainService.CUSTOM_ACTION_PLAY_NEXT,
+            bundleOf("uris" to uris.toTypedArray())
+        )
+        Toast.makeText(requireContext(), getString(R.string.playlists_queued, uris.size), Toast.LENGTH_SHORT).show()
+    }
+
     private fun update(view: TextView, lists: List<ProviderClient.ListInfo>) {
         val active = lists.firstOrNull { it.isActive } ?: return
-        view.text = "${PlaylistsUi.displayName(view.context, active)}  ·  ${active.count}"
+        view.text = PlaylistsUi.displayTitle(view.context, active)
     }
 
     // copies selected tracks of the current playlist to the chosen list
@@ -295,6 +364,8 @@ class PlaylistFragment : Fragment() {
             R.id.action_save -> savePlaylist(convertSelection(selection))
 
             R.id.action_add_to -> addSelectionTo(convertSelection(selection))
+
+            R.id.action_play_next -> playNext(convertSelection(selection))
 
             R.id.action_statistics -> showStatistics(convertSelection(selection))
 

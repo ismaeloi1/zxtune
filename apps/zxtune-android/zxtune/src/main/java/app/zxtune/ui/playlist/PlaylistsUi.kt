@@ -13,13 +13,21 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import app.zxtune.R
+import app.zxtune.playlist.Lists
 import app.zxtune.playlist.ProviderClient
 import app.zxtune.ui.utils.DialogSheets
 import kotlinx.coroutines.launch
 
 object PlaylistsUi {
 
-    fun displayName(ctx: Context, info: ProviderClient.ListInfo) = if (info.isFavorites) ctx.getString(R.string.playlists_favorites) else info.name
+    fun displayName(ctx: Context, info: ProviderClient.ListInfo) = when {
+        info.isFavorites -> ctx.getString(R.string.playlists_favorites)
+        info.name == Lists.DEFAULT_NAME -> ctx.getString(R.string.playlists_default)
+        else -> info.name
+    }
+
+    // ! "Default playlist · 104 tracks"
+    fun displayTitle(ctx: Context, info: ProviderClient.ListInfo) = "${displayName(ctx, info)} · ${ctx.resources.getQuantityString(R.plurals.tracks, info.count, info.count)}"
 
     /**
      * Chooser as in AIMP/VLC: favorites first, then lists, then "New playlist…"
@@ -29,7 +37,7 @@ object PlaylistsUi {
         val client = ProviderClient.create(activity)
         client.favoritesList()
         val lists = client.lists()
-        val names = lists.map { "${displayName(activity, it)}  ·  ${it.count}" } +
+        val names = lists.map { displayTitle(activity, it) } +
             activity.getString(R.string.playlists_new)
         AlertDialog.Builder(activity).setTitle(R.string.playlists_add_to)
             .setItems(names.toTypedArray()) { _, idx ->

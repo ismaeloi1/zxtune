@@ -33,6 +33,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.OnChildAttachStateChangeListener
 import app.zxtune.MainActivity
+import app.zxtune.MainService
 import app.zxtune.R
 import app.zxtune.ResultActivity
 import app.zxtune.ui.playlist.PlaylistsUi
@@ -324,12 +325,26 @@ class BrowserFragment :
         override fun processMenu(itemId: Int, selection: Selection<Uri>): Boolean {
             when (itemId) {
                 R.id.action_add -> addToPlaylist(selection)
+                R.id.action_play_next -> playNext(selection)
                 else -> return false
             }
             return true
         }
 
         // TODO: rework for PlaylistControl usage as a local iface
+        private fun playNext(selection: Selection<Uri>) {
+            val uris = convertSelection(selection)
+            MediaControllerCompat.getMediaController(requireActivity())?.transportControls?.sendCustomAction(
+                MainService.CUSTOM_ACTION_PLAY_NEXT,
+                androidx.core.os.bundleOf("uris" to uris)
+            )
+            android.widget.Toast.makeText(
+                requireContext(),
+                getString(R.string.playlists_queued, uris.size),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+
         // chosen playlist, as "Add to…" of AIMP/VLC
         private fun addToPlaylist(selection: Selection<Uri>) {
             val uris = convertSelection(selection)
