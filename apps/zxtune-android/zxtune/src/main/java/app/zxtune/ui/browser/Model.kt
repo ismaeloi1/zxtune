@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import app.zxtune.Logger
 import app.zxtune.R
+import app.zxtune.core.Identifier
 import app.zxtune.analytics.Analytics
 import app.zxtune.fs.provider.Schema
 import app.zxtune.fs.provider.VfsProviderClient
@@ -290,7 +291,13 @@ class Model @VisibleForTesting internal constructor(
             ObjectType.DIR -> coroutineScope {
                 val entries = async { getEntries(uri) }
                 val parents = getParents()
-                updateContent(parents, entries.await())
+                val content = entries.await()
+                if (isMultitrackModule(content)) {
+                    // multisong file (SID, NSF, AY...) is played as a whole: its subsongs, then the rest of folder
+                    _toPlay.send(uri)
+                } else {
+                    updateContent(parents, content)
+                }
             }
 
             else -> Unit
@@ -364,6 +371,11 @@ class Model @VisibleForTesting internal constructor(
         }
     }
 
+    // subsongs of multitrack module are named "#1", "#2"... unlike files of real archives (see core multitrack)
+    private fun isMultitrackModule(entries: List<ListingEntry>) = entries.isNotEmpty() && entries.all { entry ->
+        entry.details != null && Identifier(entry.uri).subPath.substringAfterLast('/').matches(SUBSONG)
+    }
+
     internal enum class ObjectType {
         DIR,
         DIR_WITH_FEED,
@@ -404,6 +416,8 @@ class Model @VisibleForTesting internal constructor(
         private val LOG = Logger(Model::class.java.name)
 
         private val EMPTY_STATE = State()
+
+        private val SUBSONG = Regex("#[0-9]+")
 
         private fun matchEntry(entry: ListingEntry, filter: String) = entry.title.contains(filter, true) || entry.description.contains(filter, true)
 

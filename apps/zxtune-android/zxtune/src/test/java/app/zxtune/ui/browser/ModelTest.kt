@@ -35,6 +35,7 @@ import org.mockito.kotlin.inOrder
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyBlocking
 import org.mockito.kotlin.verifyNoMoreInteractions
 import org.robolectric.RobolectricTestRunner
 import java.util.concurrent.Executors
@@ -271,6 +272,38 @@ class ModelTest {
             verify(progressObserver).invoke(null)
             verify(stateObserver).invoke(matchState(testUri, testParents, testContent))
         }
+    }
+
+    // multisong file is resolved as archive dir of "#N" tracks, it's played instead of browsing
+    @Test
+    fun `browse multitrack module plays it`() {
+        val tracks = (1..3).map { idx ->
+            Schema.Listing.File(
+                testUri.buildUpon().fragment("#$idx").build(), "#$idx", "", null, "1:00", Schema.Listing.File.Type.TRACK
+            )
+        }
+        vfsClient.stub {
+            on { resolve(any(), any()) } doAnswer {
+                with(it.getArgument<VfsProviderClient.ListingCallback>(1)) {
+                    onDir(Schema.Listing.Dir(it.getArgument(0), "unused", "unused", null, false))
+                }
+            }
+            on { list(any(), any()) } doAnswer {
+                with(it.getArgument<VfsProviderClient.ListingCallback>(1)) {
+                    tracks.forEach(this::onFile)
+                }
+            }
+        }
+        execute {
+            browse(testUri)
+        }
+        verifyBlocking(vfsClient) { resolve(eq(testUri), any()) }
+        verifyBlocking(vfsClient) { parents(eq(testUri), any()) }
+        verifyBlocking(vfsClient) { list(eq(testUri), any()) }
+        verify(progressObserver).invoke(-1)
+        verify(playbacksObserver).invoke(testUri)
+        verify(progressObserver).invoke(null)
+        // subsongs are not displayed as folder: no state change, see tearDown
     }
 
     @Test
