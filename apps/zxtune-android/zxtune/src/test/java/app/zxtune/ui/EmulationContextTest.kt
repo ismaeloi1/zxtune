@@ -22,7 +22,7 @@ class EmulationContextTest {
         assertEquals(setOf("aym", "fm", "dac", "saa"), chips("MTC"))
         // no zxtune's emulation settings for these
         assertEquals(emptySet<String>(), chips("VGM"))
-        assertEquals(emptySet<String>(), chips("SPC"))
+        assertEquals(setOf("spc"), chips("SPC"))
         assertEquals(emptySet<String>(), chips("NSF"))
         assertEquals(emptySet<String>(), chips(""))
     }

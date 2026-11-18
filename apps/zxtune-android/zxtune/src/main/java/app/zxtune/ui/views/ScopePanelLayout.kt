@@ -21,6 +21,15 @@ class ScopePanelLayout @JvmOverloads constructor(
 
     var maxTopFraction = 0.7f
 
+    /** Oscilloscope height relative to 16:9, user setting; the rest is for dashboard */
+    var topScale = 1f
+        set(value) {
+            if (field != value) {
+                field = value
+                requestLayout()
+            }
+        }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val fullWidth = MeasureSpec.getSize(widthMeasureSpec)
         val fullHeight = MeasureSpec.getSize(heightMeasureSpec)
@@ -30,7 +39,9 @@ class ScopePanelLayout @JvmOverloads constructor(
         val topHeight = if (bottom?.visibility == View.GONE) {
             height
         } else {
-            minOf(width * ASPECT_HEIGHT / ASPECT_WIDTH, (height * maxTopFraction).toInt())
+            // larger oscilloscope may take up to 85% of height, dashboard keeps the rest
+            val limit = if (topScale > 1f) maxOf(maxTopFraction, MAX_SCALED_FRACTION) else maxTopFraction
+            minOf((width * ASPECT_HEIGHT / ASPECT_WIDTH * topScale).toInt(), (height * limit).toInt())
         }
         getChildAt(0)?.measure(exactly(width), exactly(topHeight))
         bottom?.measure(exactly(width), exactly(maxOf(height - topHeight, 0)))
@@ -51,5 +62,6 @@ class ScopePanelLayout @JvmOverloads constructor(
     private companion object {
         const val ASPECT_WIDTH = 16
         const val ASPECT_HEIGHT = 9
+        const val MAX_SCALED_FRACTION = 0.85f
     }
 }

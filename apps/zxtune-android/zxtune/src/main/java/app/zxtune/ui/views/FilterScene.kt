@@ -32,6 +32,8 @@ data class FilterSettings(
     val is8580: Boolean = false,
     /** Oscilloscope lanes are displayed under filter response */
     val withWaves: Boolean = true,
+    /** Part of height taken by response plots above oscilloscope lanes */
+    val filterShare: Float = FilterLayout.DEFAULT_FILTER_SHARE,
 )
 
 /**
@@ -87,11 +89,12 @@ internal class FilterLayout private constructor(
     // oscilloscope channels of chips' voices
     private val groupFirst: IntArray,
     private val groupVoices: IntArray,
+    filterShare: Float,
 ) {
     val lanes = titles.size
 
     /** Oscilloscope lanes area */
-    val wavesTop = if (withWaves) (height * FILTER_SHARE).roundToInt().toFloat() else height.toFloat()
+    val wavesTop = if (withWaves) (height * filterShare.coerceIn(MIN_FILTER_SHARE, MAX_FILTER_SHARE)).roundToInt().toFloat() else height.toFloat()
     val wavesHeight = (height - wavesTop).toInt()
 
     private val laneLeft = FloatArray(lanes)
@@ -270,7 +273,10 @@ internal class FilterLayout private constructor(
         const val WAVES_LABEL = 2
 
         // plots part of height above waveforms
-        private const val FILTER_SHARE = 0.55f
+        const val DEFAULT_FILTER_SHARE = 0.55f
+        const val SAMPLES_GROUP = "Samples"
+        const val MIN_FILTER_SHARE = 0.2f
+        const val MAX_FILTER_SHARE = 0.8f
         private const val SMALL_TO_LABEL = 0.85f
         private const val TAG_HEIGHT_TO_SIZE = 1.5f
         private const val PEAK_PADDING_DP = 8f
@@ -310,8 +316,10 @@ internal class FilterLayout private constructor(
             labelTextSize: Float,
             res: FilterResources,
             withWaves: Boolean,
+            filterShare: Float = DEFAULT_FILTER_SHARE,
         ): FilterLayout {
-            val groups = layout.groups.take(MAX_LANES)
+            // master volume samples lanes have no filter (see native SID player)
+            val groups = layout.groups.filter { it.name != SAMPLES_GROUP }.take(MAX_LANES)
             val names = groups.map { it.name }.ifEmpty { listOf("SID") }
             val first = IntArray(groups.size)
             for (idx in 1 until groups.size) {
@@ -325,9 +333,10 @@ internal class FilterLayout private constructor(
                 labelTextSize,
                 ctx.resources.displayMetrics.density,
                 res,
-                withWaves && layout.groups.isNotEmpty() && grid.channels != 0,
+                withWaves && groups.isNotEmpty() && grid.channels != 0,
                 first,
                 groups.map { it.voices.size }.toIntArray(),
+                filterShare,
             )
         }
 

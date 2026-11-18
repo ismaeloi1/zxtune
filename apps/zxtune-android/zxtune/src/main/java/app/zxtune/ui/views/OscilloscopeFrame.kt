@@ -66,7 +66,7 @@ class OscilloscopeFrame @JvmOverloads constructor(
 
     override var filterSettings = FilterSettings()
         set(value) {
-            val relayout = value.withWaves != field.withWaves
+            val relayout = value.withWaves != field.withWaves || value.filterShare != field.filterShare
             field = value
             display?.filterSettings = value
             if (relayout) {

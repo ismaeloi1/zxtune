@@ -238,7 +238,8 @@ class VulkanOscilloscopeView internal constructor(
                 grid,
                 labelTextSize,
                 filterResources,
-                filterScene.settings.withWaves
+                filterScene.settings.withWaves,
+                filterScene.settings.filterShare,
             )
         } else {
             null

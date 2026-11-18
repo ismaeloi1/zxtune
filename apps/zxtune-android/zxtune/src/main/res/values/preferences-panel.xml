@@ -31,4 +31,8 @@
     <string name="pref_oscilloscope_show_stats_summary">Scope, sound output, rendering and GPU lines below the dashboard</string>
     <string name="pref_main_screen_show_information_title">Show track information</string>
     <string name="pref_main_screen_show_information_summary">Title, chips, stream format, chip emulation, original driver and engine above the controls. Also toggled by the button at the left of the controls</string>
+    <string name="pref_oscilloscope_height_title">Oscilloscope height</string>
+    <string name="pref_oscilloscope_height_summary">Relative to 16:9 of width, the dashboard below takes the rest of screen</string>
+    <string name="pref_oscilloscope_filter_share_title">Filter response height</string>
+    <string name="pref_oscilloscope_filter_share_summary">Part of oscilloscope taken by SID filter response above voices waveforms</string>
 </resources>

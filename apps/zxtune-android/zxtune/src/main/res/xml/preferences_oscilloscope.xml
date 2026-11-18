@@ -35,6 +35,24 @@
                 app:valueFormat="@string/pref_value_ms"
                 app:min="2"
                 app:showSeekBarValue="true" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="100"
+                android:key="ui.oscilloscope.height"
+                android:max="160"
+                android:summary="@string/pref_oscilloscope_height_summary"
+                android:title="@string/pref_oscilloscope_height_title"
+                app:valueFormat="@string/pref_value_percent"
+                app:min="60"
+                app:showSeekBarValue="true" />
+        <app.zxtune.ui.settings.ValueSeekBarPreference
+                android:defaultValue="55"
+                android:key="ui.oscilloscope.filter_share"
+                android:max="80"
+                android:summary="@string/pref_oscilloscope_filter_share_summary"
+                android:title="@string/pref_oscilloscope_filter_share_title"
+                app:valueFormat="@string/pref_value_percent"
+                app:min="20"
+                app:showSeekBarValue="true" />
         <SwitchPreferenceCompat
                 android:defaultValue="true"
                 android:key="ui.oscilloscope.filter_waves"

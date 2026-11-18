@@ -253,4 +253,6 @@
         <item>Stéréo (puces réparties)</item>
         <item>Mono</item>
     </string-array>
+    <string name="pref_zxtune_sid_digi_lane_title">Voie des samples ($D418)</string>
+    <string name="pref_zxtune_sid_digi_lane_summary">Oscilloscope : une voie en plus avec les samples du volume principal (digis 4 bits), les trois voies montrent les oscillateurs seuls. Appliqué au morceau suivant</string>
 </resources>

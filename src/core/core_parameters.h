@@ -522,6 +522,10 @@ namespace Parameters::ZXTune::Core
     const auto STRONG_PULSE_SAW = PREFIX + "strong_pulse_saw"_id;
     //! 2SID/3SID tunes: chips are panned by libsidplayfp (left, right, center), 1 - all of them mixed to center
     const IntType MULTI_SID_MONO_DEFAULT = 0;
+    //! Oscilloscope: 1 - extra lane per chip with master volume ($D418) samples (4-bit digis), as in JSIDPlay2-like
+    //! digi views; voices lanes keep only oscillators outputs
+    const IntType DIGI_LANE_DEFAULT = 0;
+    const auto DIGI_LANE = PREFIX + "digi_lane"_id;
     const auto MULTI_SID_MONO = PREFIX + "multi_sid_mono"_id;
     //@}
   }  // namespace SID

@@ -26,6 +26,7 @@ class EmulationContext(val chips: Set<String>, val names: List<String>) {
         const val SAA = "saa"
         const val MT32 = "mt32"
         const val SID = "sid"
+        const val SPC = "spc"
 
         // Yamaha FM chips of libvgm, see FmPresets
         const val FM_OPN2 = "fm.opn2"
@@ -80,7 +81,8 @@ class EmulationContext(val chips: Set<String>, val names: List<String>) {
             } else {
                 byType
             }
-            val names = groups.map { it.substringBefore('/') }.distinct().ifEmpty {
+            // samples lanes of SID player are not a chip
+            val names = groups.map { it.substringBefore('/') }.filter { it != "Samples" }.distinct().ifEmpty {
                 listOfNotNull(description.substringBefore(',').takeIf { it.isNotBlank() })
             }
             return EmulationContext(chips, names)
@@ -93,6 +95,7 @@ class EmulationContext(val chips: Set<String>, val names: List<String>) {
             if (type in DAC_TYPES) add(DAC)
             if (type in SAA_TYPES) add(SAA)
             if (type == "SID") add(SID)
+            if (type == "SPC" || type == "SNSF") add(SPC)
             if (type == "MIDI") add(MT32)
             if (type == MTC) addAll(listOf(AYM, FM, DAC, SAA))
         }
@@ -112,6 +115,7 @@ class EmulationContext(val chips: Set<String>, val names: List<String>) {
             }
             if (groups.any { it.startsWith("SID") } || description.contains("MOS")) add(SID)
             if (description.contains("Munt")) add(MT32)
+            if (groups.any { it.startsWith("S-DSP") }) add(SPC)
         }
 
         // libvgm devices names, see 3rdparty/vgm/emu/cores/*intf.c

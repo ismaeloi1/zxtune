@@ -64,7 +64,7 @@ class ScopeSettingsDialogTest {
     fun `emulation categories are taken from preferences`() {
         val ids = ScopeSettingsDialog.emulationCategories(ctx).map { it.id }
         assertEquals(
-            listOf("general", "aym", "z80", "fm", "fm.opn2", "fm.opm", "fm.opn", "fm.opl", "fm.opll", "dac", "saa", "mt32", "sid"),
+            listOf("general", "aym", "z80", "fm", "fm.opn2", "fm.opm", "fm.opn", "fm.opl", "fm.opll", "dac", "saa", "mt32", "spc", "sid"),
             ids
         )
     }
@@ -80,7 +80,8 @@ class ScopeSettingsDialogTest {
         // libvgm chips are emulated with FM families settings
         assertEquals(listOf(scope, trigger, "OPN2", general, all), titles(VGM))
         assertEquals(listOf(scope, trigger, "OPL", general, all), titles(OPL))
-        assertEquals(listOf(scope, trigger, "S-DSP", general, all), titles(SPC))
+        // engine choice (ares/snes_spc)
+        assertEquals(listOf(scope, trigger, ctx.getString(R.string.pref_zxtune_spc_title), general, all), titles(SPC))
         // nothing is playing
         assertEquals(listOf(scope, trigger, general, all), titles(EmulationContext.NONE))
         val categories = ScopeSettingsDialog.emulationCategories(ctx)
@@ -88,7 +89,7 @@ class ScopeSettingsDialogTest {
         assertEquals(listOf(categories.first { it.id == "sid" }.index), pages[2].categories.toList())
         assertEquals(categories.map { it.index }, pages.last().categories.toList())
         assertEquals(listOf(categories.first { it.id == "fm.opn2" }.index), ScopeSettingsDialog.pagesOf(ctx, VGM)[2].categories.toList())
-        assertTrue(ScopeSettingsDialog.pagesOf(ctx, SPC)[2].categories.isEmpty())
+        assertEquals(listOf(categories.first { it.id == "spc" }.index), ScopeSettingsDialog.pagesOf(ctx, SPC)[2].categories.toList())
     }
 
     @Test

@@ -16,4 +16,8 @@
     <string name="pref_oscilloscope_show_stats_summary">Lignes de l\'oscilloscope, de la sortie son, du rendu et du GPU sous le tableau de bord</string>
     <string name="pref_main_screen_show_information_title">Afficher les informations du morceau</string>
     <string name="pref_main_screen_show_information_summary">Titre, puces, format du flux, émulation des puces, pilote d\'origine et moteur au-dessus des commandes. Aussi basculé par le bouton à gauche des commandes</string>
+    <string name="pref_oscilloscope_height_title">Hauteur de l\'oscilloscope</string>
+    <string name="pref_oscilloscope_height_summary">Par rapport au 16:9 de la largeur, le tableau de bord en dessous prend le reste de l\'écran</string>
+    <string name="pref_oscilloscope_filter_share_title">Hauteur de la réponse du filtre</string>
+    <string name="pref_oscilloscope_filter_share_summary">Part de l\'oscilloscope prise par la réponse du filtre SID au-dessus des formes d\'onde des voix</string>
 </resources>

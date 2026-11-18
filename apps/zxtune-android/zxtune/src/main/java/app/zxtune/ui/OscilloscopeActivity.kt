@@ -30,9 +30,8 @@ import kotlinx.coroutines.launch
  * Fullscreen oscilloscope, follows device orientation:
  * - portrait: oscilloscope with SID state dashboard below, as in now playing view
  * - landscape: oscilloscope only
- * Black background covers the whole screen (cutout mode is set by theme). Content avoids only side cutouts
- * (landscape notches): top/bottom ones (camera holes) overlap just a part of the first voice waveform, while
- * avoiding them wastes a band of screen height.
+ * Black background covers the whole screen (cutout mode is set by theme). Content avoids cutouts and rounded
+ * corners on every side, in both orientations (camera hole of portrait top edge, notch of landscape side).
  */
 class OscilloscopeActivity : AppCompatActivity() {
     private lateinit var oscilloscope: OscilloscopeFrame
@@ -64,9 +63,16 @@ class OscilloscopeActivity : AppCompatActivity() {
         }
         ViewCompat.setOnApplyWindowInsetsListener(panel) { view, insets ->
             val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            val corners = roundedCornersInsets(view)
+            val left = maxOf(cutout.left, corners[0])
+            val top = maxOf(cutout.top, corners[1])
+            val right = maxOf(cutout.right, corners[2])
+            val bottom = maxOf(cutout.bottom, corners[3])
             // avoid relayout (and oscilloscope surface repositioning) on repeated identical insets
-            if (view.paddingLeft != cutout.left || view.paddingRight != cutout.right) {
-                view.setPadding(cutout.left, 0, cutout.right, 0)
+            if (view.paddingLeft != left || view.paddingTop != top || view.paddingRight != right ||
+                view.paddingBottom != bottom
+            ) {
+                view.setPadding(left, top, right, bottom)
             }
             insets
         }
@@ -137,6 +143,27 @@ class OscilloscopeActivity : AppCompatActivity() {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
+    }
+
+    // Content inside the rounded corners: the arc leaves radius * (1 - 1/sqrt(2)) at the diagonal, so text and
+    // frames of panel corners stay visible. Edges are left/top/right/bottom of the current orientation.
+    private fun roundedCornersInsets(view: android.view.View): IntArray {
+        val result = IntArray(4)
+        if (Build.VERSION.SDK_INT < 31) {
+            return result
+        }
+        val insets = view.rootWindowInsets ?: return result
+        fun radius(pos: Int) = insets.getRoundedCorner(pos)?.radius ?: 0
+        val share = 1 - 1 / Math.sqrt(2.0)
+        val tl = radius(android.view.RoundedCorner.POSITION_TOP_LEFT)
+        val tr = radius(android.view.RoundedCorner.POSITION_TOP_RIGHT)
+        val bl = radius(android.view.RoundedCorner.POSITION_BOTTOM_LEFT)
+        val br = radius(android.view.RoundedCorner.POSITION_BOTTOM_RIGHT)
+        result[0] = (maxOf(tl, bl) * share).toInt()
+        result[1] = (maxOf(tl, tr) * share).toInt()
+        result[2] = (maxOf(tr, br) * share).toInt()
+        result[3] = (maxOf(bl, br) * share).toInt()
+        return result
     }
 
     companion object {

@@ -267,6 +267,12 @@ namespace Module::Sid
       }
     }
 
+    bool IsDigiLane() const
+    {
+      using namespace Parameters::ZXTune::Core::SID;
+      return Get(DIGI_LANE, DIGI_LANE_DEFAULT) != 0;
+    }
+
     bool IsMultiSidMono() const
     {
       using namespace Parameters::ZXTune::Core::SID;
@@ -330,6 +336,18 @@ namespace Module::Sid
       }
       Scope->Feed(chip * VOICES, VOICES, VoicesData.data(), count);
       Scope->FeedChip(chip, ChipData.data(), count);
+      if (Digi && chip < Digis.size())
+      {
+        FeedDigi(chip, count);
+      }
+    }
+
+    //! @param chips count of chips, their samples lanes follow all the voices lanes
+    void SetDigi(bool enabled, uint_t chips)
+    {
+      Digi = enabled;
+      Chips = chips;
+      Digis.assign(enabled ? chips : 0, DcBlocker());
     }
 
     void state(unsigned int chip, const unsigned char* regs, const unsigned char* osc,
@@ -347,8 +365,43 @@ namespace Module::Sid
     uint_t StatePeriod = 1;
 
   private:
+    // Master volume register written at samples rate is 4-bit digi (and the volume part of 8-bit Mahoney's
+    // technique): steady volume is removed, so only the samples are displayed, as on oscilloscope at the output
+    struct DcBlocker
+    {
+      float PrevIn = 0;
+      float PrevOut = 0;
+      bool Started = false;
+    };
+
+    void FeedDigi(unsigned int chip, unsigned int count)
+    {
+      auto& dc = Digis[chip];
+      DigiData.resize(count);
+      for (unsigned int idx = 0; idx < count; ++idx)
+      {
+        // 0..15 to +-15 steps of 2048, full scale as voices
+        const auto in = (float(ChipData[idx * 4 + 3]) - 7.5f) * 4096.f;
+        if (!dc.Started)
+        {
+          dc.PrevIn = in;
+          dc.Started = true;
+        }
+        // ~10Hz at 48kHz, keeps shapes of samples played at 2..10kHz
+        const auto out = in - dc.PrevIn + 0.9987f * dc.PrevOut;
+        dc.PrevIn = in;
+        dc.PrevOut = out;
+        DigiData[idx] = static_cast<int16_t>(std::clamp(out, -32767.f, 32767.f));
+      }
+      Scope->Feed(Chips * VOICES + chip, 1, DigiData.data(), count);
+    }
+
     std::vector<int16_t> VoicesData;
     std::vector<uint8_t> ChipData;
+    std::vector<int16_t> DigiData;
+    std::vector<DcBlocker> Digis;
+    bool Digi = false;
+    uint_t Chips = 1;
   };
 
   class SidEngine
@@ -551,9 +604,11 @@ namespace Module::Sid
       return done;
     }
 
-    void SetVoicesScope(VoicesScope::Ptr scope, uint_t chips)
+    //! @param digi extra group of master volume samples lanes, one per chip
+    void SetVoicesScope(VoicesScope::Ptr scope, uint_t chips, bool digi)
     {
       Sink.Scope = std::move(scope);
+      Sink.SetDigi(digi && Sink.Scope, chips);
       if (Sink.Scope)
       {
         std::vector<VoicesGroup> groups(chips);
@@ -563,6 +618,16 @@ namespace Module::Sid
           for (uint_t voice = 0; voice < VOICES; ++voice)
           {
             groups[chip].Voices.emplace_back("Voice " + std::to_string(voice + 1));
+          }
+        }
+        if (digi)
+        {
+          // name is known by UI to exclude it from filter response view
+          auto& samples = groups.emplace_back();
+          samples.Name = "Samples";
+          for (uint_t chip = 0; chip < chips; ++chip)
+          {
+            samples.Voices.emplace_back(chips > 1 ? "$D418 SID " + std::to_string(chip + 1) : "$D418"s);
           }
         }
         Sink.Scope->SetVoicesGroups(groups, true);
@@ -897,7 +962,7 @@ namespace Module::Sid
     bool SetVoicesScope(VoicesScope::Ptr scope) override
     {
       const uint_t chips = std::max<uint_t>(Tune->getInfo()->sidChips(), 1);
-      Engine->SetVoicesScope(std::move(scope), chips);
+      Engine->SetVoicesScope(std::move(scope), chips, SidParams->IsDigiLane());
       return true;
     }
 

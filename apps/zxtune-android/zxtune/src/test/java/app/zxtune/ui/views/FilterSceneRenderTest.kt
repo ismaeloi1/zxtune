@@ -85,7 +85,7 @@ class FilterSceneRenderTest {
     ): Rendered {
         val voices = voicesLayout(chips.size)
         val grid = ScopeGrid.of(voices, chips.size * 3)
-        val layout = FilterLayout.of(ctx, width, height, voices, grid, labelTextSize, res, settings.withWaves)
+        val layout = FilterLayout.of(ctx, width, height, voices, grid, labelTextSize, res, settings.withWaves, settings.filterShare)
         val scene = FilterScene(res).apply { this.settings = settings }
         val shapes = ScopeShapes()
         frames(scene, layout, shapes)
@@ -115,6 +115,13 @@ class FilterSceneRenderTest {
         val result = render("lowpass-waves", listOf(lowpass))
         assertTrue(result.shapes.count in 100 until ScopeShapes.MAX)
         assertTrue(result.layout.withWaves)
+    }
+
+    // smaller response gives the height to voices lanes (setting)
+    @Test
+    fun `reduced response share`() {
+        val result = render("lowpass-share35", listOf(lowpass), settings = FilterSettings(filterShare = 0.35f))
+        assertEquals((608 * 0.35f).toInt().toFloat(), result.layout.wavesTop, 1f)
     }
 
     @Test
