@@ -4,7 +4,9 @@ import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
+import android.os.Bundle
 import androidx.annotation.VisibleForTesting
+import androidx.core.os.bundleOf
 import app.zxtune.TimeStamp
 import app.zxtune.analytics.Analytics
 import app.zxtune.core.Identifier
@@ -36,8 +38,70 @@ class ProviderClient @VisibleForTesting constructor(
         desc
     }
 
-    fun addItem(item: Item) {
-        resolver.insert(PlaylistQuery.ALL, item.toContentValues())
+    // ! @param list named list id, current playlist if null
+    fun addItem(item: Item, list: Long? = null) {
+        val uri = list?.let {
+            PlaylistQuery.ALL.buildUpon().appendQueryParameter(Provider.PARAM_LIST, it.toString()).build()
+        } ?: PlaylistQuery.ALL
+        resolver.insert(uri, item.toContentValues())
+    }
+
+    class ListInfo(val id: Long, val name: String, val isFavorites: Boolean, val count: Int, val isActive: Boolean)
+
+    private fun callLists(method: String, arg: String? = null, extras: Bundle? = null) = resolver.call(PlaylistQuery.ALL, Provider.LISTS_PREFIX + method, arg, extras)
+
+    suspend fun lists() = withContext(dispatcher) {
+        callLists("all")?.run {
+            val ids = getLongArray("ids") ?: LongArray(0)
+            val names = getStringArray("names") ?: emptyArray()
+            val kinds = getIntArray("kinds") ?: IntArray(0)
+            val counts = getIntArray("counts") ?: IntArray(0)
+            val active = getLong("active")
+            List(ids.size) { idx ->
+                ListInfo(ids[idx], names[idx], kinds[idx] == Lists.KIND_FAVORITES, counts[idx], ids[idx] == active)
+            }
+        } ?: emptyList()
+    }
+
+    @OptIn(FlowPreview::class)
+    fun observeLists() = resolver.observeChanges(PlaylistQuery.ALL).debounce(300).transform {
+        emit(lists())
+    }
+
+    suspend fun createList(name: String) = withContext(dispatcher) {
+        callLists("create", name)?.getLong("id")
+    }
+
+    suspend fun renameList(id: Long, name: String) = withContext(dispatcher) {
+        callLists("rename", name, bundleOf("id" to id))
+        Unit
+    }
+
+    suspend fun deleteList(id: Long) = withContext(dispatcher) {
+        callLists("delete", id.toString())
+        Unit
+    }
+
+    suspend fun duplicateList(id: Long, name: String) = withContext(dispatcher) {
+        callLists("duplicate", name, bundleOf("id" to id))?.getLong("id")
+    }
+
+    suspend fun switchList(id: Long) = withContext(dispatcher) {
+        callLists("switch", id.toString())
+        Unit
+    }
+
+    suspend fun favoritesList() = withContext(dispatcher) {
+        callLists("favorites")?.getLong("id")
+    }
+
+    suspend fun isFavorite(location: Identifier) = withContext(dispatcher) {
+        callLists("is_favorite", location.toString())?.getBoolean("result") ?: false
+    }
+
+    // ! @return true if became favorite
+    suspend fun toggleFavorite(item: Item) = withContext(dispatcher) {
+        callLists("toggle_favorite", null, bundleOf("values" to item.toContentValues()))?.getBoolean("result") ?: false
     }
 
     fun notifyChanges() = resolver.notifyChange(PlaylistQuery.ALL, null)

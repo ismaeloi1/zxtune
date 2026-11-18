@@ -3,7 +3,13 @@
     <item
             android:id="@+id/action_add"
             android:icon="@drawable/ic_menu_add"
-            android:title="@string/add"
+            android:title="@string/playlists_add_to"
+            app:iconTint="?colorControlNormal"
+            app:showAsAction="never" />
+    <item
+            android:id="@+id/action_favorite"
+            android:icon="@drawable/ic_menu_favorite"
+            android:title="@string/playlists_favorite_add"
             app:iconTint="?colorControlNormal"
             app:showAsAction="never" />
     <item

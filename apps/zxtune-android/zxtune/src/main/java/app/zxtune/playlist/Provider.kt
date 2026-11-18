@@ -18,14 +18,16 @@ import app.zxtune.Log
 import app.zxtune.MainApplication
 import app.zxtune.playlist.Database.Tables.Playlist
 import app.zxtune.playlist.xspf.XspfStorage
+import app.zxtune.utils.getParcelableCompat
 import app.zxtune.utils.getSerializableCompat
-import kotlinx.coroutines.runBlocking
 import kotlin.math.abs
+import kotlinx.coroutines.runBlocking
 
 class Provider : ContentProvider() {
     private lateinit var db: Database
     private lateinit var storage: XspfStorage
     private lateinit var resolver: ContentResolver
+    private val lists by lazy { Lists(db.getWritable()) }
 
     override fun onCreate() = context?.run {
         MainApplication.initialize(applicationContext)
@@ -43,7 +45,9 @@ class Provider : ContentProvider() {
         sortOrder: String?
     ): Cursor = when (uri) {
         PlaylistQuery.STATISTICS -> db.queryStatistics(selection)
+
         PlaylistQuery.SAVED -> querySavedPlaylists(selection)
+
         else -> {
             val select =
                 PlaylistQuery.idOf(uri)?.let { PlaylistQuery.selectionFor(it) } ?: selection
@@ -53,40 +57,52 @@ class Provider : ContentProvider() {
         }
     }
 
-    private fun querySavedPlaylists(selection: String?) =
-        MatrixCursor(arrayOf("name", "path")).apply {
-            runBlocking {
-                val ids = selection?.let { arrayListOf(it) } ?: storage.enumeratePlaylists()
-                for (id in ids) {
-                    storage.findPlaylistUri(id)?.let { uri ->
-                        addRow(arrayOf(id, uri.toString()))
-                    }
+    private fun querySavedPlaylists(selection: String?) = MatrixCursor(arrayOf("name", "path")).apply {
+        runBlocking {
+            val ids = selection?.let { arrayListOf(it) } ?: storage.enumeratePlaylists()
+            for (id in ids) {
+                storage.findPlaylistUri(id)?.let { uri ->
+                    addRow(arrayOf(id, uri.toString()))
                 }
             }
         }
+    }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? {
         require(null == PlaylistQuery.idOf(uri)) { "Wrong URI: $uri" }
-        val result = db.insertPlaylistItem(values)
-        //do not notify about change
+        // named list target, see ProviderClient.addItem
+        uri.getQueryParameter(PARAM_LIST)?.toLongOrNull()?.let { list ->
+            if (!lists.add(list, requireNotNull(values))) {
+                return null
+            }
+        }
+        val result = if (uri.getQueryParameter(PARAM_LIST) == null) db.insertPlaylistItem(values) else 0L
+        // do not notify about change
         return PlaylistQuery.uriFor(result)
     }
 
-    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<String>?) =
-        PlaylistQuery.idOf(uri)?.let { id ->
-            db.deletePlaylistItems(PlaylistQuery.selectionFor(id), null)
-        } ?: db.deletePlaylistItems(selection, selectionArgs)
+    override fun delete(uri: Uri, selection: String?, selectionArgs: Array<String>?) = PlaylistQuery.idOf(uri)?.let { id ->
+        db.deletePlaylistItems(PlaylistQuery.selectionFor(id), null)
+    } ?: db.deletePlaylistItems(selection, selectionArgs)
 
     override fun update(
-        uri: Uri, values: ContentValues?, selection: String?, selectionArgs: Array<String>?
+        uri: Uri,
+        values: ContentValues?,
+        selection: String?,
+        selectionArgs: Array<String>?
     ) = PlaylistQuery.idOf(uri)?.let { id ->
         db.updatePlaylistItems(values, PlaylistQuery.selectionFor(id), null)
     } ?: db.updatePlaylistItems(values, selection, selectionArgs)
 
-
     override fun call(method: String, arg: String?, extras: Bundle?) = when {
+        method.startsWith(LISTS_PREFIX) -> callLists(method.removePrefix(LISTS_PREFIX), arg, extras).also {
+            resolver.notifyChange(PlaylistQuery.ALL, null)
+        }
+
         arg == null -> null
+
         METHOD_SAVE == method -> save(arg, extras!!.getLongArray("ids"))
+
         METHOD_SORT == method -> {
             sort(arg.substringBefore(' '), arg.substringAfter(' '))
             null
@@ -100,41 +116,74 @@ class Provider : ContentProvider() {
         else -> null
     }
 
+    private fun callLists(method: String, arg: String?, extras: Bundle?): Bundle? = when (method) {
+        "all" -> lists.all().let { all ->
+            bundleOf(
+                "ids" to LongArray(all.size) { all[it].id },
+                "names" to Array(all.size) { all[it].name },
+                "kinds" to IntArray(all.size) { all[it].kind },
+                "counts" to IntArray(all.size) { all[it].count },
+                "active" to lists.active(),
+            )
+        }
+
+        "create" -> bundleOf("id" to lists.create(requireNotNull(arg)))
+
+        "rename" -> null.also { lists.rename(extras!!.getLong("id"), requireNotNull(arg)) }
+
+        "delete" -> null.also { lists.delete(requireNotNull(arg).toLong()) }
+
+        "duplicate" -> bundleOf("id" to lists.duplicate(extras!!.getLong("id"), requireNotNull(arg)))
+
+        "switch" -> null.also { lists.switchTo(requireNotNull(arg).toLong()) }
+
+        "favorites" -> bundleOf("id" to lists.favorites())
+
+        "is_favorite" -> bundleOf("result" to lists.isFavorite(requireNotNull(arg)))
+
+        "toggle_favorite" -> bundleOf("result" to lists.toggleFavorite(
+            requireNotNull(extras?.getParcelableCompat<ContentValues>("values"))
+        ))
+
+        else -> null
+    }
+
     private fun sort(fieldName: String, order: String) = db.sortPlaylistItems(
-        Playlist.Fields.valueOf(fieldName), order
+        Playlist.Fields.valueOf(fieldName),
+        order
     )
 
     /*
-    * @param id item to move
-    * @param delta position change
-    *//*
-   * pos idx     pos idx
-   *       <-+
-   * p0  i0  |   p0  i0 -+
-   * p1  i1  |   p1  i1  |
-   * p2  i2  |   p2  i2  |
-   * p3  i3  |   p3  i3  |
-   * p4  i4  |   p4  i4  |
-   * p5  i5 -+   p5  i5  |
-   *                   <-+
-   *
-   * move(i5,-5) move(i0,5)
-   *
-   * select:
-   * i5 i4 i3 i2 i1 i0
-   * p5 p4 p3 p2 p1 p0
-   *
-   *             i0 i1 i2 i3 i4 i5
-   *             p0 p1 p2 p3 p4 p5
-   *
-   * p0  i5      p0  i1
-   * p1  i0      p1  i2
-   * p2  i1      p2  i3
-   * p3  i2      p3  i4
-   * p4  i3      p4  i5
-   * p5  i4      p5  i0
-   *
-   */
+     * @param id item to move
+     * @param delta position change
+     *//*
+     * pos idx     pos idx
+     *       <-+
+     * p0  i0  |   p0  i0 -+
+     * p1  i1  |   p1  i1  |
+     * p2  i2  |   p2  i2  |
+     * p3  i3  |   p3  i3  |
+     * p4  i4  |   p4  i4  |
+     * p5  i5 -+   p5  i5  |
+     *                   <-+
+     *
+     * move(i5,-5) move(i0,5)
+     *
+     * select:
+     * i5 i4 i3 i2 i1 i0
+     * p5 p4 p3 p2 p1 p0
+     *
+     *             i0 i1 i2 i3 i4 i5
+     *             p0 p1 p2 p3 p4 p5
+     *
+     * p0  i5      p0  i1
+     * p1  i0      p1  i2
+     * p2  i1      p2  i3
+     * p3  i2      p3  i4
+     * p4  i3      p4  i5
+     * p5  i4      p5  i0
+     *
+     */
     private fun move(id: Long, delta: Int) = getNewPositions(id, delta).let {
         db.updatePlaylistItemsOrder(it)
     }
@@ -163,7 +212,10 @@ class Provider : ContentProvider() {
     }
 
     private fun save(id: String, ids: LongArray?) = db.queryPlaylistItems(
-        null, PlaylistQuery.selectionFor(ids), null, null
+        null,
+        PlaylistQuery.selectionFor(ids),
+        null,
+        null
     ).use { cursor ->
         runCatching {
             runBlocking {
@@ -184,20 +236,27 @@ class Provider : ContentProvider() {
         private val TAG: String = Provider::class.java.name
 
         private const val METHOD_SORT = "sort"
+        const val LISTS_PREFIX = "lists."
+        const val PARAM_LIST = "list"
         private const val METHOD_MOVE = "move"
         private const val METHOD_SAVE = "save"
 
         fun sort(resolver: ContentResolver, by: String, order: String) = resolver.call(
-            PlaylistQuery.ALL, METHOD_SORT, "$by $order", null
+            PlaylistQuery.ALL,
+            METHOD_SORT,
+            "$by $order",
+            null
         )
 
         fun move(resolver: ContentResolver, id: Long, delta: Int) = resolver.call(
-            PlaylistQuery.ALL, METHOD_MOVE, "$id $delta", null
+            PlaylistQuery.ALL,
+            METHOD_MOVE,
+            "$id $delta",
+            null
         )
 
-        fun save(resolver: ContentResolver, id: String?, ids: LongArray?) =
-            resolver.call(PlaylistQuery.ALL, METHOD_SAVE, id, bundleOf("ids" to ids))?.run {
-                throw requireNotNull(getSerializableCompat<Throwable>("error"))
-            }
+        fun save(resolver: ContentResolver, id: String?, ids: LongArray?) = resolver.call(PlaylistQuery.ALL, METHOD_SAVE, id, bundleOf("ids" to ids))?.run {
+            throw requireNotNull(getSerializableCompat<Throwable>("error"))
+        }
     }
 }

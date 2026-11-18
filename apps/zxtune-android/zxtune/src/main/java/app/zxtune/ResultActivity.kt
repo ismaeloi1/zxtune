@@ -29,46 +29,51 @@ class ResultActivity : ComponentActivity() {
         private const val ACTION_ADD_TRACKS_TO_PLAYLIST = "add_tracks_to_playlist"
 
         fun createStoragePermissionRequestIntent(ctx: Context, treeUri: Uri) = Intent(
-            ACTION_REQUEST_STORAGE_PERMISSION, treeUri, ctx, ResultActivity::class.java
+            ACTION_REQUEST_STORAGE_PERMISSION,
+            treeUri,
+            ctx,
+            ResultActivity::class.java
         )
 
         fun createPersistentStorageLocationRequestIntent(ctx: Context, treeUri: Uri) = Intent(
-            ACTION_REQUEST_PERSISTENT_STORAGE_LOCATION, treeUri, ctx, ResultActivity::class.java
+            ACTION_REQUEST_PERSISTENT_STORAGE_LOCATION,
+            treeUri,
+            ctx,
+            ResultActivity::class.java
         )
 
-        fun createSetupPowerManagementIntent(ctx: Context) =
+        fun createSetupPowerManagementIntent(ctx: Context) = Intent(ctx, ResultActivity::class.java).apply {
+            action = ACTION_SETUP_POWER_MANAGEMENT
+        }
+
+        fun createPermissionsRequestIntent(ctx: Context, vararg permissions: String) = permissions.filter {
+            ActivityCompat.checkSelfPermission(ctx, it) != PackageManager.PERMISSION_GRANTED
+        }.takeIf { it.isNotEmpty() }?.run {
             Intent(ctx, ResultActivity::class.java).apply {
-                action = ACTION_SETUP_POWER_MANAGEMENT
+                action = ACTION_REQUEST_PERMISSIONS
+                putExtra(
+                    ActivityResultContracts.RequestMultiplePermissions.EXTRA_PERMISSIONS,
+                    toTypedArray()
+                )
             }
+        }
 
-        fun createPermissionsRequestIntent(ctx: Context, vararg permissions: String) =
-            permissions.filter {
-                ActivityCompat.checkSelfPermission(ctx, it) != PackageManager.PERMISSION_GRANTED
-            }.takeIf { it.isNotEmpty() }?.run {
-                Intent(ctx, ResultActivity::class.java).apply {
-                    action = ACTION_REQUEST_PERMISSIONS
-                    putExtra(
-                        ActivityResultContracts.RequestMultiplePermissions.EXTRA_PERMISSIONS,
-                        toTypedArray()
-                    )
-                }
+        // ! @param list named playlist, current one if null
+        fun addToPlaylistOrCreateRequestPermissionIntent(ctx: Context, uris: Array<Uri>, list: Long? = null) = if (needRequestNotificationsPermission(ctx)) {
+            Intent(ctx, ResultActivity::class.java).apply {
+                action = ACTION_ADD_TRACKS_TO_PLAYLIST
+                putExtra(ScanService.EXTRA_PATHS, uris)
+                list?.let { putExtra(ScanService.EXTRA_LIST, it) }
             }
+        } else {
+            ScanService.add(ctx, uris, list)
+            null
+        }
 
-        fun addToPlaylistOrCreateRequestPermissionIntent(ctx: Context, uris: Array<Uri>) =
-            if (needRequestNotificationsPermission(ctx)) {
-                Intent(ctx, ResultActivity::class.java).apply {
-                    action = ACTION_ADD_TRACKS_TO_PLAYLIST
-                    putExtra(ScanService.EXTRA_PATHS, uris)
-                }
-            } else {
-                ScanService.add(ctx, uris)
-                null
-            }
-
-        private fun needRequestNotificationsPermission(ctx: Context) =
-            Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
-                ctx, android.Manifest.permission.POST_NOTIFICATIONS
-            ) != PackageManager.PERMISSION_GRANTED
+        private fun needRequestNotificationsPermission(ctx: Context) = Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(
+            ctx,
+            android.Manifest.permission.POST_NOTIFICATIONS
+        ) != PackageManager.PERMISSION_GRANTED
     }
 
     private val storagePermissionRequest =
@@ -109,7 +114,9 @@ class ResultActivity : ComponentActivity() {
                 ?.let { uris ->
                     ScanService.add(
                         applicationContext,
-                        Array(uris.size) { idx -> uris[idx] as Uri })
+                        Array(uris.size) { idx -> uris[idx] as Uri },
+                        intent.takeIf { it.hasExtra(ScanService.EXTRA_LIST) }?.getLongExtra(ScanService.EXTRA_LIST, 0)
+                    )
                 }
             finish()
         }

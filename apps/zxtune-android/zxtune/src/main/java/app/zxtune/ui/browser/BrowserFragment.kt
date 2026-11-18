@@ -35,6 +35,7 @@ import androidx.recyclerview.widget.RecyclerView.OnChildAttachStateChangeListene
 import app.zxtune.MainActivity
 import app.zxtune.R
 import app.zxtune.ResultActivity
+import app.zxtune.ui.playlist.PlaylistsUi
 import app.zxtune.ui.utils.SelectionUtils
 import app.zxtune.ui.utils.whenLifecycleStarted
 import kotlin.coroutines.resume
@@ -329,11 +330,15 @@ class BrowserFragment :
         }
 
         // TODO: rework for PlaylistControl usage as a local iface
-        private fun addToPlaylist(selection: Selection<Uri>) = ResultActivity.addToPlaylistOrCreateRequestPermissionIntent(
-            requireContext(),
-            convertSelection(selection)
-        )?.let {
-            startActivity(it)
+        // chosen playlist, as "Add to…" of AIMP/VLC
+        private fun addToPlaylist(selection: Selection<Uri>) {
+            val uris = convertSelection(selection)
+            PlaylistsUi.chooseList(requireActivity()) { list, name ->
+                ResultActivity.addToPlaylistOrCreateRequestPermissionIntent(requireContext(), uris, list)?.let {
+                    startActivity(it)
+                }
+                PlaylistsUi.notifyAdded(requireContext(), name)
+            }
         }
     }
 

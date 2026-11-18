@@ -66,10 +66,14 @@ internal class ControlCallback(
     }
 
     override fun onCustomAction(action: String, extra: Bundle?) = when (action) {
-        MainService.CUSTOM_ACTION_ADD_CURRENT -> addCurrent()
+        MainService.CUSTOM_ACTION_ADD_CURRENT -> addCurrent(extra?.takeIf { it.containsKey(ScanService.EXTRA_LIST) }?.getLong(ScanService.EXTRA_LIST))
 
         MainService.CUSTOM_ACTION_ADD -> extra?.getParcelableArrayCompat<Uri>("uris")?.let {
-            ScanService.add(ctx, Array(it.size) { idx -> it[idx] as Uri })
+            ScanService.add(
+                ctx,
+                Array(it.size) { idx -> it[idx] as Uri },
+                extra.takeIf { e -> e.containsKey(ScanService.EXTRA_LIST) }?.getLong(ScanService.EXTRA_LIST)
+            )
         } ?: Unit
 
         StatusCallback.CUSTOM_ACTION_TOGGLE_SHUFFLE -> {
@@ -114,8 +118,8 @@ internal class ControlCallback(
         else -> Unit
     }
 
-    private fun addCurrent() = svc.nowPlaying.takeIf { it !== PlayableItemStub.instance() }?.let {
-        ScanService.add(ctx, it)
+    private fun addCurrent(list: Long?) = svc.nowPlaying.takeIf { it !== PlayableItemStub.instance() }?.let {
+        ScanService.add(ctx, it, list)
     } ?: Unit
 
     override fun onSetShuffleMode(@ShuffleMode mode: Int) = fromShuffleMode(mode)?.let {

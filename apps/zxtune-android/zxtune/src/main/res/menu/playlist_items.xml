@@ -7,6 +7,12 @@
             app:iconTint="?colorControlNormal"
             app:showAsAction="always" />
     <item
+            android:id="@+id/action_add_to"
+            android:icon="@drawable/ic_menu_playlists"
+            android:title="@string/playlists_add_to"
+            app:iconTint="?colorControlNormal"
+            app:showAsAction="always" />
+    <item
             android:id="@+id/action_save"
             android:icon="@drawable/ic_menu_save"
             android:title="@string/save"

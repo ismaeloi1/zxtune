@@ -1,19 +1,29 @@
 package app.zxtune.ui
 
-import android.content.ContentResolver
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaControllerCompat
 import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.os.bundleOf
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import app.zxtune.MainService
 import app.zxtune.R
+import app.zxtune.ScanService
 import app.zxtune.SharingActivity
+import app.zxtune.TimeStamp
+import app.zxtune.core.Identifier
+import app.zxtune.core.ModuleAttributes
+import app.zxtune.playlist.Item
+import app.zxtune.playlist.ProviderClient
+import app.zxtune.ui.playlist.PlaylistsUi
 import app.zxtune.ui.utils.bindIntent
 import app.zxtune.ui.utils.bindOnClick
 import app.zxtune.ui.utils.item
 import app.zxtune.utils.ifNotNulls
+import kotlinx.coroutines.launch
 
 /**
  * Actions on the playing track, shown from now playing transport row
@@ -39,6 +49,40 @@ internal class TrackContextMenu(private val ctx: FragmentActivity, anchor: View)
         setupItems = { menu -> setup(menu, controller, metadata) }
     }
 
+    // heart toggles the playing track in favorites list
+    private fun setupFavorite(menuItem: MenuItem, metadata: MediaMetadataCompat?) {
+        val item = metadata?.let { toItem(it) }
+        menuItem.isVisible = item != null
+        item ?: return
+        val client = ProviderClient.create(ctx)
+        menuItem.setTitle(R.string.playlists_favorite_add)
+        ctx.lifecycleScope.launch {
+            if (client.isFavorite(item.location)) {
+                menuItem.setTitle(R.string.playlists_favorite_remove)
+            }
+        }
+        menuItem.setOnMenuItemClickListener {
+            ctx.lifecycleScope.launch {
+                val added = client.toggleFavorite(item)
+                if (added) {
+                    PlaylistsUi.notifyAdded(ctx, ctx.getString(R.string.playlists_favorites))
+                }
+            }
+            true
+        }
+    }
+
+    private fun toItem(metadata: MediaMetadataCompat): Item? {
+        val location = metadata.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_URI)?.takeIf { it.isNotEmpty() }
+            ?: return null
+        return Item(
+            Identifier.parse(location),
+            metadata.getString(ModuleAttributes.TITLE) ?: "",
+            metadata.getString(ModuleAttributes.AUTHOR) ?: "",
+            TimeStamp.fromMilliseconds(metadata.getLong(MediaMetadataCompat.METADATA_KEY_DURATION))
+        )
+    }
+
     private fun setup(
         menu: Menu,
         controller: MediaControllerCompat?,
@@ -46,14 +90,20 @@ internal class TrackContextMenu(private val ctx: FragmentActivity, anchor: View)
     ) = with(menu) {
         item(R.id.action_add).bindOnClick(ifNotNulls(
             controller?.transportControls,
-            metadata?.description?.mediaId?.takeUnless {
-                it.startsWith(ContentResolver.SCHEME_CONTENT)
-            }
+            // any playing track, the current playlist one too (to another list)
+            metadata?.description?.mediaId
         ) { ctrl, _ ->
             {
-                ctrl.sendCustomAction(MainService.CUSTOM_ACTION_ADD_CURRENT, null)
+                PlaylistsUi.chooseList(ctx) { list, name ->
+                    ctrl.sendCustomAction(
+                        MainService.CUSTOM_ACTION_ADD_CURRENT,
+                        bundleOf(ScanService.EXTRA_LIST to list)
+                    )
+                    PlaylistsUi.notifyAdded(ctx, name)
+                }
             }
         })
+        setupFavorite(item(R.id.action_favorite), metadata)
         item(R.id.action_send).bindIntent(metadata?.let {
             SharingActivity.maybeCreateSendIntent(
                 ctx,

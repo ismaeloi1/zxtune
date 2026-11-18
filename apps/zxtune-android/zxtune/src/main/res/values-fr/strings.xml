@@ -2,4 +2,16 @@
 <resources>
     <string name="prefs">Réglages</string>
     <string name="review">Noter l\'appli</string>
+    <string name="playlists_favorites">Favoris</string>
+    <string name="playlists_new">Nouvelle liste…</string>
+    <string name="playlists_add_to">Ajouter à une liste…</string>
+    <string name="playlists_rename">Renommer la liste</string>
+    <string name="playlists_duplicate">Dupliquer la liste</string>
+    <string name="playlists_delete">Supprimer la liste</string>
+    <string name="playlists_delete_query">Supprimer la liste «%s» ?</string>
+    <string name="playlists_name">Nom de la liste</string>
+    <string name="playlists_added">Ajouté à «%s»</string>
+    <string name="playlists_favorite_add">Ajouter aux favoris</string>
+    <string name="playlists_favorite_remove">Retirer des favoris</string>
+    <string name="playlists_copy_suffix">%s (copie)</string>
 </resources>

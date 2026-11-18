@@ -16,10 +16,12 @@ import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.PopupMenu
 import androidx.appcompat.widget.SearchView
 import androidx.appcompat.widget.Toolbar
 import androidx.core.view.MenuProvider
@@ -34,6 +36,7 @@ import androidx.recyclerview.widget.RecyclerView
 import app.zxtune.R
 import app.zxtune.device.media.MediaModel
 import app.zxtune.fs.provider.VfsProviderClient
+import app.zxtune.playlist.Item
 import app.zxtune.playlist.ProviderClient
 import app.zxtune.ui.PersistentStorageSetupFragment
 import app.zxtune.ui.utils.DialogSheets
@@ -69,6 +72,88 @@ class PlaylistFragment : Fragment() {
             view.findViewById(R.id.playlist_stub)
         )
         search = setupSearchView(view.findViewById(R.id.playlist_search))
+        setupLists(view.findViewById(R.id.playlist_lists))
+    }
+
+    // Dropdown of named playlists with their management, as foobar2000/AIMP playlist manager
+    private fun setupLists(view: TextView) {
+        val client = ProviderClient.create(requireContext())
+        var lists = emptyList<ProviderClient.ListInfo>()
+        viewLifecycleOwner.whenLifecycleStarted {
+            launch {
+                client.favoritesList()
+                lists = client.lists()
+                update(view, lists)
+                client.observeLists().collect {
+                    lists = it
+                    update(view, it)
+                }
+            }
+        }
+        view.setOnClickListener {
+            val ctx = requireContext()
+            val active = lists.firstOrNull { it.isActive }
+            PopupMenu(ctx, view).apply {
+                lists.forEachIndexed { idx, info ->
+                    menu.add(GROUP_LISTS, idx, idx, "${PlaylistsUi.displayName(ctx, info)}  ·  ${info.count}").apply {
+                        isCheckable = true
+                        isChecked = info.isActive
+                        setOnMenuItemClickListener {
+                            lifecycleScope.launch { client.switchList(info.id) }
+                            true
+                        }
+                    }
+                }
+                menu.setGroupCheckable(GROUP_LISTS, true, true)
+                menu.add(GROUP_ACTIONS, 0, lists.size, R.string.playlists_new).setOnMenuItemClickListener {
+                    PlaylistsUi.promptName(ctx, R.string.playlists_new, "") { name ->
+                        lifecycleScope.launch { client.createList(name)?.let { client.switchList(it) } }
+                    }
+                    true
+                }
+                active?.let { current ->
+                    val name = PlaylistsUi.displayName(ctx, current)
+                    if (!current.isFavorites) {
+                        menu.add(GROUP_ACTIONS, 1, lists.size + 1, R.string.playlists_rename).setOnMenuItemClickListener {
+                            PlaylistsUi.promptName(ctx, R.string.playlists_rename, current.name) { newName ->
+                                lifecycleScope.launch { client.renameList(current.id, newName) }
+                            }
+                            true
+                        }
+                    }
+                    menu.add(GROUP_ACTIONS, 2, lists.size + 2, R.string.playlists_duplicate).setOnMenuItemClickListener {
+                        PlaylistsUi.promptName(ctx, R.string.playlists_duplicate, getString(R.string.playlists_copy_suffix, name)) { newName ->
+                            lifecycleScope.launch { client.duplicateList(current.id, newName) }
+                        }
+                        true
+                    }
+                    menu.add(GROUP_ACTIONS, 3, lists.size + 3, R.string.playlists_delete).setOnMenuItemClickListener {
+                        deletionAlert(getString(R.string.playlists_delete_query, name)) {
+                            lifecycleScope.launch { client.deleteList(current.id) }
+                        }
+                        true
+                    }
+                }
+            }.show()
+        }
+    }
+
+    private fun update(view: TextView, lists: List<ProviderClient.ListInfo>) {
+        val active = lists.firstOrNull { it.isActive } ?: return
+        view.text = "${PlaylistsUi.displayName(view.context, active)}  ·  ${active.count}"
+    }
+
+    // copies selected tracks of the current playlist to the chosen list
+    private fun addSelectionTo(ids: LongArray?) = PlaylistsUi.chooseList(requireActivity()) { list, name ->
+        lifecycleScope.launch {
+            val client = ProviderClient.create(requireContext())
+            val selected = ids?.toHashSet()
+            client.queryContent()?.filter { selected == null || it.id in selected }?.forEach { entry ->
+                client.addItem(Item(entry.location, entry.title, entry.author, entry.duration), list)
+            }
+            client.notifyChanges()
+            PlaylistsUi.notifyAdded(requireContext(), name)
+        }
     }
 
     private fun setupToolbarMenu(panel: FrameLayout) {
@@ -209,6 +294,8 @@ class PlaylistFragment : Fragment() {
 
             R.id.action_save -> savePlaylist(convertSelection(selection))
 
+            R.id.action_add_to -> addSelectionTo(convertSelection(selection))
+
             R.id.action_statistics -> showStatistics(convertSelection(selection))
 
             else -> return false
@@ -217,7 +304,9 @@ class PlaylistFragment : Fragment() {
     }
 
     // TODO: think about using DialogFragment - complicated lambda passing
-    private fun deletionAlert(@StringRes message: Int, action: () -> Unit) = AlertDialog.Builder(requireContext()).setTitle(message)
+    private fun deletionAlert(@StringRes message: Int, action: () -> Unit) = deletionAlert(getString(message), action)
+
+    private fun deletionAlert(message: String, action: () -> Unit) = AlertDialog.Builder(requireContext()).setTitle(message)
         .setPositiveButton(R.string.delete) { _, _ ->
             action()
         }.create().let(DialogSheets::apply).show()
@@ -234,6 +323,9 @@ class PlaylistFragment : Fragment() {
     private fun showStatistics(ids: LongArray?) = PlaylistStatisticsFragment.createInstance(ids).show(parentFragmentManager, "statistics")
 
     companion object {
+        private const val GROUP_LISTS = 1
+        private const val GROUP_ACTIONS = 2
+
         @StringRes
         private fun getMenuTitle(by: ProviderClient.SortBy) = when (by) {
             ProviderClient.SortBy.title -> R.string.information_title

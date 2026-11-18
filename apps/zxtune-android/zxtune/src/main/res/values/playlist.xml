@@ -8,4 +8,16 @@
   <string name="statistics_tracks">Total</string>
   <string name="statistics_duration">Duration</string>
   <string name="playlist_search_hint" translatable="false">@string/browser_search_hint</string>
+  <string name="playlists_favorites">Favorites</string>
+  <string name="playlists_new">New playlist…</string>
+  <string name="playlists_add_to">Add to playlist…</string>
+  <string name="playlists_rename">Rename playlist</string>
+  <string name="playlists_duplicate">Duplicate playlist</string>
+  <string name="playlists_delete">Delete playlist</string>
+  <string name="playlists_delete_query">Delete playlist «%s»?</string>
+  <string name="playlists_name">Playlist name</string>
+  <string name="playlists_added">Added to «%s»</string>
+  <string name="playlists_favorite_add">Add to favorites</string>
+  <string name="playlists_favorite_remove">Remove from favorites</string>
+  <string name="playlists_copy_suffix">%s (copy)</string>
 </resources>

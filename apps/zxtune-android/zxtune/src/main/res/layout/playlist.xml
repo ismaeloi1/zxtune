@@ -33,11 +33,29 @@
         </androidx.appcompat.widget.Toolbar>
     </FrameLayout>
 
+    <!-- Named playlists selector, see PlaylistFragment.setupLists -->
+    <TextView
+            android:id="@+id/playlist_lists"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/playlist_top_panel"
+            android:background="?selectableItemBackground"
+            android:drawableRight="@drawable/ic_dropdown"
+            android:drawablePadding="@dimen/lhuna_space_s"
+            android:ellipsize="end"
+            android:gravity="center_vertical"
+            android:minHeight="40dp"
+            android:paddingLeft="@dimen/lhuna_space_l"
+            android:paddingRight="@dimen/lhuna_space_l"
+            android:singleLine="true"
+            android:textAppearance="@style/TextAppearance.Lhuna.Body"
+            tools:text="Playlist · 42" />
+
     <TextView
             android:id="@+id/playlist_stub"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_below="@id/playlist_top_panel"
+            android:layout_below="@id/playlist_lists"
             android:layout_alignParentBottom="true"
             android:gravity="center"
             android:paddingLeft="@dimen/lhuna_space_xl"
@@ -50,7 +68,7 @@
             android:id="@+id/playlist_content"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:layout_below="@id/playlist_top_panel"
+            android:layout_below="@id/playlist_lists"
             android:layout_alignParentBottom="true"
             app:fastScrollEnabled="true"
             app:fastScrollHorizontalThumbDrawable="@drawable/scroll_thumb"
