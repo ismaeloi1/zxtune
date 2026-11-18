@@ -96,7 +96,7 @@ internal object SidCells {
         CellSpec(Words.DUTY, arrayOf("100%"), true, 6),
         CellSpec(Words.NOTE, arrayOf("C#5"), false, 1),
         CellSpec(Words.PITCH, arrayOf("8888 Hz"), true, 5),
-        CellSpec(Words.MOD, arrayOf("Sync V3", "Ring V3", Words.SYNC_RING), false, 7),
+        CellSpec(Words.MOD, arrayOf("Sync ← V3", "Ring ← V3", "${Words.SYNC_RING} ← V3", "→ V2 ${Words.SYNC_RING}"), false, 7),
         CellSpec(Words.FILTER, arrayOf("Low+Band", "Band+High", Words.MUTED), false, 4),
         CellSpec(Words.LEVEL, arrayOf("100%"), true, 2),
         CellSpec(Words.STAGE, SidDescription.Phase.values().map { it.word }.toTypedArray(), false, 3),
@@ -227,8 +227,9 @@ internal class SidVoiceText : SidRowText(SidCells.VOICE.size) {
                 cells.set(SidCells.PITCH, pitchReadout) { SidDescription.hzWord(it.roundToInt()) }
             }
         }
-        if (cells.changed(SidCells.MOD, ctrl and 0x16)) {
-            cells[SidCells.MOD] = SidDescription.modulationWord(ctrl, voice)
+        val target = state.control((voice + 1) % 3)
+        if (cells.changed(SidCells.MOD, (ctrl and 0x16) or ((target and 0x16) shl 8))) {
+            cells[SidCells.MOD] = SidDescription.modulationWord(ctrl, voice, target)
         }
         val muted = SidDescription.isMuted(voice, mode, routing)
         if (cells.changed(SidCells.FILTER, (if (filtered) 1 else 0) or (if (muted) 2 else 0) or ((mode and 7) shl 2))) {

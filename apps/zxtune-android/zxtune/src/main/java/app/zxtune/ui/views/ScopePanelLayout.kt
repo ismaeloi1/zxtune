@@ -51,9 +51,11 @@ class ScopePanelLayout @JvmOverloads constructor(
     override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) {
         val top = getChildAt(0) ?: return
         top.layout(paddingLeft, paddingTop, paddingLeft + top.measuredWidth, paddingTop + top.measuredHeight)
+        // padding of this layout, not of the child
+        val left = paddingLeft
+        val y = paddingTop + top.measuredHeight
         getChildAt(1)?.run {
-            val y = paddingTop + top.measuredHeight
-            layout(paddingLeft, y, paddingLeft + measuredWidth, y + measuredHeight)
+            layout(left, y, left + measuredWidth, y + measuredHeight)
         }
     }
 

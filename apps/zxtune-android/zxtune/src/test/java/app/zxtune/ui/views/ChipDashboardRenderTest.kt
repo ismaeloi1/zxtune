@@ -472,11 +472,11 @@ class ChipDashboardRenderTest {
             SidCells.VOICE.indices.map { cells[it] }
         }
         assertEquals(
-            listOf("Noise", "", "C5", "523 Hz", "\u2014", "Low", "60%", "Sustain", "2 ms", "750 ms", "60%", "1.5 s"),
+            listOf("Noise", "", "C5", "523 Hz", "→ V2 Sync", "Low", "60%", "Sustain", "2 ms", "750 ms", "60%", "1.5 s"),
             voice(0, 0)
         )
         assertEquals(
-            listOf("Pulse", "37%", "C4", "262 Hz", "Sync V1", "\u2014", "81%", "Attack", "56 ms", "1.5 s", "100%", "114 ms"),
+            listOf("Pulse", "37%", "C4", "262 Hz", "Sync ← V1", "\u2014", "81%", "Attack", "56 ms", "1.5 s", "100%", "114 ms"),
             voice(1, 1)
         )
         assertEquals(

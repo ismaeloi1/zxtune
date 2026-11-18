@@ -30,8 +30,9 @@ import kotlinx.coroutines.launch
  * Fullscreen oscilloscope, follows device orientation:
  * - portrait: oscilloscope with SID state dashboard below, as in now playing view
  * - landscape: oscilloscope only
- * Black background covers the whole screen (cutout mode is set by theme). Content avoids cutouts and rounded
- * corners on every side, in both orientations (camera hole of portrait top edge, notch of landscape side).
+ * Black background covers the whole screen (cutout mode is set by theme). Content avoids the cutouts and rounded
+ * corners of the short edges only: top and bottom in portrait, sides in landscape. The long edges are straight, so
+ * the content keeps the full width in portrait and the full height in landscape.
  */
 class OscilloscopeActivity : AppCompatActivity() {
     private lateinit var oscilloscope: OscilloscopeFrame
@@ -64,10 +65,12 @@ class OscilloscopeActivity : AppCompatActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(panel) { view, insets ->
             val cutout = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
             val corners = roundedCornersInsets(view)
-            val left = maxOf(cutout.left, corners[0])
-            val top = maxOf(cutout.top, corners[1])
-            val right = maxOf(cutout.right, corners[2])
-            val bottom = maxOf(cutout.bottom, corners[3])
+            val portrait = view.resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+            val (left, top, right, bottom) = contentPadding(
+                portrait,
+                intArrayOf(cutout.left, cutout.top, cutout.right, cutout.bottom),
+                corners
+            )
             // avoid relayout (and oscilloscope surface repositioning) on repeated identical insets
             if (view.paddingLeft != left || view.paddingTop != top || view.paddingRight != right ||
                 view.paddingBottom != bottom
@@ -167,6 +170,17 @@ class OscilloscopeActivity : AppCompatActivity() {
     }
 
     companion object {
+        /**
+         * @param cutout left/top/right/bottom display cutout insets
+         * @param corners left/top/right/bottom rounded corners insets
+         * @return left/top/right/bottom padding: only the short edges of screen are avoided
+         */
+        internal fun contentPadding(portrait: Boolean, cutout: IntArray, corners: IntArray) = if (portrait) {
+            listOf(0, maxOf(cutout[1], corners[1]), 0, maxOf(cutout[3], corners[3]))
+        } else {
+            listOf(cutout[0], 0, cutout[2], 0)
+        }
+
         fun start(ctx: Context) = ctx.startActivity(Intent(ctx, OscilloscopeActivity::class.java))
     }
 }
