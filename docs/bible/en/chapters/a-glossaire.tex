@@ -1,13 +1,29 @@
 \chapter{Glossary}
 \begin{description}
-  \item[ADSR] attack, decay, sustain, release: the four phases of a note envelope.
-  \item[Cent] one hundredth of a semitone.
-  \item[DDA] HuC6280 mode where the processor writes samples directly.
-  \item[DSP] digital signal processor (echo, reverb).
-  \item[FM] frequency modulation synthesis.
-  \item[LFSR] feedback shift register producing noise.
-  \item[Operator] sine oscillator of an FM voice.
+  \item[ADSR] attack, decay, sustain, release: the four phases of a sound's envelope. Attack is the rise at the start
+        of the note, decay the fall to the sustain level, release the fade after the note ends.
+  \item[Algorithm] on an FM chip, how a voice's operators are wired together.
+  \item[Arpeggio] a chord played by cycling very fast through its notes on a single voice, to give the illusion of
+        several voices.
+  \item[Carrier] the FM operator you hear; modulators are only heard through it.
+  \item[Cent] a hundredth of a semitone.
+  \item[Cutoff] the frequency from which a filter starts attenuating the sound.
+  \item[DDA] HuC6280 mode where the processor writes samples directly into the voice.
+  \item[Driver] the program that plays the music on the original machine by writing to the chip's registers.
+  \item[DSP] digital signal processor, used for echo and reverb.
+  \item[Duty cycle] the share of time a square wave spends high; it changes the timbre.
+  \item[Envelope] how a note's volume (or another parameter) changes over time.
+  \item[FIR] finite impulse response filter; on the Super Nintendo it colours the echo's repeats.
+  \item[FM] frequency modulation synthesis: one oscillator varies the frequency of another, creating harmonics.
+  \item[Lane] an oscilloscope row showing one voice.
+  \item[Operator] a sine oscillator of an FM voice, with its own envelope.
   \item[PAL-N] Argentine video standard: clock close to NTSC, 50 frames per second.
-  \item[Wavetable] stored waveform played in a loop.
+  \item[Register] a memory cell of the chip the driver writes a setting into.
+  \item[Resonance] emphasis of the frequencies around a filter's cutoff.
+  \item[Ring modulation] multiplication of two signals, giving metallic or bell-like sounds.
+  \item[Rip] a file extracted from a game, holding the code and data of its music.
+  \item[Sync] resetting an oscillator on every cycle of another, giving hard, rich sounds.
   \item[Tracker] pattern-based composition software, and the format of the music it produces.
+  \item[Triggering] locking the oscilloscope window to the sound's period so the shape stays still.
+  \item[Wavetable] a stored waveform, played in a loop.
 \end{description}

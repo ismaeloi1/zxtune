@@ -1,26 +1,28 @@
-\chapter{Oscilloscope}
+\chapter{The oscilloscope}
 
 \section{One lane per voice}
-Each chip takes a column, each voice a row. The voice name is shown at the top of its cell. The trace is
-synchronised on the note period (triggering) so that shapes stay still on screen: the time window of each lane is
-sized from the fundamental period of its note, then reduced to two points per pixel column (minimum and maximum), so
-no peak is lost.
+The oscilloscope draws the shape of each voice's sound. Each chip takes a column, each voice a row, with its name at
+the top of the cell. You see who plays what: the bass that holds, the arpeggio that shimmers, the snare that flashes
+past.
+
+To keep shapes still, we lock each lane's window to the period of its note: this is triggering, as on a lab
+oscilloscope. We then reduce the signal to two points per pixel column, the minimum and the maximum, so no peak is
+lost even when the lane is narrow.
 
 \section{Special cases}
-\begin{description}
-  \item[SID and samples] with the samples lane enabled, a fourth row per chip shows samples played through the
-        volume register.
-  \item[AdLib OPL/OPL2] the 9 melodic voices are laid out 3 $\times$ 3; the 5 drum lanes of the rarely used rhythm
-        mode are hidden unless ``AdLib rhythm lanes'' is enabled.
-\end{description}
+With the SID samples lane on, a fourth row per chip shows the samples played through the volume. For the AdLib, we lay
+out the nine melodic voices 3 by 3 and hide the five rhythm-mode lanes, which few tracks use; turn on ``AdLib rhythm
+lanes'' if you need them.
 
 \section{SID filter response}
-The visualisation button replaces the top half of the oscilloscope with the filter response curve of each SID chip,
-with the position of each voice on the curve.
+The visualisation button replaces the top half of the oscilloscope with the filter curve of each SID, with each
+voice's position. Previous states stay visible for a moment as they fade, which makes fast cutoff sweeps readable.
 \capturedouble{ux4-lowpass-waves}{ux4-sweep}{Resonant low-pass filter}{cutoff sweep}
+If you want more room for the voices, reduce the filter response share in the oscilloscope settings.
 \capture[0.7]{ux4-lowpass-share35}{Filter response reduced to 35~\% of the height}
 
 \section{Settings}
 \capture{prefs-en-oscilloscope}{Oscilloscope settings}
-Time window, gain, number of periods shown, oscilloscope height, filter response share, maximum frame rate, renderer
-(Vulkan or OpenGL ES) and Vulkan driver.
+You set the time window, gain, number of periods shown, oscilloscope height, filter response share, maximum frame
+rate and rendering engine. Vulkan gives the smoothest rendering when your phone supports it; otherwise OpenGL ES takes
+over.

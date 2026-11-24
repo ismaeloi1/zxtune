@@ -1,8 +1,24 @@
 \chapter{Lire les valeurs}
-\begin{itemize}
-  \item Les valeurs affichées sont celles de l'image en cours, sans lissage ni moyenne : ce que vous voyez est
-        l'état exact de la puce à cet instant.
-  \item Les notes sont en notation anglaise (C, D, E\dots), l'octave 4 contenant le la à 440~Hz.
-  \item Les niveaux sont en décibels relatifs au maximum de la puce (0~dB = plein volume).
-  \item Les registres sont en hexadécimal, préfixés par \$.
-\end{itemize}
+
+Quelques conventions valent pour toutes les vues ; une fois que vous les connaissez, vous lisez n'importe quel
+tableau de bord.
+
+\section{Ce que vous voyez est l'état exact}
+Nous n'affichons aucune moyenne et aucun lissage. Une valeur moyennée est une valeur que la puce n'a jamais eue, et
+elle cache justement ce qui nous intéresse : un arpège qui change de note à chaque image, une enveloppe qui
+redémarre. Si une valeur scintille, c'est que la musique la fait scintiller.
+
+\section{Notes et fréquences}
+Les notes sont écrites à l'anglaise : C, D, E, F, G, A, B, avec \# pour les dièses. L'octave 4 contient le la à
+440~Hz (A4), le do du milieu du piano est C4. Quand la fréquence tombe entre deux notes, nous affichons la plus
+proche ; la fréquence en hertz vous donne l'écart. Un léger désaccord entre deux voix qui jouent la même note est
+souvent voulu : c'est ce qui épaissit le son.
+
+\section{Niveaux}
+Les niveaux sont exprimés par rapport au maximum de la puce : 0~dB est le plein volume, $-6$~dB la moitié de
+l'amplitude, $-\infty$ le silence. Les barres suivent la même échelle.
+
+\section{Registres}
+Les registres sont en hexadécimal, précédés de \$, comme dans les documentations d'époque : \$D418 sur le SID,
+\$804 sur la PC Engine. Nous les montrons tels qu'ils ont été écrits par le driver, pas tels que nous les
+interprétons ; si vous cherchez dans une documentation, vous retrouverez les mêmes valeurs.

@@ -1,56 +1,45 @@
 \chapter{Moteurs d'émulation}
 
+Pour plusieurs puces, il existe plusieurs émulateurs, plus ou moins précis et plus ou moins gourmands. Nous avons
+choisi le plus fidèle comme moteur par défaut, et laissé une alternative plus légère quand elle existe. Si votre
+téléphone peine (la ligne « render » des statistiques descend sous 100~\%), changez de moteur dans les réglages.
 
-\section{Commodore 64 : reSID et reSIDfp}
-Les deux moteurs proviennent de la bibliothèque libsidplayfp, qui émule aussi le processeur et les composants du
-Commodore~64 nécessaires à l'exécution des lecteurs d'origine.
-\begin{description}
-  \item[reSIDfp] (par défaut) modèle à virgule flottante du filtre analogique et des formes d'onde combinées ;
-  \item[reSID] modèle historique, plus léger.
-\end{description}
-Le modèle de puce (6581 ou 8580), les courbes de filtre et le biais se règlent (chapitre~\ref{chap:emu-settings}).
+\section{Commodore 64 : reSIDfp et reSID}
+Les deux moteurs viennent de la bibliothèque libsidplayfp, qui émule aussi le processeur et les circuits du
+Commodore~64 nécessaires à l'exécution des lecteurs d'origine. reSID est le modèle historique de Dag Lem, construit à
+partir de mesures de vraies puces. reSIDfp, développé ensuite par Antti Lankila puis Leandro Nini, modélise le filtre
+analogique en virgule flottante et reproduit les formes d'onde combinées à partir d'échantillons de puces réelles ;
+c'est notre moteur par défaut.
 
-\section{Super Nintendo : ares ou snes\_spc}
-\begin{description}
-  \item[ares] (par défaut) émulation au cycle près du processeur SPC700 et du S-DSP, issue de l'émulateur ares ;
-        la stéréo est rendue comme sur la console, inversions de phase comprises ;
-  \item[snes\_spc] moteur historique de Shay Green (blargg), plus léger.
-\end{description}
-Le même réglage s'applique aux fichiers SPC et aux rips SNSF, qui exécutent aussi le processeur principal 65816.
+\section{Super Nintendo : ares et snes\_spc}
+Le moteur d'ares, issu des travaux de Near et de son équipe sur bsnes et higan, reproduit le SPC700 et le S-DSP cycle
+par cycle. Il rend la stéréo exactement comme la console, inversions de phase comprises : certains morceaux sonnent
+donc plus larges qu'avec d'autres lecteurs, c'est normal. snes\_spc, écrit par Shay Green (blargg), est plus léger et
+reste disponible. Le même réglage vaut pour les SPC et les SNSF.
 
-\section{Puces FM}
+\section{Puces FM de Yamaha}
+Pour chaque famille FM, vous choisissez le cœur :
 \begin{longtable}{@{}l l p{0.5\textwidth}@{}}
-\toprule \textbf{Famille} & \textbf{Puces} & \textbf{Cœurs proposés} \\ \midrule
-OPN2 & YM2612, YM3438 & Nuked (précis), ymfm, Genesis Plus GX (rapide) \\
-OPM & YM2151 & Nuked (précis), ymfm, MAME \\
-OPN & YM2203, YM2608, YM2610 & ymfm, MAME \\
-OPL & YM3526, YM3812, YMF262 & Nuked (précis), AdLibEmu, MAME \\
-OPLL & YM2413 & Nuked (précis), EMU2413, MAME \\
+\toprule \textbf{Famille} & \textbf{Puces} & \textbf{Cœurs} \\ \midrule
+OPN2 & YM2612, YM3438 & Nuked (par défaut), ymfm, Genesis Plus GX \\
+OPM & YM2151 & Nuked (par défaut), ymfm, MAME \\
+OPN & YM2203, YM2608, YM2610 & ymfm (par défaut), MAME \\
+OPL & YM3526, YM3812, YMF262 & Nuked (par défaut), AdLibEmu, MAME \\
+OPLL & YM2413 & Nuked (par défaut), EMU2413, MAME \\
 \bottomrule
 \end{longtable}
+Les cœurs Nuked d'Alexey Khokholov ont été écrits à partir de l'étude du silicium des puces ; ce sont les plus
+exacts et les plus coûteux. ymfm, d'Aaron Giles, est l'émulation utilisée par MAME. Genesis Plus GX, d'Eke-Eke, et
+les anciens cœurs de MAME sont rapides.
 
 \section{PC Engine : Ootake}
-La puce HuC6280 est émulée par le cœur d'Ootake, émulateur PC Engine japonais réputé pour sa fidélité. \soft{}
-l'utilise pour les enregistrements VGM et y lit la table d'ondes de chaque voix pour le tableau de bord.
+Nous émulons le HuC6280 avec le cœur d'Ootake, l'émulateur PC Engine de Kitao Nakamura, réputé pour sa fidélité au
+matériel. C'est aussi de ce cœur que nous lisons la table d'ondes de chaque voix pour la vue PC Engine.
 
-\section{Sega Saturn et bornes : SCSP}
-Le SCSP est émulé avec son DSP d'effets activé : la réverbération et les effets programmés par le jeu sont audibles.
+\section{Saturn et bornes Sega : SCSP}
+Le SCSP est émulé avec son processeur d'effets actif. Nous l'avons activé par défaut parce que les musiques de ces
+machines ont été mixées avec leur réverbération : sans elle, elles sonnent sèches et vides.
 
-\section{Auteurs des moteurs}
-\begin{description}
-  \item[reSID] Dag Lem, à partir de mesures de puces réelles ; référence historique de l'émulation du SID.
-  \item[reSIDfp] Antti Lankila puis Leandro Nini, mainteneur de libsidplayfp ; modèle du filtre en virgule flottante
-        et formes d'onde combinées échantillonnées.
-  \item[ares] Near et l'équipe ares, héritiers de bsnes et higan, connus pour leur exactitude au cycle près.
-  \item[snes\_spc] Shay Green (blargg), également auteur de Game Music Emu.
-  \item[Nuked] Alexey Khokholov (nukeykt), émulateurs écrits à partir de l'étude du silicium des puces Yamaha.
-  \item[ymfm] Aaron Giles, émulation des puces FM Yamaha écrite pour MAME.
-  \item[Genesis Plus GX] Eke-Eke, émulateur Mega Drive ; son cœur YM2612 est rapide.
-  \item[Ootake] Kitao Nakamura, émulateur PC Engine.
-  \item[Munt] le projet Munt, émulateur du Roland MT-32.
-\end{description}
-
-\section{Précision et coût}
-Sur un téléphone récent, tous les moteurs tournent largement en temps réel. Les plus coûteux sont Nuked OPM et
-Nuked OPN2, puis ares pour la Super Nintendo ; les plus légers sont Genesis Plus GX, MAME et snes\_spc. La ligne
-« render » des statistiques indique la vitesse d'émulation : au-dessus de 100~\%, l'appareil suit.
+\section{Ce que coûte la précision}
+Sur un téléphone récent, tous les moteurs tournent largement plus vite que le temps réel. Les plus exigeants sont
+Nuked OPM et Nuked OPN2, puis ares ; les plus légers sont Genesis Plus GX, les cœurs MAME et snes\_spc.

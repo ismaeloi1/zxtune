@@ -1,40 +1,46 @@
-\chapter{Interface}
+\chapter{The interface}
 
-\section{Now playing}
-\capture{now-playing-en}{Now playing, information collapsed}
+\section{The Now playing screen}
+\capture{now-playing-en}{Now playing screen, information folded}
 
-From top to bottom:
-\begin{description}
-  \item[Toolbar] logo, fullscreen, live settings, visualisation choice (oscilloscope or filter response), dashboard,
-        menu.
-  \item[Visualisation] one oscilloscope per voice and, below, the chip dashboard (chapter~\ref{chap:dashboards}).
-  \item[Information] title, author, chip, format and original driver. Collapsed by default to leave room for the
-        visualisation; the arrow at the bottom left expands it.
-  \item[Position] elapsed time, progress bar, total duration.
-  \item[Controls] information, shuffle, previous, play/pause, next, repeat, \textbf{$\equiv$+} button (favourites,
-        add to playlist), track menu (share, send, ringtone, properties).
-\end{description}
+At the top of the screen, the toolbar holds the fullscreen switch, the live settings, the choice between the
+oscilloscope and the filter response (for the SID), the dashboard toggle and the main menu. The heart of the screen
+is the visualisation: one oscilloscope per voice, then the chip dashboard, described in
+chapter~\ref{chap:dashboards}.
 
-\capture{now-playing-info-en}{Now playing, information expanded}
+Below the visualisation, the information block gives the track's title, author, chip, format and original driver.
+We fold it by default to leave the height to the visualisation; the arrow at the bottom left unfolds it. Then comes
+the position in the track, then the row of controls: information, shuffle, previous, play and pause, next, repeat,
+the $\equiv$+ button and the track menu.
 
-\section{Playlists}
+The $\equiv$+ button is for filing the current track: you can add it to your favourites or to any playlist,
+including a new one. The track menu, on the right, lets you share it, make it a ringtone or show all its properties.
+
+\capture{now-playing-info-en}{Now playing screen, information unfolded}
+
+\section{The Playlists screen}
 \capture{playlist-en}{Playlists screen}
-At the top: search and playlist actions (statistics, export, clear, sort). Below the search, the playlist selector
-shows the displayed playlist and its track count; tapping it opens the playlists menu (chapter~\ref{chap:listes}).
-Each track shows its chip family, title, author and duration; the handle on the right moves it.
+At the top, search filters the playlist shown; the buttons next to it give statistics, export, clear and sort. Just
+below, the selector shows the current playlist and its number of tracks; tap it to switch playlists or manage them
+(chapter~\ref{chap:listes}). Each row shows the chip family, title, author and duration. The handle on the right
+moves a track.
 
-\section{Browser}
-\capturedouble{browser-sources-en}{browser-folder-en}{Sources}{folder content}
-The current path is shown at the top; each element jumps back to that level.
+\section{The Browser screen}
+\capturedouble{browser-sources-en}{browser-folder-en}{Sources}{folder contents}
+The path is shown at the top; tap one of its parts to jump straight back to that level. A long press on a file or
+folder starts multiple selection.
 
-\section{Mini player and navigation bar}
-Outside the Now playing screen, a mini player shows the current track and allows skipping or pausing.
+\section{Away from the Now playing screen}
+When you are in the playlists or the browser, a mini-player above the bottom bar reminds you of the current track
+and lets you skip or pause without changing screens.
 
-\section{Landscape and tablet}
-\capture[0.9]{landscape-now-playing-en}{Now playing in landscape}
+\section{Landscape, tablet, fullscreen}
+\capture[0.9]{landscape-now-playing-en}{Now playing screen in landscape}
+In landscape, the visualisation takes the width and the dashboard moves beside it. On a tablet, all three screens
+make use of the available space.
+
 \capture[0.9]{tablet-playlist-en}{On a tablet}
 
-\section{Fullscreen}
-The fullscreen button shows the oscilloscope alone and, in portrait, the dashboard below it. In portrait the display
-avoids the camera cutout at the top and the rounded corners at the bottom; in landscape, the side cutout. A short tap
-leaves fullscreen, a long tap opens live settings.
+Fullscreen shows the oscilloscope alone; in portrait, the dashboard stays below it. We avoid the camera cutout at the
+top and the rounded corners at the bottom in portrait, and the side cutout in landscape. A short tap leaves
+fullscreen, a long press opens the live settings.

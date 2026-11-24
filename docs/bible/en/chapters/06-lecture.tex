@@ -1,20 +1,19 @@
 \chapter{Playback}
 
-\section{Modes}
-\begin{description}
-  \item[Shuffle] picks the next track at random within the playlist or folder.
-  \item[Repeat] loops the current track indefinitely; otherwise it stops at the end of its known duration.
-\end{description}
+\section{Shuffle and repeat}
+Shuffle picks the next track at random in the playlist or folder. Repeat plays the current track endlessly; without
+it, the track stops at the end of its known duration.
 
-\section{Duration, loop and fade}
-Much game music loops forever. \soft uses the known duration when the format or a database provides it (for SID, the
-HVSC \emph{Songlengths} database), otherwise a configurable default duration. The progress bar marks the start of the
-looped part when the track has an intro.
+\section{Duration, loops and fades}
+Much game music loops forever: the file does not say when to stop. When a duration is known, from the format itself
+or from a database (the HVSC \emph{Songlengths} database for SID), we use it. Otherwise we apply the default
+duration, which you set in the settings, along with the loop limit and the fades. When a track has an introduction
+before its loop, the progress bar marks where the looped part starts.
 
-\section{Android Auto and lock screen}
-Playback is controlled from the notification, the lock screen, Bluetooth headsets and Android Auto. Android Auto shows
-playlists and a simplified visualisation.
+\section{Outside the application}
+You can control playback from the notification, the lock screen, a Bluetooth headset or Android Auto. Android Auto
+shows your playlists and a simplified visualisation.
 
-\section{Sharing and ringtones}
-The track menu shares the file, sends a link, creates a ringtone from an excerpt, and shows all properties of the
-track.
+\section{Sharing}
+The track menu shares the file, sends a link to the track, makes a ringtone from an excerpt and shows every known
+property of the track.

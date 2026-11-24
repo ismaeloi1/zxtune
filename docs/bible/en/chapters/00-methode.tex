@@ -1,21 +1,20 @@
-\chapter*{Development method}
-\addcontentsline{toc}{chapter}{Development method}
+\chapter*{Before you start}
+\addcontentsline{toc}{chapter}{Before you start}
 
-\soft was developed by its author with the assistance of an artificial intelligence model (Claude, Anthropic), used
-as a development tool. Roles were split as follows:
-\begin{itemize}
-  \item the author defines the product, the priorities, the ergonomics and fidelity choices, validates each build on
-        his own hardware and music, and rejects what does not fit;
-  \item the tool writes code, tests and control renders from these instructions and the existing sources;
-  \item nothing is delivered without a build, automated tests and an on-device check by the author.
-\end{itemize}
-Development of this branch spans 2 October to 24 November 2026 (219 recorded changes). This is stated here once;
-the rest of the document describes the software.
+\section*{How this software was made}
+We developed \soft with the help of an artificial intelligence model, Claude by Anthropic, used as a programming
+tool. We would rather say so clearly, once, here. The split was simple: we decided what the software should do, what
+it should show and how to show it; we tested every build on our own hardware, with our own music, and turned down
+whatever did not suit us. The tool wrote the code, the tests and the control renders from our instructions. No
+build reaches you without being compiled, tested automatically, then tried on a real phone.
 
-\section*{Conventions}
-\begin{itemize}
-  \item Registers are hexadecimal, prefixed with \$.
-  \item Notes use English notation; A4 = 440~Hz.
-  \item Levels are in dB relative to the chip maximum.
-  \item Screenshots are renders of the application at 480~dp width (1080 pixels).
-\end{itemize}
+The work described in this manual runs from 2 October to 24 November 2026.
+
+\section*{What you will find here}
+This manual explains how to use \soft, but also what happens inside each sound chip and how to read it on screen.
+If you only want to listen to your music, the first two parts are enough. If you compose, study the hardware or want
+to understand why a tune sounds the way it does, the rest is for you.
+
+A few conventions: registers are written in hexadecimal with the \$ prefix, notes in English notation (concert A is
+A4, at 440~Hz) and levels in decibels relative to the chip's maximum. Screenshots are renders of the application on
+a screen 1080 pixels wide.

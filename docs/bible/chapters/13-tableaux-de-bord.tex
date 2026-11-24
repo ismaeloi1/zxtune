@@ -1,40 +1,79 @@
 \chapter{Tableaux de bord par puce}\label{chap:dashboards}
 
-Sous l'oscilloscope, le tableau de bord détaille l'état de la puce. Chaque puce a sa propre vue, conçue pour ce que
-sa synthèse a de particulier. Les états sont relevés environ toutes les millisecondes de son émulé ; chaque image
-montre le dernier, sans lissage.
+L'oscilloscope vous montre la forme du son ; le tableau de bord, en dessous, vous dit comment la puce la fabrique.
+Nous n'avons pas voulu une vue unique remplie de registres : chaque famille de puces a la sienne, construite autour de
+ce qui fait son son. Sur le SID, c'est le filtre et les modulations entre voix ; sur la Super Nintendo, les
+enveloppes et l'écho ; sur la PC Engine, la table d'ondes ; sur les puces FM, les opérateurs et la façon dont ils
+sont branchés.
+
+Nous relevons l'état de la puce environ toutes les millisecondes de son émulé, et chaque image affiche le dernier
+relevé, tel quel. Si une valeur saute, c'est que la puce a sauté.
 
 \section{SID (Commodore 64)}
 \capture[0.8]{sidcells-now-playing}{Tableau de bord SID}
-Pour chaque voix : forme d'onde et rapport cyclique, enveloppe (niveau, phase, ADSR en millisecondes), fréquence
-(note et hertz). La colonne \textbf{Mod} indique la synchronisation et la modulation en anneau avec la voix
-source : « Sync V3 », « Ring V2 », et « Sync+Ring V1 » quand les deux sont actives. Sur le SID, une voix est
-toujours modulée par la précédente (V1 par V3, V2 par V1, V3 par V2). La dernière ligne montre volume, résonance et filtre.
+Chaque colonne correspond à une voix. De haut en bas, vous lisez :
+\begin{description}
+  \item[Wave] la forme d'onde (triangle, dent de scie, impulsion, bruit, ou une combinaison) et, pour l'impulsion,
+        son rapport cyclique. Quand le rapport cyclique bouge sans arrêt, c'est la « PWM » qui donne leur
+        épaisseur aux basses de Rob Hubbard.
+  \item[Env] l'enveloppe : le niveau actuel, la phase (attaque, déclin, maintien, relâchement) et les durées ADSR en
+        millisecondes. Une attaque à 2~ms et un déclin court, c'est une note percussive ; un maintien haut, une note
+        tenue.
+  \item[Freq] la note la plus proche et la fréquence en hertz. Un arpège se voit ici : la note change à chaque image.
+  \item[Mod] la synchronisation et la modulation en anneau. Nous n'indiquons que la voix source : « Sync V3 »,
+        « Ring V2 », « Sync+Ring V1 ». Sur le SID, une voix est toujours modulée par la précédente (V1 par V3, V2 par
+        V1, V3 par V2) ; connaître la source suffit.
+\end{description}
+La dernière ligne montre le volume général, la résonance, le type de filtre et les voix qui passent dedans. Si vous
+voyez une voix entrer et sortir du filtre au rythme de la musique, vous tenez l'un des trucs favoris des musiciens
+de l'époque.
 \capturedouble{sidcells-dual}{sidcells-fullscreen}{Deux puces SID}{plein écran}
 
 \section{Super Nintendo (S-DSP)}
 \capturedouble{snes}{snes-inspector}{Vue des 8 voix}{inspecteur d'une voix}
-Pour chaque voix : échantillon, fréquence, enveloppe ADSR ou GAIN dessinée, volumes gauche et droite, écho, bruit,
-modulation de hauteur. En bas, les volumes principaux, l'écho et son filtre FIR. Toucher une voix ouvre son
-inspecteur.
+Le S-DSP joue huit voix d'échantillons. Pour chacune, vous voyez le numéro de l'échantillon, la note, l'enveloppe
+dessinée (ADSR ou mode GAIN, que beaucoup de drivers utilisent pour leurs fondus maison), les volumes gauche et
+droite, et trois indicateurs : écho, bruit, modulation de hauteur.
+
+En bas, les volumes principaux, le volume et le retour de l'écho, et les huit coefficients du filtre FIR qui colore
+ses répétitions. Un retour élevé avec un FIR passe-bas, c'est la grande salle réverbérante des jeux Square ; un écho
+court et sec, une ambiance de donjon. Touchez une voix pour ouvrir son inspecteur et voir son enveloppe en grand.
 
 \section{PC Engine (HuC6280)}
 \capture[0.8]{pce-dashboard}{Vue PC Engine}
-Pour chacune des 6 voix : la table d'ondes de 32 pas en cours d'utilisation, une barre de niveau et deux barres de
-panoramique, puis la note, la fréquence et le niveau. La forme de l'onde est décrite en mots (sinus, triangle, scie
-montante, scie descendante, carré, impulsion et son rapport cyclique) et chaque table reçoit un numéro, qui change
-quand l'instrument change. La ligne du bas donne les registres tels qu'écrits (\$802 à \$807) ; la ligne globale,
-\$801, \$808 et \$809.
-Le HuC6280 n'a pas de lecture inversée : une scie descendante est une table écrite à l'envers par le driver, d'où
-la mention « Saw $\downarrow$ (reversed) ».
+Chacune des six voix lit en boucle une table de 32 valeurs de 5 bits : sa forme d'onde. Le rectangle de chaque voix
+dessine la table en cours d'utilisation, pas à pas. À côté, une barre de niveau et deux barres de panoramique, puis
+la note, la fréquence et le niveau.
 
+Nous décrivons la forme en mots : « Sine », « Triangle », « Saw $\uparrow$ », « Square », « Pulse 25\% »\dots{} et
+nous numérotons chaque table distincte. Quand le numéro change en plein morceau, le driver vient de recharger la
+voix avec un autre instrument. Le HuC6280 ne sait pas lire une table à l'envers : une scie descendante est une table
+que le driver a écrite à l'envers, d'où la mention « Saw $\downarrow$ (reversed) ».
+
+La ligne du bas de chaque voix donne ses registres tels qu'ils ont été écrits : \$802 et \$803 (fréquence),
+\$804 (volume et activation), \$805 (panoramique), \$806 (mode DDA), \$807 (bruit). La ligne globale donne \$801
+(volume principal), \$808 et \$809 (LFO). Le mode DDA, quand il est actif, montre que la voix joue des échantillons
+envoyés un par un par le processeur : c'est ainsi que la PC Engine fait parler ses personnages.
 
 \section{Puces FM}
 \capturedouble{fm-megadrive-cards}{fm-megadrive-inspector}{Mega Drive : cartes des voix}{inspecteur d'une voix}
+Chaque carte montre une voix : son algorithme, dessiné avec les porteuses en bas et les modulateurs au-dessus, et le
+niveau de chaque opérateur. Retenez une règle simple : plus un modulateur est fort, plus le son est riche et dur.
+Une basse de Mega Drive qui « claque » a un modulateur dont l'enveloppe chute très vite.
+
+Touchez une voix pour ouvrir l'inspecteur : enveloppes de chaque opérateur dessinées en grand, multiplicateurs de
+fréquence, désaccord, rétroaction de l'opérateur 1 et sensibilité au LFO.
 \capturedouble{fmview-algorithms}{fm-adlib-cards}{Algorithmes FM}{AdLib}
-Chaque voix montre son algorithme (porteuses et modulateurs), les niveaux et enveloppes de ses opérateurs. Toucher
-une voix ouvre l'inspecteur : enveloppes dessinées, multiplicateurs, désaccord, LFO.
+Pour l'AdLib (OPL2), chaque voix n'a que deux opérateurs et deux branchements possibles : en série (l'un module
+l'autre) ou en parallèle (les deux sont entendus). Nous disposons les neuf voix en 3 sur 3.
 
 \section{NES, MT-32 et puces PCM}
 \capturedouble{nes}{mt32parts}{NES}{Roland MT-32 : parties}
+Sur NES, les cartes des deux voix carrées dessinent leur rapport cyclique (12,5, 25, 50 ou 75~\%) et donnent le
+volume sur 4 bits, l'enveloppe et le balayage de hauteur (« sweep ») ; le triangle et le bruit suivent, puis l'état
+du canal DMC, qui joue les échantillons. Pour le MT-32, il n'y a pas de registres utiles à montrer : chaque partie
+affiche le nom de son instrument, les touches jouées et l'état de ses « partiels », les briques de synthèse que le
+module combine pour former un son.
 \capturedouble{pcmchips-model1-portrait}{pcmchips-scsp-portrait}{YMW258 (Model 1/2)}{SCSP (Saturn, Model 2A/3)}
+Les puces PCM des bornes Sega et de la Saturn jouent des dizaines d'échantillons à la fois. Chaque case montre une
+voix active : son mode (PCM, FM ou bruit sur le SCSP), sa note, son panoramique et son niveau total (TL) en décibels.

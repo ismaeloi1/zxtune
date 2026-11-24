@@ -1,20 +1,48 @@
 \chapter{Dépannage}
-\begin{description}
-  \item[Craquements ou coupures] la ligne « render » est-elle sous 100~\% ? Choisir un moteur plus léger
-        (chapitre~\ref{chap:emu-settings}), réduire la fréquence d'images de l'oscilloscope ou passer au rendu
-        Vulkan s'il est disponible.
-  \item[Oscilloscope saccadé] activer Vulkan, vérifier qu'aucun économiseur de batterie ne bride l'application.
-  \item[Fichier non reconnu] vérifier qu'il figure dans la table des formats ; les rips xSF (PSF, SSF, GSF\dots)
-        ont souvent besoin de leurs fichiers \texttt{\_lib} dans le même dossier.
-  \item[Morceau trop court ou trop long] régler la durée par défaut ou la limite de boucles ; pour le SID, la durée
-        vient de la base de la HVSC.
-  \item[Notes fausses sur AY] régler l'horloge sur celle de la machine d'origine.
-  \item[Pas de son sur un MT-32] vérifier la présence des images mémoire du module.
-  \item[Catalogue indisponible] le service tiers peut être hors ligne ; les fichiers déjà écoutés restent en cache.
-  \item[Liste vide après mise à jour] les anciennes listes XSPF restent dans le navigateur, d'où on peut les ajouter
-        à une liste.
-\end{description}
 
-\section{Signaler un problème}
-Indiquez la version, l'appareil, le fichier concerné et, si un réglage est en cause, sa clé interne
-(chapitre~\ref{chap:all-settings}). Les lignes de statistiques sous le tableau de bord sont aussi utiles.
+La plupart des problèmes que nous avons rencontrés, nous ou les premiers utilisateurs, se règlent en quelques
+secondes. Voici les plus courants, avec ce que nous vérifions d'abord.
+
+\section{Le son craque ou coupe}
+Regardez la ligne « render » des statistiques. Sous 100~\%, votre téléphone ne calcule pas la musique assez vite.
+Choisissez un moteur plus léger (chapitre~\ref{chap:emu-settings}) : Genesis Plus GX au lieu de Nuked pour la Mega
+Drive, snes\_spc au lieu d'ares pour la Super Nintendo. Si la ligne est largement au-dessus de 100~\%, le
+problème vient plutôt du dessin : réduisez la fréquence d'images de l'oscilloscope ou passez au rendu Vulkan.
+
+Vérifiez aussi qu'aucun économiseur de batterie ne bride l'application. Certains fabricants ralentissent les
+applications en arrière-plan même quand elles jouent du son.
+
+\section{L'oscilloscope saccade}
+Activez Vulkan s'il est proposé. Sur les morceaux à très nombreuses voies (une borne Sega Model~2 peut en afficher
+une trentaine), réduisez le nombre de périodes affichées : le déclenchement coûte moins cher.
+
+\section{Un fichier n'est pas reconnu}
+Cherchez son extension dans les tables du chapitre~\ref{part:compat}. Les rips de la famille xSF (PSF, SSF, GSF, SNSF,
+2SF\dots) sont souvent répartis en deux fichiers : le morceau lui-même, minuscule, et une bibliothèque
+\texttt{.\_lib} qui contient le code et les sons. Les deux doivent être dans le même dossier.
+
+\section{Le morceau est trop court ou trop long}
+Beaucoup de formats ne donnent pas de durée, parce que la musique boucle à l'infini. Réglez la durée par défaut ou la
+limite de boucles. Pour le SID, la durée vient de la base de la HVSC ; un morceau absent de la base prend la durée
+par défaut.
+
+\section{Les notes sont fausses sur une musique AY}
+L'horloge de la puce ne correspond pas à la machine d'origine. Un ZX Spectrum 128 tourne à 1,7734~MHz, un Amstrad CPC
+à 1~MHz, un Atari ST à 2~MHz. Une horloge fausse décale tout le morceau d'un même intervalle : l'air reste
+reconnaissable, mais tout est trop haut ou trop bas.
+
+\section{Pas de son sur un morceau MT-32}
+L'émulation du MT-32 a besoin des images mémoire du module d'origine, que nous ne pouvons pas fournir. Sans elles,
+le morceau reste muet.
+
+\section{Le catalogue en ligne ne répond pas}
+Les catalogues sont des services tiers qui peuvent être hors ligne. Les fichiers déjà écoutés restent dans le cache
+et se jouent sans connexion.
+
+\section{Mes anciennes listes ont disparu}
+Les anciennes listes XSPF sont toujours dans le navigateur. Ouvrez-les et ajoutez leurs morceaux à une liste.
+
+\section{Nous signaler un problème}
+Donnez-nous la version de l'application, le modèle de votre téléphone, le fichier concerné et, si un réglage est en
+cause, sa clé interne (chapitre~\ref{chap:all-settings}). Une capture des lignes de statistiques nous fait gagner
+beaucoup de temps.

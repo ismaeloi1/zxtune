@@ -1,4 +1,6 @@
 \chapter{Emulated platforms and chips}
+This table sums up the chip families we emulate. The following sections present them one by one: their history,
+how they work, what you see in \soft and a few tracks to get to know them.
 
 \begin{longtable}{@{}p{0.22\textwidth} p{0.27\textwidth} p{0.43\textwidth}@{}}
 \toprule \textbf{Platform} & \textbf{Chip} & \textbf{Synthesis} \\ \midrule \endhead
@@ -7,9 +9,9 @@ ZX Spectrum (TurboSound) & 2 $\times$ AY & 6 voices \\
 ZX Spectrum (TurboFM) & 2 $\times$ YM2203 & 4-operator FM + AY \\
 SAM Coupé & SAA1099 & 6 square voices, noise, envelopes \\
 Commodore 64 & MOS 6581 / 8580 (SID), up to 3 chips & 3 oscillators, analogue filter, ring modulation, sync \\
-NES / Famicom & Ricoh 2A03 / 2A07 & 2 pulses, triangle, noise, DPCM \\
+NES / Famicom & Ricoh 2A03 / 2A07 & 2 squares, triangle, noise, DPCM \\
 Super Nintendo & SPC700 + S-DSP & 8 BRR sample voices, ADSR, FIR echo \\
-Game Boy & LR35902 (APU) & 2 pulses, programmable wave, noise \\
+Game Boy & LR35902 (APU) & 2 squares, programmable wave, noise \\
 PC Engine / TurboGrafx-16 & HuC6280 & 6 wavetable voices 32 $\times$ 5 bits, noise, DDA, LFO \\
 Atari 8-bit & POKEY & 4 voices, noise polynomials, filters \\
 Mega Drive / Genesis & YM2612 + SN76489 & 6-voice 4-operator FM, DAC, PSG \\
@@ -21,115 +23,128 @@ Roland MT-32 & LA (Munt) & linear arithmetic synthesis \\
 \bottomrule
 \end{longtable}
 
-\section{AY-3-8910 and YM2149 (ZX Spectrum, Amstrad CPC, Atari ST, MSX)}
-The AY-3-8910 programmable sound generator was designed by General Instrument in the late 1970s. Yamaha produced a
-compatible variant, the YM2149, used in the Atari ST. It is found in the ZX Spectrum 128, Amstrad CPC, MSX, Oric,
-many arcade boards and expansion cards.
+\section{AY-3-8910 and YM2149}
+General Instrument designed the AY-3-8910 in the late 1970s; Yamaha made a compatible version, the YM2149, fitted
+in the Atari ST. You find it in the ZX Spectrum 128, the Amstrad CPC, MSX machines, the Oric and many arcade boards.
 
-Voice frequency: $f = F_{clock} / (16 \times N)$, where $N$ is the 12-bit period. Volume is 4 bits (logarithmic, about
-3~dB per step on the AY, finer steps on the YM2149). The envelope has a 16-bit period and eight shapes. The clock
-depends on the machine: 1.7734~MHz for the ZX Spectrum, 1.75~MHz for the Pentagon, 2~MHz for the Atari ST, 1~MHz for
-the Amstrad CPC. Composers built chords from fast arpeggios and used the envelope at audible rates as a fourth
-waveform.
+The chip has three square voices, a noise generator that can be mixed into each voice, and a single hardware
+envelope. A voice's frequency is $F/(16N)$, with a 12-bit period $N$; volume has 16 steps of about 3~dB. The clock
+differs from machine to machine: 1.7734~MHz on the ZX Spectrum, 1.75~MHz on the Pentagon, 2~MHz on the Atari ST,
+1~MHz on the Amstrad CPC. If a track sounds out of tune, check that setting.
 
-\soft reads the formats of the scene trackers (Pro Tracker, Sound Tracker, ASC, SQ-Tracker, Vortex Tracker\dots),
-register logs (PSG, YM, VTX) and AY files containing the original player code, run on an emulated Z80.
+With so little to work with, musicians invented the techniques that make the platform's sound: very fast arpeggios to
+fake chords, the hardware envelope played at audio rate for a grinding bass, one voice alternating between melody and
+percussion.
+
+In \soft each voice has its oscilloscope; the dashboard shows period, volume, noise and envelope. To discover the
+platform, listen to Tim Follin's Spectrum tracks, for instance \emph{Agent X II}, and to the classics of the Russian
+scene in the ZXArt and ZXTunes catalogues.
 
 \section{TurboSound and TurboFM}
-Russian ZX Spectrum clones received expansion cards: TurboSound doubles the AY (six voices), TurboFM adds two Yamaha
-YM2203 chips, each combining three FM voices and an AY. \soft then shows two columns of voices and the FM operators.
+Soviet and Russian Spectrum clones got expansion boards. TurboSound doubles the AY for six voices; TurboFM adds two
+Yamaha YM2203 chips, each pairing three FM voices with an AY. You then see two columns of voices and, for FM, each
+voice's operators.
 
-\section{SAA1099 (SAM Coupé)}
-The Philips SAA1099 is used in the SAM Coupé, the British successor of the Spectrum, and in Creative Music System
-cards. It produces six square channels, two noise generators and two envelopes, with per-channel stereo. E-Tracker is
-the main format.
+\section{SAA1099}
+The Philips SAA1099 is in the SAM Coupé, the British successor of the Spectrum, and in the Creative Music System cards
+for the PC. Its six square channels, two noise generators and two envelopes come with per-channel stereo. E-Tracker
+music is the best example.
 
 \section{SID (Commodore 64)}
-The SID (Sound Interface Device) was designed by Bob Yannes at MOS Technology for the Commodore~64, released in 1982.
-Designed as a real synthesizer, it was far ahead of other chips of its time and gave rise to a generation of
-composers: Rob Hubbard, Martin Galway, Ben Daglish, Jeroen Tel, Chris Hülsbeck and many others.
+Bob Yannes designed the SID at MOS Technology for the Commodore~64, released in 1982. He wanted a real synthesiser,
+and he got one: three oscillators with four waveforms, an ADSR envelope per voice, sync, ring modulation and a
+multimode analogue filter. Rob Hubbard, Martin Galway, Ben Daglish, Jeroen Tel and Chris Hülsbeck drew from it some
+of the most famous music of home computing.
 
-Voice frequency: $f = N \times F_{clock} / 2^{24}$, with a 16-bit $N$; the clock is about 0.985~MHz in PAL and
-1.023~MHz in NTSC. The pulse width is 12 bits. Sync resets the oscillator at the rate of the previous voice; ring
-modulation multiplies the triangle by the previous voice's oscillator (V1 from V3, V2 from V1, V3 from V2). Register
-\$D418 sets the 4-bit master volume and the filter mode.
+The frequency is $N \cdot F / 2^{24}$, with a 16-bit $N$ and a clock of about 0.985~MHz on PAL and 1.023~MHz on NTSC.
+The square's duty cycle is set on 12 bits, so it can be swept smoothly. Register \$D418 holds the master volume and
+the filter mode.
 
-\subsection{6581 and 8580}
-The original 6581 has a filter that varies a lot from chip to chip and a current leak producing a click on each volume
-change. The 8580, its replacement from 1986, has a more regular filter but sounds different; it strongly attenuates
-samples played through the volume. \soft emulates both and offers filter curves measured on real chips.
+Two versions coexist. The original 6581 has a filter that varies a lot from chip to chip and clicks on every volume
+change; the 8580, which replaced it from 1986, has a steadier filter and strongly attenuates samples played through
+the volume. We offer filter curves measured on real chips: if a track sounds too dark or too bright, try another.
 
-\subsection{Samples on the SID}
-The SID has no sample player, but composers invented two techniques:
-\begin{description}
-  \item[Volume register] writing the master volume (\$D418) thousands of times per second produces a 4-bit sample;
-        it adds to the output, outside the three voices.
-  \item[Test bit] freezing and restarting an oscillator lets a value be written into it; the sample then goes through
-        a voice and its filter.
-\end{description}
-The samples lane of the oscilloscope shows the first technique separately.
+The SID has no sample player, but two techniques let it play samples. The first writes the master volume at full
+speed: the 4-bit sample adds to the output, outside the three voices. The second uses the test bit to freeze an
+oscillator and write a value into it: the sample then goes through a voice and its filter. Turn on the samples lane
+in the SID settings to see the first one on its own.
 
-\subsection{Several SIDs}
-Some recent tunes use two or three chips (expansion cartridges, emulators). \soft places them left, right and centre,
-or mixes them in mono depending on the setting.
+The SID dashboard gives, for each voice, the waveform and its duty cycle, the envelope and its phase, the note and
+its frequency, the modulation (``Sync V3'', ``Sync+Ring V1'') and the routing to the filter. The last row shows
+volume, resonance and filter. The visualisation button swaps the oscilloscope for the filter curve. To start, listen
+to Rob Hubbard's \emph{Commando} and \emph{Monty on the Run}, Martin Galway's \emph{Wizball}, Jeroen Tel's
+\emph{Cybernoid II}.
 
-\section{NES and Famicom (Ricoh 2A03)}
-The NES processor, the Ricoh 2A03 (2A07 in Europe), contains its sound unit: two pulse channels with selectable duty
-cycle (12.5~\%, 25~\%, 50~\%, 75~\%), a triangle, a noise channel and a DPCM channel playing 1-bit samples. Koji Kondo,
-Hirokazu Tanaka and Tim Follin wrote classic soundtracks for it. \soft reads NSF and NSFe files, which contain the
-game's player code.
+Some recent tracks use two or three SIDs. We spread them left, right and centre; if you prefer, set the output to
+mono.
 
-\section{Super Nintendo (SPC700 and S-DSP)}
-Super Nintendo sound is handled by a subsystem designed by Sony: an SPC700 processor and a signal processor, the
-S-DSP, sharing 64~KB of memory. The S-DSP plays eight voices of BRR-compressed samples, with ADSR or GAIN envelope,
-stereo volume and a FIR-filtered echo that gives the console's music its depth. It does not synthesize: it plays back
-short instrument recordings, so sound quality depends on the samples chosen and on very limited memory.
+\section{NES and Famicom}
+The NES processor, the Ricoh 2A03 (2A07 in Europe), contains its sound unit: two square channels with a selectable
+duty cycle (12.5, 25, 50 or 75~\%), a triangle for bass, noise for percussion and a DPCM channel that reads 1-bit
+samples. The triangle has no volume control, which explains the ever-present bass of NES music. Koji Kondo for
+\emph{Super Mario Bros.}, Hirokazu Tanaka for \emph{Metroid} and Tim Follin for \emph{Silver Surfer} got the most
+out of those five voices. NSF files hold the game's playback program; \soft shows each voice with its duty cycle,
+volume and period.
 
-An SPC file is a snapshot of the sound subsystem memory and registers; an SNSF file also holds the main processor
-program, for games driving sound from it.
+\section{Super Nintendo}
+The Super Nintendo's sound is a separate subsystem designed by Sony: an SPC700 processor and a signal processor, the
+S-DSP, share 64~KB of memory. The S-DSP plays eight voices of compressed samples, each with its ADSR or GAIN
+envelope and its left and right volume, and can send them into a filtered echo. All the music, samples included, has
+to fit in those 64~KB: composers chose very short sounds and looped them.
+
+An SPC file is a snapshot of that subsystem; an SNSF also holds the main processor's program. The dashboard shows,
+per voice, the sample played, its frequency, the drawn envelope, volumes, echo, noise and pitch modulation; at the
+bottom, master volumes, echo and its coefficients. Tap a voice to open its inspector. Listen to \emph{Chrono
+Trigger}, especially Yasunori Mitsuda's \emph{Corridors of Time}.
 
 \section{Game Boy}
-The Game Boy has two pulse channels (one with frequency sweep), a programmable wave channel of 32 4-bit steps and a
-noise channel. GBS files contain the player code.
+The Game Boy has two square channels, one of them with a frequency sweep, a programmable wave channel of 32 4-bit
+steps and noise. GBS files hold the playback program.
 
-\section{PC Engine (HuC6280)}
-NEC and Hudson Soft's PC Engine, called TurboGrafx-16 in the United States, integrates sound into its HuC6280
-processor. Each of its six channels plays a 32-step 5-bit wavetable written by the program: this is wavetable
-synthesis, where the waveform itself is the instrument. Channels 5 and 6 can produce noise; all can switch to DDA
-mode, where the processor writes samples directly; channel 2 can modulate the frequency of channel 1 (LFO).
+\section{PC Engine}
+The PC Engine by NEC and Hudson Soft, called TurboGrafx-16 in the United States, builds its sound into the HuC6280
+processor. Its six channels each play a wavetable of 32 5-bit steps, written to memory by the game's program: the
+waveform itself is the instrument. Channels 5 and 6 can produce noise, all of them can switch to DDA mode to play
+samples, and channel 2 can modulate channel 1's frequency.
 
-Registers are at \$0800: \$800 selects the channel, \$801 sets left and right master volume, \$802 and \$803 the
-12-bit period, \$804 enable, DDA mode and 5-bit volume, \$805 left and right volume, \$806 wave data, \$807 noise,
-\$808 and \$809 the LFO. Voice frequency: $f = 3\,579\,545 / (32 \times N)$.
+Registers sit at \$0800: \$800 selects the channel, \$801 sets the left and right master volume, \$802 and \$803 the
+12-bit period, \$804 enable, DDA mode and 5-bit volume, \$805 left and right volume, \$806 receives the table values,
+\$807 sets the noise, \$808 and \$809 the LFO. The frequency is $3\,579\,545 / (32N)$.
 
-\section{Atari 8-bit (POKEY)}
-POKEY, designed by Doug Neubauer at Atari, is used in the Atari 400, 800, XL and XE and in many arcade machines. Its
-four channels combine frequency dividers and noise polynomials, giving a very distinctive timbre; two channels can be
-paired for better pitch precision. SAP files are played by the ASAP library.
+The \soft PC Engine view draws each voice's wavetable, names its shape and gives it a number: when the number
+changes, the instrument has changed. A falling saw is marked ``reversed'': the chip never reads a table backwards, the
+driver wrote it that way.
 
-\section{Mega Drive (YM2612 and SN76489)}
-Sega's Mega Drive pairs a Yamaha YM2612 FM chip (six 4-operator voices, one able to play 8-bit samples) with the
-SN76489 generator inherited from the Master System (three square voices and noise). Yuzo Koshiro, Masato Nakamura and
-Motoi Sakuraba used all of its resources. Music is played from VGM logs.
+\section{Atari 8-bit}
+POKEY, designed by Doug Neubauer at Atari, is in the Atari 400, 800, XL and XE and many arcade boards. Its four
+channels combine frequency dividers and noise polynomials, which gives it very particular timbres, and two channels
+can be paired for better tuning. \emph{Ballblazer}, with Peter Langston's generative music, is a good way in. SAP
+files are played by the ASAP library.
 
-\section{AdLib and Sound Blaster (OPL, OPL2, OPL3)}
-On PC, AdLib then Sound Blaster cards use the Yamaha YM3812 (OPL2) then YMF262 (OPL3) FM chips. The OPL2 offers nine
-2-operator voices, or six voices and five percussion sounds in rhythm mode; the OPL3 doubles the voice count, adds
-4-operator voices and stereo. Since rhythm mode is rarely used, \soft shows the nine melodic voices in a 3~$\times$~3
-grid by default.
+\section{Mega Drive}
+The Mega Drive pairs a Yamaha YM2612 FM chip, six four-operator voices one of which can play samples, with the Master
+System's SN76489, three squares and a noise. The console's snapping basses and brass come from FM; drums often come
+from the sixth voice's samples. Listen to Yuzo Koshiro's \emph{Streets of Rage 2} and Masato Nakamura's \emph{Sonic
+the Hedgehog}. The music is played from VGM recordings; \soft shows a card per voice with its algorithm, and the
+inspector details each operator.
 
-\section{YM2151 (OPM)}
-The OPM offers eight 4-operator voices and a rich LFO. It is found in the Sharp X68000, Yamaha synthesizers of the same
-generation and many arcade boards.
+\section{AdLib and Sound Blaster}
+On the PC, the AdLib card and then the Sound Blasters use the Yamaha YM3812 (OPL2) and later YMF262 (OPL3) FM chips.
+The OPL2 offers nine two-operator voices, or six voices and five drums in rhythm mode; the OPL3 doubles the voice
+count and adds four-operator voices and stereo. Rhythm mode being little used, we show the nine melodic voices in a
+3 by 3 grid by default. \emph{Dune}, with Stéphane Picq's music, is a fine example.
 
-\section{Sega Model 1, 2, 2A and 3 arcade boards}
-Sega's 3D arcade boards use sample-based chips:
-\begin{description}
-  \item[Model 1 and Model 2] 68000 processor, YM3438 and two YMW258 (MultiPCM) with 28 sample voices each;
-  \item[Model 2A, 2B, 2C and Model 3] SCSP (YMF292), the Saturn chip: 32 PCM voices that can FM-modulate each other,
-        envelopes, LFO and a programmable effects DSP for reverb.
-\end{description}
+\section{YM2151}
+Yamaha's OPM has eight four-operator voices and a full LFO. It is in the Sharp X68000 and many arcade boards,
+including \emph{Out Run}, where Hiroshi Kawaguchi pairs it with a sample chip.
+
+\section{Sega Model 1, 2 and 3 arcade boards}
+Sega's 3D arcade boards play samples. Model 1 and Model 2 use a 68000, a YM3438 and two YMW258, each with 28 sample
+voices. Model 2A, 2B, 2C and Model 3 use the Saturn's SCSP: 32 PCM voices that can FM-modulate each other, envelopes,
+an LFO and a programmable effects processor that computes the reverb. We emulate that effects processor: without it,
+the music sounds dry.
 
 \section{Roland MT-32}
-Roland's MT-32 MIDI module, widely used by late-1980s PC games, combines samples and synthesis in its LA (linear
-arithmetic) synthesis. \soft emulates it with the Munt library, which requires images of the module's ROMs.
+Roland's MT-32 MIDI module, widely used by late-1980s PC games (\emph{The Secret of Monkey Island}, Sierra games),
+combines short samples and synthesis in what Roland called LA synthesis. We emulate it with the Munt library, which
+needs images of the module's memories.

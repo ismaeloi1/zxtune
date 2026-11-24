@@ -1,12 +1,33 @@
 \chapter{Glossaire}
 \begin{description}
-  \item[ADSR] attaque, déclin, maintien, relâchement : les quatre phases de l'enveloppe d'un son.
+  \item[ADSR] attaque, déclin, maintien, relâchement : les quatre phases de l'enveloppe d'un son. L'attaque est la
+        montée au début de la note, le déclin la descente vers le niveau de maintien, le relâchement l'extinction
+        après la fin de la note.
+  \item[Algorithme] sur une puce FM, la façon dont les opérateurs d'une voix sont branchés entre eux.
+  \item[Arpège] accord joué en faisant défiler très vite ses notes sur une seule voix, pour donner l'illusion de
+        plusieurs voix.
   \item[Cent] centième de demi-ton.
-  \item[DDA] mode du HuC6280 où le processeur écrit directement les échantillons.
-  \item[DSP] processeur de traitement du signal (écho, réverbération).
-  \item[FM] synthèse par modulation de fréquence.
-  \item[Opérateur] oscillateur sinusoïdal d'une voix FM.
+  \item[Coupure] fréquence à partir de laquelle un filtre commence à atténuer le son.
+  \item[DDA] mode du HuC6280 où le processeur écrit directement les échantillons dans la voix.
+  \item[Déclenchement] calage de la fenêtre de l'oscilloscope sur la période du son, pour que la forme reste
+        immobile.
+  \item[Driver] programme qui joue la musique sur la machine d'origine en écrivant dans les registres de la puce.
+  \item[DSP] processeur de traitement du signal, utilisé pour l'écho et la réverbération.
+  \item[Enveloppe] évolution du volume (ou d'un autre paramètre) d'une note dans le temps.
+  \item[FIR] filtre à réponse impulsionnelle finie ; sur la Super Nintendo, il colore les répétitions de l'écho.
+  \item[FM] synthèse par modulation de fréquence : un oscillateur fait varier la fréquence d'un autre, ce qui crée
+        des harmoniques.
+  \item[Modulation en anneau] multiplication de deux signaux, qui donne des sons métalliques ou de cloche.
+  \item[Opérateur] oscillateur sinusoïdal d'une voix FM, avec sa propre enveloppe.
   \item[PAL-N] norme vidéo argentine : horloge proche du NTSC, 50 images par seconde.
+  \item[Porteuse] opérateur FM que l'on entend ; les modulateurs ne s'entendent qu'à travers elle.
+  \item[Rapport cyclique] proportion du temps où une onde carrée est en position haute ; il change le timbre.
+  \item[Registre] case mémoire de la puce dans laquelle le driver écrit un réglage.
+  \item[Résonance] accentuation des fréquences autour de la coupure d'un filtre.
+  \item[Rip] fichier extrait d'un jeu, qui contient le code et les données de sa musique.
+  \item[Synchronisation] remise à zéro d'un oscillateur à chaque cycle d'un autre, qui donne des sons durs et
+        riches.
   \item[Table d'ondes] forme d'onde mémorisée, rejouée en boucle.
   \item[Tracker] logiciel de composition par motifs, et format des musiques qu'il produit.
+  \item[Voie] ligne de l'oscilloscope qui montre une voix.
 \end{description}

@@ -1,73 +1,60 @@
 \chapter{Development cost estimate}\label{chap:chiffrage}
 
-\section{Scope}
-This chapter estimates the cost of developing \soft with a team of developers, that is what the same work would cost
-when done conventionally. It covers the work of this branch, measured in the repository between 2 October and
+We wanted to know what this work would have cost had it been given to an experienced freelance developer, familiar
+with emulation and Android. This estimate covers only what \soft adds to ZXTune between 2 October and
 24 November 2026.
 
-\textbf{The cost of the proprietary NebulaWeave drivers is not included and is not disclosed in this document, as a
-trade secret.}
+\textbf{The cost of the proprietary NebulaWeave drivers is not included and will not be disclosed in this document:
+it is a trade secret.}
 
-\section{Measurement}
-Added lines are counted per area, excluding data and binary resources. Third-party code is split in two:
-\emph{imported} code taken as is (ymfm, mt32emu, adrenotools, ares SPC700 and S-DSP cores, sidid base) and
-\emph{adapted} code (extensions added to cores for per-voice outputs and states, standalone port of ares, SID engine
-options).
+\section{Why we do not count lines}
+A first estimate, based on the number of lines added to the repository, gave more than 900 days of work. That figure
+does not hold: a good share of those lines is code imported as is (ymfm, mt32emu, ares), resources, tests generated
+in series, or code longer than it needed to be. A developer who knows the subject writes less code for the same
+result. So we estimated feature by feature, asking each time how many days a competent person would need to get the
+same behaviour, tests included.
 
-\begin{longtable}{@{}l r l@{}}
-\toprule \textbf{Area} & \textbf{Lines} & \textbf{Kind} \\ \midrule
-ZXTune native core (C++) & 22\,700 & created \\
-Android application (Kotlin, Java) & 30\,400 & created \\
-Android resources (XML) & 6\,200 & created \\
-Android tests & 7\,200 & created \\
-Desktop version (Qt) & 7\,700 & created \\
-VGM extraction tools (Model 2/3) & 4\,100 & created \\
-Third-party libraries, adapted & about 7\,000 & adapted \\
-Third-party libraries, imported & about 24\,000 & integrated \\
-\bottomrule
-\end{longtable}
+We also separate created code from adapted code. Adapting an existing emulation core, for instance adding to Ootake
+the reading of each voice's wavetable, is mostly a matter of understanding the core; the code added fits in a few
+hundred lines. Integrating an imported library only takes checking its licence, building it for Android and wiring it
+in.
 
-\section{Productivity assumptions}
-Rates are averages of comparable projects, tests and debugging included:
-\begin{longtable}{@{}l r@{}}
-\toprule \textbf{Kind of work} & \textbf{Lines per day} \\ \midrule
-Emulation and signal processing (C++) & 75 \\
-Adapting third-party cores (reading, measuring, extending) & 60 \\
-Interface and application logic (Kotlin) & 150 \\
-XML resources & 400 \\
-Tests & 200 \\
-Desktop interface (Qt) & 120 \\
-Tools & 80 \\
-Integrating imported code (license, build, wiring) & 1\,000 \\
-\bottomrule
-\end{longtable}
-Imported code is not costed like written code: only its integration is counted. Adapted code requires understanding
-the existing core before adding a few hundred lines, hence the low rate.
-
-\section{Effort}
-\begin{longtable}{@{}l r@{}}
-\toprule \textbf{Item} & \textbf{Days} \\ \midrule
-Native core & 303 \\
-Android application & 203 \\
-Resources & 16 \\
-Tests & 36 \\
-Desktop version & 64 \\
-Tools & 51 \\
-Adapting third-party cores & 117 \\
-Integrating imported code & 24 \\ \midrule
-Subtotal & 814 \\
-Design, research, ergonomics, acceptance (15~\%) & 122 \\ \midrule
-\textbf{Total} & \textbf{936} \\
+\section{Breakdown}
+\begin{longtable}{@{}p{0.75\textwidth} r@{}}
+\toprule \textbf{Feature} & \textbf{Days} \\ \midrule
+Per-voice outputs and chip states in the engines (libvgm, SID, SNES, PC Engine, PCM) & 25 \\
+Vulkan and OpenGL ES oscilloscope, triggering & 15 \\
+SID dashboard and filter response & 15 \\
+FM views and inspector & 12 \\
+Super Nintendo view & 6 \\
+PCM chip view (YMW258, SCSP) & 6 \\
+PC Engine view & 4 \\
+NES and MT-32 cards & 3 \\
+ares port and SNSF integration & 6 \\
+FM core choice, presets, output stage & 8 \\
+SID options (samples lane, mono, filters) & 4 \\
+Multiple playlists, favourites, queue, M3U & 8 \\
+Interface redesign & 15 \\
+Audio formats and miscellaneous fixes & 2 \\
+Desktop version (Qt) & 12 \\
+VGM extraction tools (Model 2 and 3) & 8 \\
+Tests and control renders & 10 \\
+Manual & 6 \\ \midrule
+Subtotal & 165 \\
+Design, research, acceptance (15~\%) & 25 \\ \midrule
+\textbf{Total} & \textbf{190} \\
 \bottomrule
 \end{longtable}
 
 \section{Cost}
 \begin{longtable}{@{}l r r@{}}
-\toprule \textbf{Daily rate} & \textbf{Rate} & \textbf{Cost} \\ \midrule
-Low & 450~€ & 421\,200~€ \\
-Median & 600~€ & 561\,600~€ \\
-High & 750~€ & 702\,000~€ \\
+\toprule \textbf{Assumption} & \textbf{Day rate} & \textbf{Cost} \\ \midrule
+Low & 450~€ & 85\,500~€ \\
+Median & 600~€ & 114\,000~€ \\
+High & 750~€ & 142\,500~€ \\
 \bottomrule
 \end{longtable}
-These amounts are a replacement cost: they exclude the existing ZXTune base, free libraries reused without changes,
-and the proprietary drivers.
+
+These amounts include neither the ZXTune base, developed over years by its author, nor the free libraries reused
+unchanged, nor the proprietary drivers. They give an order of magnitude: adjust them if your day rate or pace differs
+from ours.

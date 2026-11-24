@@ -1,47 +1,60 @@
 \chapter{Architecture}\label{chap:architecture}
 
-\section{Overview}
-\soft has two layers:
-\begin{description}
-  \item[Native core (C++)] format parsing, chip emulation, mixing, per-voice outputs and chip states. It is built
-        with the ZXTune \texttt{make} system for four Android architectures into \texttt{libzxtune.so}.
-  \item[Application (Kotlin, Java)] playback service, interface, playlists, browsing, oscilloscope rendering (Vulkan
-        or OpenGL ES) and dashboards.
-\end{description}
+This chapter is for those who want to read the code, change it or simply understand how sound reaches the screen. We
+describe what we added to ZXTune and why we did it that way.
 
-\section{Audio path}
+\section{Two layers}
+\soft is made of two layers that talk over JNI.
+\begin{description}
+  \item[The native core, in C++] It reads formats, emulates chips, mixes and resamples. This is ZXTune's code, built
+        with its own \texttt{make} system for four Android architectures, into a single \texttt{libzxtune.so}
+        library. We added per-voice outputs, chip states and the new engines to it.
+  \item[The application, in Kotlin and Java] It runs the playback service, playlists, navigation and interface, and
+        draws the oscilloscope and dashboards.
+\end{description}
+We kept this split strict: nothing display-related goes into the native core, apart from preparing the oscilloscope
+traces, which is too costly in Kotlin.
+
+\section{The path of the sound}
 \begin{enumerate}
-  \item A \emph{Module::Holder} is created for the file; it provides a \emph{Renderer} per playback.
-  \item The renderer calls the emulation engine by blocks (about 100~ms), resamples to the output rate (48~kHz) and
-        applies gain, fades and loop limits.
-  \item The Android service writes the result to the audio output. Emulation state snapshots, taken regularly, make
-        backward seeking fast without replaying from the start.
+  \item When you open a file, the core recognises its format and creates a \emph{Module::Holder}. It provides a
+        \emph{Renderer} for each playback.
+  \item The renderer advances emulation in blocks of about 100~ms, resamples to 48~kHz and applies gain, fades and
+        the loop limit.
+  \item The Android service sends the result to the phone's audio output.
 \end{enumerate}
+To make seeking backwards fast, the renderer regularly takes snapshots of the emulation state. Going back to minute 2
+then does not mean recomputing the first two minutes, only the few seconds since the nearest snapshot.
 
 \section{Visualisation data}
-Every engine exposes the same three streams through the \emph{VoicesScope} interface:
+Every engine, whatever its origin, gives us the same three streams, through a common interface we called
+\emph{VoicesScope}:
 \begin{description}
-  \item[Layout] list of voice groups (one chip per group) and their names, sent on every change.
-  \item[Per-voice outputs] samples of each voice at the output rate, resampled like the sound.
-  \item[Voice states] snapshot of each voice about every millisecond: frequency, level, flags, chip kind and 64 bytes
-        specific to the chip (registers, envelopes, wavetable\dots).
+  \item[Layout] the list of chips and their voice names, sent at the start of the track and on every change. It
+        decides the oscilloscope's columns and rows.
+  \item[Per-voice outputs] each voice's sound, separately, at the output rate and resampled like the main sound.
+  \item[Voice states] roughly every millisecond, a reading of each voice: frequency, level, flags, chip type, and 64
+        chip-specific values (registers, envelopes, wavetable\dots).
 \end{description}
-For libvgm chips these streams come from an extension added to the emulation cores: a per-sample callback (per-voice
-outputs) and a state function. reSID and reSIDfp, ares and Ootake received equivalent extensions.
+The bulk of the work was getting those streams out of emulators that were never designed for it. An emulator mixes
+its voices as early as it can, because it only needs the result. For the libvgm cores we added a common extension: a
+callback called on every sample with each voice's output, and a function returning the voices' state. For reSID and
+reSIDfp, ares and Ootake we wrote equivalent extensions, as close as possible to each core's code.
 
-\section{Rendering}
-\begin{itemize}
-  \item A worker thread prepares each frame: for each voice, the time window is aligned on the fundamental period of
-        the note (trigger), then reduced to two points per pixel column (minimum and maximum), so no peak is lost.
-  \item Traces are drawn by Vulkan when available, otherwise OpenGL ES, with thin antialiased lines.
-  \item The dashboard is drawn in two layers: a static layer (frames, captions), redrawn only when the layout
-        changes, and a dynamic layer (values, curves), redrawn every frame.
-\end{itemize}
+We always followed the same rule: take the value where the emulator computes it, never recompute it on our side. A
+recomputed value always ends up drifting from what you hear.
+
+\section{Drawing}
+A worker thread prepares each oscilloscope frame. For each voice it locks the time window to the note's period, then
+reduces the signal to two points per pixel column, the minimum and the maximum. The drawing itself goes to Vulkan
+when the phone allows it, otherwise to OpenGL ES, with a thin antialiased line.
+
+The dashboard is drawn in two layers. The static layer (frames, labels) is redrawn only when the layout changes; the
+dynamic layer (values, curves) is redrawn every frame. We learned the hard way not to put any changing text in the
+static layer: it stays drawn under the new value and the two overlap.
 
 \section{Tests}
-\begin{itemize}
-  \item More than 1~000 JVM tests (Robolectric) for the application: models, playlist storage, view computations, and
-        render tests producing the screenshots of this manual.
-  \item Native check tools: oscilloscope measurement (\texttt{scope\_bench}), per-voice outputs of VGM chips, SID
-        parameters, seeking.
-\end{itemize}
+The application has more than 1~000 tests that run on the development machine, without a phone, thanks to
+Robolectric: models, playlist storage, view calculations, and render tests. The latter draw each view from known chip
+states and save an image; they produce the screenshots in this manual. On the native side, command-line tools measure
+the oscilloscope and check the per-voice outputs of VGM chips, SID parameters and seeking.

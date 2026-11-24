@@ -1,36 +1,73 @@
-\chapter{Chip dashboards}\label{chap:dashboards}
+\chapter{Per-chip dashboards}\label{chap:dashboards}
 
-Below the oscilloscope, the dashboard details the chip state. Each chip has its own view, built around what is
-specific to its synthesis. State snapshots are taken about every millisecond of emulated sound; each frame shows the
-latest one, without smoothing.
+The oscilloscope shows you the shape of the sound; the dashboard below it tells you how the chip makes it. We did not
+want a single view full of registers: each chip family has its own, built around what makes its sound. On the SID it
+is the filter and the modulation between voices; on the Super Nintendo, envelopes and echo; on the PC Engine, the
+wavetable; on FM chips, the operators and how they are wired.
+
+We read the chip's state roughly every millisecond of emulated sound, and each frame shows the latest reading, as is.
+If a value jumps, the chip jumped.
 
 \section{SID (Commodore 64)}
 \capture[0.8]{sidcells-now-playing}{SID dashboard}
-For each voice: waveform and duty cycle, envelope (level, phase, ADSR in milliseconds), frequency (note and hertz).
-The \textbf{Mod} column shows sync and ring modulation with the source voice: ``Sync V3'', ``Ring V2'', and
-``Sync+Ring V1'' when both are on. On the SID a voice is always modulated by the previous one (V1 from V3, V2 from V1,
-V3 from V2). The last row shows volume, resonance and filter.
+Each column is a voice. From top to bottom you read:
+\begin{description}
+  \item[Wave] the waveform (triangle, sawtooth, pulse, noise, or a combination) and, for the pulse, its duty cycle.
+        When the duty cycle never stops moving, that is the ``PWM'' that gives Rob Hubbard's basses their weight.
+  \item[Env] the envelope: the current level, the phase (attack, decay, sustain, release) and the ADSR times in
+        milliseconds. A 2~ms attack and a short decay make a percussive note; a high sustain, a held note.
+  \item[Freq] the nearest note and the frequency in hertz. An arpeggio shows here: the note changes every frame.
+  \item[Mod] sync and ring modulation. We show only the source voice: ``Sync V3'', ``Ring V2'', ``Sync+Ring V1''. On
+        the SID a voice is always modulated by the previous one (V1 by V3, V2 by V1, V3 by V2); knowing the source is
+        enough.
+\end{description}
+The last row shows the master volume, resonance, filter type and the voices routed into it. If you see a voice going
+in and out of the filter in time with the music, you have caught one of the era's favourite tricks.
 \capturedouble{sidcells-dual}{sidcells-fullscreen}{Two SID chips}{fullscreen}
 
 \section{Super Nintendo (S-DSP)}
 \capturedouble{snes}{snes-inspector}{View of the 8 voices}{voice inspector}
-For each voice: sample, frequency, drawn ADSR or GAIN envelope, left and right volumes, echo, noise, pitch
-modulation. At the bottom: master volumes, echo and its FIR filter. Tapping a voice opens its inspector.
+The S-DSP plays eight sample voices. For each you see the sample number, the note, the drawn envelope (ADSR or GAIN
+mode, which many drivers use for their own fades), left and right volumes, and three flags: echo, noise, pitch
+modulation.
+
+At the bottom: master volumes, echo volume and feedback, and the eight coefficients of the FIR filter that colours
+its repeats. High feedback with a low-pass FIR is the large reverberant hall of Square's games; a short, dry echo, a
+dungeon mood. Tap a voice to open its inspector and see its envelope at full size.
 
 \section{PC Engine (HuC6280)}
 \capture[0.8]{pce-dashboard}{PC Engine view}
-For each of the 6 voices: the 32-step wavetable in use, a level bar and two panning bars, then note, frequency and
-level. The waveform shape is named (sine, triangle, rising saw, falling saw, square, pulse with its duty cycle) and
-each distinct table gets a number, which changes when the instrument changes. The bottom row gives the registers as
-written (\$802 to \$807); the global row, \$801, \$808 and \$809. The HuC6280 has no reverse playback: a falling saw is
-a table written backwards by the driver, hence ``Saw $\downarrow$ (reversed)''.
+Each of the six voices loops over a table of 32 5-bit values: its waveform. Each voice's rectangle draws the table in
+use, step by step. Next to it, a level bar and two pan bars, then the note, frequency and level.
+
+We describe the shape in words: ``Sine'', ``Triangle'', ``Saw $\uparrow$'', ``Square'', ``Pulse 25\%''\dots{} and
+we number each distinct table. When the number changes mid-track, the driver has just reloaded the voice with another
+instrument. The HuC6280 cannot read a table backwards: a falling saw is a table the driver wrote in reverse, hence
+the label ``Saw $\downarrow$ (reversed)''.
+
+Each voice's bottom row gives its registers as written: \$802 and \$803 (frequency), \$804 (volume and enable),
+\$805 (pan), \$806 (DDA mode), \$807 (noise). The global row gives \$801 (master volume), \$808 and \$809 (LFO). When
+DDA mode is on, the voice is playing samples sent one by one by the processor: that is how the PC Engine makes its
+characters speak.
 
 \section{FM chips}
 \capturedouble{fm-megadrive-cards}{fm-megadrive-inspector}{Mega Drive: voice cards}{voice inspector}
+Each card shows a voice: its algorithm, drawn with carriers at the bottom and modulators above, and each operator's
+level. Remember one simple rule: the stronger a modulator, the richer and harsher the sound. A Mega Drive bass that
+``snaps'' has a modulator whose envelope drops very fast.
+
+Tap a voice to open the inspector: each operator's envelope drawn large, frequency multipliers, detune, operator 1
+feedback and LFO sensitivity.
 \capturedouble{fmview-algorithms}{fm-adlib-cards}{FM algorithms}{AdLib}
-Each voice shows its algorithm (carriers and modulators), levels and envelopes of its operators. Tapping a voice opens
-the inspector: drawn envelopes, multipliers, detune, LFO.
+For the AdLib (OPL2), each voice has only two operators and two possible connections: in series (one modulates the
+other) or in parallel (both are heard). We lay out the nine voices 3 by 3.
 
 \section{NES, MT-32 and PCM chips}
 \capturedouble{nes}{mt32parts}{NES}{Roland MT-32: parts}
+On the NES, the cards of the two square voices draw their duty cycle (12.5, 25, 50 or 75~\%) and give the 4-bit
+volume, the envelope and the pitch sweep; the triangle and noise follow, then the state of the DMC channel, which
+plays samples. For the MT-32 there are no useful registers to show: each part shows its instrument name, the keys
+played and the state of its ``partials'', the synthesis building blocks the module combines into a sound.
 \capturedouble{pcmchips-model1-portrait}{pcmchips-scsp-portrait}{YMW258 (Model 1/2)}{SCSP (Saturn, Model 2A/3)}
+The PCM chips of Sega arcade boards and the Saturn play dozens of samples at once. Each cell shows an active voice:
+its mode (PCM, FM or noise on the SCSP), its note, its pan and its total level (TL) in decibels.

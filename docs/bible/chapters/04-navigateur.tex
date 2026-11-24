@@ -1,46 +1,33 @@
 \chapter{Le navigateur}
 
-\section{Sources locales}
-Le navigateur donne accès au stockage du téléphone et aux cartes SD. Sur Android~10 et plus, l'accès passe par le
-sélecteur de dossiers du système : vous choisissez une fois le dossier de vos musiques, \soft{} s'en souvient.
+\section{Vos fichiers}
+Le navigateur ouvre le stockage du téléphone et les cartes SD. Sur Android~10 et plus, l'accès passe par le
+sélecteur de dossiers du système : vous désignez une fois le dossier de vos musiques et \soft s'en souvient.
 
-\section{Catalogues en ligne}
-\soft{} donne accès à plusieurs catalogues publics de musiques de puces, consultés en direct :
-\begin{itemize}
-  \item High Voltage SID Collection (Commodore~64) ;
-  \item The Mod Archive, Modland et Amiga Music Preservation (modules de tracker, Amiga) ;
-  \item ZXArt et ZXTunes (ZX Spectrum), Aygor ;
-  \item Atari SAP Music Archive (Atari 8 bits) ;
-  \item VGMRips (enregistrements VGM de consoles et bornes d'arcade) ;
-  \item Joshw (rips de consoles), Khinsider, OverClocked ReMix, Aminet, Scene.org ;
-  \item des radios en ligne.
-\end{itemize}
-\begin{description}
-  \item[High Voltage SID Collection (HVSC)] la collection de référence des musiques du Commodore~64, entretenue par
-        des bénévoles depuis la fin des années 1990 ; elle contient plusieurs dizaines de milliers de fichiers SID
-        classés par compositeur, et la base des durées utilisée par \soft.
-  \item[The Mod Archive, Modland, Amiga Music Preservation] les grandes archives de modules de tracker : la
-        première est communautaire et notée par ses visiteurs, Modland classe ses fichiers par format, et AMP
-        documente les musiciens de l'Amiga.
-  \item[ZXArt, ZXTunes, Aygor] archives de la scène ZX Spectrum, avec les compétitions de démo-parties.
-  \item[ASMA] Atari SAP Music Archive, l'équivalent de la HVSC pour les Atari 8 bits.
-  \item[VGMRips] enregistrements VGM de jeux de consoles et de bornes d'arcade, packs complets par jeu.
-  \item[Joshw, Khinsider] rips de consoles (NSF, SPC, GBS, PSF\dots) et bandes-son de jeux.
-  \item[OverClocked ReMix] réinterprétations de musiques de jeux par des musiciens contemporains.
-  \item[Aminet, Scene.org] archives historiques de l'Amiga et de la demoscène.
-\end{description}
-Les catalogues sont des services tiers : leur contenu, leur disponibilité et leurs conditions d'utilisation
-dépendent de leurs responsables. \soft les consulte en direct et conserve en cache les fichiers déjà écoutés.
+\soft ouvre les archives (ZIP, RAR, 7z, LHA\dots) et les images de disquettes (TR-DOS, SCL\dots) comme des dossiers :
+vous n'avez pas besoin de les décompresser. Il retrouve aussi les musiques cachées dans des programmes compressés ou
+des instantanés de machine, ce qui est fréquent pour les collections de la scène ZX Spectrum.
 
-\section{Archives et fichiers multi-morceaux}
-\soft{} ouvre les archives (ZIP, RAR, 7z, LHA\dots) et les images de disquettes (TR-DOS, SCL\dots) comme des dossiers.
-Un fichier qui contient plusieurs morceaux (SID, NSF, AY, KSS\dots) est en revanche lu directement : ses
+Un fichier qui contient plusieurs morceaux (SID, NSF, AY, KSS\dots) se lit directement quand vous le touchez : ses
 sous-morceaux s'enchaînent, puis la lecture continue avec le fichier suivant du dossier.
 
-\section{Recherche et sélection}
-La loupe filtre le dossier affiché. Un appui long sur un élément démarre la sélection multiple ; la barre du haut
-propose alors :
-\begin{description}
-  \item[Ajouter] demande la liste de destination et y ajoute les fichiers (les dossiers sont parcourus en entier) ;
-  \item[Jouer ensuite] place les éléments sélectionnés dans la file d'attente (section~\ref{sec:file}).
-\end{description}
+\section{Les catalogues en ligne}
+Le navigateur donne aussi accès, en direct, à de grandes collections publiques. La \textbf{High Voltage SID
+Collection} rassemble la quasi-totalité des musiques du Commodore~64, classées par compositeur, et fournit la base
+des durées que nous utilisons. \textbf{The Mod Archive}, \textbf{Modland} et \textbf{Amiga Music Preservation}
+couvrent les modules de tracker de l'Amiga et du PC ; Modland les classe par format, AMP documente les musiciens.
+\textbf{ZXArt}, \textbf{ZXTunes} et \textbf{Aygor} archivent la scène du ZX Spectrum, compétitions de demo-parties
+comprises. \textbf{ASMA} est l'équivalent de la HVSC pour les Atari 8 bits. \textbf{VGMRips} propose des
+enregistrements VGM de jeux de consoles et de bornes, par jeu complet. \textbf{Joshw} et \textbf{Khinsider}
+proposent des rips de consoles et des bandes-son, \textbf{OverClocked ReMix} des réinterprétations, \textbf{Aminet}
+et \textbf{Scene.org} les archives historiques de l'Amiga et de la demoscène. Quelques radios en ligne complètent
+la liste.
+
+Ces catalogues sont des services indépendants : leur contenu et leur disponibilité dépendent de leurs responsables.
+Les morceaux que vous avez déjà écoutés restent en cache et se rejouent sans connexion.
+
+\section{Rechercher et sélectionner}
+La loupe filtre le dossier affiché. Pour agir sur plusieurs éléments, faites un appui long sur le premier puis
+touchez les suivants. Le bouton « Add » vous demande dans quelle liste les ranger ; les dossiers sont parcourus en
+entier, ce qui peut prendre un moment pour une grande collection (la progression s'affiche dans les notifications).
+Le bouton « Play next » place la sélection dans la file d'attente, pour l'écouter juste après le morceau en cours.

@@ -1,51 +1,66 @@
 \chapter{Architecture}\label{chap:architecture}
 
-\section{Vue d'ensemble}
-\soft est composé de deux couches :
-\begin{description}
-  \item[Cœur natif (C++)] lecture des formats, émulation des puces, mixage, sorties par voix et états des puces. Il
-        est construit avec le système \texttt{make} de ZXTune pour quatre architectures Android, et produit une
-        bibliothèque \texttt{libzxtune.so}.
-  \item[Application (Kotlin, Java)] service de lecture, interface, listes, navigation, rendu de l'oscilloscope
-        (Vulkan ou OpenGL ES) et des tableaux de bord.
-\end{description}
+Ce chapitre s'adresse à celles et ceux qui veulent lire le code, le modifier ou simplement comprendre comment le son
+arrive jusqu'à l'écran. Nous décrivons ce que nous avons ajouté à ZXTune et pourquoi nous l'avons fait ainsi.
 
-\section{Chaîne audio}
+\section{Deux couches}
+\soft est fait de deux couches qui se parlent par JNI.
+\begin{description}
+  \item[Le cœur natif, en C++] Il lit les formats, émule les puces, mixe et rééchantillonne. C'est le code de ZXTune,
+        construit avec son propre système \texttt{make} pour quatre architectures Android, en une seule
+        bibliothèque \texttt{libzxtune.so}. Nous y avons ajouté les sorties par voix, les états des puces et les
+        nouveaux moteurs.
+  \item[L'application, en Kotlin et Java] Elle gère le service de lecture, les listes, la navigation, l'interface,
+        et dessine l'oscilloscope et les tableaux de bord.
+\end{description}
+Nous avons gardé cette séparation stricte : rien de ce qui concerne l'affichage n'entre dans le cœur natif, à part
+la préparation des traces de l'oscilloscope, trop coûteuse en Kotlin.
+
+\section{Le chemin du son}
 \begin{enumerate}
-  \item Un \emph{Module::Holder} est créé pour le fichier ; il fournit un \emph{Renderer} par lecture.
-  \item Le renderer appelle le moteur d'émulation par blocs (environ 100~ms), rééchantillonne vers la fréquence de
-        sortie (48~kHz) et applique gain, fondus et limites de boucles.
-  \item Le service Android écrit le résultat dans la sortie audio. Des instantanés de l'état d'émulation, pris
-        régulièrement, rendent le retour arrière rapide sans tout recalculer depuis le début.
+  \item Quand vous ouvrez un fichier, le cœur reconnaît son format et crée un \emph{Module::Holder}. Celui-ci
+        fournit un \emph{Renderer} à chaque lecture.
+  \item Le renderer fait avancer l'émulation par blocs d'environ 100~ms, rééchantillonne vers 48~kHz et applique le
+        gain, les fondus et la limite de boucles.
+  \item Le service Android envoie le résultat à la sortie audio du téléphone.
 \end{enumerate}
+Pour que le retour en arrière soit rapide, le renderer prend régulièrement des instantanés de l'état de
+l'émulation. Revenir à la minute 2 ne demande alors pas de recalculer les deux premières minutes, seulement les
+quelques secondes depuis l'instantané le plus proche.
 
-\section{Données de visualisation}
-Chaque moteur expose les mêmes trois flux, par l'interface \emph{VoicesScope} :
+\section{Les données de visualisation}
+Tous les moteurs, quelle que soit leur origine, nous donnent les mêmes trois flux, par une interface commune que
+nous avons appelée \emph{VoicesScope} :
 \begin{description}
-  \item[Disposition] liste des groupes de voix (une puce par groupe) et de leurs noms, envoyée à chaque changement.
-  \item[Sorties par voix] échantillons de chaque voix, au rythme de la sortie, rééchantillonnés comme le son.
-  \item[États des voix] instantané d'environ 1~ms de chaque voix : fréquence, niveau, indicateurs, type de puce et
-        64 octets propres à la puce (registres, enveloppes, table d'ondes\dots).
+  \item[La disposition] la liste des puces et des noms de leurs voix, envoyée au début du morceau et à chaque
+        changement. C'est elle qui décide des colonnes et des lignes de l'oscilloscope.
+  \item[Les sorties par voix] le son de chaque voix, séparément, au rythme de la sortie et rééchantillonné comme le
+        son principal.
+  \item[Les états des voix] toutes les millisecondes environ, un relevé de chaque voix : fréquence, niveau,
+        indicateurs, type de puce, et 64 valeurs propres à la puce (registres, enveloppes, table d'ondes\dots).
 \end{description}
-Pour les puces de libvgm, ces flux viennent d'une extension ajoutée aux cœurs d'émulation : une fonction de rappel
-par échantillon (sorties par voix) et une fonction d'état. Les cœurs reSID et reSIDfp, ares et Ootake ont reçu des
-extensions équivalentes.
+Le plus gros du travail a été d'obtenir ces flux des émulateurs, qui n'ont jamais été prévus pour ça. Un émulateur
+mélange ses voix au plus tôt, parce qu'il n'a besoin que du résultat. Pour les cœurs de libvgm, nous avons ajouté une
+extension commune : une fonction de rappel appelée à chaque échantillon avec la sortie de chaque voix, et une
+fonction qui renvoie l'état des voix. Pour reSID et reSIDfp, ares et Ootake, nous avons écrit des extensions
+équivalentes, au plus près du code de chaque cœur.
 
-\section{Rendu}
-\begin{itemize}
-  \item Un fil de calcul prépare chaque image : pour chaque voix, la fenêtre de temps est calée sur la période
-        fondamentale de la note (déclenchement), puis réduite à deux points par colonne de pixels (minimum et
-        maximum), ce qui ne perd aucun pic.
-  \item Le rendu des traces est fait par Vulkan quand il est disponible, sinon par OpenGL ES, avec un tracé fin
-        anticrénelé.
-  \item Le tableau de bord est dessiné en deux couches : une couche fixe (cadres, légendes), redessinée seulement
-        quand la disposition change, et une couche dynamique (valeurs, courbes), redessinée à chaque image.
-\end{itemize}
+Nous avons toujours suivi la même règle : prendre la valeur là où l'émulateur la calcule, jamais la recalculer de
+notre côté. Une valeur recalculée finit toujours par diverger de ce qu'on entend.
 
-\section{Tests}
-\begin{itemize}
-  \item Plus de 1~000 tests JVM (Robolectric) pour l'application : modèles, stockage des listes, calculs des vues,
-        et tests de rendu qui produisent les captures de ce manuel.
-  \item Outils natifs de contrôle : mesure de l'oscilloscope (\texttt{scope\_bench}), vérification des sorties
-        par voix des puces VGM, des paramètres SID, de la recherche dans le morceau.
-\end{itemize}
+\section{Le dessin}
+Un fil de calcul prépare chaque image de l'oscilloscope. Pour chaque voix, il cale la fenêtre de temps sur la
+période de la note, puis réduit le signal à deux points par colonne de pixels, le minimum et le maximum. Le dessin
+lui-même est confié à Vulkan quand le téléphone le permet, sinon à OpenGL ES, avec un trait fin anticrénelé.
+
+Le tableau de bord est dessiné en deux couches. La couche fixe (cadres, légendes) n'est redessinée que quand la
+disposition change ; la couche dynamique (valeurs, courbes) l'est à chaque image. Nous avons appris à nos dépens à
+ne mettre aucun texte qui change dans la couche fixe : il reste dessiné sous la nouvelle valeur et les deux se
+superposent.
+
+\section{Les tests}
+L'application compte plus de 1~000 tests qui tournent sur la machine de développement, sans téléphone, grâce à
+Robolectric : modèles, stockage des listes, calculs des vues, et tests de rendu. Ces derniers dessinent chaque vue à
+partir d'états de puces connus et enregistrent une image ; ce sont eux qui produisent les captures de ce manuel. Côté
+natif, des outils en ligne de commande mesurent l'oscilloscope, vérifient les sorties par voix des puces VGM, les
+paramètres SID et la recherche dans le morceau.

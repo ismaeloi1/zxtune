@@ -1,19 +1,46 @@
 \chapter{Troubleshooting}
-\begin{description}
-  \item[Crackles or dropouts] is the ``render'' line below 100~\%? Choose a lighter engine
-        (chapter~\ref{chap:emu-settings}), lower the oscilloscope frame rate or switch to Vulkan if available.
-  \item[Stuttering oscilloscope] enable Vulkan, check that no battery saver throttles the application.
-  \item[File not recognised] check it is in the formats table; xSF rips (PSF, SSF, GSF\dots) often need their
-        \texttt{\_lib} files in the same folder.
-  \item[Track too short or too long] set the default duration or the loops limit; for SID, the duration comes from the
-        HVSC database.
-  \item[Wrong notes on AY] set the clock to the original machine's.
-  \item[No sound on MT-32] check that the module ROM images are present.
-  \item[Catalogue unavailable] the third-party service may be offline; files already played stay cached.
-  \item[Empty playlist after update] former XSPF playlists remain in the browser, from where they can be added to a
-        playlist.
-\end{description}
 
-\section{Reporting a problem}
-Give the version, the device, the file and, if a setting is involved, its internal key (chapter~\ref{chap:all-settings}).
-The statistics lines below the dashboard are useful too.
+Most problems we, or the first users, ran into are solved in a few seconds. Here are the most common, with what we
+check first.
+
+\section{The sound crackles or drops out}
+Look at the ``render'' line of the statistics. Below 100~\%, your phone is not computing the music fast enough.
+Choose a lighter engine (chapter~\ref{chap:emu-settings}): Genesis Plus GX instead of Nuked for the Mega Drive,
+snes\_spc instead of ares for the Super Nintendo. If the line is well above 100~\%, the problem is more likely the
+drawing: lower the oscilloscope frame rate or switch to Vulkan rendering.
+
+Also check that no battery saver is throttling the application. Some manufacturers slow down background apps even
+while they play sound.
+
+\section{The oscilloscope stutters}
+Turn on Vulkan if it is offered. On tracks with very many lanes (a Sega Model~2 board can show around thirty),
+reduce the number of periods shown: triggering gets cheaper.
+
+\section{A file is not recognised}
+Look for its extension in the tables of part~\ref{part:compat}. Rips of the xSF family (PSF, SSF, GSF, SNSF,
+2SF\dots) are often split into two files: the tiny track itself, and a \texttt{.\_lib} library holding the code and
+sounds. Both must be in the same folder.
+
+\section{The track is too short or too long}
+Many formats give no duration, because the music loops forever. Set the default duration or the loop limit. For SID,
+the duration comes from the HVSC database; a track missing from it gets the default duration.
+
+\section{Notes are wrong on AY music}
+The chip clock does not match the original machine. A ZX Spectrum 128 runs at 1.7734~MHz, an Amstrad CPC at 1~MHz,
+an Atari ST at 2~MHz. A wrong clock shifts the whole track by the same interval: the tune stays recognisable, but
+everything is too high or too low.
+
+\section{No sound on an MT-32 track}
+MT-32 emulation needs the original module's memory images, which we cannot supply. Without them the track stays
+silent.
+
+\section{The online catalogue does not respond}
+Catalogues are third-party services that can be offline. Tracks you already played stay in the cache and play without
+a connection.
+
+\section{My old playlists are gone}
+Old XSPF playlists are still in the browser. Open them and add their tracks to a playlist.
+
+\section{Reporting a problem to us}
+Give us the application version, your phone model, the file concerned and, if a setting is involved, its internal key
+(chapter~\ref{chap:all-settings}). A screenshot of the statistics lines saves us a lot of time.

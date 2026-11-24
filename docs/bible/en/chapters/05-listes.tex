@@ -1,38 +1,35 @@
 \chapter{Playlists}\label{chap:listes}
 
-\section{Multiple playlists}
-\soft handles any number of playlists, plus two special ones:
-\begin{description}
-  \item[Default playlist] created at first launch, it takes over your previous playlist.
-  \item[Favourites] filled by the \textbf{$\equiv$+} button $\rightarrow$ ``Add to favorites''.
-\end{description}
-The displayed playlist is also the played one. Switching in the selector saves the playlist left and loads the new
-one; the current track keeps playing and ``next'' follows the new playlist.
+\section{Several playlists}
+You can create as many playlists as you like. Two exist from the start: the default playlist, which takes over your
+old playlist when you update, and favourites, which you fill with the $\equiv$+ button on the Now playing screen.
 
-\capture{playlist-en-top}{Playlist selector}
+The playlist shown is also the one that plays. When you switch playlists with the selector, we save the one you leave
+and load the new one; the current track goes on, and the ``next'' button will follow the new playlist. We chose this
+so that the screen always shows what you are about to hear.
 
-\section{Managing playlists}
-The selector menu offers: switch, new playlist, rename, duplicate, delete, export as M3U, import M3U. Deleting the
-displayed playlist switches to another one.
+\capture{playlist-en-top}{The playlist selector}
+
+\section{Managing your playlists}
+The selector menu lets you create a playlist, rename or duplicate the one shown, delete it (another playlist then
+takes its place) and exchange playlists in M3U format.
 
 \section{Adding tracks}
-\begin{itemize}
-  \item From Now playing: \textbf{$\equiv$+} $\rightarrow$ ``Add to playlist\dots'', then a playlist or ``New
-        playlist\dots''.
-  \item From the browser: selection $\rightarrow$ Add.
-  \item From a playlist: selection $\rightarrow$ ``Add to playlist\dots'' copies tracks to another playlist.
-\end{itemize}
+From the Now playing screen, the $\equiv$+ button then ``Add to playlist\dots'' files the current track; you can
+create a playlist on the way. From the browser, select files or folders then tap ``Add''. From a playlist, select
+tracks and copy them to another one.
 
-\section{Play next queue}\label{sec:file}
-Queued tracks play after the current one, in the order they were added. Then playback resumes where it was in the
-playlist or folder. Choosing another track yourself keeps the queue but drops that resume point.
+\section{The queue}\label{sec:file}
+``Play next'' inserts tracks right after the current one, without touching your playlists. They play in the order you
+added them, then playback resumes where it was. If you pick another track yourself in the meantime, the queue is
+kept but that resume point is forgotten.
 
 \section{M3U import and export}
-Export writes the displayed playlist as extended M3U (title, author, duration). Locations are complete, including
-inside archives and online catalogues, so an exported playlist is re-imported identically. Import also accepts M3U
-from other players (plain paths) and creates a new playlist named after the file. Former XSPF playlists remain
+Export writes the playlist shown in extended M3U format, with title, author and duration. Locations are complete,
+including inside archives and online catalogues: an exported playlist imports back identically. Import also accepts
+playlists from other players and creates a new playlist named after the file. Your old XSPF playlists remain
 available in the browser.
 
-\section{Sort, move, statistics}
-Sorting is by title, author or duration. Each track's handle moves it. Statistics give track count, distinct files
-and total duration of the playlist or the selection.
+\section{Sorting and arranging}
+Sorting works on title, author or duration. For an order of your own, move tracks by their handle. Statistics give
+the number of tracks, the number of distinct files and the total duration.

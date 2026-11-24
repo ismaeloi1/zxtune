@@ -1,9 +1,12 @@
 \chapter{Technical statistics}
-Below the dashboard, technical lines report on rendering:
+Below the dashboard, a few technical lines describe what your phone is doing. You will only need them when something
+goes wrong, but they quickly tell you where the problem is.
 \begin{description}
-  \item[scope] lanes shown, trigger cost, synchronisation;
-  \item[output] output rate and audio buffer size;
-  \item[render] emulation speed relative to real time (above 100~\%, the device keeps up);
-  \item[vulkan / gles] frames per second and drawing time;
-  \item[vk] GPU and driver.
+  \item[scope] the number of lanes shown, the cost of triggering and the sync gap between sound and picture.
+  \item[output] the output rate and audio buffer size. A larger buffer protects against dropouts at the cost of the
+        picture lagging the sound slightly.
+  \item[render] emulation speed relative to real time. This is the most useful line: at 300~\%, your phone computes
+        three seconds of music per second; below 100~\%, it cannot keep up and the sound drops out.
+  \item[vulkan / gles] the drawing engine, frames per second and the drawing time of each.
+  \item[vk] the graphics processor and its driver version.
 \end{description}

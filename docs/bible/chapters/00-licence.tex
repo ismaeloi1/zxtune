@@ -3,11 +3,11 @@
 
 \section*{Ce qui est sous licence LHUNA}
 Le nom \emph{LHUNA}, le logo, l'identité visuelle et le présent manuel sont la propriété de leur auteur et sont
-diffusés sous licence LHUNA. Toute reproduction du logo ou de ce manuel demande son accord.
+diffusés sous licence LHUNA. Toute reproduction du logo ou de ce manuel demande son accord ; demandez-le, nous répondons.
 
 \section*{Ce qui est sous licence libre}
-L'application \soft{} est un logiciel libre distribué sous \textbf{GNU General Public License, version 3}. Ce choix
-n'est pas arbitraire : il découle des composants qu'elle contient.
+L'application \soft{} est un logiciel libre distribué sous \textbf{GNU General Public License, version 3}. Nous n'avons pas
+vraiment eu le choix, et c'est très bien ainsi : ce sont les composants qu'elle contient qui l'imposent.
 \begin{itemize}
   \item \soft{} est dérivé de \emph{ZXTune}, distribué sous GNU Lesser General Public License version~3.
         La LGPL~v3 n'autorise une combinaison qu'avec la GPL~v3, pas avec la GPL~v2.
@@ -16,19 +16,19 @@ n'est pas arbitraire : il découle des composants qu'elle contient.
         avec la GPL~v3.
   \item Les autres composants sont sous licences permissives (MIT, BSD, ISC, zlib, MPL~2.0…), toutes compatibles.
 \end{itemize}
-Conséquence : quiconque reçoit l'APK a le droit d'obtenir le code source correspondant, de le modifier et de le
+Concrètement, si vous recevez l'APK, vous avez le droit d'obtenir le code source correspondant, de le modifier et de le
 redistribuer sous les mêmes conditions. La liste complète des composants et de leurs licences figure en
 annexe~\ref{chap:credits}.
 
 \section*{Les drivers propriétaires}
-Les drivers musicaux de l'auteur (famille \emph{NebulaWeave}) ne font pas partie de l'APK de base. Ils sont
+Nos drivers musicaux (famille \emph{NebulaWeave}) ne font pas partie de l'APK de base. Ils sont
 distribués dans un APK séparé, sous licence propriétaire.
 \begin{itemize}
   \item Sans cet APK, \soft{} fonctionne exactement comme décrit dans ce manuel.
   \item Avec cet APK installé, \soft{} peut utiliser les drivers qu'il fournit.
 \end{itemize}
 
-Pour que les deux licences cohabitent, l'APK des drivers doit rester une œuvre séparée au sens de la GPL~v3 :
+Pour que les deux licences cohabitent, nous avons fixé une règle simple : l'APK des drivers doit rester une œuvre séparée au sens de la GPL~v3 :
 il fonctionne dans son propre processus et échange avec \soft{} par une interface documentée (service Android,
 fournisseur de contenu, données). Charger sa bibliothèque native dans le processus de \soft{} ferait de l'ensemble une
 seule œuvre, qui devrait alors être entièrement sous GPL~v3.

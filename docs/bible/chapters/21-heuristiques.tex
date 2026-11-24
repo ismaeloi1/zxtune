@@ -1,26 +1,56 @@
 \chapter{Heuristiques de développement}
-Règles appliquées tout au long du développement, et raisons de chacune.
 
-\begin{description}
-  \item[Fidélité d'abord] le moteur par défaut est le plus exact disponible (reSIDfp, ares, Nuked, Ootake). Un moteur
-        plus léger reste sélectionnable, pour les appareils lents et pour comparer.
-  \item[Valeurs exactes] toute valeur affichée est l'état de la puce à l'image en cours. Pas de lissage, pas de
-        moyenne : une valeur moyennée est une valeur qui n'a jamais existé.
-  \item[Le graphique quand il suffit] quand une courbe dit tout (réponse du filtre), aucun texte ne la double. Quand
-        un texte est nécessaire, il est placé à côté de ce qu'il décrit.
-  \item[Une vue par synthèse] chaque famille de puces a sa vue, construite autour de ce qui fait son son : table
-        d'ondes pour la PC Engine, opérateurs et algorithmes pour la FM, enveloppes et écho pour la Super Nintendo,
-        filtre et modulations pour le SID.
-  \item[Mesurer avant d'affirmer] chaque correctif est vérifié par une mesure (sorties par voix comparées, rendu,
-        test) avant d'être livré ; ce qui n'a pas pu être vérifié est signalé comme tel.
-  \item[Rendu avant livraison] toute modification visuelle est contrôlée sur un rendu généré par les tests avant
-        d'être compilée en APK.
-  \item[Correctifs minimaux dans le code tiers] les modifications des bibliothèques importées sont limitées,
-        signalées dans le code (« zxtune extension », « standalone ») et suivent le style du fichier modifié, pour
-        rester réintégrables.
-  \item[Options par défaut neutres] les fonctions qui changent la disposition (voie des samples SID, voies de
-        batterie AdLib) sont désactivées par défaut.
-  \item[Licences vérifiées à l'import] tout code importé est vérifié pour sa compatibilité avec la GPL~v3.
-  \item[Pas de régression] la suite de tests complète est relancée avant les livraisons importantes ; les seuls
-        échecs tolérés sont les tests de catalogues qui demandent un accès réseau.
-\end{description}
+Au fil du projet, nous nous sommes donné quelques règles. Aucune n'est originale, mais chacune vient d'une erreur que
+nous avons faite au moins une fois.
+
+\section{La fidélité d'abord}
+Le moteur par défaut est toujours le plus exact dont nous disposons : reSIDfp, ares, Nuked, Ootake. Quelqu'un qui
+ouvre \soft pour la première fois doit entendre le morceau tel qu'il sonnait. Les moteurs plus légers restent
+disponibles pour les téléphones lents, et pour comparer.
+
+\section{Montrer l'état exact}
+Toute valeur affichée est celle de la puce à l'image en cours, sans moyenne ni lissage. La première vue PC Engine
+avait un historique de la hauteur qui se recadrait en permanence pour rester lisible ; résultat, la courbe semblait
+toujours en retard sur la musique. Nous l'avons remplacée par une description de la forme d'onde en mots, qui est
+exacte à chaque image.
+
+\section{Le graphique quand il suffit}
+Quand une courbe dit tout, nous ne la doublons pas d'un texte. La réponse du filtre du SID affichait ses valeurs
+en chiffres à côté de la courbe ; personne ne les lisait, et elles cachaient la courbe. Quand un texte est utile,
+nous le mettons à côté de ce qu'il décrit, pas dans une légende à l'autre bout de l'écran.
+
+\section{Une vue par synthèse}
+Nous avons commencé par une vue générique, la même pour toutes les puces. Elle ne montrait rien d'intéressant. Chaque
+synthèse a sa logique, et c'est cette logique qu'il faut montrer : la table d'ondes pour la PC Engine, les opérateurs
+pour la FM, les enveloppes et l'écho pour la Super Nintendo, le filtre et les modulations pour le SID.
+
+\section{Ne dire que ce qui est utile}
+La première version de la colonne Mod du SID indiquait la source et la destination de chaque modulation, avec des
+flèches. C'était exact et illisible. Comme la destination se déduit toujours de la source sur le SID, nous n'avons
+gardé que la source.
+
+\section{Mesurer avant d'affirmer}
+Chaque correctif est vérifié par une mesure avant d'être livré : sorties par voix comparées à la sortie mixée, rendu
+de contrôle, test. Quand nous n'avons pas pu vérifier quelque chose, nous le disons.
+
+\section{Voir avant de livrer}
+Toute modification visuelle est contrôlée sur une image produite par les tests avant d'être compilée. Cela nous a
+évité de livrer plusieurs fois du texte coupé ou superposé, mais pas toujours : certains défauts, comme les marges de
+l'encoche de l'écran, ne se voient que sur un vrai téléphone.
+
+\section{Toucher le moins possible au code des autres}
+Nos modifications dans les bibliothèques importées sont courtes, marquées dans le code et écrites dans le style du
+fichier modifié. Le jour où ces bibliothèques évoluent, nous devons pouvoir reporter nos changements sans tout
+reprendre.
+
+\section{Ne rien imposer}
+Ce qui change la disposition de l'écran (voie des samples du SID, voies de batterie de l'AdLib, mono pour les
+morceaux à plusieurs SID) est désactivé par défaut. Vous l'activez si vous en avez besoin.
+
+\section{Vérifier les licences à l'entrée}
+Avant d'importer du code, nous vérifions que sa licence est compatible avec la GPL~v3. Pour certains cœurs de libvgm,
+la licence n'est pas indiquée fichier par fichier ; nous les avons listés pour les vérifier avant toute publication.
+
+\section{Pas de régression}
+Avant chaque livraison importante, nous relançons toute la suite de tests. Les seuls échecs que nous acceptons sont
+ceux des tests de catalogues, qui ont besoin du réseau.

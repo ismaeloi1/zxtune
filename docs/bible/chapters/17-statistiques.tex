@@ -1,9 +1,13 @@
 \chapter{Statistiques techniques}
-Sous le tableau de bord, des lignes techniques renseignent sur le rendu :
+Sous le tableau de bord, quelques lignes techniques décrivent ce que fait votre téléphone. Vous n'en aurez besoin
+qu'en cas de souci, mais elles disent vite où est le problème.
 \begin{description}
-  \item[scope] voies affichées, coût du déclenchement, synchronisation ;
-  \item[output] fréquence de sortie et taille du tampon audio ;
-  \item[render] vitesse d'émulation par rapport au temps réel (au-dessus de 100~\%, l'appareil suit) ;
-  \item[vulkan / gles] images par seconde et temps de dessin ;
-  \item[vk] processeur graphique et pilote.
+  \item[scope] le nombre de voies affichées, le coût du déclenchement et l'écart de synchronisation entre le son et
+        l'image.
+  \item[output] la fréquence de sortie et la taille du tampon audio. Un tampon plus grand protège des coupures au
+        prix d'un léger retard de l'image sur le son.
+  \item[render] la vitesse de l'émulation par rapport au temps réel. C'est la ligne la plus utile : à 300~\%, votre
+        téléphone calcule trois secondes de musique par seconde ; sous 100~\%, il ne suit plus et le son coupe.
+  \item[vulkan / gles] le moteur de dessin, les images par seconde et le temps de dessin de chacune.
+  \item[vk] le processeur graphique et la version de son pilote.
 \end{description}

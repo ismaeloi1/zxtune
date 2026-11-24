@@ -1,4 +1,7 @@
 \chapter{Plateformes et puces émulées}
+Ce tableau résume les familles de puces que nous émulons. Les sections suivantes les présentent une par une : leur
+histoire, leur fonctionnement, ce que vous voyez dans \soft et quelques morceaux pour les découvrir.
+
 
 
 \begin{longtable}{@{}p{0.22\textwidth} p{0.27\textwidth} p{0.43\textwidth}@{}}
@@ -22,130 +25,132 @@ Roland MT-32 & LA (Munt) & synthèse linéaire arithmétique \\
 \bottomrule
 \end{longtable}
 
+\section{AY-3-8910 et YM2149}
+General Instrument a conçu l'AY-3-8910 à la fin des années 1970 ; Yamaha en a produit une version compatible, le
+YM2149, montée dans l'Atari ST. On la retrouve dans le ZX Spectrum 128, l'Amstrad CPC, les MSX, l'Oric et de
+nombreuses bornes.
 
-\section{AY-3-8910 et YM2149 (ZX Spectrum, Amstrad CPC, Atari ST, MSX)}
-Le générateur de son programmable AY-3-8910 a été conçu par General Instrument à la fin des années 1970. Yamaha en
-a produit une variante compatible, le YM2149, qui équipe l'Atari ST. On le trouve dans le ZX Spectrum 128, l'Amstrad
-CPC, le MSX, l'Oric, de nombreuses bornes d'arcade et des cartes d'extension.
+La puce a trois voix carrées, un générateur de bruit qu'on peut mélanger à chaque voix, et une enveloppe matérielle
+unique. La fréquence d'une voix vaut $F/(16N)$, avec une période $N$ sur 12 bits ; le volume se règle sur 16 pas
+d'environ 3~dB. L'horloge change d'une machine à l'autre : 1,7734~MHz sur ZX Spectrum, 1,75~MHz sur Pentagon,
+2~MHz sur Atari ST, 1~MHz sur Amstrad CPC. Si vous entendez un morceau faux, vérifiez ce réglage.
 
+Avec si peu de moyens, les musiciens ont inventé des techniques qui font le son de la plateforme : arpèges très
+rapides pour simuler des accords, enveloppe matérielle jouée à vitesse audible pour obtenir une basse grinçante,
+alternance d'une voix entre mélodie et percussion.
 
-Fréquence d'une voix : $f = F_{horloge} / (16 \times N)$, où $N$ est la période sur 12 bits. Le volume est sur
-4 bits (échelle logarithmique d'environ 3~dB par pas sur l'AY, avec des pas plus fins sur le YM2149). L'enveloppe a
-une période sur 16 bits et huit formes. L'horloge dépend de la machine : 1,7734~MHz pour le ZX Spectrum, 1,75~MHz
-pour le Pentagon, 2~MHz pour l'Atari ST, 1~MHz pour l'Amstrad CPC.
-
-
-\soft lit les formats des trackers de la scène (Pro Tracker, Sound Tracker, ASC, SQ-Tracker, Vortex Tracker\dots),
-les enregistrements de registres (PSG, YM, VTX) et les fichiers AY qui contiennent le programme de lecture d'origine,
-exécuté par un processeur Z80 émulé.
+Dans \soft, chaque voix a son oscilloscope ; le tableau de bord montre la période, le volume, le bruit et
+l'enveloppe. Pour découvrir la plateforme, écoutez les morceaux de Tim Follin pour le Spectrum, par exemple
+\emph{Agent X II}, et les classiques de la scène russe dans les catalogues ZXArt et ZXTunes.
 
 \section{TurboSound et TurboFM}
-Les clones russes du ZX Spectrum ont reçu des cartes d'extension : TurboSound double l'AY (six voix), TurboFM
-ajoute deux puces Yamaha YM2203 qui combinent chacune trois voix FM et un AY. \soft affiche alors deux colonnes de
-voix et les opérateurs FM.
+Les clones soviétiques et russes du Spectrum ont reçu des cartes d'extension. TurboSound double l'AY et offre six
+voix ; TurboFM ajoute deux puces Yamaha YM2203, qui associent chacune trois voix FM et un AY. Vous verrez alors deux
+colonnes de voix et, pour la FM, les opérateurs de chaque voix.
 
-\section{SAA1099 (SAM Coupé)}
-La puce Philips SAA1099 équipe le SAM Coupé, successeur britannique du Spectrum, et les cartes Creative Music System.
-Elle produit six voies carrées, deux générateurs de bruit et deux enveloppes, avec un réglage de stéréo par voie. Le
-format E-Tracker en est l'exemple principal.
+\section{SAA1099}
+La Philips SAA1099 équipe le SAM Coupé, successeur britannique du Spectrum, et les cartes Creative Music System
+pour PC. Ses six voies carrées, ses deux bruits et ses deux enveloppes s'accompagnent d'un réglage de stéréo par
+voie. Les musiques E-Tracker en sont le meilleur exemple.
 
 \section{SID (Commodore 64)}
-Le SID (Sound Interface Device) a été conçu par Bob Yannes chez MOS Technology pour le Commodore~64, sorti en 1982.
-Pensé comme un véritable synthétiseur, il dépasse largement les puces de son époque et a fait naître une génération
-de compositeurs : Rob Hubbard, Martin Galway, Ben Daglish, Jeroen Tel, Chris Hülsbeck, parmi tant d'autres.
+Bob Yannes a conçu le SID chez MOS Technology pour le Commodore~64, sorti en 1982. Il voulait un vrai synthétiseur,
+et il l'a obtenu : trois oscillateurs à quatre formes d'onde, une enveloppe ADSR par voix, la synchronisation, la
+modulation en anneau et un filtre analogique multimode. Rob Hubbard, Martin Galway, Ben Daglish, Jeroen Tel ou Chris
+Hülsbeck en ont tiré des musiques qui comptent parmi les plus célèbres de l'informatique familiale.
 
+La fréquence vaut $N \cdot F / 2^{24}$, avec $N$ sur 16 bits et une horloge d'environ 0,985~MHz en PAL et 1,023~MHz
+en NTSC. Le rapport cyclique du carré se règle sur 12 bits, ce qui permet de le faire varier en douceur. Le registre
+\$D418 porte le volume principal et le mode du filtre.
 
-Fréquence d'une voix : $f = N \times F_{horloge} / 2^{24}$, avec $N$ sur 16 bits ; l'horloge vaut environ
-0,985~MHz en PAL et 1,023~MHz en NTSC. Le rapport cyclique du carré est sur 12 bits. La synchronisation remet
-l'oscillateur à zéro au rythme de la voix précédente ; la modulation en anneau multiplie le triangle par
-l'oscillateur de la voix précédente (V1 par V3, V2 par V1, V3 par V2). Le registre \$D418 règle le volume
-principal sur 4 bits et le mode du filtre.
+Deux versions coexistent. Le 6581 d'origine a un filtre très différent d'une puce à l'autre et produit un clic à
+chaque changement de volume ; le 8580, qui le remplace à partir de 1986, a un filtre plus régulier et atténue
+fortement les échantillons joués par le volume. Nous proposons des courbes de filtre mesurées sur de vraies puces :
+si un morceau vous semble trop sombre ou trop brillant, essayez-en une autre.
 
+Le SID n'a pas de lecteur d'échantillons, mais deux techniques permettent d'en jouer. La première écrit le volume
+principal à toute vitesse : l'échantillon de 4 bits s'ajoute à la sortie, hors des trois voix. La seconde utilise le
+bit de test pour figer un oscillateur et y écrire une valeur : l'échantillon passe alors par une voix et son filtre.
+Activez la voie des samples dans les réglages SID pour voir la première séparément.
 
-\subsection{6581 et 8580}
-Le 6581 d'origine a un filtre très variable d'une puce à l'autre et une fuite de courant qui produit un clic à
-chaque changement de volume. Le 8580, qui le remplace à partir de 1986, a un filtre plus régulier mais sonne
-différemment ; il atténue fortement les échantillons joués par le volume. \soft émule les deux et propose des
-courbes de filtre mesurées sur de vraies puces.
+Le tableau de bord du SID donne, pour chaque voix, la forme d'onde et son rapport cyclique, l'enveloppe et sa phase,
+la note et sa fréquence, la modulation (« Sync V3 », « Sync+Ring V1 ») et le routage vers le filtre. La dernière
+ligne montre le volume, la résonance et le filtre. Le bouton de visualisation remplace l'oscilloscope par la courbe
+du filtre. Pour commencer, écoutez \emph{Commando} et \emph{Monty on the Run} de Rob Hubbard, \emph{Wizball} de
+Martin Galway, \emph{Cybernoid II} de Jeroen Tel.
 
-\subsection{Échantillons sur le SID}
-Le SID n'a pas de lecteur d'échantillons, mais les compositeurs en ont inventé deux techniques :
-\begin{description}
-  \item[Le registre de volume] écrire le volume principal (\$D418) des milliers de fois par seconde produit un
-        échantillon 4 bits ; il s'ajoute à la sortie, en dehors des trois voix.
-  \item[Le bit de test] figer et relancer un oscillateur permet d'y écrire une valeur ; l'échantillon passe alors
-        par une voix et son filtre.
-\end{description}
-La voie des samples de l'oscilloscope montre la première technique séparément.
+Certains morceaux récents utilisent deux ou trois SID. Nous les répartissons à gauche, à droite et au centre ; si
+vous préférez, réglez la sortie en mono.
 
-\subsection{Plusieurs SID}
-Certains morceaux récents utilisent deux ou trois puces (cartouches d'extension, émulateurs). \soft les place à
-gauche, à droite et au centre, ou les mélange en mono selon le réglage.
+\section{NES et Famicom}
+Le processeur de la NES, le Ricoh 2A03 (2A07 en Europe), contient son unité sonore : deux voies carrées au rapport
+cyclique réglable (12,5, 25, 50 ou 75~\%), un triangle pour les basses, un bruit pour les percussions et un canal DPCM
+qui lit des échantillons de 1 bit. Le triangle n'a pas de réglage de volume, ce qui explique les basses toujours
+présentes des musiques NES. Koji Kondo pour \emph{Super Mario Bros.}, Hirokazu Tanaka pour \emph{Metroid}, ou Tim
+Follin pour \emph{Silver Surfer} ont tiré le maximum de ces cinq voix. Les fichiers NSF contiennent le programme de
+lecture du jeu ; \soft montre chaque voix avec son rapport cyclique, son volume et sa période.
 
-\section{NES et Famicom (Ricoh 2A03)}
-Le processeur de la NES, le Ricoh 2A03 (2A07 en Europe), contient son unité sonore : deux voies carrées à rapport
-cyclique réglable (12,5~\%, 25~\%, 50~\%, 75~\%), un triangle, un bruit et un canal DPCM qui lit des échantillons de
-1 bit. Koji Kondo, Hirokazu Tanaka ou Tim Follin en ont tiré des bandes-son devenues classiques. \soft lit les
-fichiers NSF et NSFe, qui contiennent le programme de lecture du jeu.
+\section{Super Nintendo}
+Le son de la Super Nintendo est un sous-système à part, conçu par Sony : un processeur SPC700 et un processeur de
+signal, le S-DSP, partagent 64~Ko de mémoire. Le S-DSP joue huit voix d'échantillons compressés, chacune avec son
+enveloppe ADSR ou GAIN, son volume gauche et droit, et peut les envoyer dans un écho filtré. Toute la musique, avec ses
+échantillons, doit tenir dans ces 64~Ko : les compositeurs choisissaient des sons très courts et les bouclaient.
 
-\section{Super Nintendo (SPC700 et S-DSP)}
-Le son de la Super Nintendo est confié à un sous-système conçu par Sony : un processeur SPC700 et un processeur de
-signal, le S-DSP, partagent 64~Ko de mémoire. Le S-DSP joue huit voix d'échantillons compressés au format BRR, avec
-enveloppe ADSR ou GAIN, volume stéréo et un écho à filtre FIR qui donne aux musiques de la console leur ampleur.
-
-
-Un fichier SPC est une photographie de la mémoire et des registres du sous-système sonore ; un fichier SNSF contient
-en plus le programme du processeur principal, pour les jeux qui pilotent le son depuis celui-ci.
+Un fichier SPC est une photographie de ce sous-système ; un SNSF contient aussi le programme du processeur principal.
+Le tableau de bord montre, par voix, l'échantillon joué, sa fréquence, l'enveloppe dessinée, les volumes, l'écho, le
+bruit et la modulation de hauteur ; en bas, les volumes principaux, l'écho et ses coefficients. Touchez une voix pour
+ouvrir son inspecteur. À écouter : \emph{Chrono Trigger}, en particulier \emph{Corridors of Time} de Yasunori
+Mitsuda.
 
 \section{Game Boy}
-La Game Boy dispose de deux voies carrées (dont une avec balayage de fréquence), d'une voie à onde programmable de
-32 pas de 4 bits et d'un bruit. Les fichiers GBS en contiennent le programme de lecture.
+La Game Boy a deux voies carrées, dont une avec balayage de fréquence, une voie à onde programmable de 32 pas de
+4 bits et un bruit. Les fichiers GBS contiennent le programme de lecture.
 
-\section{PC Engine (HuC6280)}
+\section{PC Engine}
 La PC Engine de NEC et Hudson Soft, appelée TurboGrafx-16 aux États-Unis, intègre le son dans son processeur
-HuC6280. Ses six voies jouent chacune une table d'ondes de 32 pas de 5 bits, écrite par le programme : c'est une
-synthèse par table d'ondes, où la forme d'onde elle-même est l'instrument. Les voies 5 et 6 peuvent produire du
-bruit ; toutes peuvent passer en mode DDA, où le processeur écrit directement les échantillons ; la voie 2 peut
-moduler la fréquence de la voie 1 (LFO).
+HuC6280. Ses six voies jouent chacune une table d'ondes de 32 pas de 5 bits, écrite en mémoire par le programme du
+jeu : la forme d'onde elle-même est l'instrument. Les voies 5 et 6 peuvent produire du bruit, toutes peuvent passer en
+mode DDA pour jouer des échantillons, et la voie 2 peut moduler la fréquence de la voie 1.
 
-Les registres sont à l'adresse \$0800 : \$800 sélectionne la voie, \$801 règle le volume principal gauche et droite,
-\$802 et \$803 la période sur 12 bits, \$804 l'activation, le mode DDA et le volume sur 5 bits, \$805 le volume
-gauche et droite, \$806 les données d'onde, \$807 le bruit, \$808 et \$809 le LFO. Fréquence d'une voix :
-$f = 3\,579\,545 / (32 \times N)$.
+Les registres sont à l'adresse \$0800 : \$800 choisit la voie, \$801 règle le volume principal gauche et droit,
+\$802 et \$803 la période sur 12 bits, \$804 l'activation, le mode DDA et le volume sur 5 bits, \$805 le volume gauche
+et droit, \$806 reçoit les valeurs de la table, \$807 règle le bruit, \$808 et \$809 le LFO. La fréquence vaut
+$3\,579\,545 / (32N)$.
 
+La vue PC Engine de \soft dessine la table d'ondes de chaque voix, nomme sa forme et lui donne un numéro : quand le
+numéro change, l'instrument a changé. Une scie descendante est signalée « reversed » : la puce ne lit jamais une
+table à l'envers, c'est le pilote qui l'a écrite ainsi.
 
-\section{Atari 8 bits (POKEY)}
-Le POKEY, conçu par Doug Neubauer chez Atari, équipe les Atari 400, 800, XL et XE ainsi que de nombreuses bornes. Ses
-quatre voies combinent des diviseurs de fréquence et des polynômes de bruit, ce qui lui donne un timbre très
-particulier ; deux voies peuvent être couplées pour une meilleure précision de hauteur. Les fichiers SAP sont lus par
-la bibliothèque ASAP.
+\section{Atari 8 bits}
+Le POKEY, conçu par Doug Neubauer chez Atari, équipe les Atari 400, 800, XL et XE et de nombreuses bornes. Ses quatre
+voies combinent des diviseurs de fréquence et des polynômes de bruit, ce qui lui donne des timbres très particuliers,
+et deux voies peuvent être couplées pour gagner en justesse. \emph{Ballblazer}, avec la musique générative de Peter
+Langston, est un bon point d'entrée. Les fichiers SAP sont lus par la bibliothèque ASAP.
 
-\section{Mega Drive (YM2612 et SN76489)}
-La Mega Drive de Sega associe une puce FM Yamaha YM2612 (six voix de quatre opérateurs, dont une peut lire des
-échantillons 8 bits) au générateur SN76489 hérité de la Master System (trois voix carrées et un bruit). Yuzo
-Koshiro, Masato Nakamura ou Motoi Sakuraba en ont exploité toutes les ressources. Les musiques sont lues depuis des
-enregistrements VGM.
+\section{Mega Drive}
+La Mega Drive associe une puce FM Yamaha YM2612, six voix de quatre opérateurs dont une peut lire des échantillons,
+au SN76489 de la Master System, trois carrés et un bruit. Les basses claquantes et les cuivres de la console viennent
+de la FM ; les percussions viennent souvent des échantillons de la sixième voix. Écoutez \emph{Streets of Rage 2} de
+Yuzo Koshiro et \emph{Sonic the Hedgehog} de Masato Nakamura. Les musiques sont lues depuis des enregistrements VGM ;
+\soft affiche une carte par voix avec son algorithme, et l'inspecteur détaille chaque opérateur.
 
+\section{AdLib et Sound Blaster}
+Sur PC, la carte AdLib puis les Sound Blaster utilisent les puces FM Yamaha YM3812 (OPL2) puis YMF262 (OPL3). L'OPL2
+offre neuf voix de deux opérateurs, ou six voix et cinq percussions en mode rythme ; l'OPL3 double le nombre de voix
+et ajoute des voix de quatre opérateurs et la stéréo. Le mode rythme étant peu utilisé, nous affichons par défaut les
+neuf voix mélodiques en grille de 3 sur 3. \emph{Dune}, avec la musique de Stéphane Picq, est un bel exemple.
 
-\section{AdLib et Sound Blaster (OPL, OPL2, OPL3)}
-Sur PC, les cartes AdLib puis Sound Blaster utilisent les puces FM Yamaha YM3812 (OPL2) puis YMF262 (OPL3). L'OPL2
-offre neuf voix de deux opérateurs, ou six voix et cinq percussions en mode rythme ; l'OPL3 double le nombre de voix,
-ajoute des voix de quatre opérateurs et la stéréo. Le mode rythme étant peu utilisé, \soft affiche par défaut les
-neuf voix mélodiques en grille 3~$\times$~3.
+\section{YM2151}
+L'OPM de Yamaha a huit voix de quatre opérateurs et un LFO complet. Il équipe le Sharp X68000 et de nombreuses bornes,
+dont \emph{Out Run}, où Hiroshi Kawaguchi l'associe à une puce d'échantillons.
 
-\section{YM2151 (OPM)}
-L'OPM offre huit voix de quatre opérateurs et un LFO riche. On le trouve dans le Sharp X68000, les synthétiseurs
-Yamaha de la même génération et de nombreuses bornes d'arcade.
-
-\section{Bornes Sega Model 1, 2, 2A et 3}
-Les bornes 3D de Sega utilisent des puces à échantillons :
-\begin{description}
-  \item[Model 1 et Model 2] processeur 68000, YM3438 et deux YMW258 (MultiPCM) de 28 voix d'échantillons ;
-  \item[Model 2A, 2B, 2C et Model 3] SCSP (YMF292), la puce de la Saturn : 32 voix PCM pouvant se moduler en FM,
-        enveloppes, LFO et un DSP d'effets programmable pour la réverbération.
-\end{description}
+\section{Bornes Sega Model 1, 2 et 3}
+Les bornes 3D de Sega jouent des échantillons. Les Model 1 et Model 2 utilisent un 68000, un YM3438 et deux YMW258,
+de 28 voix d'échantillons chacun. Les Model 2A, 2B, 2C et Model 3 utilisent le SCSP de la Saturn : 32 voix PCM qui
+peuvent se moduler en FM, des enveloppes, un LFO et un processeur d'effets programmable qui calcule la
+réverbération. Nous émulons ce processeur d'effets : sans lui, les musiques sonnent sèches.
 
 \section{Roland MT-32}
-Le module MIDI MT-32 de Roland, très utilisé par les jeux PC de la fin des années 1980, combine échantillons et
-synthèse dans sa synthèse LA (« linéaire arithmétique »). \soft l'émule avec la bibliothèque Munt, qui demande les
-images des mémoires du module.
+Le module MIDI MT-32 de Roland, très utilisé par les jeux PC de la fin des années 1980 (\emph{The Secret of Monkey
+Island}, les jeux Sierra), combine courts échantillons et synthèse dans ce que Roland appelait la synthèse LA. Nous
+l'émulons avec la bibliothèque Munt, qui demande les images des mémoires du module.

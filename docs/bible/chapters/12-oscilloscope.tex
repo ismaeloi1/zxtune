@@ -1,27 +1,30 @@
 \chapter{L'oscilloscope}
 
-
 \section{Une voie par voix}
-Chaque puce occupe une colonne, chaque voix une ligne. Le nom de la voix s'affiche en haut de sa case. Le tracé est
-synchronisé sur la période de la note (déclenchement), pour que les formes restent stables à l'écran : la fenêtre
-de temps de chaque voie est calée sur la période fondamentale de sa note, puis réduite à deux points par colonne de
-pixels (minimum et maximum), ce qui ne perd aucun pic.
+L'oscilloscope dessine la forme du son de chaque voix. Chaque puce occupe une colonne, chaque voix une ligne, avec
+son nom en haut de la case. Vous voyez ainsi qui joue quoi : la basse qui tient, l'arpège qui scintille, la caisse
+claire qui passe en un éclair.
+
+Pour que les formes restent immobiles, nous calons la fenêtre de chaque voie sur la période de sa note : c'est le
+déclenchement, comme sur un oscilloscope de laboratoire. Nous réduisons ensuite le signal à deux points par colonne
+de pixels, le minimum et le maximum, si bien qu'aucun pic n'est perdu même quand la voie est étroite.
 
 \section{Cas particuliers}
-\begin{description}
-  \item[SID et samples] avec la voie des samples activée, une quatrième ligne par puce montre les échantillons
-        joués par le registre de volume.
-  \item[AdLib OPL/OPL2] les 9 voix mélodiques sont disposées en 3 $\times$ 3 ; les 5 voies de batterie du mode rythme,
-        rarement utilisé, sont masquées sauf si le réglage « Voies de batterie AdLib » est activé.
-\end{description}
+Avec la voie des samples du SID activée, une quatrième ligne par puce montre les échantillons joués par le volume.
+Pour l'AdLib, nous disposons les neuf voix mélodiques en 3 sur 3 et masquons les cinq voies du mode rythme, que peu
+de morceaux utilisent ; activez « AdLib rhythm lanes » si vous en avez besoin.
 
-\section{Réponse du filtre SID}
-Le bouton de visualisation remplace la moitié haute de l'oscilloscope par la courbe de réponse du filtre de chaque
-puce SID, avec la position de chaque voix sur la courbe.
+\section{La réponse du filtre du SID}
+Le bouton de visualisation remplace la moitié haute de l'oscilloscope par la courbe du filtre de chaque SID, avec la
+position de chaque voix. Les états précédents restent visibles quelques instants en fondu, ce qui rend lisibles les
+balayages rapides de la coupure.
 \capturedouble{ux4-lowpass-waves}{ux4-sweep}{Filtre passe-bas résonant}{balayage de la coupure}
+Si vous voulez plus de place pour les voix, réduisez la part de la réponse du filtre dans les réglages de
+l'oscilloscope.
 \capture[0.7]{ux4-lowpass-share35}{Réponse du filtre réduite à 35~\% de la hauteur}
 
 \section{Réglages}
 \capture{prefs-en-oscilloscope}{Réglages de l'oscilloscope}
-Fenêtre de temps, gain, nombre de périodes affichées, hauteur de l'oscilloscope, part de la réponse du filtre,
-fréquence d'images maximale, moteur de rendu (Vulkan ou OpenGL ES) et pilote Vulkan.
+Vous réglez la fenêtre de temps, le gain, le nombre de périodes affichées, la hauteur de l'oscilloscope, la part de la
+réponse du filtre, la fréquence d'images maximale et le moteur de rendu. Vulkan donne le rendu le plus fluide quand
+votre téléphone le permet ; sinon, OpenGL ES prend le relais.

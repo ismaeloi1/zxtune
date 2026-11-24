@@ -1,52 +1,40 @@
 \chapter{Réglages d'émulation}\label{chap:emu-settings}
+Ce chapitre décrit les réglages qui changent le son, et ce que vous entendrez en les modifiant. La liste complète,
+avec les valeurs par défaut, est au chapitre~\ref{chap:all-settings}.
 
 \section{SID}
 \capture{settings-sid}{Réglages SID dans le panneau en direct}
-\begin{description}
-  \item[Moteur] reSID ou reSIDfp.
-  \item[Modèle] 6581 ou 8580 pour les morceaux qui ne le précisent pas, ou pour tous si le choix est forcé.
-  \item[Filtre] préréglages mesurés sur de vraies puces, ou courbe personnalisée.
-  \item[Sortie 2SID/3SID] stéréo (puces réparties à gauche, à droite, au centre) ou mono.
-  \item[Voie des samples (\$D418)] ajoute à l'oscilloscope une voie par puce montrant les échantillons joués par le
-        registre de volume ; les trois voix ne les contiennent alors plus.
-\end{description}
+Le moteur se choisit entre reSIDfp et reSID. Le modèle, 6581 ou 8580, s'applique aux morceaux qui ne le précisent
+pas ; vous pouvez aussi l'imposer à tous. Le filtre propose des préréglages mesurés sur de vraies puces et une courbe
+personnalisée : un 6581 « sombre » étouffe davantage les voix filtrées, un 6581 « clair » les laisse passer.
 
-\section{SNES}
+Pour les morceaux à deux ou trois SID, la sortie peut rester stéréo (une puce à gauche, une à droite, une au centre)
+ou être ramenée en mono. La voie des samples ajoute à l'oscilloscope une voie par puce qui montre les échantillons
+joués par le volume ; les trois voix ne les contiennent alors plus, ce qui les rend plus lisibles. Ce réglage prend
+effet au morceau suivant.
+
+\section{Super Nintendo}
 \capture{settings-spc}{Réglages SNES}
-\begin{description}
-  \item[Moteur d'émulation] ares ou snes\_spc, appliqué au morceau suivant.
-\end{description}
+Un seul réglage, le moteur, entre ares et snes\_spc, appliqué au morceau suivant.
 
-\section{FM}
+\section{Puces FM}
 \capturedouble{settings-ym2612-psg}{settings-ym3812}{Réglages OPN2}{réglages OPL}
-Pour chaque famille : cœur d'émulation, préréglage de puce, échelle (« ladder ») du DAC, filtres passe-bas et
-passe-haut de sortie, largeur stéréo.
+Pour chaque famille, vous choisissez le cœur, un préréglage de puce, l'effet « ladder » du convertisseur, les filtres
+de sortie et la largeur stéréo.
+
+Le ladder mérite une explication. Les YM2612 des premières Mega Drive ont un défaut de convertisseur qui renforce les
+sons très faibles ; des compositeurs en ont tiré parti, et certaines musiques sonnent mal sans lui. Le YM3438 et les
+consoles plus tardives ne l'ont pas. Les filtres de sortie reproduisent le filtrage analogique de la console : sans
+eux, le son est plus brillant que sur le matériel. La largeur stéréo à zéro donne un son mono.
 
 \section{AY et Z80}
 \capture{settings-ay}{Réglages AY}
-\begin{description}
-  \item[Fréquence d'horloge] doit correspondre à la machine d'origine : une horloge fausse décale toutes les notes.
-  \item[Type de puce] AY-3-8910 ou YM2149 : le YM a une enveloppe plus fine et des volumes légèrement différents.
-  \item[Disposition stéréo] répartition des trois voix (ABC, ACB, mono\dots), selon les habitudes de chaque
-        plateforme.
-  \item[Interpolation] adoucit le rendu ; désactivée, le son est plus brut, proche de la puce.
-\end{description}
-
-\section{Effet des réglages FM}
-\begin{description}
-  \item[Ladder] les YM2612 d'origine ont un défaut de leur convertisseur qui renforce les sons faibles ; certaines
-        bandes-son ont été composées en en tenant compte. Le YM3438 et les Mega Drive tardives ne l'ont pas.
-  \item[Filtres de sortie] reproduisent le filtrage analogique de la console ; sans eux, le son est plus brillant
-        que sur le matériel.
-  \item[Stéréo] largeur de la stéréo : à 0, mono.
-\end{description}
+L'horloge doit correspondre à la machine d'origine : une horloge fausse décale toutes les notes. Le type de puce
+choisit entre AY-3-8910 et YM2149, dont l'enveloppe est plus fine et les volumes légèrement différents. La
+disposition stéréo répartit les trois voix (ABC, ACB ou mono) selon les habitudes de chaque plateforme.
+L'interpolation adoucit le rendu ; désactivée, le son est plus brut, plus proche de la puce.
 
 \section{Durées et volume}
-\begin{description}
-  \item[Durée par défaut] utilisée quand ni le format ni une base de données ne donnent la durée.
-  \item[Détection du silence] passe au morceau suivant après un silence de la durée choisie.
-  \item[Limite de boucles] nombre de répétitions des morceaux qui bouclent.
-  \item[Fondus] fondu d'entrée et de sortie.
-  \item[Gain] volume général, de 50 à 200~\%.
-\end{description}
-La liste complète, avec les valeurs par défaut, figure au chapitre~\ref{chap:all-settings}.
+La durée par défaut s'applique quand ni le format ni une base de données ne donnent la durée. La détection du silence
+passe au morceau suivant après un silence de la durée choisie. La limite de boucles fixe le nombre de répétitions des
+morceaux qui bouclent, et les fondus adoucissent le début et la fin. Le gain règle le volume général, de 50 à 200~\%.

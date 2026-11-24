@@ -1,55 +1,37 @@
-\chapter{Overview}
+\chapter{Introduction}
 
-\section{What it is}
-\soft is an Android music player dedicated to music of computers, consoles and arcade machines from the 1980s to the
-2000s. This music is not recorded audio: it is programs and data driving a sound chip. To play it faithfully, \soft
-reproduces the behaviour of these chips in software, which is emulation.
+\section{What \soft is for}
+The music of 1980s and 1990s computers and consoles is not recorded. A Commodore~64 music file holds the program the
+game ran to play its music; a ZX Spectrum module holds a score and instruments described as register values. To
+hear this music as it sounded, you have to run that program on a software copy of the original sound chip. That is
+what \soft does, for more than two hundred formats and some fifteen chip families.
 
-\section{Origin}
-\soft is derived from \emph{ZXTune}, a free player created for ZX Spectrum music and later extended to many
-platforms. \soft reuses its playback core and adds:
-\begin{itemize}
-  \item emulation engines chosen for accuracy (ares for the Super Nintendo, Ootake for the PC Engine, reSIDfp for the
-        Commodore~64, Nuked for Yamaha FM chips);
-  \item real-time visualisation of each voice and of the internal state of chips, chip by chip;
-  \item a redesigned interface: multiple playlists, favourites, play-next queue, live settings.
-\end{itemize}
+We added a second goal: to show you what the chip is doing while you listen. Each voice has its oscilloscope, and
+each chip family has a dashboard that shows, frame by frame, its registers, envelopes and waveforms. When a chiptune
+puzzles you, you can see how it is built.
 
-\section{Features}
-\begin{itemize}
-  \item Plays \lhunaModulesCount{} music formats and opens \lhunaContainersCount{} container formats (archives,
-        disk images, packers), see part~\ref{part:compat}.
-  \item Browses the phone storage and large online catalogues.
-  \item Shows one oscilloscope per voice, the SID filter response, and detailed dashboards for SID, FM, SNES,
-        PC Engine, NES, MT-32 and Sega arcade PCM chips.
-  \item Works with Android Auto and the lock screen.
-\end{itemize}
+\section{Where \soft comes from}
+\soft builds on ZXTune, the free player Vitamin created for the ZX Spectrum scene. On that machine every tracker
+(Sound Tracker, Pro Tracker, ASC Sound Master, SQ-Tracker\dots) had its own format, and every player read only one.
+ZXTune reads them all, finds them inside disk images, archives and packed programs, and plays them back faithfully.
+Over the years it took in the best free libraries of other platforms: libsidplayfp for the Commodore~64, Game Music
+Emu for consoles, libopenmpt and libxmp for tracker modules, vgmstream for the audio of later games, libvgm for VGM
+recordings.
 
-\section{Requirements}
-\begin{itemize}
-  \item Android~4.1 or later for the full build.
-  \item Oscilloscope: OpenGL ES, or Vulkan where available (smoother).
-  \item About 16~MB for the application, plus your music.
-\end{itemize}
+We started from the ZXTune Android application. We kept its playback core, which is solid, and worked on three
+things: the fidelity of the emulation engines, visualisation, and ergonomics.
 
-\section{History}
-\subsection{ZXTune}
-ZXTune comes from the ZX Spectrum community, whose music scene produced tens of thousands of tunes for the
-AY-3-8910 chip with trackers such as Sound Tracker, Pro Tracker or ASC Sound Master. Each tracker stored music in
-its own format, and players of the time read only one. ZXTune, created by Vitamin, set out to read all of them, to
-find them even inside disk images, archives or packed programs, and to replay them faithfully.
+\section{Our choices}
+For each chip we use the most accurate engine we have by default, and leave a lighter one to choose for modest
+devices. For the Super Nintendo it is the ares engine, which reproduces the sound processor cycle by cycle. For the
+PC Engine it is the Ootake emulator's. For Yamaha FM chips it is the Nuked cores, written from a study of the
+silicon.
 
-The project then opened to other platforms by integrating the best free libraries: libsidplayfp for the
-Commodore~64, Game Music Emu for consoles, libopenmpt and libxmp for tracker modules, vgmstream for modern game
-audio, libvgm for VGM logs. It exists as a command-line tool, a desktop GUI and an Android application.
+Everything \soft shows is the actual state of the emulated chip at the moment you see it. We do not smooth values
+and we do not average them: an average is a value the chip never had. When a graph is enough, such as the SID
+filter curve, we add no text to it; when a precise value matters, we write it next to what it describes.
 
-\subsection{ZXTune\_LHUNA}
-\soft is a branch of the ZXTune Android application with two goals:
-\begin{description}
-  \item[Fidelity] use for each chip the most accurate engine available, with a lighter engine selectable for slow
-        devices and comparison;
-  \item[Readability] show what each chip does, voice by voice and frame by frame, with views built around the
-        synthesis of each chip rather than a generic view.
-\end{description}
-Everything displayed is the real state of the emulated chip at the current moment: no averaged or invented values.
-Text does not repeat the graphics; it gives what graphics do not show: register values, notes, levels in dB.
+\section{What you need}
+\soft runs from Android~4.1. The oscilloscope uses OpenGL ES, or Vulkan if your phone supports it, which makes it
+smoother. The application takes about 16~MB. Online catalogues need a connection, but tracks you have already played
+stay in the cache.

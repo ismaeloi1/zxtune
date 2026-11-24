@@ -1,73 +1,61 @@
 \chapter{Chiffrage du développement}\label{chap:chiffrage}
 
-\section{Périmètre}
-Ce chapitre estime le coût de développement de \soft par une équipe de développeurs, c'est-à-dire ce que coûterait
-le même travail réalisé de façon classique. Il porte sur le travail de cette branche, mesuré dans le dépôt entre le
-2 octobre et le 24 novembre 2026.
+Nous avons voulu savoir ce qu'aurait coûté ce travail s'il avait été confié à un développeur indépendant
+expérimenté, habitué à l'émulation et à Android. Ce chiffrage porte uniquement sur ce que \soft ajoute à ZXTune
+entre le 2 octobre et le 24 novembre 2026.
 
-\textbf{Le coût des drivers propriétaires NebulaWeave n'est pas inclus et n'est pas communiqué dans ce document,
-au titre du secret des affaires.}
+\textbf{Le coût des drivers propriétaires NebulaWeave n'est pas inclus et ne sera pas communiqué dans ce document :
+il relève du secret des affaires.}
 
-\section{Mesure}
-Les lignes ajoutées sont comptées par zone, données et ressources binaires exclues. Le code des bibliothèques
-tierces est séparé en deux : le code \emph{importé} tel quel (ymfm, mt32emu, adrenotools, cœurs SPC700 et S-DSP
-d'ares, base sidid), et le code \emph{adapté} (extensions ajoutées aux cœurs pour les sorties par voix et les
-états, portage autonome d'ares, options des moteurs SID).
+\section{Pourquoi nous ne comptons pas les lignes}
+Une première estimation, fondée sur le nombre de lignes ajoutées au dépôt, donnait plus de 900 jours de travail.
+Ce chiffre ne tient pas : une bonne part de ces lignes est du code importé tel quel (ymfm, mt32emu, ares), des
+ressources, des tests générés en série, ou du code plus long qu'il n'aurait fallu. Un développeur qui connaît son
+sujet écrit moins de code pour le même résultat. Nous avons donc chiffré fonctionnalité par fonctionnalité, en
+nous demandant à chaque fois combien de jours il faudrait à une personne compétente pour obtenir le même
+comportement, tests compris.
 
-\begin{longtable}{@{}l r l@{}}
-\toprule \textbf{Zone} & \textbf{Lignes} & \textbf{Nature} \\ \midrule
-Cœur natif ZXTune (C++) & 22\,700 & créé \\
-Application Android (Kotlin, Java) & 30\,400 & créé \\
-Ressources Android (XML) & 6\,200 & créé \\
-Tests Android & 7\,200 & créé \\
-Version bureau (Qt) & 7\,700 & créé \\
-Outils d'extraction VGM (Model 2/3) & 4\,100 & créé \\
-Bibliothèques tierces, adapté & environ 7\,000 & adapté \\
-Bibliothèques tierces, importé & environ 24\,000 & intégré \\
-\bottomrule
-\end{longtable}
+Nous distinguons aussi le code créé du code adapté. Adapter un cœur d'émulation existant, par exemple ajouter à
+Ootake la lecture de la table d'ondes de chaque voix, demande surtout de comprendre le cœur ; le code ajouté tient
+en quelques centaines de lignes. Intégrer une bibliothèque importée ne demande que de vérifier sa licence, de la
+compiler pour Android et de la raccorder.
 
-\section{Hypothèses de productivité}
-Les rythmes retenus sont des moyennes de projets comparables, tests et mise au point compris :
-\begin{longtable}{@{}l r@{}}
-\toprule \textbf{Nature du travail} & \textbf{Lignes par jour} \\ \midrule
-Émulation et traitement du signal (C++) & 75 \\
-Adaptation de cœurs tiers (lecture, mesure, extension) & 60 \\
-Interface et logique applicative (Kotlin) & 150 \\
-Ressources XML & 400 \\
-Tests & 200 \\
-Interface bureau (Qt) & 120 \\
-Outils & 80 \\
-Intégration de code importé (licence, compilation, raccordement) & 1\,000 \\
-\bottomrule
-\end{longtable}
-Le code importé ne se chiffre pas comme du code écrit : seul son raccordement est compté. Le code adapté demande de
-comprendre le cœur existant avant d'y ajouter quelques centaines de lignes, d'où un rythme bas.
-
-\section{Charge}
-\begin{longtable}{@{}l r@{}}
-\toprule \textbf{Poste} & \textbf{Jours} \\ \midrule
-Cœur natif & 303 \\
-Application Android & 203 \\
-Ressources & 16 \\
-Tests & 36 \\
-Version bureau & 64 \\
-Outils & 51 \\
-Adaptation des cœurs tiers & 117 \\
-Intégration du code importé & 24 \\ \midrule
-Sous-total & 814 \\
-Conception, recherche, ergonomie, recette (15~\%) & 122 \\ \midrule
-\textbf{Total} & \textbf{936} \\
+\section{Détail}
+\begin{longtable}{@{}p{0.75\textwidth} r@{}}
+\toprule \textbf{Fonctionnalité} & \textbf{Jours} \\ \midrule
+Sorties par voix et états des puces dans les moteurs (libvgm, SID, SNES, PC Engine, PCM) & 25 \\
+Oscilloscope Vulkan et OpenGL ES, déclenchement & 15 \\
+Tableau de bord SID et réponse du filtre & 15 \\
+Vues FM et inspecteur & 12 \\
+Vue Super Nintendo & 6 \\
+Vue des puces PCM (YMW258, SCSP) & 6 \\
+Vue PC Engine & 4 \\
+Cartes NES et MT-32 & 3 \\
+Portage d'ares et intégration SNSF & 6 \\
+Choix des cœurs FM, préréglages, étage de sortie & 8 \\
+Options SID (voie des samples, mono, filtres) & 4 \\
+Listes multiples, favoris, file d'attente, M3U & 8 \\
+Refonte de l'interface & 15 \\
+Formats audio et correctifs divers & 2 \\
+Version bureau (Qt) & 12 \\
+Outils d'extraction VGM (Model 2 et 3) & 8 \\
+Tests et rendus de contrôle & 10 \\
+Manuel & 6 \\ \midrule
+Sous-total & 165 \\
+Conception, recherche, recette (15~\%) & 25 \\ \midrule
+\textbf{Total} & \textbf{190} \\
 \bottomrule
 \end{longtable}
 
 \section{Coût}
 \begin{longtable}{@{}l r r@{}}
-\toprule \textbf{Taux journalier} & \textbf{Taux} & \textbf{Coût} \\ \midrule
-Bas & 450~€ & 421\,200~€ \\
-Médian & 600~€ & 561\,600~€ \\
-Haut & 750~€ & 702\,000~€ \\
+\toprule \textbf{Hypothèse} & \textbf{Taux journalier} & \textbf{Coût} \\ \midrule
+Basse & 450~€ & 85\,500~€ \\
+Médiane & 600~€ & 114\,000~€ \\
+Haute & 750~€ & 142\,500~€ \\
 \bottomrule
 \end{longtable}
-Ces montants sont un coût de remplacement : ils ne tiennent pas compte de la base ZXTune existante, ni des
-bibliothèques libres réutilisées sans modification, ni des drivers propriétaires.
+
+Ces montants ne comprennent ni la base ZXTune, développée pendant des années par son auteur, ni les bibliothèques
+libres réutilisées sans changement, ni les drivers propriétaires. Ils donnent un ordre de grandeur : à vous de les
+ajuster si votre taux journalier ou votre rythme diffèrent des nôtres.

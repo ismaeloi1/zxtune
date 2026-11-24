@@ -1,42 +1,47 @@
 \chapter{L'interface}
 
-\section{Écran Lecture}
+\section{L'écran Lecture}
 \capture{now-playing-en}{Écran Lecture, informations repliées}
 
-De haut en bas :
-\begin{description}
-  \item[Barre d'outils] logo, plein écran, réglages en direct, choix de la visualisation (oscilloscope ou réponse
-        du filtre), tableau de bord, menu.
-  \item[Visualisation] oscilloscope par voix et, en dessous, le tableau de bord de la puce (chapitre~\ref{chap:dashboards}).
-  \item[Informations] titre, auteur, puce, format et pilote d'origine. Repliées par défaut pour laisser la place à
-        la visualisation ; la flèche en bas à gauche les déplie.
-  \item[Position] temps écoulé, barre de progression, durée totale.
-  \item[Commandes] informations, aléatoire, précédent, lecture/pause, suivant, répétition, bouton \textbf{$\equiv$+}
-        (favoris, ajouter à une liste), menu du morceau (partager, envoyer, sonnerie, propriétés).
-\end{description}
+En haut de l'écran, la barre d'outils regroupe le passage en plein écran, les réglages en direct, le choix entre
+l'oscilloscope et la réponse du filtre (pour le SID), l'affichage du tableau de bord et le menu général. Le cœur de
+l'écran est la visualisation : un oscilloscope par voix, puis le tableau de bord de la puce, décrit au
+chapitre~\ref{chap:dashboards}.
+
+Sous la visualisation, le bloc d'informations donne le titre, l'auteur, la puce, le format et le pilote d'origine du
+morceau. Nous l'avons replié par défaut pour laisser la hauteur à la visualisation ; la flèche en bas à gauche le
+déplie. Viennent ensuite la position dans le morceau, puis la rangée de commandes : informations, lecture
+aléatoire, précédent, lecture et pause, suivant, répétition, le bouton $\equiv$+ et le menu du morceau.
+
+Le bouton $\equiv$+ sert à ranger le morceau en cours : vous pouvez l'ajouter à vos favoris ou à n'importe quelle
+liste, y compris une nouvelle. Le menu du morceau, à droite, permet de le partager, d'en faire une sonnerie ou d'en
+afficher toutes les propriétés.
 
 \capture{now-playing-info-en}{Écran Lecture, informations dépliées}
 
-\section{Écran Listes}
+\section{L'écran Listes}
 \capture{playlist-en}{Écran Listes}
-En haut, la recherche et les actions sur la liste (statistiques, export, effacer, trier). Sous la recherche, le
-sélecteur de liste indique la liste affichée et son nombre de morceaux ; le toucher ouvre le menu des listes
-(chapitre~\ref{chap:listes}). Chaque morceau montre la famille de puce, le titre, l'auteur et la durée ; la poignée
-à droite permet de le déplacer.
+En haut, la recherche filtre la liste affichée ; les boutons voisins donnent les statistiques, l'export, l'effacement
+et le tri. Juste dessous, le sélecteur indique la liste affichée et son nombre de morceaux ; touchez-le pour changer
+de liste ou pour la gérer (chapitre~\ref{chap:listes}). Chaque ligne montre la famille de puce, le titre, l'auteur et
+la durée. La poignée à droite permet de déplacer un morceau.
 
-\section{Écran Navigateur}
+\section{L'écran Navigateur}
 \capturedouble{browser-sources-en}{browser-folder-en}{Sources}{contenu d'un dossier}
-Le chemin parcouru s'affiche en haut ; chaque élément permet de revenir directement à ce niveau.
+Le chemin s'affiche en haut ; touchez un de ses éléments pour revenir directement à ce niveau. Un appui long sur un
+fichier ou un dossier lance la sélection multiple.
 
-\section{Mini-lecteur et barre de navigation}
-Hors de l'écran Lecture, un mini-lecteur rappelle le morceau en cours et permet de passer au suivant ou de mettre
-en pause.
+\section{Hors de l'écran Lecture}
+Quand vous êtes dans les listes ou le navigateur, un mini-lecteur au-dessus de la barre du bas rappelle le morceau en
+cours et vous laisse passer au suivant ou mettre en pause sans changer d'écran.
 
-\section{Paysage et tablette}
+\section{Paysage, tablette, plein écran}
 \capture[0.9]{landscape-now-playing-en}{Écran Lecture en paysage}
+En paysage, la visualisation occupe la largeur et le tableau de bord passe à côté. Sur tablette, les trois écrans
+profitent de la place disponible.
+
 \capture[0.9]{tablet-playlist-en}{Sur tablette}
 
-\section{Plein écran}
-Le bouton plein écran affiche l'oscilloscope seul, et en portrait le tableau de bord sous lui. En portrait,
-l'affichage évite l'encoche de la caméra en haut et les coins arrondis en bas ; en paysage, l'encoche latérale.
-Un appui court quitte le plein écran, un appui long ouvre les réglages en direct.
+Le plein écran montre l'oscilloscope seul ; en portrait, le tableau de bord reste dessous. Nous évitons l'encoche de
+la caméra en haut et les coins arrondis en bas en portrait, l'encoche latérale en paysage. Un appui court quitte le
+plein écran, un appui long ouvre les réglages en direct.

@@ -1,8 +1,22 @@
-\chapter{Reading values}
-\begin{itemize}
-  \item Values are those of the current frame, without smoothing or averaging: what you see is the exact chip state
-        at that moment.
-  \item Notes use English notation (C, D, E\dots); octave 4 contains A at 440~Hz.
-  \item Levels are in decibels relative to the chip maximum (0~dB = full volume).
-  \item Registers are hexadecimal, prefixed with \$.
-\end{itemize}
+\chapter{Reading the values}
+
+A few conventions hold for every view; once you know them, you can read any dashboard.
+
+\section{What you see is the exact state}
+We show no averages and no smoothing. An averaged value is a value the chip never had, and it hides exactly what is
+interesting: an arpeggio changing note every frame, an envelope restarting. If a value flickers, the music makes it
+flicker.
+
+\section{Notes and frequencies}
+Notes are written in English: C, D, E, F, G, A, B, with \# for sharps. Octave 4 holds the 440~Hz A (A4), middle C
+is C4. When the frequency falls between two notes we show the nearest; the frequency in hertz gives you the gap. A
+slight detune between two voices playing the same note is often deliberate: it thickens the sound.
+
+\section{Levels}
+Levels are relative to the chip's maximum: 0~dB is full volume, $-6$~dB half the amplitude, $-\infty$ silence. The
+bars follow the same scale.
+
+\section{Registers}
+Registers are hexadecimal, prefixed with \$, as in period documentation: \$D418 on the SID, \$804 on the PC Engine.
+We show them as the driver wrote them, not as we interpret them; if you look them up in a datasheet you will find the
+same values.
