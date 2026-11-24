@@ -1,9 +1,20 @@
 \chapter{Dépannage}
 \begin{description}
-  \item[Craquements] baisser la fréquence d'images de l'oscilloscope, choisir un cœur d'émulation plus léger, ou
-        augmenter le tampon audio.
-  \item[Fichier non reconnu] vérifier qu'il figure dans la table des formats ; certains formats demandent des
-        fichiers annexes (bibliothèques \_lib des rips xSF) dans le même dossier.
-  \item[Catalogue indisponible] le service en ligne peut être hors ligne ; réessayer plus tard.
+  \item[Craquements ou coupures] la ligne « render » est-elle sous 100~\% ? Choisir un moteur plus léger
+        (chapitre~\ref{chap:emu-settings}), réduire la fréquence d'images de l'oscilloscope ou passer au rendu
+        Vulkan s'il est disponible.
+  \item[Oscilloscope saccadé] activer Vulkan, vérifier qu'aucun économiseur de batterie ne bride l'application.
+  \item[Fichier non reconnu] vérifier qu'il figure dans la table des formats ; les rips xSF (PSF, SSF, GSF\dots)
+        ont souvent besoin de leurs fichiers \texttt{\_lib} dans le même dossier.
+  \item[Morceau trop court ou trop long] régler la durée par défaut ou la limite de boucles ; pour le SID, la durée
+        vient de la base de la HVSC.
+  \item[Notes fausses sur AY] régler l'horloge sur celle de la machine d'origine.
+  \item[Pas de son sur un MT-32] vérifier la présence des images mémoire du module.
+  \item[Catalogue indisponible] le service tiers peut être hors ligne ; les fichiers déjà écoutés restent en cache.
+  \item[Liste vide après mise à jour] les anciennes listes XSPF restent dans le navigateur, d'où on peut les ajouter
+        à une liste.
 \end{description}
-\arediger{Problèmes rencontrés par les utilisateurs et leurs solutions.}
+
+\section{Signaler un problème}
+Indiquez la version, l'appareil, le fichier concerné et, si un réglage est en cause, sa clé interne
+(chapitre~\ref{chap:all-settings}). Les lignes de statistiques sous le tableau de bord sont aussi utiles.

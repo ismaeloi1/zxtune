@@ -2,10 +2,10 @@
 
 \section{Sources locales}
 Le navigateur donne accès au stockage du téléphone et aux cartes SD. Sur Android~10 et plus, l'accès passe par le
-sélecteur de dossiers du système : vous choisissez une fois le dossier de vos musiques, LHUNA s'en souvient.
+sélecteur de dossiers du système : vous choisissez une fois le dossier de vos musiques, \soft{} s'en souvient.
 
 \section{Catalogues en ligne}
-LHUNA donne accès à plusieurs catalogues publics de musiques de puces, consultés en direct :
+\soft{} donne accès à plusieurs catalogues publics de musiques de puces, consultés en direct :
 \begin{itemize}
   \item High Voltage SID Collection (Commodore~64) ;
   \item The Mod Archive, Modland et Amiga Music Preservation (modules de tracker, Amiga) ;
@@ -15,11 +15,25 @@ LHUNA donne accès à plusieurs catalogues publics de musiques de puces, consult
   \item Joshw (rips de consoles), Khinsider, OverClocked ReMix, Aminet, Scene.org ;
   \item des radios en ligne.
 \end{itemize}
-\arediger{Description de chaque catalogue : contenu, taille, mainteneurs, conditions d'utilisation. À vérifier sur
-leurs sites.}
+\begin{description}
+  \item[High Voltage SID Collection (HVSC)] la collection de référence des musiques du Commodore~64, entretenue par
+        des bénévoles depuis la fin des années 1990 ; elle contient plusieurs dizaines de milliers de fichiers SID
+        classés par compositeur, et la base des durées utilisée par \soft.
+  \item[The Mod Archive, Modland, Amiga Music Preservation] les grandes archives de modules de tracker : la
+        première est communautaire et notée par ses visiteurs, Modland classe ses fichiers par format, et AMP
+        documente les musiciens de l'Amiga.
+  \item[ZXArt, ZXTunes, Aygor] archives de la scène ZX Spectrum, avec les compétitions de démo-parties.
+  \item[ASMA] Atari SAP Music Archive, l'équivalent de la HVSC pour les Atari 8 bits.
+  \item[VGMRips] enregistrements VGM de jeux de consoles et de bornes d'arcade, packs complets par jeu.
+  \item[Joshw, Khinsider] rips de consoles (NSF, SPC, GBS, PSF\dots) et bandes-son de jeux.
+  \item[OverClocked ReMix] réinterprétations de musiques de jeux par des musiciens contemporains.
+  \item[Aminet, Scene.org] archives historiques de l'Amiga et de la demoscène.
+\end{description}
+Les catalogues sont des services tiers : leur contenu, leur disponibilité et leurs conditions d'utilisation
+dépendent de leurs responsables. \soft les consulte en direct et conserve en cache les fichiers déjà écoutés.
 
 \section{Archives et fichiers multi-morceaux}
-LHUNA ouvre les archives (ZIP, RAR, 7z, LHA\dots) et les images de disquettes (TR-DOS, SCL\dots) comme des dossiers.
+\soft{} ouvre les archives (ZIP, RAR, 7z, LHA\dots) et les images de disquettes (TR-DOS, SCL\dots) comme des dossiers.
 Un fichier qui contient plusieurs morceaux (SID, NSF, AY, KSS\dots) est en revanche lu directement : ses
 sous-morceaux s'enchaînent, puis la lecture continue avec le fichier suivant du dossier.
 

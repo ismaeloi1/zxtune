@@ -22,4 +22,31 @@
 Pour chaque famille : cœur d'émulation, préréglage de puce, échelle (« ladder ») du DAC, filtres passe-bas et
 passe-haut de sortie, largeur stéréo.
 
-\arediger{Description détaillée de chaque réglage et de son effet audible, avec exemples de morceaux.}
+\section{AY et Z80}
+\capture{settings-ay}{Réglages AY}
+\begin{description}
+  \item[Fréquence d'horloge] doit correspondre à la machine d'origine : une horloge fausse décale toutes les notes.
+  \item[Type de puce] AY-3-8910 ou YM2149 : le YM a une enveloppe plus fine et des volumes légèrement différents.
+  \item[Disposition stéréo] répartition des trois voix (ABC, ACB, mono\dots), selon les habitudes de chaque
+        plateforme.
+  \item[Interpolation] adoucit le rendu ; désactivée, le son est plus brut, proche de la puce.
+\end{description}
+
+\section{Effet des réglages FM}
+\begin{description}
+  \item[Ladder] les YM2612 d'origine ont un défaut de leur convertisseur qui renforce les sons faibles ; certaines
+        bandes-son ont été composées en en tenant compte. Le YM3438 et les Mega Drive tardives ne l'ont pas.
+  \item[Filtres de sortie] reproduisent le filtrage analogique de la console ; sans eux, le son est plus brillant
+        que sur le matériel.
+  \item[Stéréo] largeur de la stéréo : à 0, mono.
+\end{description}
+
+\section{Durées et volume}
+\begin{description}
+  \item[Durée par défaut] utilisée quand ni le format ni une base de données ne donnent la durée.
+  \item[Détection du silence] passe au morceau suivant après un silence de la durée choisie.
+  \item[Limite de boucles] nombre de répétitions des morceaux qui bouclent.
+  \item[Fondus] fondu d'entrée et de sortie.
+  \item[Gain] volume général, de 50 à 200~\%.
+\end{description}
+La liste complète, avec les valeurs par défaut, figure au chapitre~\ref{chap:all-settings}.

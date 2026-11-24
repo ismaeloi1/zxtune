@@ -1,4 +1,4 @@
-% LHUNA — manuel de référence
+% ZXTune_LHUNA — manuel de référence
 % Compilation : lualatex lhuna-bible ; lualatex lhuna-bible (deux passes pour la table des matières)
 % Les tables de formats sont générées : voir tools/formats.py et gen/formats.tex
 \documentclass[11pt,a4paper,twoside,openright]{book}
@@ -16,6 +16,9 @@
 \usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage[hidelinks]{hyperref}
+\usepackage{xspace}
+% nom du logiciel ; la marque et le logo restent « LHUNA »
+\newcommand{\soft}{ZXTune\_LHUNA\xspace}
 
 \graphicspath{{images/}}
 

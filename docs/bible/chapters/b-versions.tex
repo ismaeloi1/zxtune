@@ -1,2 +1,56 @@
 \chapter{Historique des versions}
-\arediger{Versions publiées de LHUNA et leurs nouveautés.}
+Cette annexe résume les grandes étapes du développement de \soft, des plus récentes aux plus anciennes. Les
+numéros sont ceux des versions de développement remises pour essai.
+
+\section*{Version 39}
+\begin{itemize}
+  \item Vue PC Engine : forme de l'onde décrite en mots (sinus, triangle, scie montante ou descendante, carré,
+        impulsion), numéro de table et amplitude.
+\end{itemize}
+\section*{Version 38}
+\begin{itemize}
+  \item Vue PC Engine : barre de niveau et barres de panoramique.
+  \item SID : la voie des samples se place sous les voix de sa puce ; les trois voix ne contiennent plus les
+        échantillons joués par le volume.
+  \item AdLib OPL/OPL2 : neuf voix en 3~$\times$~3, voies de batterie masquées par défaut.
+\end{itemize}
+\section*{Version 37}
+\begin{itemize}
+  \item PC Engine : sortie par voix et état du HuC6280 dans le cœur Ootake ; vue dédiée avec la table d'ondes de
+        chaque voix et tous ses registres.
+\end{itemize}
+\section*{Version 36}
+\begin{itemize}
+  \item Plein écran portrait : encoche du haut et coins du bas évités, tableau de bord correctement placé.
+  \item SID : la colonne Mod indique la voix source et la voix pilotée de la synchronisation et de l'anneau.
+\end{itemize}
+\section*{Version 35}
+\begin{itemize}
+  \item Réglages de hauteur de l'oscilloscope et de la réponse du filtre.
+  \item SID : voie des samples (\$D418) en option.
+  \item Panneau en direct : page SNES.
+\end{itemize}
+\section*{Versions 33 et 34}
+\begin{itemize}
+  \item Listes de lecture multiples, favoris, ajout depuis le lecteur, le navigateur et les listes.
+  \item File d'attente « Jouer ensuite », import et export M3U, bouton $\equiv$+ dans le lecteur.
+  \item Fichiers multi-morceaux lus directement depuis le navigateur.
+  \item SID : sortie mono en option pour les morceaux 2SID et 3SID.
+\end{itemize}
+\section*{Versions 30 à 32}
+\begin{itemize}
+  \item Super Nintendo : émulation ares (au cycle près) par défaut, snes\_spc en option, pour les SPC et les SNSF.
+\end{itemize}
+\section*{Versions antérieures}
+\begin{itemize}
+  \item Vue de la réponse du filtre SID dans l'oscilloscope, sans texte de valeurs.
+  \item DSP d'effets du SCSP activé : réverbération des bornes Sega et de la Saturn.
+  \item Valeurs du tableau de bord en temps réel, image par image.
+  \item Informations techniques du morceau (codec, fréquence, résolution, débit), bas d'écran compact.
+  \item Cœurs FM au choix par famille, préréglages de plateforme et étage de sortie analogique.
+  \item Vue des puces PCM YMW258 et SCSP.
+  \item WAV étendu (PCM et virgule flottante).
+  \item Identité LHUNA : barre de navigation, mini-lecteur, réglages en cartes, À propos.
+  \item Oscilloscope Vulkan et OpenGL ES à traits fins, fenêtre adaptée à la période de chaque voix.
+  \item Inspecteur FM (OPN, OPM, OPL) et vue S-DSP.
+\end{itemize}

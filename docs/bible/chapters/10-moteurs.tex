@@ -2,7 +2,7 @@
 
 \begin{enclair}
 Plusieurs programmes savent imiter une même puce. Certains sont très précis mais demandent beaucoup de calcul ;
-d'autres sont plus légers. Quand il existe un vrai choix, LHUNA le propose dans les réglages.
+d'autres sont plus légers. Quand il existe un vrai choix, \soft{} le propose dans les réglages.
 \end{enclair}
 
 \section{Commodore 64 : reSID et reSIDfp}
@@ -34,12 +34,31 @@ OPLL & YM2413 & Nuked (précis), EMU2413, MAME \\
 \end{longtable}
 
 \section{PC Engine : Ootake}
-La puce HuC6280 est émulée par le cœur d'Ootake, émulateur PC Engine japonais réputé pour sa fidélité. LHUNA
+La puce HuC6280 est émulée par le cœur d'Ootake, émulateur PC Engine japonais réputé pour sa fidélité. \soft{}
 l'utilise pour les enregistrements VGM et y lit la table d'ondes de chaque voix pour le tableau de bord.
 
 \section{Sega Saturn et bornes : SCSP}
 Le SCSP est émulé avec son DSP d'effets activé : la réverbération et les effets programmés par le jeu sont audibles.
 
-\arediger{Historique et auteurs de chaque moteur (Dag Lem, Antti Lankila et Leandro Nini pour reSID/reSIDfp ;
-Near et l'équipe ares ; nukeykt pour les cœurs Nuked ; Aaron Giles pour ymfm ; Kitao Nakamura pour Ootake\dots),
-mesures de précision, coût en calcul sur téléphone.}
+\section{Auteurs des moteurs}
+\begin{description}
+  \item[reSID] Dag Lem, à partir de mesures de puces réelles ; référence historique de l'émulation du SID.
+  \item[reSIDfp] Antti Lankila puis Leandro Nini, mainteneur de libsidplayfp ; modèle du filtre en virgule flottante
+        et formes d'onde combinées échantillonnées.
+  \item[ares] Near et l'équipe ares, héritiers de bsnes et higan, connus pour leur exactitude au cycle près.
+  \item[snes\_spc] Shay Green (blargg), également auteur de Game Music Emu.
+  \item[Nuked] Alexey Khokholov (nukeykt), émulateurs écrits à partir de l'étude du silicium des puces Yamaha.
+  \item[ymfm] Aaron Giles, émulation des puces FM Yamaha écrite pour MAME.
+  \item[Genesis Plus GX] Eke-Eke, émulateur Mega Drive ; son cœur YM2612 est rapide.
+  \item[Ootake] Kitao Nakamura, émulateur PC Engine.
+  \item[Munt] le projet Munt, émulateur du Roland MT-32.
+\end{description}
+
+\section{Précision et coût}
+\begin{enclair}
+Un moteur « au cycle près » reproduit chaque étape interne de la puce, au rythme de son horloge. C'est le plus
+fidèle, mais il demande beaucoup de calcul. La ligne « render » des statistiques indique la vitesse d'émulation : au
+dessus de 100~\%, l'appareil suit sans difficulté. Si elle descend sous 100~\%, choisissez le moteur plus léger.
+\end{enclair}
+Sur un téléphone récent, tous les moteurs tournent largement en temps réel. Les plus coûteux sont Nuked OPM et
+Nuked OPN2, puis ares pour la Super Nintendo ; les plus légers sont Genesis Plus GX, MAME et snes\_spc.

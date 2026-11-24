@@ -1,20 +1,20 @@
 \chapter{Présentation}
 
-\section{Ce qu'est LHUNA}
-LHUNA est un lecteur de musique pour Android consacré aux musiques des ordinateurs, consoles et bornes d'arcade
+\section{Ce qu'est \soft{}}
+\soft{} est un lecteur de musique pour Android consacré aux musiques des ordinateurs, consoles et bornes d'arcade
 des années 1980 à 2000. Ces musiques ne sont pas des enregistrements : ce sont des programmes et des données qui
-pilotent une puce sonore. Pour les écouter fidèlement, LHUNA reproduit, par logiciel, le comportement de ces puces.
+pilotent une puce sonore. Pour les écouter fidèlement, \soft{} reproduit, par logiciel, le comportement de ces puces.
 On parle d'\emph{émulation}.
 
 \begin{enclair}
 Un fichier MP3 contient le son lui-même. Un fichier de musique de Commodore~64 ou de Mega Drive contient plutôt une
-partition et les réglages d'un instrument électronique précis. LHUNA joue cette partition sur une copie logicielle
+partition et les réglages d'un instrument électronique précis. \soft{} joue cette partition sur une copie logicielle
 de l'instrument d'origine.
 \end{enclair}
 
 \section{Origine}
-LHUNA est dérivé de \emph{zxtune}, lecteur libre créé pour les musiques du ZX Spectrum puis étendu à de nombreuses
-plateformes. LHUNA en reprend le cœur de lecture et y ajoute :
+\soft{} est dérivé de \emph{ZXTune}, lecteur libre créé pour les musiques du ZX Spectrum puis étendu à de nombreuses
+plateformes. \soft{} en reprend le cœur de lecture et y ajoute :
 \begin{itemize}
   \item des moteurs d'émulation choisis pour leur précision (par exemple ares pour la Super Nintendo, Ootake pour la
         PC Engine, reSIDfp pour le Commodore~64) ;
@@ -22,7 +22,7 @@ plateformes. LHUNA en reprend le cœur de lecture et y ajoute :
   \item une interface repensée : listes de lecture multiples, favoris, file d'attente, réglages en direct.
 \end{itemize}
 
-\section{Ce que LHUNA sait faire}
+\section{Ce que \soft{} sait faire}
 \begin{itemize}
   \item Lire \lhunaModulesCount{} formats de musique et ouvrir \lhunaContainersCount{} formats de conteneurs
         (archives, images de disquettes, compresseurs), voir la partie~\ref{part:compat}.
@@ -39,5 +39,27 @@ plateformes. LHUNA en reprend le cœur de lecture et y ajoute :
   \item Espace de stockage : environ 16~Mo pour l'application, plus vos musiques.
 \end{itemize}
 
-\arediger{Historique de zxtune et de son auteur, chronologie des versions de LHUNA, philosophie du projet
-(fidélité, lisibilité). Sources à collecter.}
+\section{Historique}
+\subsection{ZXTune}
+ZXTune est né dans la communauté du ZX Spectrum, dont la scène musicale a produit des dizaines de milliers de
+morceaux pour la puce AY-3-8910 avec des trackers comme Sound Tracker, Pro Tracker ou ASC Sound Master. Chacun de
+ces logiciels enregistrait ses musiques dans son propre format, et les lecteurs de l'époque ne savaient en lire
+qu'un seul. ZXTune, créé par Vitamin, s'est donné pour but de tous les lire, de les retrouver même cachés dans des
+images de disquettes, des archives ou des programmes compressés, et de les rejouer fidèlement.
+
+Le projet s'est ensuite ouvert aux autres plateformes en intégrant les meilleures bibliothèques libres existantes :
+libsidplayfp pour le Commodore~64, Game Music Emu pour les consoles, libopenmpt et libxmp pour les modules de
+tracker, vgmstream pour l'audio des jeux récents, libvgm pour les enregistrements VGM. Il existe en ligne de
+commande, avec une interface graphique pour ordinateur et en application Android.
+
+\subsection{ZXTune\_LHUNA}
+\soft est une branche de l'application Android de ZXTune, centrée sur deux objectifs :
+\begin{description}
+  \item[La fidélité] choisir pour chaque puce le moteur d'émulation le plus juste disponible, et pouvoir comparer
+        avec un moteur plus léger quand l'appareil peine ;
+  \item[La lisibilité] montrer ce que fait chaque puce, voix par voix et image par image, avec des vues pensées
+        pour la synthèse propre à chaque puce plutôt qu'une vue générique.
+\end{description}
+Tout ce qui est affiché est l'état réel de la puce émulée à l'instant présent : pas de valeurs moyennées ni
+inventées. Le texte complète toujours le graphique, pour qu'un auditeur non technicien comprenne ce qu'il voit et
+qu'un musicien retrouve exactement les valeurs de ses registres.
