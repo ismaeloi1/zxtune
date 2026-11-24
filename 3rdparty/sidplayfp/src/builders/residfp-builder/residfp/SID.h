@@ -116,6 +116,9 @@ private:
     short* voiceOutput;
     unsigned char lastModeVol;
 
+    /// zxtune: see setVoicesFixedVolume
+    bool voicesFixedVolume = false;
+
     /// zxtune: shadow filters fed by single voice each to get voice output after filtering
     Filter6581* voiceFilter6581[3];
     Filter8580* voiceFilter8580[3];
@@ -250,6 +253,11 @@ public:
      * Should be big enough to store the same samples count as main output. nullptr to disable.
      */
     void setVoiceOutput(short* buf) { voiceOutput = buf; }
+
+    /**
+     * zxtune: voices outputs with constant master volume, see SidVoicesSink::voicesWithoutVolume
+     */
+    void setVoicesFixedVolume(bool fixed);
 
     /**
      * zxtune: oscillator and envelope outputs of any voice, as OSC3/ENV3 registers

@@ -61,6 +61,9 @@ public:
   // Optional per-voice output tap (zxtune oscilloscope).
   // When set, clock() also stores 7 values per output sample: 3 filtered voices, 3 oscillators, volume.
   void set_voice_output(short* buf) { voice_output = buf; }
+  // zxtune: voices outputs with constant master volume, see SidVoicesSink::voicesWithoutVolume
+  void set_voices_fixed_volume(bool fixed);
+  bool voices_fixed_volume = false;
 
   // Oscillator and envelope outputs of any voice, as OSC3/ENV3 registers
   reg8 read_osc(int i) { return voice[i].wave.readOSC(); }

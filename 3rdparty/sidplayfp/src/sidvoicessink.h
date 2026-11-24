@@ -41,6 +41,12 @@ public:
      * @return period of state snapshots in output samples
      */
     virtual unsigned int statePeriod() const = 0;
+
+    /**
+     * @return true to keep master volume constant (15) in voices outputs, so samples played by volume register
+     *         (4-bit digis) are not mixed into them (e.g. when they are displayed separately)
+     */
+    virtual bool voicesWithoutVolume() const { return false; }
 };
 
 #endif // SIDVOICESSINK_H

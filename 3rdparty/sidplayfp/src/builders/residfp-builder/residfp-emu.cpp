@@ -145,6 +145,7 @@ void ReSIDfp::clock()
     }
     SidVoicesSink* const sink = m_residBuilder->getVoicesSink();
     m_sid.setVoiceOutput(sink ? m_voicesBuffer : nullptr);
+    m_sid.setVoicesFixedVolume(sink && sink->voicesWithoutVolume());
     const int samples = m_sid.clock(cycles, m_buffer+m_bufferpos);
     m_bufferpos += samples;
     if (sink && samples > 0)

@@ -589,8 +589,9 @@ void SID::write(int offset, unsigned char value)
         filter8580->writeMODE_VOL(value);
         for (int i = 0; i < 3; i++)
         {
-            voiceFilter6581[i]->writeMODE_VOL(value);
-            voiceFilter8580[i]->writeMODE_VOL(value);
+            const unsigned char voiceValue = voicesFixedVolume ? (value | 0x0f) : value;
+            voiceFilter6581[i]->writeMODE_VOL(voiceValue);
+            voiceFilter8580[i]->writeMODE_VOL(voiceValue);
         }
         break;
 
@@ -658,6 +659,19 @@ void SID::clockSilent(unsigned int cycles)
         {
             voiceSync(true);
         }
+    }
+}
+
+void SID::setVoicesFixedVolume(bool fixed)
+{
+    if (fixed == voicesFixedVolume)
+        return;
+    voicesFixedVolume = fixed;
+    const unsigned char value = fixed ? (lastModeVol | 0x0f) : lastModeVol;
+    for (int i = 0; i < 3; i++)
+    {
+        voiceFilter6581[i]->writeMODE_VOL(value);
+        voiceFilter8580[i]->writeMODE_VOL(value);
     }
 }
 

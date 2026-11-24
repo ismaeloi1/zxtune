@@ -317,7 +317,7 @@ void SID::write()
   case 0x18:
     filter.writeMODE_VOL(bus_value);
     for (int i = 0; i < 3; i++) {
-      voice_filter[i].writeMODE_VOL(bus_value);
+      voice_filter[i].writeMODE_VOL(voices_fixed_volume ? (bus_value | 0x0f) : bus_value);
     }
     break;
   default:
@@ -1163,6 +1163,18 @@ int SID::clock_resample_fastmem(cycle_count& delta_t, short* buf, int n, int int
   }
 
   return s;
+}
+
+void SID::set_voices_fixed_volume(bool fixed)
+{
+  if (fixed == voices_fixed_volume) {
+    return;
+  }
+  voices_fixed_volume = fixed;
+  const reg8 value = filter.mode | filter.vol;
+  for (int i = 0; i < 3; i++) {
+    voice_filter[i].writeMODE_VOL(fixed ? (value | 0x0f) : value);
+  }
 }
 
 } // namespace reSID

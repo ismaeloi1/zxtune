@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.preference.PreferenceDataStore
 import app.zxtune.preferences.Preferences
 import app.zxtune.preferences.VulkanDriver
+import app.zxtune.ui.views.ChipColumns
 import app.zxtune.ui.views.FilterLayout
 import app.zxtune.ui.views.FilterSettings
 import app.zxtune.ui.views.OscilloscopeFrame
@@ -33,6 +34,7 @@ internal object OscilloscopeSettings {
     private const val SHOW_STATS_KEY = "ui.oscilloscope.show_stats"
     private const val FILTER_SHARE_KEY = "ui.oscilloscope.filter_share"
     private const val HEIGHT_KEY = "ui.oscilloscope.height"
+    private const val OPL_RHYTHM_KEY = "ui.oscilloscope.opl_rhythm"
 
     /** Native SID options affecting filter response view */
     const val SID_PREFIX = "zxtune.core.sid."
@@ -67,6 +69,7 @@ internal object OscilloscopeSettings {
         dashboard.waveWindowMs = prefs.getInt(GAUGE_WINDOW_KEY, SidDashboardView.DEFAULT_WAVE_WINDOW_MS)
         dashboard.showStatistics = prefs.getBoolean(SHOW_STATS_KEY, true)
         oscilloscope.showFilter = prefs.getBoolean(FILTER_KEY, false)
+        ChipColumns.showOplRhythm = runCatching { prefs.getBoolean(OPL_RHYTHM_KEY, false) }.getOrDefault(false)
         oscilloscope.filterSettings = readFilterSettings(prefs)
         (oscilloscope.parent as? ScopePanelLayout)?.topScale =
             (runCatching { prefs.getInt(HEIGHT_KEY, 100) }.getOrDefault(100).coerceIn(50, 200)) / 100f

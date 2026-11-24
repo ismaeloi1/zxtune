@@ -20,4 +20,6 @@
     <string name="pref_oscilloscope_height_summary">Par rapport au 16:9 de la largeur, le tableau de bord en dessous prend le reste de l\'écran</string>
     <string name="pref_oscilloscope_filter_share_title">Hauteur de la réponse du filtre</string>
     <string name="pref_oscilloscope_filter_share_summary">Part de l\'oscilloscope prise par la réponse du filtre SID au-dessus des formes d\'onde des voix</string>
+    <string name="pref_oscilloscope_opl_rhythm_title">Voies de batterie AdLib</string>
+    <string name="pref_oscilloscope_opl_rhythm_summary">OPL/OPL2 : voies des batteries du mode rythme (peu de musiques l\'utilisent), sinon 9 voix en 3×3. Appliqué au morceau suivant</string>
 </resources>

@@ -65,7 +65,14 @@ class PceDashboardRenderTest {
         val canvas = Canvas(bitmap)
         canvas.drawColor(Color.BLACK)
         val density = 2.625f
-        PceDashboard(density, 16 * density).draw(canvas, data, 6, w.toFloat(), h.toFloat())
+        val dashboard = PceDashboard(density, 16 * density)
+        // vibrato of the first channel and arpeggio of the third one are seen in pitch history
+        for (frame in 0 until 240) {
+            voice(data, 0, { (15.5 + 15.5 * sin(2 * PI * it / 32)).roundToInt() }, (0x1AC * (1 + 0.02 * sin(frame / 8.0))).roundToInt(), 31, 1, 5)
+            voice(data, 2, { it }, intArrayOf(0x358, 0x2A6, 0x23A)[frame / 10 % 3], 28, 1, 30)
+            canvas.drawColor(Color.BLACK)
+            dashboard.draw(canvas, data, 6, w.toFloat(), h.toFloat())
+        }
         // waveform of the first channel is drawn
         var lit = 0
         for (y in 0 until h / 6) for (x in 0 until w / 3) if (bitmap.getPixel(x, y) == Color.WHITE) ++lit

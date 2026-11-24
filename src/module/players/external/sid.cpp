@@ -361,6 +361,12 @@ namespace Module::Sid
       return StatePeriod;
     }
 
+    // samples of volume register are shown in their own lane only
+    bool voicesWithoutVolume() const override
+    {
+      return Digi;
+    }
+
     VoicesScope::Ptr Scope;
     uint_t StatePeriod = 1;
 

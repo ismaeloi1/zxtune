@@ -27,7 +27,11 @@ internal class ScopeGrid private constructor(
     private val chipStarts: IntArray = IntArray(0),
     // group of each channel
     private val chipOf: IntArray = IntArray(labels.size),
+    // channels without cell, see ChipColumns.isHidden
+    private val hidden: BooleanArray = BooleanArray(labels.size),
 ) {
+    fun isHidden(chan: Int) = hidden.getOrElse(chan) { false }
+
     val channels
         get() = cellColumns.size
 
@@ -61,6 +65,14 @@ internal class ScopeGrid private constructor(
         val band = labelBand(viewHeight, textSize)
         val cellH = viewHeight.toFloat() / rows
         for (chan in 0 until channels) {
+            if (isHidden(chan)) {
+                // outside of view, nothing to draw
+                target[chan * 4] = -viewWidth.toFloat()
+                target[chan * 4 + 1] = 0f
+                target[chan * 4 + 2] = -viewHeight.toFloat()
+                target[chan * 4 + 3] = 0f
+                continue
+            }
             val cellW = viewWidth * width(chan)
             val top = viewTop + cellH * row(chan) + band
             val traceH = cellH - band
@@ -92,6 +104,9 @@ internal class ScopeGrid private constructor(
             strokeWidth = 1f
         }
         for (chan in 0 until channels) {
+            if (isHidden(chan)) {
+                continue
+            }
             val left = width * left(chan)
             val right = left + width * width(chan)
             val top = cellH * row(chan)
@@ -122,11 +137,14 @@ internal class ScopeGrid private constructor(
         // the same form of labels for all the voices of chip
         val fullFits = BooleanArray((chipOf.maxOrNull() ?: 0) + 1) { true }
         for (chan in 0 until channels) {
-            if (textPaint.measureText(labels[chan]) > width * width(chan) - padding * 2) {
+            if (!isHidden(chan) && textPaint.measureText(labels[chan]) > width * width(chan) - padding * 2) {
                 fullFits[chipOf[chan]] = false
             }
         }
         for (chan in 0 until channels) {
+            if (isHidden(chan)) {
+                continue
+            }
             val x = width * left(chan) + padding
             // centered in the band
             val y = cellH * row(chan) + padding / 2 - textPaint.ascent()
@@ -182,9 +200,11 @@ internal class ScopeGrid private constructor(
             val shortLabels = ArrayList<String>()
             val voiceLabels = ArrayList<String>()
             val chips = ArrayList<Int>()
+            val hidden = ArrayList<Boolean>()
             layout.groups.forEachIndexed { group, desc ->
                 desc.voices.forEachIndexed { idx, voice ->
                     chips.add(group)
+                    hidden.add(columns.isHidden(group, idx))
                     cellColumns.add(columns.column(group, idx))
                     rows.add(columns.row(group, idx))
                     labels.add("${desc.name} - $voice")
@@ -204,6 +224,7 @@ internal class ScopeGrid private constructor(
                 voiceLabels.take(count),
                 chipStarts,
                 chips.take(count).toIntArray(),
+                hidden.take(count).toBooleanArray(),
             )
         }
     }

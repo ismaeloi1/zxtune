@@ -983,7 +983,10 @@ class SidDashboardView @JvmOverloads constructor(
         }
         // wavetable channels: waveforms and registers instead of generic cards
         if (PceDashboard.isPce(data, voices)) {
-            pce.draw(canvas, data, voices, width.toFloat(), areaHeight)
+            // values change at each frame, nothing is static
+            if (pass.isDynamic) {
+                pce.draw(canvas, data, voices, width.toFloat(), areaHeight)
+            }
             return
         }
         pcmShown = hasPcmSlots(current, data, voices)
@@ -1015,6 +1018,10 @@ class SidDashboardView @JvmOverloads constructor(
             group.voices.forEachIndexed { idx, name ->
                 if (voice >= voices) {
                     return
+                }
+                if (columns.isHidden(groupIdx, idx)) {
+                    ++voice
+                    return@forEachIndexed
                 }
                 val gauges = VoiceGauges(data, voice * VoiceGauges.SIZE)
                 val col = columns.column(groupIdx, idx)

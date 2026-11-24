@@ -35,4 +35,6 @@
     <string name="pref_oscilloscope_height_summary">Relative to 16:9 of width, the dashboard below takes the rest of screen</string>
     <string name="pref_oscilloscope_filter_share_title">Filter response height</string>
     <string name="pref_oscilloscope_filter_share_summary">Part of oscilloscope taken by SID filter response above voices waveforms</string>
+    <string name="pref_oscilloscope_opl_rhythm_title">AdLib rhythm lanes</string>
+    <string name="pref_oscilloscope_opl_rhythm_summary">OPL/OPL2: lanes of drums of rhythm mode (most of tunes don\'t use it), else 9 voices in 3×3. Applied from the next track</string>
 </resources>

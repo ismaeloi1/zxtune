@@ -39,8 +39,11 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
     private val fillPaint = Paint().apply {
         color = Color.argb(50, 255, 255, 255)
     }
-    private val cursorPaint = Paint().apply {
-        color = Color.argb(110, 0, 229, 255)
+    private val levelPaint = Paint().apply {
+        color = Color.rgb(0, 229, 255)
+    }
+    private val fillStrongPaint = Paint().apply {
+        color = Color.argb(170, 255, 255, 255)
     }
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -62,24 +65,114 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
         val channels = min(voices, CHANNELS)
         // global row is lower: one line of cells
         val rowH = height / (channels + 0.6f)
-        val captionSize = min(textSize * 0.62f, rowH * 0.16f)
-        val valueSize = min(textSize * 0.95f, rowH * 0.24f)
-        captionPaint.textSize = captionSize
-        valuePaint.textSize = valueSize
-        dimPaint.textSize = valueSize
+        val lineH = rowH * LINE_PART
+        // caption and value fit the line with descents
+        captionPaint.textSize = min(textSize * 0.62f, lineH * 0.3f)
+        valuePaint.textSize = min(textSize * 0.95f, lineH * 0.42f)
+        dimPaint.textSize = valuePaint.textSize
         titlePaint.textSize = min(textSize, rowH * 0.22f)
-        val waveW = min(rowH * 2.4f, width * 0.40f)
+        val waveW = min(rowH * 2.2f, width * 0.34f)
+        val barsW = density * 30
+        val rightLeft = waveW + barsW
+        val rightW = width - rightLeft
         for (ch in 0 until channels) {
             val g = VoiceGauges(data, ch * VoiceGauges.SIZE)
             val top = rowH * ch
+            updateHistory(ch, g)
             drawWavePanel(canvas, g, ch, 0f, top, waveW, rowH)
-            drawChannelCells(canvas, g, ch, waveW, top, width - waveW, rowH)
+            drawBars(canvas, g, waveW, top, barsW, rowH)
+            drawValues(canvas, g, rightLeft, top, rightW, lineH)
+            drawHistory(canvas, ch, rightLeft, top + lineH, rightW, rowH - lineH * 2)
+            drawRegisters(canvas, g, ch, rightLeft, top + rowH - lineH, rightW, lineH)
             canvas.drawLine(0f, top + rowH, width, top + rowH, gridPaint)
         }
         if (channels > 0) {
             drawGlobal(canvas, VoiceGauges(data, 0), 0f, rowH * channels, width, height - rowH * channels)
         }
     }
+
+    // pitch in semitones of the last frames, NaN if channel is silent or has no pitch
+    private val history = Array(CHANNELS) { FloatArray(HISTORY) { Float.NaN } }
+    private var historyPos = 0
+    private var historyChannel = -1
+
+    private fun updateHistory(ch: Int, g: VoiceGauges) {
+        if (ch <= historyChannel) {
+            historyPos = (historyPos + 1) % HISTORY
+        }
+        historyChannel = ch
+        history[ch][historyPos] = if (g.isKeyOn && g.hasFrequency && g.frequency > 0f) {
+            ChipWidgets.semitones(g.frequency)
+        } else {
+            Float.NaN
+        }
+    }
+
+    // level (all the attenuations) and stereo balance of channel
+    private fun drawBars(canvas: Canvas, g: VoiceGauges, left: Float, top: Float, w: Float, h: Float) {
+        val pad = density * 4
+        val bottom = top + h - pad
+        val barTop = top + pad + titlePaint.fontSpacing
+        val levelW = w * 0.42f
+        rect.set(left + density * 2, barTop, left + density * 2 + levelW, bottom)
+        canvas.drawRect(rect, framePaint)
+        val level = if (g.hasLevel) ((g.level - MIN_DB) / -MIN_DB).coerceIn(0f, 1f) else 0f
+        canvas.drawRect(rect.left, rect.bottom - rect.height() * level, rect.right, rect.bottom, levelPaint)
+        val balance = g.field(BALANCE)
+        val sideW = (w - levelW - density * 8) / 2
+        var x = rect.right + density * 3
+        for (side in intArrayOf(balance shr 4, balance and 15)) {
+            rect.set(x, barTop, x + sideW, bottom)
+            canvas.drawRect(rect, framePaint)
+            canvas.drawRect(rect.left, rect.bottom - rect.height() * side / 15f, rect.right, rect.bottom, fillStrongPaint)
+            x += sideW + density * 2
+        }
+    }
+
+    private fun drawHistory(canvas: Canvas, ch: Int, left: Float, top: Float, w: Float, h: Float) {
+        val pad = density * 4
+        rect.set(left + pad, top + density, left + w - pad, top + h - density)
+        canvas.drawRect(rect, framePaint)
+        val values = history[ch]
+        // range follows played notes, so vibrato and arpeggios are visible
+        var low = Float.MAX_VALUE
+        var high = -Float.MAX_VALUE
+        for (v in values) {
+            if (!v.isNaN()) {
+                low = min(low, v)
+                high = max(high, v)
+            }
+        }
+        if (low > high) {
+            return
+        }
+        val center = (low + high) / 2
+        val span = max(high - low + 1f, MIN_SPAN)
+        rangeLow = center - span / 2
+        rangeHigh = center + span / 2
+        val step = rect.width() / (HISTORY - 1)
+        path.reset()
+        var drawing = false
+        for (idx in 0 until HISTORY) {
+            // oldest first
+            val v = values[(historyPos + 1 + idx) % HISTORY]
+            if (v.isNaN()) {
+                drawing = false
+                continue
+            }
+            val x = rect.left + step * idx
+            val y = semitoneY(v)
+            if (drawing) path.lineTo(x, y) else path.moveTo(x, y)
+            drawing = true
+        }
+        wavePaint.alpha = 255
+        canvas.drawPath(path, wavePaint)
+    }
+
+    private var rangeLow = 12f
+    private var rangeHigh = 96f
+
+    private fun semitoneY(semitones: Float) = rect.bottom - (semitones - rangeLow) / (rangeHigh - rangeLow) * rect.height()
 
     private fun drawWavePanel(canvas: Canvas, g: VoiceGauges, ch: Int, left: Float, top: Float, w: Float, h: Float) {
         val pad = density * 4
@@ -98,10 +191,6 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
         canvas.drawLine(rect.left, midY, rect.right, midY, gridPaint)
         val step = rect.width() / WAVE_STEPS
         val playing = mode and M_ON != 0 && mode and (M_DDA or M_NOISE) == 0
-        if (playing) {
-            val pos = g.field(POS) and 31
-            canvas.drawRect(rect.left + step * pos, rect.top, rect.left + step * (pos + 1), rect.bottom, cursorPaint)
-        }
         // waveform RAM keeps the last written table even while DDA or noise is played
         path.reset()
         for (idx in 0 until WAVE_STEPS) {
@@ -113,49 +202,49 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
         }
         wavePaint.alpha = if (playing) 255 else 110
         canvas.drawPath(path, wavePaint)
-        if (mode and M_DDA != 0 && mode and M_ON != 0) {
-            // direct value as a level line over the table
-            val y = rect.bottom - (g.field(DDA) and 31) * rect.height() / 31f
-            canvas.drawLine(rect.left, y, rect.right, y, cursorPaint.apply { strokeWidth = density * 3 })
-        }
     }
 
-    private fun drawChannelCells(canvas: Canvas, g: VoiceGauges, ch: Int, left: Float, top: Float, w: Float, h: Float) {
+    // musical values: what is heard
+    private fun drawValues(canvas: Canvas, g: VoiceGauges, left: Float, top: Float, w: Float, h: Float) {
+        val mode = g.field(MODE)
+        val on = mode and M_ON != 0
+        val hz = if (g.hasFrequency) g.frequency else 0f
+        val cells = arrayOf(
+            "Mode" to modeName(mode),
+            "Note" to (if (hz > 0f) ChipWidgets.noteName(hz).ifEmpty { "—" } else "—"),
+            "Pitch" to (if (hz > 0f) hzText(hz) else "—"),
+            "Level" to (if (g.hasLevel) dbText(g.level) else "—"),
+        )
+        drawCellsLine(canvas, cells, left, top, w, h, on)
+    }
+
+    // registers as written by driver
+    private fun drawRegisters(canvas: Canvas, g: VoiceGauges, ch: Int, left: Float, top: Float, w: Float, h: Float) {
         val mode = g.field(MODE)
         val on = mode and M_ON != 0
         val divider = g.field(FREQ) or ((g.field(FREQ + 1) and 0x0f) shl 8)
-        val hz = if (g.hasFrequency) g.frequency else 0f
         val volume = g.field(VOLUME) and 31
         val balance = g.field(BALANCE)
-        val first = arrayOf(
-            "\$804 Mode" to (if (!on) {
-                "Off"
-            } else if (mode and M_DDA != 0) {
-                "DDA"
-            } else if (mode and M_NOISE != 0) {
-                "Noise"
-            } else {
-                "Wave"
-            }),
-            "Note" to (if (hz > 0f) ChipWidgets.noteName(hz).ifEmpty { "—" } else "—"),
-            "\$802/3 Freq" to "$%03X".format(divider),
-            "Pitch" to (if (hz > 0f) hzText(hz) else "—"),
-            "\$804 Vol" to "%d · %s".format(volume, dbText(-1.5f * (31 - volume))),
-        )
-        val second = arrayOf(
-            "\$805 Pan" to "L%d R%d".format(balance shr 4, balance and 15),
-            "\$807 Noise" to (if (ch >= NOISE_CHANNEL) "$%02X".format(g.field(NOISE)) + if (mode and M_NOISE != 0) " on" else "" else "—"),
+        val cells = arrayOf(
+            "\$802/3" to "$%03X".format(divider),
+            "\$804 Vol" to "%d".format(volume),
+            "\$805 Pan" to "%X·%X".format(balance shr 4, balance and 15),
             "\$806 DDA" to (if (mode and M_DDA != 0) "$%02X".format(g.field(DDA)) else "—"),
-            "Level" to (if (g.hasLevel) dbText(g.level) else "—"),
+            "\$807 Noise" to (if (ch >= NOISE_CHANNEL && mode and M_NOISE != 0) "$%02X".format(g.field(NOISE)) else "—"),
             "LFO" to when {
-                ch == 0 && mode and M_LFO != 0 -> "by ch 2"
-                ch == 1 && g.field(LFO_CTRL) != 0 -> "→ ch 1"
+                ch == 0 && mode and M_LFO != 0 -> "← 2"
+                ch == 1 && g.field(LFO_CTRL) != 0 -> "→ 1"
                 else -> "—"
             },
         )
-        val lineH = h / 2
-        drawCellsLine(canvas, first, left, top, w, lineH, on)
-        drawCellsLine(canvas, second, left, top + lineH, w, lineH, on)
+        drawCellsLine(canvas, cells, left, top, w, h, on)
+    }
+
+    private fun modeName(mode: Int) = when {
+        mode and M_ON == 0 -> "Off"
+        mode and M_DDA != 0 -> "DDA"
+        mode and M_NOISE != 0 -> "Noise"
+        else -> "Wave"
     }
 
     private fun drawGlobal(canvas: Canvas, g: VoiceGauges, left: Float, top: Float, w: Float, h: Float) {
@@ -173,7 +262,7 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
     private fun drawCellsLine(canvas: Canvas, cells: Array<Pair<String, String>>, left: Float, top: Float, w: Float, h: Float, on: Boolean) {
         val cellW = w / cells.size
         val pad = density * 4
-        val captionBase = top + pad - captionPaint.ascent()
+        val captionBase = top + density - captionPaint.ascent()
         val valueBase = captionBase + captionPaint.descent() - valuePaint.ascent()
         cells.forEachIndexed { idx, (caption, value) ->
             val x = left + cellW * idx + pad
@@ -201,6 +290,12 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
 
     companion object {
         const val CHANNELS = 6
+        private const val HISTORY = 240
+        private const val LINE_PART = 0.32f
+        private const val MIN_DB = -48f
+
+        // semitones, pitch history range is never narrower
+        private const val MIN_SPAN = 6f
         private const val WAVE_STEPS = 32
 
         // noise is available only on channels 5 and 6
@@ -208,7 +303,6 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
 
         // see Module::VoiceState::PCE_*
         private const val WAVE = 0
-        private const val POS = 32
         private const val FREQ = 33
         private const val VOLUME = 35
         private const val BALANCE = 36
