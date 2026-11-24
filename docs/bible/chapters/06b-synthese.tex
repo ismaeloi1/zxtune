@@ -1,0 +1,97 @@
+\chapter{Notions de synthèse}\label{chap:synthese}
+Les tableaux de bord emploient le vocabulaire des puces. Ce chapitre explique chaque terme par ce qu'il fait au son.
+
+\section{Oscillateur et forme d'onde}
+Un oscillateur produit un motif répété ; sa fréquence de répétition donne la hauteur de la note, sa forme donne le
+timbre.
+\begin{description}
+  \item[Carré, impulsion] alternance de deux niveaux. Le \emph{rapport cyclique} (duty) est la part du temps passée
+        au niveau haut : à 50~\% le son est creux (harmoniques impaires seulement), à 12,5~\% il est nasillard.
+  \item[Triangle] montée et descente linéaires ; peu d'harmoniques, son doux proche d'une flûte.
+  \item[Dent de scie] montée linéaire puis chute brutale ; toutes les harmoniques, son brillant de cuivre ou de
+        corde.
+  \item[Sinus] onde pure, sans harmonique.
+  \item[Bruit] suite pseudo-aléatoire produite par un registre à décalage rebouclé (LFSR) ; sa vitesse de défilement
+        règle la couleur, du souffle grave au sifflement aigu. Les percussions des puces 8 bits sont faites de bruit.
+\end{description}
+
+\section{Diviseur de fréquence}
+Une puce ne calcule pas une fréquence : elle divise son horloge. Pour l'AY, $f = F/(16N)$ ; pour la PC Engine,
+$f = F/(32N)$. Plus $N$ est grand, plus la note est grave. Conséquence pratique : dans l'aigu, deux valeurs
+voisines de $N$ donnent des notes très écartées, d'où l'imprécision d'accord des notes hautes. Le SID fait
+l'inverse : un accumulateur de phase de 24 bits avance de $N$ à chaque cycle, $f = N \cdot F / 2^{24}$, ce qui lui
+donne une précision égale sur toute la tessiture.
+
+\section{Enveloppe}
+L'enveloppe fait varier le volume d'une note dans le temps.
+\begin{description}
+  \item[ADSR] quatre phases : \emph{attack} (montée depuis le silence), \emph{decay} (descente vers le niveau de
+        maintien), \emph{sustain} (niveau tenu tant que la note est enfoncée), \emph{release} (extinction après le
+        relâchement). Les trois phases A, D, R sont des durées, S est un niveau. Le tableau de bord affiche la phase en
+        cours, le niveau et les durées en millisecondes.
+  \item[GAIN] (Super Nintendo) le programme pilote le volume directement ou choisit une rampe linéaire ou
+        exponentielle, au lieu des quatre phases.
+  \item[Enveloppe matérielle de l'AY] une seule pour les trois voix, à motif répété (dents de scie, triangle) ; à
+        vitesse audible, elle devient une forme d'onde à part entière.
+\end{description}
+
+\section{Filtre}
+Un filtre retire une partie du spectre.
+\begin{description}
+  \item[Passe-bas] garde les graves, assourdit les aigus ; \emph{passe-haut} l'inverse ; \emph{passe-bande} ne garde
+        qu'une zone ; \emph{coupe-bande} (notch) retire une zone.
+  \item[Fréquence de coupure] limite entre ce qui passe et ce qui est atténué.
+  \item[Résonance] renforcement autour de la coupure ; poussée, elle fait siffler le filtre.
+\end{description}
+Le SID est la seule puce de cette liste à avoir un filtre analogique réglable ; la courbe de réponse affichée par
+\soft montre, pour chaque fréquence, l'amplification ou l'atténuation appliquée, et la position de chaque voix.
+
+\section{Synchronisation et modulation en anneau}
+\begin{description}
+  \item[Sync] l'oscillateur est remis à zéro à chaque période de l'oscillateur source. Sa forme est coupée au rythme
+        de la source : la hauteur perçue est celle de la source, le timbre change avec la fréquence propre de la voix
+        (son « hard sync » des basses agressives).
+  \item[Ring] (modulation en anneau) le triangle de la voix est multiplié par le signe de l'oscillateur source. Le
+        résultat contient la somme et la différence des deux fréquences : sons métalliques, cloches.
+\end{description}
+Sur le SID, la source est fixe : la voix précédente (V1 par V3, V2 par V1, V3 par V2). La colonne Mod l'indique :
+« Sync V3 », « Sync+Ring V1 ».
+
+\section{Synthèse FM}
+La synthèse par modulation de fréquence fait varier la fréquence d'un oscillateur sinusoïdal, la \emph{porteuse},
+au rythme d'un autre, le \emph{modulateur}. Plus l'amplitude du modulateur est grande, plus le son s'enrichit en
+harmoniques.
+\begin{description}
+  \item[Opérateur] un oscillateur sinusoïdal avec sa propre enveloppe et son niveau (TL, \emph{total level},
+        atténuation en pas de 0,75~dB).
+  \item[Multiplicateur] rapport entre la fréquence de l'opérateur et celle de la note ; un rapport entier donne un
+        son harmonique, un désaccord (DT) un battement.
+  \item[Algorithme] manière de relier les opérateurs : en chaîne (son riche), en parallèle (orgue), mixte. Les
+        opérateurs qui sortent vers le haut-parleur sont les porteuses ; leur niveau règle le volume. Ceux qui en
+        modulent d'autres règlent le timbre.
+  \item[Feedback] le premier opérateur se module lui-même : du sinus vers la dent de scie, puis le bruit.
+  \item[LFO] oscillateur lent (quelques hertz) qui ajoute vibrato (PM) ou trémolo (AM).
+\end{description}
+
+\section{Lecture d'échantillons}
+\begin{description}
+  \item[Échantillon] son enregistré, rejoué à une vitesse qui fixe la hauteur : à double vitesse, une octave plus
+        haut.
+  \item[Boucle] après la fin, la lecture repart d'un point de boucle, pour tenir une note.
+  \item[BRR, ADPCM] compressions des échantillons (Super Nintendo : 9 octets pour 16 échantillons).
+  \item[Interpolation] calcul des valeurs entre deux échantillons ; la Super Nintendo utilise une interpolation
+        gaussienne qui adoucit le son.
+  \item[Table d'ondes] (PC Engine, Game Boy) très court échantillon d'une seule période, écrit en mémoire par le
+        programme et rejoué en boucle : la table est l'instrument.
+  \item[DDA] (PC Engine) le processeur écrit directement la valeur de sortie, pour jouer des échantillons longs.
+\end{description}
+
+\section{Volume, panoramique, effets}
+\begin{description}
+  \item[Atténuation en dB] les puces règlent le volume par pas logarithmiques ; $-6$~dB divise l'amplitude par deux.
+  \item[Panoramique] répartition entre gauche et droite, par volume séparé (PC Engine, Super Nintendo) ou par
+        interrupteurs (Mega Drive).
+  \item[Écho et FIR] (Super Nintendo) le son est réinjecté après un retard, à travers un filtre à 8 coefficients.
+  \item[DSP] processeur programmable de la Saturn et des bornes Sega, qui calcule réverbération et effets.
+  \item[Échantillons par le volume] (SID) changer très vite le volume principal produit un échantillon de 4 bits.
+\end{description}

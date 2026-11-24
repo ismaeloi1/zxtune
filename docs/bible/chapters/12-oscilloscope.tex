@@ -1,13 +1,11 @@
 \chapter{L'oscilloscope}
 
-\begin{enclair}
-Un oscilloscope dessine la forme du son au fil du temps. \soft{} en dessine un par voix de la puce : on voit ainsi
-quel instrument joue quoi, et comment sa forme change (une note carrée, une dent de scie, du bruit\dots).
-\end{enclair}
 
 \section{Une voie par voix}
 Chaque puce occupe une colonne, chaque voix une ligne. Le nom de la voix s'affiche en haut de sa case. Le tracé est
-synchronisé sur la période de la note (déclenchement), pour que les formes restent stables à l'écran.
+synchronisé sur la période de la note (déclenchement), pour que les formes restent stables à l'écran : la fenêtre
+de temps de chaque voie est calée sur la période fondamentale de sa note, puis réduite à deux points par colonne de
+pixels (minimum et maximum), ce qui ne perd aucun pic.
 
 \section{Cas particuliers}
 \begin{description}
@@ -24,6 +22,6 @@ puce SID, avec la position de chaque voix sur la courbe.
 \capture[0.7]{ux4-lowpass-share35}{Réponse du filtre réduite à 35~\% de la hauteur}
 
 \section{Réglages}
-\capture{prefs-fr-oscilloscope}{Réglages de l'oscilloscope}
+\capture{prefs-en-oscilloscope}{Réglages de l'oscilloscope}
 Fenêtre de temps, gain, nombre de périodes affichées, hauteur de l'oscilloscope, part de la réponse du filtre,
 fréquence d'images maximale, moteur de rendu (Vulkan ou OpenGL ES) et pilote Vulkan.

@@ -1,0 +1,55 @@
+\chapter{Emulation engines}
+
+\section{Commodore 64: reSID and reSIDfp}
+Both engines come from the libsidplayfp library, which also emulates the Commodore~64 processor and components needed
+to run the original players.
+\begin{description}
+  \item[reSIDfp] (default) floating-point model of the analogue filter and of the combined waveforms;
+  \item[reSID] historical model, lighter.
+\end{description}
+Chip model (6581 or 8580), filter curves and bias are configurable (chapter~\ref{chap:emu-settings}).
+
+\section{Super Nintendo: ares or snes\_spc}
+\begin{description}
+  \item[ares] (default) cycle-accurate emulation of the SPC700 processor and the S-DSP, taken from the ares emulator;
+        stereo is rendered as on the console, phase inversions included;
+  \item[snes\_spc] historical engine by Shay Green (blargg), lighter.
+\end{description}
+The same setting applies to SPC files and to SNSF rips, which also run the main 65816 processor.
+
+\section{FM chips}
+\begin{longtable}{@{}l l p{0.5\textwidth}@{}}
+\toprule \textbf{Family} & \textbf{Chips} & \textbf{Available cores} \\ \midrule
+OPN2 & YM2612, YM3438 & Nuked (accurate), ymfm, Genesis Plus GX (fast) \\
+OPM & YM2151 & Nuked (accurate), ymfm, MAME \\
+OPN & YM2203, YM2608, YM2610 & ymfm, MAME \\
+OPL & YM3526, YM3812, YMF262 & Nuked (accurate), AdLibEmu, MAME \\
+OPLL & YM2413 & Nuked (accurate), EMU2413, MAME \\
+\bottomrule
+\end{longtable}
+
+\section{PC Engine: Ootake}
+The HuC6280 is emulated by the core of Ootake, a Japanese PC Engine emulator known for its fidelity. \soft uses it for
+VGM logs and reads the wavetable of each voice from it for the dashboard.
+
+\section{Sega Saturn and arcade: SCSP}
+The SCSP is emulated with its effects DSP enabled: reverb and effects programmed by the game are audible.
+
+\section{Engine authors}
+\begin{description}
+  \item[reSID] Dag Lem, from measurements of real chips; the historical reference of SID emulation.
+  \item[reSIDfp] Antti Lankila then Leandro Nini, maintainer of libsidplayfp; floating-point filter model and
+        sampled combined waveforms.
+  \item[ares] Near and the ares team, successors of bsnes and higan, known for cycle accuracy.
+  \item[snes\_spc] Shay Green (blargg), also author of Game Music Emu.
+  \item[Nuked] Alexey Khokholov (nukeykt), emulators written from the study of the Yamaha chips' silicon.
+  \item[ymfm] Aaron Giles, Yamaha FM emulation written for MAME.
+  \item[Genesis Plus GX] Eke-Eke, Mega Drive emulator; its YM2612 core is fast.
+  \item[Ootake] Kitao Nakamura, PC Engine emulator.
+  \item[Munt] the Munt project, Roland MT-32 emulator.
+\end{description}
+
+\section{Accuracy and cost}
+On a recent phone all engines run well above real time. The most expensive are Nuked OPM and Nuked OPN2, then ares
+for the Super Nintendo; the lightest are Genesis Plus GX, MAME and snes\_spc. The ``render'' statistics line shows the
+emulation speed: above 100~\%, the device keeps up.

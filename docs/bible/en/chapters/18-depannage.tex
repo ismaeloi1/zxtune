@@ -1,0 +1,19 @@
+\chapter{Troubleshooting}
+\begin{description}
+  \item[Crackles or dropouts] is the ``render'' line below 100~\%? Choose a lighter engine
+        (chapter~\ref{chap:emu-settings}), lower the oscilloscope frame rate or switch to Vulkan if available.
+  \item[Stuttering oscilloscope] enable Vulkan, check that no battery saver throttles the application.
+  \item[File not recognised] check it is in the formats table; xSF rips (PSF, SSF, GSF\dots) often need their
+        \texttt{\_lib} files in the same folder.
+  \item[Track too short or too long] set the default duration or the loops limit; for SID, the duration comes from the
+        HVSC database.
+  \item[Wrong notes on AY] set the clock to the original machine's.
+  \item[No sound on MT-32] check that the module ROM images are present.
+  \item[Catalogue unavailable] the third-party service may be offline; files already played stay cached.
+  \item[Empty playlist after update] former XSPF playlists remain in the browser, from where they can be added to a
+        playlist.
+\end{description}
+
+\section{Reporting a problem}
+Give the version, the device, the file and, if a setting is involved, its internal key (chapter~\ref{chap:all-settings}).
+The statistics lines below the dashboard are useful too.

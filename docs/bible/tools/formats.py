@@ -74,6 +74,13 @@ def pick(caps, table, default='--'):
     return ', '.join(found) if found else default
 
 
+EN = '--lang=en' in sys.argv
+LABELS = {
+    'family': 'Family' if EN else 'Famille',
+    'container': 'Container' if EN else 'Conteneur',
+}
+
+
 def main():
     items = re.findall(r'Plugin:\s+(\S+)\nDescription:\s+(.*)\nCapabilities:\s+(.*)', sys.stdin.read())
     modules = [(p, d, c.split()) for p, d, c in items if 'cat_module' in c]
@@ -84,13 +91,13 @@ def main():
     out.append(r'\newcommand{\lhunaContainersCount}{%d}' % len(containers))
     out.append(r'\newcommand{\lhunaFormatsTable}{%')
     out.append(r'\begin{longtable}{@{}l p{0.46\textwidth} l l@{}}')
-    out.append(r'\toprule \textbf{Id} & \textbf{Format} & \textbf{Type} & \textbf{Famille} \\ \midrule \endhead')
+    out.append(r'\toprule \textbf{Id} & \textbf{Format} & \textbf{Type} & \textbf{%s}' % LABELS['family'] + r' \\ \midrule \endhead')
     for p, d, caps in sorted(modules, key=lambda m: (family(*m), m[0])):
         out.append('%s & %s & %s & %s \\\\' % (esc(p), esc(d), pick(caps, KIND), esc(family(p, d, caps))))
     out.append(r'\bottomrule \end{longtable}}')
     out.append(r'\newcommand{\lhunaContainersTable}{%')
     out.append(r'\begin{longtable}{@{}l p{0.55\textwidth} l@{}}')
-    out.append(r'\toprule \textbf{Id} & \textbf{Conteneur} & \textbf{Type} \\ \midrule \endhead')
+    out.append(r'\toprule \textbf{Id} & \textbf{%s} & \textbf{Type}' % LABELS['container'] + r' \\ \midrule \endhead')
     for p, d, caps in sorted(containers, key=lambda m: (pick(m[2], CONTAINER), m[0])):
         out.append('%s & %s & %s \\\\' % (esc(p), esc(d), pick(caps, CONTAINER)))
     out.append(r'\bottomrule \end{longtable}}')

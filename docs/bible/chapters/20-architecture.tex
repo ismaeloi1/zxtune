@@ -1,0 +1,51 @@
+\chapter{Architecture}\label{chap:architecture}
+
+\section{Vue d'ensemble}
+\soft est composé de deux couches :
+\begin{description}
+  \item[Cœur natif (C++)] lecture des formats, émulation des puces, mixage, sorties par voix et états des puces. Il
+        est construit avec le système \texttt{make} de ZXTune pour quatre architectures Android, et produit une
+        bibliothèque \texttt{libzxtune.so}.
+  \item[Application (Kotlin, Java)] service de lecture, interface, listes, navigation, rendu de l'oscilloscope
+        (Vulkan ou OpenGL ES) et des tableaux de bord.
+\end{description}
+
+\section{Chaîne audio}
+\begin{enumerate}
+  \item Un \emph{Module::Holder} est créé pour le fichier ; il fournit un \emph{Renderer} par lecture.
+  \item Le renderer appelle le moteur d'émulation par blocs (environ 100~ms), rééchantillonne vers la fréquence de
+        sortie (48~kHz) et applique gain, fondus et limites de boucles.
+  \item Le service Android écrit le résultat dans la sortie audio. Des instantanés de l'état d'émulation, pris
+        régulièrement, rendent le retour arrière rapide sans tout recalculer depuis le début.
+\end{enumerate}
+
+\section{Données de visualisation}
+Chaque moteur expose les mêmes trois flux, par l'interface \emph{VoicesScope} :
+\begin{description}
+  \item[Disposition] liste des groupes de voix (une puce par groupe) et de leurs noms, envoyée à chaque changement.
+  \item[Sorties par voix] échantillons de chaque voix, au rythme de la sortie, rééchantillonnés comme le son.
+  \item[États des voix] instantané d'environ 1~ms de chaque voix : fréquence, niveau, indicateurs, type de puce et
+        64 octets propres à la puce (registres, enveloppes, table d'ondes\dots).
+\end{description}
+Pour les puces de libvgm, ces flux viennent d'une extension ajoutée aux cœurs d'émulation : une fonction de rappel
+par échantillon (sorties par voix) et une fonction d'état. Les cœurs reSID et reSIDfp, ares et Ootake ont reçu des
+extensions équivalentes.
+
+\section{Rendu}
+\begin{itemize}
+  \item Un fil de calcul prépare chaque image : pour chaque voix, la fenêtre de temps est calée sur la période
+        fondamentale de la note (déclenchement), puis réduite à deux points par colonne de pixels (minimum et
+        maximum), ce qui ne perd aucun pic.
+  \item Le rendu des traces est fait par Vulkan quand il est disponible, sinon par OpenGL ES, avec un tracé fin
+        anticrénelé.
+  \item Le tableau de bord est dessiné en deux couches : une couche fixe (cadres, légendes), redessinée seulement
+        quand la disposition change, et une couche dynamique (valeurs, courbes), redessinée à chaque image.
+\end{itemize}
+
+\section{Tests}
+\begin{itemize}
+  \item Plus de 1~000 tests JVM (Robolectric) pour l'application : modèles, stockage des listes, calculs des vues,
+        et tests de rendu qui produisent les captures de ce manuel.
+  \item Outils natifs de contrôle : mesure de l'oscilloscope (\texttt{scope\_bench}), vérification des sorties
+        par voix des puces VGM, des paramètres SID, de la recherche dans le morceau.
+\end{itemize}

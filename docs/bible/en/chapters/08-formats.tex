@@ -1,0 +1,20 @@
+\chapter{Music formats}
+\soft recognises \lhunaModulesCount{} music formats. The table below is generated from the application itself, so it
+is exact for the version described.
+
+\begin{description}
+  \item[Tracker module] score and instruments, replayed by a player faithful to the original one;
+  \item[Register stream] sequence of values written to the chip registers, logged from the machine;
+  \item[Memory dump] original player program run on an emulated processor (Z80, 6502\dots);
+  \item[Multichip] several chips played together.
+\end{description}
+``Game audio stream'' refers to audio formats of modern games (CRI, Nintendo, Sony, Wwise\dots): compressed recordings
+read by the vgmstream library.
+
+{\small\lhunaFormatsTable}
+
+\section{Containers}
+\soft also opens \lhunaContainersCount{} container formats: archives, packers, disk images, machine snapshots and
+player decompilers.
+
+{\small\lhunaContainersTable}

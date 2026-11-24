@@ -1,0 +1,34 @@
+\chapter*{License and trademark}
+\addcontentsline{toc}{chapter}{License and trademark}
+
+\section*{Under the LHUNA license}
+The name \emph{LHUNA}, the logo, the visual identity and this manual are the property of their author and are
+distributed under the LHUNA license. Any reproduction of the logo or of this manual requires the author's consent.
+
+\section*{Under a free software license}
+The \soft application is free software distributed under the \textbf{GNU General Public License, version 3}. This
+follows from the components it contains:
+\begin{itemize}
+  \item \soft is derived from \emph{ZXTune}, distributed under the GNU Lesser General Public License version~3.
+        LGPL~v3 code can be combined with GPL~v3, not with GPL~v2.
+  \item Several bundled emulation engines are licensed under GPL~v3 (\emph{Highly Theoretical/Experimental}
+        Saturn and PlayStation cores) or GPL~v2 ``or later'' (libsidplayfp, z80ex, ASAP), compatible with GPL~v3.
+  \item The other components use permissive licenses (MIT, BSD, ISC, zlib, MPL~2.0\dots), all compatible.
+\end{itemize}
+Anyone receiving the APK is entitled to the corresponding source code, and may modify and redistribute it under the
+same terms. The full list of components and licenses is given in appendix~\ref{chap:credits}.
+
+\section*{Proprietary drivers}
+The author's music drivers (\emph{NebulaWeave} family) are not part of the base APK. They are distributed in a
+separate APK under a proprietary license.
+\begin{itemize}
+  \item Without that APK, \soft works exactly as described in this manual.
+  \item With that APK installed, \soft can use the drivers it provides.
+\end{itemize}
+For both licenses to coexist, the drivers APK must remain a separate work under GPL~v3: it runs in its own process and
+talks to \soft through a documented interface (Android service, content provider, data). Loading its native library
+into the \soft process would make the whole a single work, which would then have to be entirely under GPL~v3.
+
+\section*{Trademarks}
+Names of consoles, computers, chips and games cited in this manual belong to their respective owners and are used
+only to describe compatibility.

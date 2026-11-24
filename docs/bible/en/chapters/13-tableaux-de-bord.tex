@@ -1,0 +1,36 @@
+\chapter{Chip dashboards}\label{chap:dashboards}
+
+Below the oscilloscope, the dashboard details the chip state. Each chip has its own view, built around what is
+specific to its synthesis. State snapshots are taken about every millisecond of emulated sound; each frame shows the
+latest one, without smoothing.
+
+\section{SID (Commodore 64)}
+\capture[0.8]{sidcells-now-playing}{SID dashboard}
+For each voice: waveform and duty cycle, envelope (level, phase, ADSR in milliseconds), frequency (note and hertz).
+The \textbf{Mod} column shows sync and ring modulation with the source voice: ``Sync V3'', ``Ring V2'', and
+``Sync+Ring V1'' when both are on. On the SID a voice is always modulated by the previous one (V1 from V3, V2 from V1,
+V3 from V2). The last row shows volume, resonance and filter.
+\capturedouble{sidcells-dual}{sidcells-fullscreen}{Two SID chips}{fullscreen}
+
+\section{Super Nintendo (S-DSP)}
+\capturedouble{snes}{snes-inspector}{View of the 8 voices}{voice inspector}
+For each voice: sample, frequency, drawn ADSR or GAIN envelope, left and right volumes, echo, noise, pitch
+modulation. At the bottom: master volumes, echo and its FIR filter. Tapping a voice opens its inspector.
+
+\section{PC Engine (HuC6280)}
+\capture[0.8]{pce-dashboard}{PC Engine view}
+For each of the 6 voices: the 32-step wavetable in use, a level bar and two panning bars, then note, frequency and
+level. The waveform shape is named (sine, triangle, rising saw, falling saw, square, pulse with its duty cycle) and
+each distinct table gets a number, which changes when the instrument changes. The bottom row gives the registers as
+written (\$802 to \$807); the global row, \$801, \$808 and \$809. The HuC6280 has no reverse playback: a falling saw is
+a table written backwards by the driver, hence ``Saw $\downarrow$ (reversed)''.
+
+\section{FM chips}
+\capturedouble{fm-megadrive-cards}{fm-megadrive-inspector}{Mega Drive: voice cards}{voice inspector}
+\capturedouble{fmview-algorithms}{fm-adlib-cards}{FM algorithms}{AdLib}
+Each voice shows its algorithm (carriers and modulators), levels and envelopes of its operators. Tapping a voice opens
+the inspector: drawn envelopes, multipliers, detune, LFO.
+
+\section{NES, MT-32 and PCM chips}
+\capturedouble{nes}{mt32parts}{NES}{Roland MT-32: parts}
+\capturedouble{pcmchips-model1-portrait}{pcmchips-scsp-portrait}{YMW258 (Model 1/2)}{SCSP (Saturn, Model 2A/3)}

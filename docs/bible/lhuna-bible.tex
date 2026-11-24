@@ -37,10 +37,6 @@
 \fancyfoot[C]{\small\thepage}
 \renewcommand{\headrulewidth}{0.3pt}
 
-% Encadré pour non-techniciens
-\newtcolorbox{enclair}{colback=lhunacyan!6,colframe=lhunacyan!70!black,title=En clair,fonttitle=\bfseries,breakable}
-% Encadré technique
-\newtcolorbox{technique}{colback=lhunagrey!8,colframe=lhunagrey,title=Technique,fonttitle=\bfseries,breakable}
 % Partie restant à rédiger (repérable par recherche de « À RÉDIGER »)
 \newcommand{\arediger}[1]{\begin{tcolorbox}[colback=red!5,colframe=red!60!black,title=À RÉDIGER,breakable]#1\end{tcolorbox}}
 
@@ -67,7 +63,7 @@
 \input{chapters/00-couverture}
 \input{chapters/00-licence}
 \tableofcontents
-\input{chapters/00-lire}
+\input{chapters/00-methode}
 
 \mainmatter
 \part{Découvrir LHUNA}
@@ -81,6 +77,7 @@
 \input{chapters/06-lecture}
 
 \part{Compatibilité}\label{part:compat}
+\input{chapters/06b-synthese}
 \input{chapters/07-plateformes}
 \input{chapters/08-formats}
 \input{chapters/09-audio}
@@ -100,6 +97,11 @@
 \input{chapters/17-statistiques}
 \input{chapters/18-depannage}
 \input{chapters/19-limites}
+
+\part{Développement}
+\input{chapters/20-architecture}
+\input{chapters/21-heuristiques}
+\input{chapters/22-chiffrage}
 
 \appendix
 \input{chapters/a-glossaire}

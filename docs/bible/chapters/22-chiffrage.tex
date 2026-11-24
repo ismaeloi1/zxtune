@@ -1,0 +1,73 @@
+\chapter{Chiffrage du développement}\label{chap:chiffrage}
+
+\section{Périmètre}
+Ce chapitre estime le coût de développement de \soft par une équipe de développeurs, c'est-à-dire ce que coûterait
+le même travail réalisé de façon classique. Il porte sur le travail de cette branche, mesuré dans le dépôt entre le
+2 octobre et le 24 novembre 2026.
+
+\textbf{Le coût des drivers propriétaires NebulaWeave n'est pas inclus et n'est pas communiqué dans ce document,
+au titre du secret des affaires.}
+
+\section{Mesure}
+Les lignes ajoutées sont comptées par zone, données et ressources binaires exclues. Le code des bibliothèques
+tierces est séparé en deux : le code \emph{importé} tel quel (ymfm, mt32emu, adrenotools, cœurs SPC700 et S-DSP
+d'ares, base sidid), et le code \emph{adapté} (extensions ajoutées aux cœurs pour les sorties par voix et les
+états, portage autonome d'ares, options des moteurs SID).
+
+\begin{longtable}{@{}l r l@{}}
+\toprule \textbf{Zone} & \textbf{Lignes} & \textbf{Nature} \\ \midrule
+Cœur natif ZXTune (C++) & 22\,700 & créé \\
+Application Android (Kotlin, Java) & 30\,400 & créé \\
+Ressources Android (XML) & 6\,200 & créé \\
+Tests Android & 7\,200 & créé \\
+Version bureau (Qt) & 7\,700 & créé \\
+Outils d'extraction VGM (Model 2/3) & 4\,100 & créé \\
+Bibliothèques tierces, adapté & environ 7\,000 & adapté \\
+Bibliothèques tierces, importé & environ 24\,000 & intégré \\
+\bottomrule
+\end{longtable}
+
+\section{Hypothèses de productivité}
+Les rythmes retenus sont des moyennes de projets comparables, tests et mise au point compris :
+\begin{longtable}{@{}l r@{}}
+\toprule \textbf{Nature du travail} & \textbf{Lignes par jour} \\ \midrule
+Émulation et traitement du signal (C++) & 75 \\
+Adaptation de cœurs tiers (lecture, mesure, extension) & 60 \\
+Interface et logique applicative (Kotlin) & 150 \\
+Ressources XML & 400 \\
+Tests & 200 \\
+Interface bureau (Qt) & 120 \\
+Outils & 80 \\
+Intégration de code importé (licence, compilation, raccordement) & 1\,000 \\
+\bottomrule
+\end{longtable}
+Le code importé ne se chiffre pas comme du code écrit : seul son raccordement est compté. Le code adapté demande de
+comprendre le cœur existant avant d'y ajouter quelques centaines de lignes, d'où un rythme bas.
+
+\section{Charge}
+\begin{longtable}{@{}l r@{}}
+\toprule \textbf{Poste} & \textbf{Jours} \\ \midrule
+Cœur natif & 303 \\
+Application Android & 203 \\
+Ressources & 16 \\
+Tests & 36 \\
+Version bureau & 64 \\
+Outils & 51 \\
+Adaptation des cœurs tiers & 117 \\
+Intégration du code importé & 24 \\ \midrule
+Sous-total & 814 \\
+Conception, recherche, ergonomie, recette (15~\%) & 122 \\ \midrule
+\textbf{Total} & \textbf{936} \\
+\bottomrule
+\end{longtable}
+
+\section{Coût}
+\begin{longtable}{@{}l r r@{}}
+\toprule \textbf{Taux journalier} & \textbf{Taux} & \textbf{Coût} \\ \midrule
+Bas & 450~€ & 421\,200~€ \\
+Médian & 600~€ & 561\,600~€ \\
+Haut & 750~€ & 702\,000~€ \\
+\bottomrule
+\end{longtable}
+Ces montants sont un coût de remplacement : ils ne tiennent pas compte de la base ZXTune existante, ni des
+bibliothèques libres réutilisées sans modification, ni des drivers propriétaires.

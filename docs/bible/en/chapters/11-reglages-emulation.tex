@@ -1,0 +1,50 @@
+\chapter{Emulation settings}\label{chap:emu-settings}
+
+\section{SID}
+\capture{settings-sid}{SID settings in the live panel}
+\begin{description}
+  \item[Engine] reSID or reSIDfp.
+  \item[Model] 6581 or 8580 for tunes that do not specify it, or for all if forced.
+  \item[Filter] presets measured on real chips, or a custom curve.
+  \item[2SID/3SID output] stereo (chips placed left, right, centre) or mono.
+  \item[Samples lane (\$D418)] adds one oscilloscope lane per chip showing samples played through the volume
+        register; the three voices then no longer contain them.
+\end{description}
+
+\section{SNES}
+\capture{settings-spc}{SNES settings}
+\begin{description}
+  \item[Emulation engine] ares or snes\_spc, applied from the next track.
+\end{description}
+
+\section{FM}
+\capturedouble{settings-ym2612-psg}{settings-ym3812}{OPN2 settings}{OPL settings}
+For each family: emulation core, chip preset, DAC ladder, output low-pass and high-pass filters, stereo width.
+
+\section{AY and Z80}
+\capture{settings-ay}{AY settings}
+\begin{description}
+  \item[Clock rate] must match the original machine: a wrong clock shifts every note.
+  \item[Chip type] AY-3-8910 or YM2149: the YM has a finer envelope and slightly different volumes.
+  \item[Stereo layout] placement of the three voices (ABC, ACB, mono\dots), following each platform's habits.
+  \item[Interpolation] smooths the output; disabled, the sound is rawer, closer to the chip.
+\end{description}
+
+\section{Effect of FM settings}
+\begin{description}
+  \item[Ladder] original YM2612 chips have a converter flaw that boosts quiet sounds; some soundtracks were composed
+        with it. The YM3438 and late Mega Drives do not have it.
+  \item[Output filters] reproduce the console's analogue filtering; without them the sound is brighter than on the
+        hardware.
+  \item[Stereo] stereo width: 0 is mono.
+\end{description}
+
+\section{Durations and volume}
+\begin{description}
+  \item[Default duration] used when neither the format nor a database gives the duration.
+  \item[Silence detection] skips to the next track after a silence of the chosen length.
+  \item[Loops limit] number of repetitions of looping tracks.
+  \item[Fades] fade-in and fade-out.
+  \item[Gain] overall volume, 50 to 200~\%.
+\end{description}
+The full list with default values is in chapter~\ref{chap:all-settings}.

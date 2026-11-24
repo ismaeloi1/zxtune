@@ -1,0 +1,73 @@
+\chapter{Development cost estimate}\label{chap:chiffrage}
+
+\section{Scope}
+This chapter estimates the cost of developing \soft with a team of developers, that is what the same work would cost
+when done conventionally. It covers the work of this branch, measured in the repository between 2 October and
+24 November 2026.
+
+\textbf{The cost of the proprietary NebulaWeave drivers is not included and is not disclosed in this document, as a
+trade secret.}
+
+\section{Measurement}
+Added lines are counted per area, excluding data and binary resources. Third-party code is split in two:
+\emph{imported} code taken as is (ymfm, mt32emu, adrenotools, ares SPC700 and S-DSP cores, sidid base) and
+\emph{adapted} code (extensions added to cores for per-voice outputs and states, standalone port of ares, SID engine
+options).
+
+\begin{longtable}{@{}l r l@{}}
+\toprule \textbf{Area} & \textbf{Lines} & \textbf{Kind} \\ \midrule
+ZXTune native core (C++) & 22\,700 & created \\
+Android application (Kotlin, Java) & 30\,400 & created \\
+Android resources (XML) & 6\,200 & created \\
+Android tests & 7\,200 & created \\
+Desktop version (Qt) & 7\,700 & created \\
+VGM extraction tools (Model 2/3) & 4\,100 & created \\
+Third-party libraries, adapted & about 7\,000 & adapted \\
+Third-party libraries, imported & about 24\,000 & integrated \\
+\bottomrule
+\end{longtable}
+
+\section{Productivity assumptions}
+Rates are averages of comparable projects, tests and debugging included:
+\begin{longtable}{@{}l r@{}}
+\toprule \textbf{Kind of work} & \textbf{Lines per day} \\ \midrule
+Emulation and signal processing (C++) & 75 \\
+Adapting third-party cores (reading, measuring, extending) & 60 \\
+Interface and application logic (Kotlin) & 150 \\
+XML resources & 400 \\
+Tests & 200 \\
+Desktop interface (Qt) & 120 \\
+Tools & 80 \\
+Integrating imported code (license, build, wiring) & 1\,000 \\
+\bottomrule
+\end{longtable}
+Imported code is not costed like written code: only its integration is counted. Adapted code requires understanding
+the existing core before adding a few hundred lines, hence the low rate.
+
+\section{Effort}
+\begin{longtable}{@{}l r@{}}
+\toprule \textbf{Item} & \textbf{Days} \\ \midrule
+Native core & 303 \\
+Android application & 203 \\
+Resources & 16 \\
+Tests & 36 \\
+Desktop version & 64 \\
+Tools & 51 \\
+Adapting third-party cores & 117 \\
+Integrating imported code & 24 \\ \midrule
+Subtotal & 814 \\
+Design, research, ergonomics, acceptance (15~\%) & 122 \\ \midrule
+\textbf{Total} & \textbf{936} \\
+\bottomrule
+\end{longtable}
+
+\section{Cost}
+\begin{longtable}{@{}l r r@{}}
+\toprule \textbf{Daily rate} & \textbf{Rate} & \textbf{Cost} \\ \midrule
+Low & 450~€ & 421\,200~€ \\
+Median & 600~€ & 561\,600~€ \\
+High & 750~€ & 702\,000~€ \\
+\bottomrule
+\end{longtable}
+These amounts are a replacement cost: they exclude the existing ZXTune base, free libraries reused without changes,
+and the proprietary drivers.

@@ -1,0 +1,90 @@
+\chapter{Synthesis concepts}\label{chap:synthese}
+Dashboards use the vocabulary of the chips. This chapter explains each term by what it does to the sound.
+
+\section{Oscillator and waveform}
+An oscillator produces a repeated pattern; its repetition rate is the pitch of the note, its shape is the timbre.
+\begin{description}
+  \item[Square, pulse] two alternating levels. The \emph{duty cycle} is the share of time spent at the high level: at
+        50~\% the sound is hollow (odd harmonics only), at 12.5~\% it is nasal.
+  \item[Triangle] linear rise and fall; few harmonics, a soft flute-like tone.
+  \item[Sawtooth] linear rise then sharp drop; all harmonics, a bright brass or string tone.
+  \item[Sine] pure tone, no harmonics.
+  \item[Noise] pseudo-random sequence produced by a feedback shift register (LFSR); its clock sets the colour, from
+        low rumble to high hiss. 8-bit chip percussion is made of noise.
+\end{description}
+
+\section{Frequency divider}
+A chip does not compute a frequency: it divides its clock. For the AY, $f = F/(16N)$; for the PC Engine,
+$f = F/(32N)$. The larger $N$, the lower the note. In practice, two neighbouring values of $N$ give widely spaced
+notes in the treble, hence the poor tuning of high notes. The SID works the other way: a 24-bit phase accumulator
+advances by $N$ each cycle, $f = N \cdot F / 2^{24}$, which gives it the same precision over the whole range.
+
+\section{Envelope}
+The envelope changes the volume of a note over time.
+\begin{description}
+  \item[ADSR] four phases: \emph{attack} (rise from silence), \emph{decay} (fall to the sustain level),
+        \emph{sustain} (level held while the note is on), \emph{release} (fade after the note is released). A, D and
+        R are durations, S is a level. The dashboard shows the current phase, the level and durations in
+        milliseconds.
+  \item[GAIN] (Super Nintendo) the program drives the volume directly or picks a linear or exponential ramp instead
+        of the four phases.
+  \item[AY hardware envelope] one envelope shared by the three voices, with a repeated pattern (sawtooth, triangle);
+        at audible rates it becomes a waveform of its own.
+\end{description}
+
+\section{Filter}
+A filter removes part of the spectrum.
+\begin{description}
+  \item[Low-pass] keeps the bass, dulls the treble; \emph{high-pass} the opposite; \emph{band-pass} keeps a band;
+        \emph{notch} removes a band.
+  \item[Cutoff frequency] the limit between what passes and what is attenuated.
+  \item[Resonance] boost around the cutoff; pushed high, the filter whistles.
+\end{description}
+The SID is the only chip of this list with an adjustable analogue filter; the response curve shown by \soft gives,
+for each frequency, the boost or attenuation applied, and the position of each voice.
+
+\section{Sync and ring modulation}
+\begin{description}
+  \item[Sync] the oscillator is reset at each period of the source oscillator. Its waveform is cut at the source rate:
+        the perceived pitch is the source's, the timbre changes with the voice's own frequency (``hard sync'' of
+        aggressive bass and leads).
+  \item[Ring] (ring modulation) the voice's triangle is multiplied by the sign of the source oscillator. The result
+        contains the sum and difference of both frequencies: metallic tones, bells.
+\end{description}
+On the SID the source is fixed: the previous voice (V1 from V3, V2 from V1, V3 from V2). The Mod column shows it:
+``Sync V3'', ``Sync+Ring V1''.
+
+\section{FM synthesis}
+Frequency modulation synthesis varies the frequency of a sine oscillator, the \emph{carrier}, at the rate of another,
+the \emph{modulator}. The larger the modulator amplitude, the richer the harmonics.
+\begin{description}
+  \item[Operator] a sine oscillator with its own envelope and level (TL, \emph{total level}, attenuation in 0.75~dB
+        steps).
+  \item[Multiplier] ratio between the operator frequency and the note frequency; an integer ratio gives a harmonic
+        tone, a detune (DT) a beating.
+  \item[Algorithm] how operators are connected: in series (rich tone), in parallel (organ), mixed. Operators feeding
+        the output are carriers, their level sets the volume. Those modulating others set the timbre.
+  \item[Feedback] the first operator modulates itself: from sine towards sawtooth, then noise.
+  \item[LFO] slow oscillator (a few hertz) adding vibrato (PM) or tremolo (AM).
+\end{description}
+
+\section{Sample playback}
+\begin{description}
+  \item[Sample] recorded sound, played at a rate that sets the pitch: at double rate, one octave higher.
+  \item[Loop] after the end, playback restarts from a loop point to sustain a note.
+  \item[BRR, ADPCM] sample compression (Super Nintendo: 9 bytes for 16 samples).
+  \item[Interpolation] computing values between two samples; the Super Nintendo uses a Gaussian interpolation that
+        softens the sound.
+  \item[Wavetable] (PC Engine, Game Boy) a very short single-period sample written to memory by the program and
+        looped: the table is the instrument.
+  \item[DDA] (PC Engine) the processor writes the output value directly, to play long samples.
+\end{description}
+
+\section{Volume, panning, effects}
+\begin{description}
+  \item[Attenuation in dB] chips set volume in logarithmic steps; $-6$~dB halves the amplitude.
+  \item[Panning] left/right balance, by separate volumes (PC Engine, Super Nintendo) or by switches (Mega Drive).
+  \item[Echo and FIR] (Super Nintendo) sound is fed back after a delay through an 8-tap filter.
+  \item[DSP] programmable processor of the Saturn and Sega arcade boards computing reverb and effects.
+  \item[Samples through volume] (SID) changing the master volume very fast produces a 4-bit sample.
+\end{description}

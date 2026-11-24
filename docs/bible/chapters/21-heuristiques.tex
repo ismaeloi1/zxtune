@@ -1,0 +1,26 @@
+\chapter{Heuristiques de développement}
+Règles appliquées tout au long du développement, et raisons de chacune.
+
+\begin{description}
+  \item[Fidélité d'abord] le moteur par défaut est le plus exact disponible (reSIDfp, ares, Nuked, Ootake). Un moteur
+        plus léger reste sélectionnable, pour les appareils lents et pour comparer.
+  \item[Valeurs exactes] toute valeur affichée est l'état de la puce à l'image en cours. Pas de lissage, pas de
+        moyenne : une valeur moyennée est une valeur qui n'a jamais existé.
+  \item[Le graphique quand il suffit] quand une courbe dit tout (réponse du filtre), aucun texte ne la double. Quand
+        un texte est nécessaire, il est placé à côté de ce qu'il décrit.
+  \item[Une vue par synthèse] chaque famille de puces a sa vue, construite autour de ce qui fait son son : table
+        d'ondes pour la PC Engine, opérateurs et algorithmes pour la FM, enveloppes et écho pour la Super Nintendo,
+        filtre et modulations pour le SID.
+  \item[Mesurer avant d'affirmer] chaque correctif est vérifié par une mesure (sorties par voix comparées, rendu,
+        test) avant d'être livré ; ce qui n'a pas pu être vérifié est signalé comme tel.
+  \item[Rendu avant livraison] toute modification visuelle est contrôlée sur un rendu généré par les tests avant
+        d'être compilée en APK.
+  \item[Correctifs minimaux dans le code tiers] les modifications des bibliothèques importées sont limitées,
+        signalées dans le code (« zxtune extension », « standalone ») et suivent le style du fichier modifié, pour
+        rester réintégrables.
+  \item[Options par défaut neutres] les fonctions qui changent la disposition (voie des samples SID, voies de
+        batterie AdLib) sont désactivées par défaut.
+  \item[Licences vérifiées à l'import] tout code importé est vérifié pour sa compatibilité avec la GPL~v3.
+  \item[Pas de régression] la suite de tests complète est relancée avant les livraisons importantes ; les seuls
+        échecs tolérés sont les tests de catalogues qui demandent un accès réseau.
+\end{description}

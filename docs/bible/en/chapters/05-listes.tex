@@ -1,0 +1,38 @@
+\chapter{Playlists}\label{chap:listes}
+
+\section{Multiple playlists}
+\soft handles any number of playlists, plus two special ones:
+\begin{description}
+  \item[Default playlist] created at first launch, it takes over your previous playlist.
+  \item[Favourites] filled by the \textbf{$\equiv$+} button $\rightarrow$ ``Add to favorites''.
+\end{description}
+The displayed playlist is also the played one. Switching in the selector saves the playlist left and loads the new
+one; the current track keeps playing and ``next'' follows the new playlist.
+
+\capture{playlist-en-top}{Playlist selector}
+
+\section{Managing playlists}
+The selector menu offers: switch, new playlist, rename, duplicate, delete, export as M3U, import M3U. Deleting the
+displayed playlist switches to another one.
+
+\section{Adding tracks}
+\begin{itemize}
+  \item From Now playing: \textbf{$\equiv$+} $\rightarrow$ ``Add to playlist\dots'', then a playlist or ``New
+        playlist\dots''.
+  \item From the browser: selection $\rightarrow$ Add.
+  \item From a playlist: selection $\rightarrow$ ``Add to playlist\dots'' copies tracks to another playlist.
+\end{itemize}
+
+\section{Play next queue}\label{sec:file}
+Queued tracks play after the current one, in the order they were added. Then playback resumes where it was in the
+playlist or folder. Choosing another track yourself keeps the queue but drops that resume point.
+
+\section{M3U import and export}
+Export writes the displayed playlist as extended M3U (title, author, duration). Locations are complete, including
+inside archives and online catalogues, so an exported playlist is re-imported identically. Import also accepts M3U
+from other players (plain paths) and creates a new playlist named after the file. Former XSPF playlists remain
+available in the browser.
+
+\section{Sort, move, statistics}
+Sorting is by title, author or duration. Each track's handle moves it. Statistics give track count, distinct files
+and total duration of the playlist or the selection.

@@ -1,9 +1,5 @@
 \chapter{Moteurs d'émulation}
 
-\begin{enclair}
-Plusieurs programmes savent imiter une même puce. Certains sont très précis mais demandent beaucoup de calcul ;
-d'autres sont plus légers. Quand il existe un vrai choix, \soft{} le propose dans les réglages.
-\end{enclair}
 
 \section{Commodore 64 : reSID et reSIDfp}
 Les deux moteurs proviennent de la bibliothèque libsidplayfp, qui émule aussi le processeur et les composants du
@@ -55,10 +51,6 @@ Le SCSP est émulé avec son DSP d'effets activé : la réverbération et les ef
 \end{description}
 
 \section{Précision et coût}
-\begin{enclair}
-Un moteur « au cycle près » reproduit chaque étape interne de la puce, au rythme de son horloge. C'est le plus
-fidèle, mais il demande beaucoup de calcul. La ligne « render » des statistiques indique la vitesse d'émulation : au
-dessus de 100~\%, l'appareil suit sans difficulté. Si elle descend sous 100~\%, choisissez le moteur plus léger.
-\end{enclair}
 Sur un téléphone récent, tous les moteurs tournent largement en temps réel. Les plus coûteux sont Nuked OPM et
-Nuked OPN2, puis ares pour la Super Nintendo ; les plus légers sont Genesis Plus GX, MAME et snes\_spc.
+Nuked OPN2, puis ares pour la Super Nintendo ; les plus légers sont Genesis Plus GX, MAME et snes\_spc. La ligne
+« render » des statistiques indique la vitesse d'émulation : au-dessus de 100~\%, l'appareil suit.

@@ -1,10 +1,5 @@
 \chapter{Plateformes et puces émulées}
 
-\begin{enclair}
-Chaque machine de l'époque avait sa propre puce sonore, avec ses forces et ses limites : trois voix carrées pour le
-ZX Spectrum, un synthétiseur analogique pour le Commodore~64, des opérateurs FM pour la Mega Drive, des échantillons
-pour la Super Nintendo. Ce chapitre présente chaque famille et ce que \soft{} en affiche.
-\end{enclair}
 
 \begin{longtable}{@{}p{0.22\textwidth} p{0.27\textwidth} p{0.43\textwidth}@{}}
 \toprule \textbf{Plateforme} & \textbf{Puce} & \textbf{Synthèse} \\ \midrule \endhead
@@ -33,19 +28,12 @@ Le générateur de son programmable AY-3-8910 a été conçu par General Instrum
 a produit une variante compatible, le YM2149, qui équipe l'Atari ST. On le trouve dans le ZX Spectrum 128, l'Amstrad
 CPC, le MSX, l'Oric, de nombreuses bornes d'arcade et des cartes d'extension.
 
-\begin{enclair}
-L'AY produit trois sons carrés, un bruit (pour les percussions) et une enveloppe automatique qui peut faire monter
-ou descendre le volume en dents de scie. Toute la richesse des musiques du Spectrum vient de l'astuce des
-compositeurs : arpèges rapides pour simuler des accords, enveloppe utilisée comme une quatrième forme d'onde,
-alternance très rapide des voix.
-\end{enclair}
 
-\begin{technique}
 Fréquence d'une voix : $f = F_{horloge} / (16 \times N)$, où $N$ est la période sur 12 bits. Le volume est sur
 4 bits (échelle logarithmique d'environ 3~dB par pas sur l'AY, avec des pas plus fins sur le YM2149). L'enveloppe a
 une période sur 16 bits et huit formes. L'horloge dépend de la machine : 1,7734~MHz pour le ZX Spectrum, 1,75~MHz
 pour le Pentagon, 2~MHz pour l'Atari ST, 1~MHz pour l'Amstrad CPC.
-\end{technique}
+
 
 \soft lit les formats des trackers de la scène (Pro Tracker, Sound Tracker, ASC, SQ-Tracker, Vortex Tracker\dots),
 les enregistrements de registres (PSG, YM, VTX) et les fichiers AY qui contiennent le programme de lecture d'origine,
@@ -66,19 +54,13 @@ Le SID (Sound Interface Device) a été conçu par Bob Yannes chez MOS Technolog
 Pensé comme un véritable synthétiseur, il dépasse largement les puces de son époque et a fait naître une génération
 de compositeurs : Rob Hubbard, Martin Galway, Ben Daglish, Jeroen Tel, Chris Hülsbeck, parmi tant d'autres.
 
-\begin{enclair}
-Chacune des trois voix peut produire un triangle, une dent de scie, un signal carré à largeur variable ou du bruit,
-avec sa propre enveloppe ADSR. Un filtre analogique, réglable en fréquence et en résonance, colore le son : c'est
-lui qui donne au SID son caractère chaud et parfois imprévisible, car il varie d'une puce à l'autre.
-\end{enclair}
 
-\begin{technique}
 Fréquence d'une voix : $f = N \times F_{horloge} / 2^{24}$, avec $N$ sur 16 bits ; l'horloge vaut environ
 0,985~MHz en PAL et 1,023~MHz en NTSC. Le rapport cyclique du carré est sur 12 bits. La synchronisation remet
 l'oscillateur à zéro au rythme de la voix précédente ; la modulation en anneau multiplie le triangle par
 l'oscillateur de la voix précédente (V1 par V3, V2 par V1, V3 par V2). Le registre \$D418 règle le volume
 principal sur 4 bits et le mode du filtre.
-\end{technique}
+
 
 \subsection{6581 et 8580}
 Le 6581 d'origine a un filtre très variable d'une puce à l'autre et une fuite de courant qui produit un clic à
@@ -111,11 +93,6 @@ Le son de la Super Nintendo est confié à un sous-système conçu par Sony : un
 signal, le S-DSP, partagent 64~Ko de mémoire. Le S-DSP joue huit voix d'échantillons compressés au format BRR, avec
 enveloppe ADSR ou GAIN, volume stéréo et un écho à filtre FIR qui donne aux musiques de la console leur ampleur.
 
-\begin{enclair}
-Contrairement aux puces précédentes, la Super Nintendo ne synthétise pas : elle rejoue de courts enregistrements
-d'instruments, comme un échantillonneur. La qualité dépend donc des échantillons choisis par le compositeur et de la
-place, très limitée, dont il disposait.
-\end{enclair}
 
 Un fichier SPC est une photographie de la mémoire et des registres du sous-système sonore ; un fichier SNSF contient
 en plus le programme du processeur principal, pour les jeux qui pilotent le son depuis celui-ci.
@@ -131,12 +108,11 @@ synthèse par table d'ondes, où la forme d'onde elle-même est l'instrument. Le
 bruit ; toutes peuvent passer en mode DDA, où le processeur écrit directement les échantillons ; la voie 2 peut
 moduler la fréquence de la voie 1 (LFO).
 
-\begin{technique}
 Les registres sont à l'adresse \$0800 : \$800 sélectionne la voie, \$801 règle le volume principal gauche et droite,
 \$802 et \$803 la période sur 12 bits, \$804 l'activation, le mode DDA et le volume sur 5 bits, \$805 le volume
 gauche et droite, \$806 les données d'onde, \$807 le bruit, \$808 et \$809 le LFO. Fréquence d'une voix :
 $f = 3\,579\,545 / (32 \times N)$.
-\end{technique}
+
 
 \section{Atari 8 bits (POKEY)}
 Le POKEY, conçu par Doug Neubauer chez Atari, équipe les Atari 400, 800, XL et XE ainsi que de nombreuses bornes. Ses
@@ -150,11 +126,6 @@ La Mega Drive de Sega associe une puce FM Yamaha YM2612 (six voix de quatre opé
 Koshiro, Masato Nakamura ou Motoi Sakuraba en ont exploité toutes les ressources. Les musiques sont lues depuis des
 enregistrements VGM.
 
-\begin{enclair}
-La synthèse FM fait moduler la fréquence d'une onde par une autre. Avec quatre ondes, appelées opérateurs, et
-différentes manières de les relier, appelées algorithmes, on obtient des cuivres, des basses claquantes, des
-cloches : des timbres impossibles avec de simples sons carrés.
-\end{enclair}
 
 \section{AdLib et Sound Blaster (OPL, OPL2, OPL3)}
 Sur PC, les cartes AdLib puis Sound Blaster utilisent les puces FM Yamaha YM3812 (OPL2) puis YMF262 (OPL3). L'OPL2

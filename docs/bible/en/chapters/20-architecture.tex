@@ -1,0 +1,47 @@
+\chapter{Architecture}\label{chap:architecture}
+
+\section{Overview}
+\soft has two layers:
+\begin{description}
+  \item[Native core (C++)] format parsing, chip emulation, mixing, per-voice outputs and chip states. It is built
+        with the ZXTune \texttt{make} system for four Android architectures into \texttt{libzxtune.so}.
+  \item[Application (Kotlin, Java)] playback service, interface, playlists, browsing, oscilloscope rendering (Vulkan
+        or OpenGL ES) and dashboards.
+\end{description}
+
+\section{Audio path}
+\begin{enumerate}
+  \item A \emph{Module::Holder} is created for the file; it provides a \emph{Renderer} per playback.
+  \item The renderer calls the emulation engine by blocks (about 100~ms), resamples to the output rate (48~kHz) and
+        applies gain, fades and loop limits.
+  \item The Android service writes the result to the audio output. Emulation state snapshots, taken regularly, make
+        backward seeking fast without replaying from the start.
+\end{enumerate}
+
+\section{Visualisation data}
+Every engine exposes the same three streams through the \emph{VoicesScope} interface:
+\begin{description}
+  \item[Layout] list of voice groups (one chip per group) and their names, sent on every change.
+  \item[Per-voice outputs] samples of each voice at the output rate, resampled like the sound.
+  \item[Voice states] snapshot of each voice about every millisecond: frequency, level, flags, chip kind and 64 bytes
+        specific to the chip (registers, envelopes, wavetable\dots).
+\end{description}
+For libvgm chips these streams come from an extension added to the emulation cores: a per-sample callback (per-voice
+outputs) and a state function. reSID and reSIDfp, ares and Ootake received equivalent extensions.
+
+\section{Rendering}
+\begin{itemize}
+  \item A worker thread prepares each frame: for each voice, the time window is aligned on the fundamental period of
+        the note (trigger), then reduced to two points per pixel column (minimum and maximum), so no peak is lost.
+  \item Traces are drawn by Vulkan when available, otherwise OpenGL ES, with thin antialiased lines.
+  \item The dashboard is drawn in two layers: a static layer (frames, captions), redrawn only when the layout
+        changes, and a dynamic layer (values, curves), redrawn every frame.
+\end{itemize}
+
+\section{Tests}
+\begin{itemize}
+  \item More than 1~000 JVM tests (Robolectric) for the application: models, playlist storage, view computations, and
+        render tests producing the screenshots of this manual.
+  \item Native check tools: oscilloscope measurement (\texttt{scope\_bench}), per-voice outputs of VGM chips, SID
+        parameters, seeking.
+\end{itemize}

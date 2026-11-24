@@ -1,0 +1,44 @@
+\chapter{Browser}
+
+\section{Local sources}
+The browser gives access to the phone storage and SD cards. On Android~10 and later, access goes through the system
+folder picker: choose your music folder once and \soft remembers it.
+
+\section{Online catalogues}
+\soft accesses several public chip music catalogues live:
+\begin{itemize}
+  \item High Voltage SID Collection (Commodore~64);
+  \item The Mod Archive, Modland and Amiga Music Preservation (tracker modules, Amiga);
+  \item ZXArt and ZXTunes (ZX Spectrum), Aygor;
+  \item Atari SAP Music Archive (Atari 8-bit);
+  \item VGMRips (VGM logs of consoles and arcade machines);
+  \item Joshw (console rips), Khinsider, OverClocked ReMix, Aminet, Scene.org;
+  \item online radios.
+\end{itemize}
+\begin{description}
+  \item[High Voltage SID Collection (HVSC)] the reference collection of Commodore~64 music, maintained by volunteers
+        since the late 1990s; tens of thousands of SID files sorted by composer, plus the song length database used
+        by \soft.
+  \item[The Mod Archive, Modland, Amiga Music Preservation] the large tracker module archives: the first is
+        community-run and rated by visitors, Modland sorts files by format, AMP documents Amiga musicians.
+  \item[ZXArt, ZXTunes, Aygor] ZX Spectrum scene archives, including demoparty competitions.
+  \item[ASMA] Atari SAP Music Archive, the HVSC counterpart for Atari 8-bit machines.
+  \item[VGMRips] VGM logs of console and arcade games, full packs per game.
+  \item[Joshw, Khinsider] console rips (NSF, SPC, GBS, PSF\dots) and game soundtracks.
+  \item[OverClocked ReMix] modern arrangements of game music.
+  \item[Aminet, Scene.org] historical Amiga and demoscene archives.
+\end{description}
+Catalogues are third-party services: their content, availability and terms depend on their owners. \soft queries
+them live and caches files already played.
+
+\section{Archives and multi-song files}
+\soft opens archives (ZIP, RAR, 7z, LHA\dots) and disk images (TR-DOS, SCL\dots) as folders. A file holding several
+songs (SID, NSF, AY, KSS\dots) is played directly instead: its subsongs play in sequence, then playback continues with
+the next file of the folder.
+
+\section{Search and selection}
+The magnifier filters the current folder. A long press starts multiple selection; the top bar then offers:
+\begin{description}
+  \item[Add] asks for the target playlist and adds the files (folders are scanned entirely);
+  \item[Play next] puts the selection in the play queue (section~\ref{sec:file}).
+\end{description}
