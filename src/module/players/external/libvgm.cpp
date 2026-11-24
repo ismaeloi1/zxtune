@@ -412,6 +412,15 @@ namespace Module::LibVGM
     setup(DEVID_YM2413, GetCoreId(emu.OpllCore, {FCC_NUKE, FCC_EMU_, FCC_MAME}), 0, {});
   }
 
+  static_assert(VoiceState::PCE_WAVE == DEVVOICE_KIND_PCE_WAVE && VoiceState::PCE_WAVE_DATA == DEVVOICE_PCE_WAVE
+                    && VoiceState::PCE_POS == DEVVOICE_PCE_POS && VoiceState::PCE_FREQ == DEVVOICE_PCE_FREQ
+                    && VoiceState::PCE_VOLUME == DEVVOICE_PCE_VOLUME && VoiceState::PCE_BALANCE == DEVVOICE_PCE_BALANCE
+                    && VoiceState::PCE_MODE == DEVVOICE_PCE_MODE && VoiceState::PCE_NOISE == DEVVOICE_PCE_NOISE
+                    && VoiceState::PCE_DDA == DEVVOICE_PCE_DDA && VoiceState::PCE_MAIN == DEVVOICE_PCE_MAIN
+                    && VoiceState::PCE_LFO_FREQ == DEVVOICE_PCE_LFO_FREQ && VoiceState::PCE_LFO_CTRL == DEVVOICE_PCE_LFO_CTRL
+                    && VoiceState::PCE_M_ON == DEVVOICE_PCE_M_ON && VoiceState::PCE_M_DDA == DEVVOICE_PCE_M_DDA
+                    && VoiceState::PCE_M_NOISE == DEVVOICE_PCE_M_NOISE && VoiceState::PCE_M_LFO == DEVVOICE_PCE_M_LFO,
+                "HuC6280 voice state layout");
   static_assert(VoiceState::OPN_FM == DEVVOICE_KIND_OPN_FM && VoiceState::OPN_DAC == DEVVOICE_KIND_OPN_DAC
                     && VoiceState::PSG_TONE == DEVVOICE_KIND_PSG_TONE
                     && VoiceState::PSG_NOISE == DEVVOICE_KIND_PSG_NOISE && VoiceState::OPL_2OP == DEVVOICE_KIND_OPL_2OP

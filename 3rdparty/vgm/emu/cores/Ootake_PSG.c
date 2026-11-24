@@ -61,11 +61,16 @@ Copyright(C)2006-2021 Kitao Nakamura.
 #include "Ootake_PSG_private.h"
 
 
+static void OPSG_SetVoicesCb(void* chip, DEVCB_VOICES cb, void* param);
+static UINT32 OPSG_GetVoicesState(void* chip, UINT32 count, DEV_VOICE_STATE* states);
+
 static DEVDEF_RWFUNC devFunc[] =
 {
 	{RWF_REGISTER | RWF_WRITE, DEVRW_A8D8, 0, OPSG_Write},
 	{RWF_REGISTER | RWF_READ, DEVRW_A8D8, 0, OPSG_Read},
 	{RWF_CHN_MUTE | RWF_WRITE, DEVRW_ALL, 0, OPSG_SetMuteMask},
+	{RWF_VOICES | RWF_WRITE, DEVRW_ALL, 0, OPSG_SetVoicesCb},
+	{RWF_VOICES | RWF_READ, DEVRW_ALL, 0, OPSG_GetVoicesState},
 	{0x00, 0x00, 0, NULL}
 };
 DEV_DEF devDef_C6280_Ootake =
@@ -284,6 +289,11 @@ typedef struct
 	Uint8		Port[16];				// for debug purpose
 
 	BOOL		bHoneyInTheSky; //はにいいんざすかいパッチ用。v2.60
+
+	// per-channel output tap (zxtune extension, see RWF_VOICES)
+	DEVCB_VOICES	voicesCb;
+	void*		voicesParam;
+	INT32		voicesOut[N_CHANNEL];
 } huc6280_state;
 
 static BOOL			_bTblInit = FALSE;
@@ -651,6 +661,8 @@ OPSG_Mix(
 		sampleAllR = 0;
 		for (i=0; i<N_CHANNEL; i++)
 		{
+			const Sint32 prevL = sampleAllL;
+			const Sint32 prevR = sampleAllR;
 			PSGChn = &info->Psg[i];
 			
 			if ((PSGChn->bOn)&&((i != 1)||(info->LfoCtrl == 0))&&(!info->bPsgMute[i])) //Kitao更新
@@ -724,7 +736,14 @@ OPSG_Mix(
 			//sampleAllL += info->DdaFadeOutL[i] * OVERSAMPLE_RATE; //オーバーサンプリング用
 			sampleAllR += info->DdaFadeOutR[i];
 			//sampleAllR += info->DdaFadeOutR[i] * OVERSAMPLE_RATE; //オーバーサンプリング用
+			if (info->voicesCb)
+			{
+				// contribution of channel to both sides, scaled as the mix (panning is shown by state)
+				info->voicesOut[i] = (INT32)((double)((sampleAllL - prevL) + (sampleAllR - prevR)) * 0.5 * info->VOL);
+			}
 		}
+		if (info->voicesCb)
+			info->voicesCb(info->voicesParam, N_CHANNEL, info->voicesOut);
 		//Kitao更新。6ch合わさったところで、ボリューム調整してバッファに書き込む。
 		bufL[j] = (DEV_SMPL)((double)sampleAllL * info->VOL);
 		bufR[j] = (DEV_SMPL)((double)sampleAllR * info->VOL);
@@ -963,4 +982,69 @@ OPSG_SetHoneyInTheSky(
 	huc6280_state* info = (huc6280_state*)chip;
 	
 	info->bHoneyInTheSky = bHoneyInTheSky;
+}
+
+
+static void OPSG_SetVoicesCb(void* chip, DEVCB_VOICES cb, void* param)
+{
+	huc6280_state* info = (huc6280_state*)chip;
+	info->voicesCb = cb;
+	info->voicesParam = param;
+}
+
+// registers are kept as written (waveform, DDA and noise values are stored transformed by the core)
+static UINT32 OPSG_GetVoicesState(void* chip, UINT32 count, DEV_VOICE_STATE* states)
+{
+	huc6280_state* info = (huc6280_state*)chip;
+	UINT32 ch;
+	UINT32 idx;
+	
+	if (count > N_CHANNEL)
+		count = N_CHANNEL;
+	for (ch = 0; ch < count; ch ++)
+	{
+		const PSG* psg = &info->Psg[ch];
+		DEV_VOICE_STATE* st = &states[ch];
+		UINT8* f = st->fields;
+		// channel 2 only modulates channel 1 while LFO is on
+		const BOOL lfoSource = (ch == 1) && (info->LfoCtrl != 0);
+		const UINT32 side = psg->volumeL > psg->volumeR ? psg->volumeL : psg->volumeR;
+		const UINT32 mainSide = info->MainVolumeL > info->MainVolumeR ? info->MainVolumeL : info->MainVolumeR;
+		const BOOL audible = psg->bOn && !lfoSource && psg->volume != 0 && side != 0 && mainSide != 0;
+		
+		memset(st, 0, sizeof(*st));
+		st->kind = DEVVOICE_KIND_PCE_WAVE;
+		for (idx = 0; idx < 32; idx ++)
+			f[DEVVOICE_PCE_WAVE + idx] = (UINT8)((17 - psg->wave[idx]) & 0x1F);
+		f[DEVVOICE_PCE_POS] = (UINT8)(psg->phase >> 27);
+		f[DEVVOICE_PCE_FREQ + 0] = (UINT8)(psg->frq & 0xFF);
+		f[DEVVOICE_PCE_FREQ + 1] = (UINT8)((psg->frq >> 8) & 0x0F);
+		f[DEVVOICE_PCE_VOLUME] = (UINT8)psg->volume;
+		f[DEVVOICE_PCE_BALANCE] = (UINT8)((psg->volumeL << 4) | psg->volumeR);
+		f[DEVVOICE_PCE_MODE] = (psg->bOn ? DEVVOICE_PCE_M_ON : 0) | (psg->bDDA ? DEVVOICE_PCE_M_DDA : 0)
+			| (psg->bNoiseOn ? DEVVOICE_PCE_M_NOISE : 0) | (ch == 0 && info->LfoCtrl != 0 ? DEVVOICE_PCE_M_LFO : 0);
+		f[DEVVOICE_PCE_NOISE] = (UINT8)((0x1F - psg->noiseFrq) & 0x1F);
+		f[DEVVOICE_PCE_DDA] = (UINT8)((11 - psg->ddaSample) & 0x1F);
+		f[DEVVOICE_PCE_MAIN] = (UINT8)((info->MainVolumeL << 4) | info->MainVolumeR);
+		f[DEVVOICE_PCE_LFO_FREQ] = (UINT8)info->LfoFrq;
+		f[DEVVOICE_PCE_LFO_CTRL] = (UINT8)info->LfoCtrl;
+		
+		if (audible)
+		{
+			st->flags |= DEVVOICE_KEYON | DEVVOICE_LEVEL;
+			st->level = -1.5f * (float)(31 - psg->volume) - 3.0f * (float)(15 - side) - 3.0f * (float)(15 - mainSide);
+			if (psg->bNoiseOn)
+			{
+				st->flags |= DEVVOICE_NOISE;
+			}
+			else if (!psg->bDDA)
+			{
+				// 32 steps of waveform per period of divider (0 is 4096)
+				const UINT32 div = psg->frq ? psg->frq : 0x1000;
+				st->flags |= DEVVOICE_FREQ;
+				st->freq = (float)(info->PSG_FRQ / 32.0 / (double)div);
+			}
+		}
+	}
+	return count;
 }

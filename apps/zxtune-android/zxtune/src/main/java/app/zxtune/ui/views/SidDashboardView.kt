@@ -341,6 +341,7 @@ class SidDashboardView @JvmOverloads constructor(
     @androidx.annotation.VisibleForTesting
     internal var pcmTabsHeight = 0f
     private var pcmShown = false
+    private val pce by lazy { PceDashboard(density, titlePaint.textSize) }
     private var pcmTabsLayout: VoicesLayout? = null
     private var pcmFirstVoices = IntArray(0)
     private var pcmTabEdges = FloatArray(0)
@@ -978,6 +979,11 @@ class SidDashboardView @JvmOverloads constructor(
         spcShown = voices >= SpcDescription.VOICES && VoiceGauges(data, 0).kind == VoiceGauges.Kind.SPC_DSP
         if (spcShown) {
             drawSpc(canvas, data, voices, areaHeight)
+            return
+        }
+        // wavetable channels: waveforms and registers instead of generic cards
+        if (PceDashboard.isPce(data, voices)) {
+            pce.draw(canvas, data, voices, width.toFloat(), areaHeight)
             return
         }
         pcmShown = hasPcmSlots(current, data, voices)

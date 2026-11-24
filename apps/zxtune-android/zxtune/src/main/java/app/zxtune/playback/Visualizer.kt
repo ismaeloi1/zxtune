@@ -256,6 +256,7 @@ class VoiceGauges(private val data: ByteArray, private val offset: Int) : Gauges
         const val NES_NOISE = 13
         const val NES_DMC = 14
         const val PCM_SLOT = 15
+        const val PCE_WAVE = 16
     }
 
     /**

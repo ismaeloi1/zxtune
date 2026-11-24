@@ -154,6 +154,23 @@ typedef void (*DEVFUNC_SET_VOICES_CB)(void* info, DEVCB_VOICES cb, void* param);
 
 // PCM slot of wavetable chips (YMW258/MultiPCM, SCSP), raw registers are in chip's own units (see DEVVOICE_PCM_CHIP)
 #define DEVVOICE_KIND_PCM_SLOT		0x0F
+// HuC6280 (PC Engine) wavetable channel, see DEVVOICE_PCE_*
+#define DEVVOICE_KIND_PCE_WAVE		0x10
+#define DEVVOICE_PCE_WAVE		0	// 32 bytes: waveform RAM as written (0..31)
+#define DEVVOICE_PCE_POS		32	// waveform position being played 0..31
+#define DEVVOICE_PCE_FREQ		33	// 2 bytes: 12 bit frequency divider
+#define DEVVOICE_PCE_VOLUME		35	// channel volume (AL) 0..31, 1.5dB step
+#define DEVVOICE_PCE_BALANCE	36	// left << 4 | right, 0..15 each, 3dB step
+#define DEVVOICE_PCE_MODE		37	// DEVVOICE_PCE_M_* flags
+#define DEVVOICE_PCE_NOISE		38	// noise frequency 0..31 as written
+#define DEVVOICE_PCE_DDA		39	// last DDA value 0..31 as written
+#define DEVVOICE_PCE_MAIN		40	// main balance left << 4 | right, 0..15 each
+#define DEVVOICE_PCE_LFO_FREQ	41	// LFO frequency divider
+#define DEVVOICE_PCE_LFO_CTRL	42	// LFO control 0..3 (0 off)
+#define DEVVOICE_PCE_M_ON		0x01	// channel is enabled
+#define DEVVOICE_PCE_M_DDA		0x02	// direct output (samples) instead of waveform
+#define DEVVOICE_PCE_M_NOISE	0x04	// noise instead of waveform (channels 5, 6)
+#define DEVVOICE_PCE_M_LFO		0x08	// channel 1 is frequency modulated by channel 2 (which is silent)
 #define DEVVOICE_PCM_CHIP		0	// see DEVVOICE_PCM_CHIP_*
 #define DEVVOICE_PCM_STATE		1	// envelope stage 0..4 (off, attack, decay 1, decay 2, release) | DEVVOICE_PCM_ST_*
 #define DEVVOICE_PCM_EG			2	// envelope level 0..255 (96dB range, 255 is maximal)

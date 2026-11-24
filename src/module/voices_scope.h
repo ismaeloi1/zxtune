@@ -77,6 +77,37 @@ namespace Module
       NES_DMC = 14,
       //! slot of wavetable chip (YMW258/MultiPCM, SCSP), see PCM_* fields
       PCM_SLOT = 15,
+      //! HuC6280 (PC Engine) channel, see PCE_* fields
+      PCE_WAVE = 16,
+    };
+
+    //! PCE_WAVE fields, registers as written:
+    //! - PCE_WAVE: 32 bytes of waveform RAM 0..31, PCE_POS: position being played 0..31
+    //! - PCE_FREQ: 16 bit LE 12 bit frequency divider (tone is clock / 32 / divider)
+    //! - PCE_VOLUME: 0..31 (1.5dB step), PCE_BALANCE and PCE_MAIN: left << 4 | right (3dB step)
+    //! - PCE_MODE: PCE_M_* flags, PCE_NOISE: noise frequency 0..31, PCE_DDA: last direct value 0..31
+    //! - PCE_LFO_FREQ, PCE_LFO_CTRL: LFO of channel 1 by channel 2 (0 is off)
+    enum PceField : uint8_t
+    {
+      PCE_WAVE_DATA = 0,
+      PCE_POS = 32,
+      PCE_FREQ = 33,
+      PCE_VOLUME = 35,
+      PCE_BALANCE = 36,
+      PCE_MODE = 37,
+      PCE_NOISE = 38,
+      PCE_DDA = 39,
+      PCE_MAIN = 40,
+      PCE_LFO_FREQ = 41,
+      PCE_LFO_CTRL = 42,
+    };
+
+    enum PceMode : uint8_t
+    {
+      PCE_M_ON = 1,
+      PCE_M_DDA = 2,
+      PCE_M_NOISE = 4,
+      PCE_M_LFO = 8,
     };
 
     //! PCM_SLOT fields, raw registers are in units of chip (PCM_CHIP):
