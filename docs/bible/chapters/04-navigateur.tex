@@ -1,0 +1,32 @@
+\chapter{Le navigateur}
+
+\section{Sources locales}
+Le navigateur donne accès au stockage du téléphone et aux cartes SD. Sur Android~10 et plus, l'accès passe par le
+sélecteur de dossiers du système : vous choisissez une fois le dossier de vos musiques, LHUNA s'en souvient.
+
+\section{Catalogues en ligne}
+LHUNA donne accès à plusieurs catalogues publics de musiques de puces, consultés en direct :
+\begin{itemize}
+  \item High Voltage SID Collection (Commodore~64) ;
+  \item The Mod Archive, Modland et Amiga Music Preservation (modules de tracker, Amiga) ;
+  \item ZXArt et ZXTunes (ZX Spectrum), Aygor ;
+  \item Atari SAP Music Archive (Atari 8 bits) ;
+  \item VGMRips (enregistrements VGM de consoles et bornes d'arcade) ;
+  \item Joshw (rips de consoles), Khinsider, OverClocked ReMix, Aminet, Scene.org ;
+  \item des radios en ligne.
+\end{itemize}
+\arediger{Description de chaque catalogue : contenu, taille, mainteneurs, conditions d'utilisation. À vérifier sur
+leurs sites.}
+
+\section{Archives et fichiers multi-morceaux}
+LHUNA ouvre les archives (ZIP, RAR, 7z, LHA\dots) et les images de disquettes (TR-DOS, SCL\dots) comme des dossiers.
+Un fichier qui contient plusieurs morceaux (SID, NSF, AY, KSS\dots) est en revanche lu directement : ses
+sous-morceaux s'enchaînent, puis la lecture continue avec le fichier suivant du dossier.
+
+\section{Recherche et sélection}
+La loupe filtre le dossier affiché. Un appui long sur un élément démarre la sélection multiple ; la barre du haut
+propose alors :
+\begin{description}
+  \item[Ajouter] demande la liste de destination et y ajoute les fichiers (les dossiers sont parcourus en entier) ;
+  \item[Jouer ensuite] place les éléments sélectionnés dans la file d'attente (section~\ref{sec:file}).
+\end{description}

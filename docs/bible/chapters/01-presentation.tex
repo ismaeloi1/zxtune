@@ -1,0 +1,43 @@
+\chapter{Présentation}
+
+\section{Ce qu'est LHUNA}
+LHUNA est un lecteur de musique pour Android consacré aux musiques des ordinateurs, consoles et bornes d'arcade
+des années 1980 à 2000. Ces musiques ne sont pas des enregistrements : ce sont des programmes et des données qui
+pilotent une puce sonore. Pour les écouter fidèlement, LHUNA reproduit, par logiciel, le comportement de ces puces.
+On parle d'\emph{émulation}.
+
+\begin{enclair}
+Un fichier MP3 contient le son lui-même. Un fichier de musique de Commodore~64 ou de Mega Drive contient plutôt une
+partition et les réglages d'un instrument électronique précis. LHUNA joue cette partition sur une copie logicielle
+de l'instrument d'origine.
+\end{enclair}
+
+\section{Origine}
+LHUNA est dérivé de \emph{zxtune}, lecteur libre créé pour les musiques du ZX Spectrum puis étendu à de nombreuses
+plateformes. LHUNA en reprend le cœur de lecture et y ajoute :
+\begin{itemize}
+  \item des moteurs d'émulation choisis pour leur précision (par exemple ares pour la Super Nintendo, Ootake pour la
+        PC Engine, reSIDfp pour le Commodore~64) ;
+  \item une visualisation en temps réel de chaque voix et de l'état interne des puces, puce par puce ;
+  \item une interface repensée : listes de lecture multiples, favoris, file d'attente, réglages en direct.
+\end{itemize}
+
+\section{Ce que LHUNA sait faire}
+\begin{itemize}
+  \item Lire \lhunaModulesCount{} formats de musique et ouvrir \lhunaContainersCount{} formats de conteneurs
+        (archives, images de disquettes, compresseurs), voir la partie~\ref{part:compat}.
+  \item Parcourir le stockage du téléphone et de grands catalogues en ligne.
+  \item Afficher un oscilloscope par voix, la réponse du filtre du SID, et des tableaux de bord détaillés pour les
+        puces SID, FM, SNES, PC Engine, NES, MT-32 et les puces PCM des bornes Sega.
+  \item Fonctionner avec Android Auto et l'écran verrouillé.
+\end{itemize}
+
+\section{Configuration requise}
+\begin{itemize}
+  \item Android~4.1 ou plus récent pour la version complète.
+  \item Pour l'oscilloscope : OpenGL ES, ou Vulkan quand l'appareil le permet (plus fluide).
+  \item Espace de stockage : environ 16~Mo pour l'application, plus vos musiques.
+\end{itemize}
+
+\arediger{Historique de zxtune et de son auteur, chronologie des versions de LHUNA, philosophie du projet
+(fidélité, lisibilité). Sources à collecter.}

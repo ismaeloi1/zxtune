@@ -1,0 +1,45 @@
+\chapter{Moteurs d'émulation}
+
+\begin{enclair}
+Plusieurs programmes savent imiter une même puce. Certains sont très précis mais demandent beaucoup de calcul ;
+d'autres sont plus légers. Quand il existe un vrai choix, LHUNA le propose dans les réglages.
+\end{enclair}
+
+\section{Commodore 64 : reSID et reSIDfp}
+Les deux moteurs proviennent de la bibliothèque libsidplayfp, qui émule aussi le processeur et les composants du
+Commodore~64 nécessaires à l'exécution des lecteurs d'origine.
+\begin{description}
+  \item[reSIDfp] (par défaut) modèle à virgule flottante du filtre analogique et des formes d'onde combinées ;
+  \item[reSID] modèle historique, plus léger.
+\end{description}
+Le modèle de puce (6581 ou 8580), les courbes de filtre et le biais se règlent (chapitre~\ref{chap:emu-settings}).
+
+\section{Super Nintendo : ares ou snes\_spc}
+\begin{description}
+  \item[ares] (par défaut) émulation au cycle près du processeur SPC700 et du S-DSP, issue de l'émulateur ares ;
+        la stéréo est rendue comme sur la console, inversions de phase comprises ;
+  \item[snes\_spc] moteur historique de Shay Green (blargg), plus léger.
+\end{description}
+Le même réglage s'applique aux fichiers SPC et aux rips SNSF, qui exécutent aussi le processeur principal 65816.
+
+\section{Puces FM}
+\begin{longtable}{@{}l l p{0.5\textwidth}@{}}
+\toprule \textbf{Famille} & \textbf{Puces} & \textbf{Cœurs proposés} \\ \midrule
+OPN2 & YM2612, YM3438 & Nuked (précis), ymfm, Genesis Plus GX (rapide) \\
+OPM & YM2151 & Nuked (précis), ymfm, MAME \\
+OPN & YM2203, YM2608, YM2610 & ymfm, MAME \\
+OPL & YM3526, YM3812, YMF262 & Nuked (précis), AdLibEmu, MAME \\
+OPLL & YM2413 & Nuked (précis), EMU2413, MAME \\
+\bottomrule
+\end{longtable}
+
+\section{PC Engine : Ootake}
+La puce HuC6280 est émulée par le cœur d'Ootake, émulateur PC Engine japonais réputé pour sa fidélité. LHUNA
+l'utilise pour les enregistrements VGM et y lit la table d'ondes de chaque voix pour le tableau de bord.
+
+\section{Sega Saturn et bornes : SCSP}
+Le SCSP est émulé avec son DSP d'effets activé : la réverbération et les effets programmés par le jeu sont audibles.
+
+\arediger{Historique et auteurs de chaque moteur (Dag Lem, Antti Lankila et Leandro Nini pour reSID/reSIDfp ;
+Near et l'équipe ares ; nukeykt pour les cœurs Nuked ; Aaron Giles pour ymfm ; Kitao Nakamura pour Ootake\dots),
+mesures de précision, coût en calcul sur téléphone.}

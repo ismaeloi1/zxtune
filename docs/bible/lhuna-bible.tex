@@ -1,0 +1,107 @@
+% LHUNA — manuel de référence
+% Compilation : lualatex lhuna-bible ; lualatex lhuna-bible (deux passes pour la table des matières)
+% Les tables de formats sont générées : voir tools/formats.py et gen/formats.tex
+\documentclass[11pt,a4paper,twoside,openright]{book}
+
+\usepackage{fontspec}
+\usepackage[french]{babel}
+\usepackage[margin=1.5cm,bindingoffset=0.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage[most]{tcolorbox}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{images/}}
+
+\definecolor{lhunacyan}{RGB}{0,229,255}
+\definecolor{lhunanight}{RGB}{11,14,20}
+\definecolor{lhunagrey}{RGB}{110,118,130}
+
+\setlist{itemsep=2pt,topsep=4pt}
+\titleformat{\chapter}[display]{\normalfont\huge\bfseries}{\color{lhunacyan}\chaptertitlename\ \thechapter}{12pt}{\Huge}
+\titleformat{\section}{\normalfont\Large\bfseries}{\color{lhunacyan}\thesection}{1em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[LE]{\small\leftmark}
+\fancyhead[RO]{\small\rightmark}
+\fancyfoot[C]{\small\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+
+% Encadré pour non-techniciens
+\newtcolorbox{enclair}{colback=lhunacyan!6,colframe=lhunacyan!70!black,title=En clair,fonttitle=\bfseries,breakable}
+% Encadré technique
+\newtcolorbox{technique}{colback=lhunagrey!8,colframe=lhunagrey,title=Technique,fonttitle=\bfseries,breakable}
+% Partie restant à rédiger (repérable par recherche de « À RÉDIGER »)
+\newcommand{\arediger}[1]{\begin{tcolorbox}[colback=red!5,colframe=red!60!black,title=À RÉDIGER,breakable]#1\end{tcolorbox}}
+
+% Capture d'écran centrée avec légende ; largeur relative à la ligne
+\newcommand{\capture}[3][0.45]{%
+  \begin{figure}[htbp]\centering
+  \includegraphics[width=#1\linewidth]{#2}
+  \caption{#3}
+  \end{figure}}
+
+% Deux captures côte à côte
+\newcommand{\capturedouble}[4]{%
+  \begin{figure}[htbp]\centering
+  \includegraphics[width=0.45\linewidth]{#1}\hfill
+  \includegraphics[width=0.45\linewidth]{#2}
+  \caption{#3 (gauche) et #4 (droite)}
+  \end{figure}}
+
+\input{gen/formats}
+
+\begin{document}
+
+\frontmatter
+\input{chapters/00-couverture}
+\input{chapters/00-licence}
+\tableofcontents
+\input{chapters/00-lire}
+
+\mainmatter
+\part{Découvrir LHUNA}
+\input{chapters/01-presentation}
+\input{chapters/02-installation}
+\input{chapters/03-interface}
+
+\part{Écouter}
+\input{chapters/04-navigateur}
+\input{chapters/05-listes}
+\input{chapters/06-lecture}
+
+\part{Compatibilité}\label{part:compat}
+\input{chapters/07-plateformes}
+\input{chapters/08-formats}
+\input{chapters/09-audio}
+
+\part{Moteurs d'émulation}
+\input{chapters/10-moteurs}
+\input{chapters/11-reglages-emulation}
+
+\part{Visualiser}
+\input{chapters/12-oscilloscope}
+\input{chapters/13-tableaux-de-bord}
+\input{chapters/14-valeurs}
+\input{chapters/15-panneau}
+
+\part{Référence}
+\input{chapters/16-reglages}
+\input{chapters/17-statistiques}
+\input{chapters/18-depannage}
+\input{chapters/19-limites}
+
+\appendix
+\input{chapters/a-glossaire}
+\input{chapters/b-versions}
+\input{chapters/c-credits}
+\input{chapters/d-bibliographie}
+
+\end{document}

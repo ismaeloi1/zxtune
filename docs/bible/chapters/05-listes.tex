@@ -1,0 +1,38 @@
+\chapter{Listes de lecture}\label{chap:listes}
+
+\section{Listes multiples}
+LHUNA gère autant de listes que vous le souhaitez, plus deux listes particulières :
+\begin{description}
+  \item[Liste par défaut] créée au premier lancement, elle reprend votre ancienne liste.
+  \item[Favoris] alimentée par le bouton \textbf{$\equiv$+} $\rightarrow$ « Ajouter aux favoris ».
+\end{description}
+La liste affichée est aussi la liste lue. Changer de liste dans le sélecteur enregistre la liste quittée et charge
+la nouvelle ; le morceau en cours continue, et « suivant » suit la nouvelle liste.
+
+\capture{playlist-fr-top}{Sélecteur de liste}
+
+\section{Gérer les listes}
+Le menu du sélecteur propose : changer de liste, nouvelle liste, renommer, dupliquer, supprimer, exporter en M3U,
+importer un M3U. La suppression de la liste affichée bascule sur une autre liste.
+
+\section{Ajouter des morceaux}
+\begin{itemize}
+  \item Depuis la lecture : bouton \textbf{$\equiv$+} $\rightarrow$ « Ajouter à une liste\dots », puis la liste ou « Nouvelle liste\dots ».
+  \item Depuis le navigateur : sélection $\rightarrow$ Ajouter.
+  \item Depuis une liste : sélection $\rightarrow$ « Ajouter à une liste\dots » copie les morceaux dans une autre liste.
+\end{itemize}
+
+\section{File d'attente « Jouer ensuite »}\label{sec:file}
+Les morceaux placés dans la file passent après le morceau en cours, dans l'ordre d'ajout. Ensuite, la lecture
+reprend là où elle en était dans la liste ou le dossier. Choisir soi-même un autre morceau conserve la file mais
+abandonne ce point de reprise.
+
+\section{Import et export M3U}
+L'export écrit la liste affichée au format M3U étendu (titre, auteur, durée). Les emplacements sont complets, y
+compris dans les archives et les catalogues en ligne, si bien qu'une liste exportée se réimporte à l'identique dans
+LHUNA. L'import accepte aussi les M3U d'autres lecteurs (chemins simples) et crée une nouvelle liste portant le nom
+du fichier. Les anciennes listes XSPF restent accessibles dans le navigateur.
+
+\section{Tri, déplacement, statistiques}
+Le tri porte sur le titre, l'auteur ou la durée. La poignée de chaque morceau permet de le déplacer. Les
+statistiques donnent le nombre de morceaux, de fichiers distincts et la durée totale, de la liste ou de la sélection.

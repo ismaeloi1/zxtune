@@ -1,0 +1,29 @@
+\chapter{L'oscilloscope}
+
+\begin{enclair}
+Un oscilloscope dessine la forme du son au fil du temps. LHUNA en dessine un par voix de la puce : on voit ainsi
+quel instrument joue quoi, et comment sa forme change (une note carrée, une dent de scie, du bruit\dots).
+\end{enclair}
+
+\section{Une voie par voix}
+Chaque puce occupe une colonne, chaque voix une ligne. Le nom de la voix s'affiche en haut de sa case. Le tracé est
+synchronisé sur la période de la note (déclenchement), pour que les formes restent stables à l'écran.
+
+\section{Cas particuliers}
+\begin{description}
+  \item[SID et samples] avec la voie des samples activée, une quatrième ligne par puce montre les échantillons
+        joués par le registre de volume.
+  \item[AdLib OPL/OPL2] les 9 voix mélodiques sont disposées en 3 $\times$ 3 ; les 5 voies de batterie du mode rythme,
+        rarement utilisé, sont masquées sauf si le réglage « Voies de batterie AdLib » est activé.
+\end{description}
+
+\section{Réponse du filtre SID}
+Le bouton de visualisation remplace la moitié haute de l'oscilloscope par la courbe de réponse du filtre de chaque
+puce SID, avec la position de chaque voix sur la courbe.
+\capturedouble{ux4-lowpass-waves}{ux4-sweep}{Filtre passe-bas résonant}{balayage de la coupure}
+\capture[0.7]{ux4-lowpass-share35}{Réponse du filtre réduite à 35~\% de la hauteur}
+
+\section{Réglages}
+\capture{prefs-fr-oscilloscope}{Réglages de l'oscilloscope}
+Fenêtre de temps, gain, nombre de périodes affichées, hauteur de l'oscilloscope, part de la réponse du filtre,
+fréquence d'images maximale, moteur de rendu (Vulkan ou OpenGL ES) et pilote Vulkan.

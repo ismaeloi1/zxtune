@@ -1,0 +1,25 @@
+\chapter{Réglages d'émulation}\label{chap:emu-settings}
+
+\section{SID}
+\capture{settings-sid-fr}{Réglages SID dans le panneau en direct}
+\begin{description}
+  \item[Moteur] reSID ou reSIDfp.
+  \item[Modèle] 6581 ou 8580 pour les morceaux qui ne le précisent pas, ou pour tous si le choix est forcé.
+  \item[Filtre] préréglages mesurés sur de vraies puces, ou courbe personnalisée.
+  \item[Sortie 2SID/3SID] stéréo (puces réparties à gauche, à droite, au centre) ou mono.
+  \item[Voie des samples (\$D418)] ajoute à l'oscilloscope une voie par puce montrant les échantillons joués par le
+        registre de volume ; les trois voix ne les contiennent alors plus.
+\end{description}
+
+\section{SNES}
+\capture{settings-spc}{Réglages SNES}
+\begin{description}
+  \item[Moteur d'émulation] ares ou snes\_spc, appliqué au morceau suivant.
+\end{description}
+
+\section{FM}
+\capturedouble{settings-opn2-fr}{settings-ym3812}{Réglages OPN2}{réglages OPL}
+Pour chaque famille : cœur d'émulation, préréglage de puce, échelle (« ladder ») du DAC, filtres passe-bas et
+passe-haut de sortie, largeur stéréo.
+
+\arediger{Description détaillée de chaque réglage et de son effet audible, avec exemples de morceaux.}

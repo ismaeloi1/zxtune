@@ -1,0 +1,41 @@
+\chapter{Tableaux de bord par puce}\label{chap:dashboards}
+
+Sous l'oscilloscope, le tableau de bord détaille l'état de la puce. Chaque puce a sa propre vue, conçue pour ce que
+sa synthèse a de particulier.
+
+\section{SID (Commodore 64)}
+\capture[0.8]{sidcells-now-playing}{Tableau de bord SID}
+Pour chaque voix : forme d'onde et rapport cyclique, enveloppe (niveau, phase, ADSR en millisecondes), fréquence
+(note et hertz). La colonne \textbf{Mod} indique la synchronisation et la modulation en anneau avec leur source : la
+voix modulée affiche « Sync $\leftarrow$ V1 », la voix qui module affiche « $\rightarrow$ V2 Sync ». Sur le SID, une voix est toujours
+modulée par la précédente (V1 par V3, V2 par V1, V3 par V2). La dernière ligne montre volume, résonance et filtre.
+\capture[0.8]{sidcells-top}{Colonne Mod : source et voix pilotée}
+\capturedouble{sidcells-dual}{sidcells-fullscreen}{Deux puces SID}{plein écran}
+
+\section{Super Nintendo (S-DSP)}
+\capturedouble{snes}{snes-inspector}{Vue des 8 voix}{inspecteur d'une voix}
+Pour chaque voix : échantillon, fréquence, enveloppe ADSR ou GAIN dessinée, volumes gauche et droite, écho, bruit,
+modulation de hauteur. En bas, les volumes principaux, l'écho et son filtre FIR. Toucher une voix ouvre son
+inspecteur.
+
+\section{PC Engine (HuC6280)}
+\capture[0.8]{pce-dashboard}{Vue PC Engine}
+Pour chacune des 6 voix : la table d'ondes de 32 pas en cours d'utilisation, une barre de niveau et deux barres de
+panoramique, puis la note, la fréquence et le niveau. La forme de l'onde est décrite en mots (sinus, triangle, scie
+montante, scie descendante, carré, impulsion et son rapport cyclique) et chaque table reçoit un numéro, qui change
+quand l'instrument change. La ligne du bas donne les registres tels qu'écrits (\$802 à \$807) ; la ligne globale,
+\$801, \$808 et \$809.
+\begin{technique}
+Le HuC6280 n'a pas de lecture inversée : une scie descendante est une table écrite à l'envers par le driver, d'où
+la mention « Saw $\downarrow$ (reversed) ».
+\end{technique}
+
+\section{Puces FM}
+\capturedouble{fm-megadrive-cards}{fm-megadrive-inspector}{Mega Drive : cartes des voix}{inspecteur d'une voix}
+\capturedouble{fmview-algorithms}{fm-adlib-cards}{Algorithmes FM}{AdLib}
+Chaque voix montre son algorithme (porteuses et modulateurs), les niveaux et enveloppes de ses opérateurs. Toucher
+une voix ouvre l'inspecteur : enveloppes dessinées, multiplicateurs, désaccord, LFO.
+
+\section{NES, MT-32 et puces PCM}
+\capturedouble{nes}{mt32parts}{NES}{Roland MT-32 : parties}
+\capturedouble{pcmchips-model1-portrait}{pcmchips-scsp-portrait}{YMW258 (Model 1/2)}{SCSP (Saturn, Model 2A/3)}

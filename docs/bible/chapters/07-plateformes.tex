@@ -1,0 +1,31 @@
+\chapter{Plateformes et puces émulées}
+
+\begin{enclair}
+Chaque machine de l'époque avait sa propre puce sonore, avec ses forces et ses limites : trois voix carrées pour le
+ZX Spectrum, un synthétiseur analogique pour le Commodore~64, des opérateurs FM pour la Mega Drive, des échantillons
+pour la Super Nintendo. Ce chapitre présente chaque famille et ce que LHUNA en affiche.
+\end{enclair}
+
+\begin{longtable}{@{}p{0.22\textwidth} p{0.27\textwidth} p{0.43\textwidth}@{}}
+\toprule \textbf{Plateforme} & \textbf{Puce} & \textbf{Synthèse} \\ \midrule \endhead
+ZX Spectrum 128, Amstrad CPC, Atari ST, MSX & AY-3-8910 / YM2149 & 3 voix carrées, bruit, enveloppe matérielle \\
+ZX Spectrum (TurboSound) & 2 $\times$ AY & 6 voix \\
+ZX Spectrum (TurboFM) & 2 $\times$ YM2203 & FM 4 opérateurs + AY \\
+SAM Coupé & SAA1099 & 6 voix carrées, bruit, enveloppes \\
+Commodore 64 & MOS 6581 / 8580 (SID), jusqu'à 3 puces & 3 oscillateurs, filtre analogique, modulation en anneau, synchronisation \\
+NES / Famicom & Ricoh 2A03 / 2A07 & 2 carrés, triangle, bruit, DPCM \\
+Super Nintendo & SPC700 + S-DSP & 8 voix d'échantillons BRR, ADSR, écho FIR \\
+Game Boy & LR35902 (APU) & 2 carrés, onde programmable, bruit \\
+PC Engine / TurboGrafx-16 & HuC6280 & 6 voix à table d'ondes 32 $\times$ 5 bits, bruit, DDA, LFO \\
+Atari 8 bits & POKEY & 4 voix, polynômes de bruit, filtres \\
+Mega Drive / Genesis & YM2612 + SN76489 & FM 6 voix 4 opérateurs, DAC, PSG \\
+PC (AdLib, Sound Blaster) & YM3526 / YM3812 / YMF262 & FM 2 ou 4 opérateurs, mode rythme \\
+Sharp X68000, bornes & YM2151 & FM 8 voix 4 opérateurs \\
+Bornes Sega Model 1 et 2 & YMW258 (MultiPCM) & 28 voix d'échantillons \\
+Sega Saturn, bornes Model 2A/3 & YMF292 (SCSP) & 32 voix PCM/FM, DSP d'effets \\
+Roland MT-32 & LA (Munt) & synthèse linéaire arithmétique \\
+\bottomrule
+\end{longtable}
+
+\arediger{Une section par plateforme : historique de la puce, concepteurs, années, musiciens et jeux marquants,
+particularités audibles, avec une capture du tableau de bord correspondant. Recherche de sources en cours.}
