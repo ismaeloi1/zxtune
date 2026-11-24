@@ -44,7 +44,9 @@ android {
         targetSdk = 36
         //supported languages
         // 'fr' only has car legal notice translated: it refers to french road code
-        resourceConfigurations += ['en', 'de', 'ru', 'es', 'cs', 'zh', 'ja', 'pt', 'fr']
+        // ZXTune_LHUNA UI is in English only; translations are kept in sources:
+        // ['en', 'de', 'ru', 'es', 'cs', 'zh', 'ja', 'pt', 'fr']
+        resourceConfigurations += ['en']
         //supported densities for vector drawables rasterization
         vectorDrawables.generatedDensities  "mdpi", "hdpi", "xhdpi", "xxhdpi"
 

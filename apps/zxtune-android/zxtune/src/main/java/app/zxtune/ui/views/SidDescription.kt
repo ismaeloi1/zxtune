@@ -206,25 +206,17 @@ internal object SidDescription {
     fun hasRing(control: Int) = control and RING != 0 && control and TRIANGLE != 0
 
     /**
-     * Both effects of a voice always come from the same modulator (see [modulatorOf]), so the source is shown with
-     * them: "Sync ← V3", "Sync+Ring ← V1". A voice without own effects shows what it drives: "→ V2 Ring".
-     * @param target control register of the voice modulated by this one
-     * @return name of modulation applied to voice or driven by it
+     * Both effects of a voice come from its modulator (see [modulatorOf]), its number is shown with them.
+     * @return name of modulation applied to voice, e.g. "Sync V3", "Sync+Ring V1"
      */
-    fun modulationWord(control: Int, voice: Int, target: Int = 0): String {
+    fun modulationWord(control: Int, voice: Int): String {
         val sync = hasSync(control)
         val ring = hasRing(control)
         val source = modulatorOf(voice) + 1
-        val targetSync = hasSync(target)
-        val targetRing = hasRing(target)
-        val driven = (voice + 1) % 3 + 1
         return when {
-            sync && ring -> "${Words.SYNC_RING} ← V$source"
-            sync -> "${Words.SYNC} ← V$source"
-            ring -> "${Words.RING} ← V$source"
-            targetSync && targetRing -> "→ V$driven ${Words.SYNC_RING}"
-            targetSync -> "→ V$driven ${Words.SYNC}"
-            targetRing -> "→ V$driven ${Words.RING}"
+            sync && ring -> "${Words.SYNC_RING} V$source"
+            sync -> "${Words.SYNC} V$source"
+            ring -> "${Words.RING} V$source"
             else -> Words.DASH
         }
     }
