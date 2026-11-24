@@ -78,33 +78,15 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
         for (ch in 0 until channels) {
             val g = VoiceGauges(data, ch * VoiceGauges.SIZE)
             val top = rowH * ch
-            updateHistory(ch, g)
             drawWavePanel(canvas, g, ch, 0f, top, waveW, rowH)
             drawBars(canvas, g, waveW, top, barsW, rowH)
             drawValues(canvas, g, rightLeft, top, rightW, lineH)
-            drawHistory(canvas, ch, rightLeft, top + lineH, rightW, rowH - lineH * 2)
+            drawShape(canvas, g, rightLeft, top + lineH, rightW, rowH - lineH * 2)
             drawRegisters(canvas, g, ch, rightLeft, top + rowH - lineH, rightW, lineH)
             canvas.drawLine(0f, top + rowH, width, top + rowH, gridPaint)
         }
         if (channels > 0) {
             drawGlobal(canvas, VoiceGauges(data, 0), 0f, rowH * channels, width, height - rowH * channels)
-        }
-    }
-
-    // pitch in semitones of the last frames, NaN if channel is silent or has no pitch
-    private val history = Array(CHANNELS) { FloatArray(HISTORY) { Float.NaN } }
-    private var historyPos = 0
-    private var historyChannel = -1
-
-    private fun updateHistory(ch: Int, g: VoiceGauges) {
-        if (ch <= historyChannel) {
-            historyPos = (historyPos + 1) % HISTORY
-        }
-        historyChannel = ch
-        history[ch][historyPos] = if (g.isKeyOn && g.hasFrequency && g.frequency > 0f) {
-            ChipWidgets.semitones(g.frequency)
-        } else {
-            Float.NaN
         }
     }
 
@@ -129,50 +111,34 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
         }
     }
 
-    private fun drawHistory(canvas: Canvas, ch: Int, left: Float, top: Float, w: Float, h: Float) {
-        val pad = density * 4
-        rect.set(left + pad, top + density, left + w - pad, top + h - density)
-        canvas.drawRect(rect, framePaint)
-        val values = history[ch]
-        // range follows played notes, so vibrato and arpeggios are visible
-        var low = Float.MAX_VALUE
-        var high = -Float.MAX_VALUE
-        for (v in values) {
-            if (!v.isNaN()) {
-                low = min(low, v)
-                high = max(high, v)
-            }
+    // Waveform in words: the chip has no reverse playback, so descending saw is a table written reversed by driver
+    private fun drawShape(canvas: Canvas, g: VoiceGauges, left: Float, top: Float, w: Float, h: Float) {
+        val mode = g.field(MODE)
+        for (idx in 0 until WAVE_STEPS) {
+            table[idx] = g.field(WAVE + idx) and 31
         }
-        if (low > high) {
-            return
-        }
-        val center = (low + high) / 2
-        val span = max(high - low + 1f, MIN_SPAN)
-        rangeLow = center - span / 2
-        rangeHigh = center + span / 2
-        val step = rect.width() / (HISTORY - 1)
-        path.reset()
-        var drawing = false
-        for (idx in 0 until HISTORY) {
-            // oldest first
-            val v = values[(historyPos + 1 + idx) % HISTORY]
-            if (v.isNaN()) {
-                drawing = false
-                continue
-            }
-            val x = rect.left + step * idx
-            val y = semitoneY(v)
-            if (drawing) path.lineTo(x, y) else path.moveTo(x, y)
-            drawing = true
-        }
-        wavePaint.alpha = 255
-        canvas.drawPath(path, wavePaint)
+        val id = tables.idOf(table)
+        // tables are rarely changed, so their shapes are classified once
+        val shape = shapes.getOrPut(id) { WaveShape.describe(table) }
+        val cells = arrayOf(
+            "Shape" to if (mode and M_DDA != 0) {
+                "Direct samples"
+            } else if (mode and M_NOISE != 0) {
+                "Noise"
+            } else {
+                shape
+            },
+            "Table" to "#$id",
+            "Range" to "%d–%d".format(table.min(), table.max()),
+        )
+        drawCellsLine(canvas, cells, left, top + (h - lineHeight()) / 2, w, lineHeight(), mode and M_ON != 0)
     }
 
-    private var rangeLow = 12f
-    private var rangeHigh = 96f
+    private val table = IntArray(WAVE_STEPS)
+    private val tables = TableIds()
+    private val shapes = HashMap<Int, String>()
 
-    private fun semitoneY(semitones: Float) = rect.bottom - (semitones - rangeLow) / (rangeHigh - rangeLow) * rect.height()
+    private fun lineHeight() = captionPaint.fontSpacing + valuePaint.fontSpacing
 
     private fun drawWavePanel(canvas: Canvas, g: VoiceGauges, ch: Int, left: Float, top: Float, w: Float, h: Float) {
         val pad = density * 4
@@ -290,12 +256,8 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
 
     companion object {
         const val CHANNELS = 6
-        private const val HISTORY = 240
         private const val LINE_PART = 0.32f
         private const val MIN_DB = -48f
-
-        // semitones, pitch history range is never narrower
-        private const val MIN_SPAN = 6f
         private const val WAVE_STEPS = 32
 
         // noise is available only on channels 5 and 6
@@ -331,5 +293,96 @@ internal class PceDashboard(private val density: Float, private val textSize: Fl
                 if (db >= -0.05f) "0" else "−%.1f".format(-db)
             )
         }
+    }
+}
+
+/**
+ * Numbers of distinct waveforms tables in order of appearance, so changes of instruments are seen
+ */
+internal class TableIds {
+    private val known = HashMap<Long, Int>()
+    private val buffer = StringBuilder()
+
+    fun idOf(table: IntArray): Int {
+        // 32 values of 5 bits are 160 bits: two longs hash is enough to distinguish real tables
+        var lo = 0L
+        var hi = 0L
+        for (idx in 0 until 16) {
+            lo = lo * 31 + table[idx]
+            hi = hi * 31 + table[idx + 16]
+        }
+        val key = lo * 1000003 xor hi
+        return known.getOrPut(key) { known.size + 1 }
+    }
+}
+
+/**
+ * Classification of 32 steps waveform by its shape, as musicians name them
+ */
+internal object WaveShape {
+    fun describe(table: IntArray): String {
+        val size = table.size
+        val min = table.min()
+        val max = table.max()
+        if (min == max) {
+            return "Flat"
+        }
+        val levels = table.distinct().size
+        if (levels == 2) {
+            val high = table.count { it == max }
+            val duty = high * 100 / size
+            return if (duty == 50) "Square" else "Pulse $duty%"
+        }
+        // direction changes over the cycle (table is looped)
+        var ups = 0
+        var downs = 0
+        var bigUp = 0
+        var bigDown = 0
+        val jump = (max - min) / 2
+        for (idx in 0 until size) {
+            val d = table[(idx + 1) % size] - table[idx]
+            when {
+                d > jump -> ++bigUp
+                d < -jump -> ++bigDown
+                d > 0 -> ++ups
+                d < 0 -> ++downs
+            }
+        }
+        if (bigDown == 1 && bigUp == 0 && downs <= 1) {
+            return "Saw ↑"
+        }
+        if (bigUp == 1 && bigDown == 0 && ups <= 1) {
+            return "Saw ↓ (reversed)"
+        }
+        if (bigUp == 0 && bigDown == 0 && turns(table) == 2) {
+            return if (isLinear(table)) "Triangle" else "Sine"
+        }
+        return "Custom"
+    }
+
+    private fun turns(table: IntArray): Int {
+        var result = 0
+        var last = 0
+        for (idx in table.indices) {
+            val d = Integer.signum(table[(idx + 1) % table.size] - table[idx])
+            if (d != 0) {
+                if (last != 0 && d != last) {
+                    ++result
+                }
+                last = d
+            }
+        }
+        // closing turn of the cycle
+        val first = table.indices.map { Integer.signum(table[(it + 1) % table.size] - table[it]) }.firstOrNull { it != 0 } ?: 0
+        if (first != 0 && last != 0 && first != last) {
+            ++result
+        }
+        return result
+    }
+
+    // triangle has constant absolute slope, sine changes it
+    private fun isLinear(table: IntArray): Boolean {
+        val slopes = table.indices.map { kotlin.math.abs(table[(it + 1) % table.size] - table[it]) }.filter { it != 0 }
+        return slopes.isNotEmpty() && slopes.max() - slopes.min() <= 1
     }
 }
