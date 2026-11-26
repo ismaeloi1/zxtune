@@ -1,39 +1,201 @@
-\chapter{Emulation settings}\label{chap:emu-settings}
-This chapter describes the settings that change the sound, and what you will hear when you change them. The full
-list, with default values, is in chapter~\ref{chap:all-settings}.
+\chapter{Emulation settings: options and state of the art}\label{chap:emu-settings}
 
-\section{SID}
+Every setting in this chapter changes the sound. For each one we give the possible choices, the default (in bold in
+the tables), what you will hear when you change it, and what reference players and emulators do. When our default
+differs from theirs, we explain why.
+
+We invented almost none of these values. Filter presets come from published measurements of real chips and real
+boards, and we name their origin each time. The raw list of every setting, with its internal key, is in
+chapter~\ref{chap:all-settings}.
+
+\section{General settings}
+\begin{reglages}
+\regl{Default duration}{30~s, 1, 2, \textbf{3}, 5, 10, 15, 30~min}{Used only when neither the file nor a database
+gives the duration. Game music players usually choose between two and three minutes; three minutes let at least one
+full loop of most tracks play.}
+\regl{Silence detection}{\textbf{none}, 3, 4, 5, 10, 15~s}{Game Music Emu and the foobar2000 plugins built on it
+skip to the next track after a silence. We leave it off: many tracks have deliberate pauses, and a SID playing
+samples can seem silent for a few seconds.}
+\regl{Loop limit}{\textbf{none}, 1 to 5}{For formats that know their loop point (VGM, some modules). Without a limit,
+the known or default duration applies.}
+\regl{Fade-in, fade-out}{\textbf{none}, 1, 2, 3, 5, 10~s}{A fade-out of a few seconds softens the cut of looping
+tracks; VGMPlay and most VGM players offer one. We do not force it, so as never to alter a track that has a real
+ending.}
+\regl{Gain}{50 to 200~\%, \textbf{100~\%}}{Applied after emulation. Above 100~\%, tracks that are already loud clip:
+turn up the phone volume instead.}
+\end{reglages}
+
+\section{SID (Commodore 64)}
 \capture{settings-sid}{SID settings in the live panel}
-The engine is reSIDfp or reSID. The model, 6581 or 8580, applies to tracks that do not specify one; you can also
-force it for all. The filter offers presets measured on real chips and a custom curve: a ``dark'' 6581 muffles
-filtered voices more, a ``bright'' 6581 lets them through.
 
-For tracks with two or three SIDs, output can stay stereo (one chip left, one right, one centre) or be folded to
-mono. The samples lane adds one oscilloscope lane per chip showing the samples played through the volume; the three
-voices then no longer contain them, which makes them easier to read. This setting takes effect on the next track.
+The SID is the chip where the state of the art has gone furthest, and where settings matter most: two 6581s from the
+same factory do not have the same filter. The software reference is the reSID family: Dag Lem's reSID, used by VICE,
+and reSIDfp, developed later in libsidplayfp (sidplayfp on the command line) and ported to Java by JSIDPlay2.
 
-\section{Super Nintendo}
+\begin{reglages}
+\regl{Engine}{reSID, \textbf{reSIDfp}}{sidplayfp uses reSIDfp by default, VICE offers reSID. reSIDfp models the 6581
+filter from its transistors and reproduces combined waveforms better; reSID is lighter.}
+\regl{Default model}{\textbf{6581}, 8580}{Used when the file does not say. The vast majority of HVSC music was written
+on the 6581; it is also libsidplayfp's default.}
+\regl{Force model}{\textbf{no}, yes}{To hear a track on the other chip. Useful for comparing, rarely faithful.}
+\regl{C64 model}{\textbf{PAL}, NTSC, old NTSC, Drean (PAL-N), PAL-M}{The clock changes pitch and tempo. Most European
+music is PAL; recent files state their model.}
+\regl{Force C64 model}{\textbf{no}, yes}{As for the chip model.}
+\regl{Interpolation}{\textbf{none}, performance, quality}{Maps to reSID's sampling methods: fast sampling,
+interpolation, full resampling. Full resampling, which VICE also offers, removes treble aliasing but costs much more.
+On a phone the difference is rarely audible.}
+\regl{Filter emulation}{no, \textbf{yes}}{Without the filter, filtered voices sound raw: wrong for almost all C64
+music. The setting is mostly there to understand what the filter brings.}
+\regl{6581 preset}{\textbf{custom}, 31 presets}{See below.}
+\regl{8580 preset}{\textbf{custom}, 5 presets}{See below.}
+\regl{reSID: 6581 bias}{$-1000$ to $+1000$~mV, \textbf{0}}{Shifts the whole cutoff curve. VICE sets this bias to
+$+500$~mV by default (\texttt{SidResidFilterBias}); we keep reSID's original value and offer VICE's as a preset.}
+\regl{reSIDfp: 6581 curve}{0 (light) to 100 (dark), \textbf{50}}{Same scale and default as sidplayfp's
+\texttt{FilterCurve6581} (0.5).}
+\regl{reSIDfp: 6581 range}{0 (dark) to 100 (light), \textbf{50}}{Same default as sidplayfp.}
+\regl{reSIDfp: 8580 curve}{0 (light) to 100 (dark), \textbf{50}}{Same default as sidplayfp.}
+\regl{Combined waveforms}{\textbf{average}, weak, strong}{The strength of waveforms obtained by enabling several at
+once varies from chip to chip. sidplayfp offers the same three levels (\texttt{CombinedWaveforms}), with the same
+default.}
+\regl{6581 pulse + saw}{\textbf{normal}, strong}{Some chips give a much louder pulse + sawtooth combination. Try it
+when a sound seems missing in a track you know.}
+\regl{8580 digi boost}{\textbf{no}, yes}{The 8580 makes samples played through the volume almost inaudible.
+Musicians added a resistor to the board; libsidplayfp offers the same correction (\texttt{digiBoost}).}
+\regl{2SID / 3SID output}{\textbf{stereo}, mono}{Stereo: one chip left, one right, the third centre, as most players
+do. Mono: all chips centred, as on a real machine.}
+\regl{Samples lane (\$D418)}{\textbf{no}, yes}{Specific to \soft. Separates samples played through the volume into
+their own lane; the three voices then show only their oscillators. Applied to the next track.}
+\end{reglages}
+
+\subsection*{Filter presets}
+The 31 6581 presets and the 5 8580 presets come from JSIDPlay2's default configuration. They fall into three
+families.
+\begin{description}
+  \item[Lightest to Darkest] seven reSID curves, from lightest to darkest. JSIDPlay2 defines them by a curve
+        position; we convert it to a reSID bias.
+  \item[VICE default] VICE's $+500$~mV bias, to get that emulator's sound.
+  \item[Measured chips] 23 reSIDfp curves named after the person who measured the chip and its date code: Alankila,
+        Lord Nightmare, ZrX, Trurl, Nata, Grue, KruLLo, Enigma. ``6581R3 4885'' means an R3 revision made in week 48 of
+        1985.
+\end{description}
+For the 8580: three reSID curves (Light, Average, Dark) and two chips measured by Trurl.
+
+Our advice: leave the custom setting at its defaults, which are sidplayfp's. If a track sounds muffled, try Light or a
+Trurl chip; if it whistles, Dark. There is no ``right'' 6581: the composer heard their own.
+
+\section{Super Nintendo (SPC, SNSF)}
 \capture{settings-spc}{SNES settings}
-A single setting, the engine, ares or snes\_spc, applied to the next track.
+\begin{reglages}
+\regl{Engine}{snes\_spc, \textbf{ares}}{ares carries on the work of bsnes and higan, the accuracy reference; Mesen is
+the other emulator at that level. blargg's snes\_spc, used by Game Music Emu and many players, is lighter but does
+not render the phase-inverted stereo some games use to widen the sound. Applied to the next track.}
+\end{reglages}
+We offer no interpolation other than Gaussian. Snes9x, bsnes and Mesen offer cubic or sinc interpolation, which makes
+the sound brighter; pleasant, but not the console's sound, whose S-DSP applies exactly that Gaussian filter.
 
-\section{FM chips}
+\section{Yamaha FM chips}
 \capturedouble{settings-ym2612-psg}{settings-ym3812}{OPN2 settings}{OPL settings}
-For each family you choose the core, a chip preset, the DAC ``ladder'' effect, the output filters and the stereo
-width.
+The core of an FM chip is digital: emulated well, it gives the same result as the chip. What changes from one
+machine to another is what comes after, the DAC and the output circuit. That is why each family has a platform
+setting, which sets the chip, low-pass filter, DC blocking and stereo from published measurements. If you change one
+of those settings, the platform switches to ``custom''.
 
-The ladder deserves an explanation. The YM2612 in early Mega Drives has a DAC flaw that boosts very quiet sounds;
-some composers made use of it, and some music sounds wrong without it. The YM3438 and later consoles lack it. The
-output filters reproduce the console's analogue filtering: without them, the sound is brighter than on the hardware.
-Stereo width at zero gives mono.
+\subsection*{YM2612 and YM3438 (OPN2, Mega Drive)}
+\begin{reglages}
+\regl{Core}{\textbf{Nuked}, ymfm, Genesis Plus GX}{Nuked-OPN2 is written from the silicon and is the reference;
+Genesis Plus GX also includes it as an option. ymfm is MAME's core. Genesis Plus GX's own core is the fastest.}
+\regl{Platform}{\textbf{Mega Drive model 1 (VA0--VA6)}, model 1 VA7, model 2, Genesis 3, bare YM3438, bare YMF276,
+custom}{Early Mega Drives have a separate YM2612; from model 1 VA7, the chip is built into the main ASIC as a YM3438.
+Genesis Plus GX offers the same YM2612 / YM3438 choice.}
+\regl{Chip}{\textbf{YM2612}, YM3438, YMF276}{Set by the platform.}
+\regl{DAC ladder effect}{no, \textbf{yes} (model 1)}{Crossover distortion of the separate YM2612, which boosts quiet
+sounds. Nuked-OPN2 reproduces it in YM2612 mode. The YM3438 lacks it.}
+\regl{Low-pass filter}{0 to 24\,000~Hz, \textbf{3390~Hz}}{Model 1 filters its output with a first-order RC circuit.
+BlastEm uses 3390~Hz; Genesis Plus GX's one-pole filter, set to 0.6, cuts around 3.7~kHz. Model 2 filters more: a
+second order around 2840~Hz, measured by consolemods.org.}
+\regl{Slope}{\textbf{6}, 12~dB/oct}{First order for model 1, second order for model 2.}
+\regl{DC blocking}{0 to 200~Hz, \textbf{5~Hz}}{The output capacitors remove the DAC's DC voltage; this is essential
+with the ladder effect, which offsets every voice even when silent. The real value is undocumented, so we put it
+below the audible band.}
+\regl{Stereo width}{0 to 100~\%, \textbf{100~\%}}{FM voices are only left, right or centre; reducing the width
+helps on headphones with very separated tracks.}
+\end{reglages}
 
-\section{AY and Z80}
+\subsection*{YM2151 (OPM)}
+\begin{reglages}
+\regl{Core}{Nuked, \textbf{ymfm}, old MAME}{Nuked-OPM is the most exact but also the most expensive of all our cores:
+we leave it as an option and use ymfm, MAME's current core.}
+\regl{Platform}{\textbf{YM3012} (stereo: X68000, arcade), YM3014 (mono), custom}{The floating-point DAC is emulated
+by the cores. Boards have no explicit filter on the FM part (noted in jotego's arcade work), so we add none.}
+\regl{Filter, slope, DC, stereo}{\textbf{0~Hz}, \textbf{12~dB/oct}, \textbf{0~Hz}, \textbf{100~\%}}{No filtering by
+default, for lack of measurements.}
+\end{reglages}
+
+\subsection*{YM2203, YM2608, YM2610 (OPN)}
+\begin{reglages}
+\regl{Core}{\textbf{ymfm}, old MAME}{There is no Nuked core for these chips. ymfm is MAME's core.}
+\regl{Platform}{\textbf{PC-88 / PC-98}, custom}{The output stages of PC-88 and PC-98 boards have not been measured;
+we do not filter.}
+\regl{Clock (TurboFM)}{1.75, \textbf{3.5}, 3.58, 4~MHz}{For ZX Spectrum TurboFM music, the board runs at 3.5~MHz.}
+\end{reglages}
+
+\subsection*{YM3526, YM3812, YMF262 (OPL)}
+\begin{reglages}
+\regl{Core}{\textbf{Nuked}, AdLibEmu, MAME}{Nuked-OPL3 is the reference today, used in particular by modern DOSBox
+versions. Ken Silverman's AdLibEmu and MAME's core are fast.}
+\regl{Platform}{AdLib (mono), Sound Blaster 1.x/2.0, SB Pro 1/2, \textbf{SB16}, custom}{Values taken from DOSBox
+Staging, which tuned them on recordings of real cards: SB 1.x and 2.0, first-order low-pass at 12~kHz; SB Pro,
+first order at 8~kHz; SB16, no filter. The AdLib card has not been measured.}
+\end{reglages}
+
+\subsection*{YM2413 (OPLL)}
+\begin{reglages}
+\regl{Core}{\textbf{Nuked}, EMU2413, MAME}{Mitsutaka Okazaki's EMU2413 is the most widespread core in MSX and Master
+System players and emulators; Nuked-OPLL is more exact.}
+\end{reglages}
+
+\section{AY-3-8910, YM2149 and the Z80 processor}
 \capture{settings-ay}{AY settings}
-The clock must match the original machine: a wrong clock shifts every note. The chip type chooses between
-AY-3-8910 and YM2149, whose envelope is finer and volumes slightly different. The stereo layout spreads the three
-voices (ABC, ACB or mono) according to each platform's habits. Interpolation softens the output; turned off, the
-sound is rawer, closer to the chip.
+\begin{reglages}
+\regl{Clock}{ZX Spectrum (1.7734~MHz), \textbf{Pentagon (1.75~MHz)}, Taganrog (3.5~MHz), Atari ST (2~MHz), Amstrad CPC
+(1~MHz)}{Most ZX scene music archived on ZXArt was written on the Pentagon, the most widespread clone in Russia, hence
+our default. Files that state their clock take precedence.}
+\regl{Type}{\textbf{AY-3-8910}, YM2149}{The YM2149 has a 32-step envelope instead of 16 and a slightly different
+volume table. Choose it for the Atari ST.}
+\regl{Interpolation}{none, performance, \textbf{quality}}{Smooths the conversion to 48~kHz. Without it the sound is
+rawer, which some prefer on the Spectrum.}
+\regl{Layout}{\textbf{ABC}, ACB, BAC, BCA, CAB, CBA, mono}{The original ZX Spectrum 128 is mono; stereo boards imposed
+ABC or ACB depending on the region. Fuse and Unreal Speccy also offer ABC, ACB and mono.}
+\regl{Mixer}{A: 100~\% left; B: 60~\% both sides; C: 100~\% right}{The three-channel mixer sets each voice. The centre
+at 60~\% keeps a balanced level in mono.}
+\regl{Duty cycle}{channels: \textbf{none} to all; 1 to 99~\%, \textbf{50~\%}}{A ZXTune option that matches no
+hardware: it replaces the square with a pulse. Use it out of curiosity.}
+\regl{Z80 clock}{\textbf{3.5~MHz}, 3.5469~MHz (128K), 4~MHz (CPC), 7~MHz}{For AY files that contain the player
+code.}
+\regl{Interrupt duration}{1 to 100~T, \textbf{24~T}}{How long the interrupt stays active each frame. Change it only if
+a player misses interrupts.}
+\end{reglages}
 
-\section{Durations and volume}
-The default duration applies when neither the format nor a database gives one. Silence detection moves to the next
-track after a silence of the chosen length. The loop limit sets how many times looping tracks repeat, and fades soften
-the start and end. Gain sets the overall volume, from 50 to 200~\%.
+\section{SAA1099}
+\begin{reglages}
+\regl{Clock}{\textbf{SAM Coupé (8~MHz)}, Creative Music System (7.16~MHz)}{The two machines that use it.}
+\regl{Interpolation}{none, \textbf{performance}, quality}{As for the AY.}
+\end{reglages}
+
+\section{Roland MT-32}
+\begin{reglages}
+\regl{ROM folder}{to choose}{Munt, also used by DOSBox and ScummVM, needs images of the module's control and sound
+memories. We recognise them by their contents, whole or in halves.}
+\regl{Preferred model}{\textbf{automatic}, MT-32, CM-32L / LAPC-I}{The CM-32L has extra sounds later games use; the
+first games were written for the MT-32.}
+\regl{Oscilloscope lanes}{\textbf{9 parts}, 32 partials}{Parts match the instruments; partials, the LA synthesis
+building blocks. The second view will mostly interest those studying the module.}
+\end{reglages}
+
+\section{What we do not offer, and why}
+\begin{itemize}
+  \item No equaliser or ``surround'': they transform the machine's sound.
+  \item No non-Gaussian interpolation for the Super Nintendo, for the same reason.
+  \item No invented filter for boards that have not been measured (OPM, OPN, AdLib): we would rather add nothing than
+        add a guess. As soon as a measurement is published, we will include it.
+\end{itemize}

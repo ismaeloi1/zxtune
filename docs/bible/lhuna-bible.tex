@@ -55,6 +55,12 @@
   \caption{#3 (gauche) et #4 (droite)}
   \end{figure}}
 
+% Tableau de réglages : nom, choix (défaut en gras), état de l'art
+\newenvironment{reglages}{\begin{longtable}{@{}p{0.2\textwidth} p{0.3\textwidth} p{0.44\textwidth}@{}}
+\toprule \textbf{Réglage} & \textbf{Choix (\textbf{défaut})} & \textbf{Ailleurs, et notre choix} \\ \midrule \endhead}
+{\bottomrule\end{longtable}}
+\newcommand{\regl}[3]{#1 & #2 & #3 \\ \addlinespace}
+
 \input{gen/formats}
 
 \begin{document}

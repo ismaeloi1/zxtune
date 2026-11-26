@@ -55,6 +55,12 @@
   \caption{#3 (left) and #4 (right)}
   \end{figure}}
 
+% Settings table: name, choices (default in bold), state of the art
+\newenvironment{reglages}{\begin{longtable}{@{}p{0.2\textwidth} p{0.3\textwidth} p{0.44\textwidth}@{}}
+\toprule \textbf{Setting} & \textbf{Choices (\textbf{default})} & \textbf{Elsewhere, and our choice} \\ \midrule \endhead}
+{\bottomrule\end{longtable}}
+\newcommand{\regl}[3]{#1 & #2 & #3 \\ \addlinespace}
+
 \input{gen/formats}
 
 \begin{document}

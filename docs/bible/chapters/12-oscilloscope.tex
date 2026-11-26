@@ -25,6 +25,57 @@ l'oscilloscope.
 
 \section{Réglages}
 \capture{prefs-en-oscilloscope}{Réglages de l'oscilloscope}
-Vous réglez la fenêtre de temps, le gain, le nombre de périodes affichées, la hauteur de l'oscilloscope, la part de la
-réponse du filtre, la fréquence d'images maximale et le moteur de rendu. Vulkan donne le rendu le plus fluide quand
-votre téléphone le permet ; sinon, OpenGL ES prend le relais.
+\begin{reglages}
+\regl{Fenêtre des formes d'onde}{5 à 100~ms, \textbf{40~ms}}{Durée de son montrée par voie. 40~ms est la valeur de
+corrscope (\texttt{render\_ms}), l'outil qui sert à la plupart des vidéos d'oscilloscope de chiptune.}
+\regl{Amplification visuelle}{\textbf{automatique par voix}, $\times$1 à $\times$8}{N'agit que sur le dessin. En
+automatique, chaque voie est agrandie selon son propre niveau, pour qu'une voix discrète reste lisible.}
+\regl{Périodes affichées au plus}{désactivé, 4, \textbf{8}, 16, 32}{Zoome sur les notes aiguës, sinon réduites à un
+trait épais. Propre à \soft.}
+\regl{Fenêtre des jauges SID}{2 à 40~ms, \textbf{10~ms}}{Durée résumée par les jauges des oscillateurs du SID.}
+\regl{Hauteur de l'oscilloscope}{60 à 160~\%, \textbf{100~\%}}{Par rapport à un format 16:9 de la largeur ; le
+tableau de bord prend le reste.}
+\regl{Hauteur de la réponse du filtre}{20 à 80~\%, \textbf{55~\%}}{Part de la vue filtre du SID prise par la
+courbe.}
+\regl{Formes d'onde sous le filtre}{non, \textbf{oui}}{Sinon la courbe seule.}
+\regl{Voies de batterie AdLib}{\textbf{non}, oui}{Voir plus haut. Appliqué au morceau suivant.}
+\regl{Images par seconde}{\textbf{fréquence de l'écran}, 120, 90, 60, 30}{Baisser la limite économise la batterie.}
+\regl{Moteur graphique}{\textbf{automatique}, Vulkan, OpenGL ES}{Automatique choisit Vulkan quand il est disponible.}
+\regl{Pilote Vulkan personnalisé}{\textbf{non}, paquet à choisir}{Pour les processeurs Adreno, un pilote Mesa Turnip
+peut remplacer celui du fabricant, comme le font les émulateurs Android récents. Le pilote du système reprend la
+main si le vôtre ne se charge pas.}
+\end{reglages}
+
+\section{Le déclenchement}
+Caler une forme d'onde pour qu'elle reste immobile est plus difficile qu'il n'y paraît : une note qui change de
+timbre, un arpège, un bruit n'ont pas de front propre. Les oscilloscopes de laboratoire cherchent un passage de seuil ;
+c'est insuffisant pour la musique. L'état de l'art est le déclencheur par corrélation de corrscope, de nyanpasu64 :
+il cherche, dans le son qui arrive, la position qui ressemble le plus aux images précédentes, en favorisant les
+fronts montants. Nous l'avons porté tel quel, avec ses valeurs par défaut, pour que celles et ceux qui connaissent
+corrscope retrouvent la même image et puissent réutiliser leurs réglages.
+\begin{reglages}
+\regl{Préréglage}{\textbf{défaut corrscope (40~ms)}, notes évolutives (60~ms), chiptune carré, basses, triangle NES,
+économie d'énergie, personnalisé}{Chaque préréglage fixe les réglages ci-dessous.}
+\regl{Largeur}{10 à 200~ms, \textbf{40~ms}}{\texttt{trigger\_ms} de corrscope. Doit couvrir deux périodes des notes
+les plus graves : montez-la pour les basses.}
+\regl{Force des fronts}{0 à 300~\%, \textbf{100~\%}}{Favorise les fronts montants raides : les nouvelles notes sont
+mieux saisies, les notes tenues bougent davantage.}
+\regl{Largeur de pente}{5 à 100~\% de la période, \textbf{25~\%}}{Largeur du front recherché.}
+\regl{Force de l'historique}{0 à 300~\%, \textbf{100~\%}}{Favorise la ressemblance avec les images précédentes.}
+\regl{Réactivité}{0 à 100~\%, \textbf{50~\%}}{Vitesse à laquelle l'historique suit le son. corrscope l'exprime par
+image à 60~i/s ; nous la convertissons pour les autres fréquences d'écran.}
+\regl{Atténuation}{10 à 200~\% de la période, \textbf{50~\%}}{Poids des bords de l'historique.}
+\regl{Réinitialiser sous}{0 à 100~\%, \textbf{30~\%}}{Oublie l'historique quand la nouvelle note ne lui ressemble
+plus.}
+\regl{Suppression du continu}{0 à 100~\%, \textbf{0}}{Pour les voies dont le centre se déplace.}
+\regl{Amplification du signe}{0 à 300~\%, \textbf{0}}{Crée des passages par zéro nets pour les ondes douces comme le
+triangle.}
+\regl{Plage de recherche}{10 à 100~\% de la largeur, \textbf{50~\%}}{Distance maximale à laquelle la forme peut
+sauter d'une image à l'autre.}
+\regl{Fronts descendants}{\textbf{non}, oui}{Pour les sons qui commencent par une descente, comme certaines
+trompettes échantillonnées.}
+\regl{Suivi de hauteur}{non, \textbf{oui}}{Remet l'historique à l'échelle quand la note change.}
+\regl{Recalage au zéro}{\textbf{0} échantillon}{Glisse jusqu'au passage par zéro montant le plus proche.}
+\regl{Recherches complètes}{\textbf{à chaque image}, 60, 30 par seconde}{Moins de recherches, moins de calcul.}
+\regl{Sous-échantillonnage}{\textbf{automatique}, aucun, 2, 4}{Calcule la corrélation sur moins de points.}
+\end{reglages}

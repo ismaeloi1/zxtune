@@ -1,40 +1,211 @@
-\chapter{Réglages d'émulation}\label{chap:emu-settings}
-Ce chapitre décrit les réglages qui changent le son, et ce que vous entendrez en les modifiant. La liste complète,
-avec les valeurs par défaut, est au chapitre~\ref{chap:all-settings}.
+\chapter{Réglages d'émulation : possibilités et état de l'art}\label{chap:emu-settings}
 
-\section{SID}
+Chaque réglage de ce chapitre change le son. Pour chacun, nous vous donnons les choix possibles, la valeur par
+défaut (en gras dans les tableaux), ce que vous entendrez en le changeant, et ce que font les lecteurs et émulateurs
+de référence. Quand notre valeur par défaut diffère de la leur, nous expliquons pourquoi.
+
+Nous n'avons inventé presque aucune de ces valeurs. Les préréglages de filtres viennent de mesures publiées sur de
+vraies puces et de vraies cartes, et nous citons à chaque fois leur origine. La liste brute de tous les réglages,
+avec leur clé interne, est au chapitre~\ref{chap:all-settings}.
+
+\section{Réglages généraux}
+\begin{reglages}
+\regl{Durée par défaut}{30~s, 1, 2, \textbf{3}, 5, 10, 15, 30~min}{Sert seulement quand ni le fichier ni une base ne
+donnent la durée. Les lecteurs de musiques de jeux choisissent en général entre deux et trois minutes ; trois minutes
+laissent passer au moins une boucle complète de la plupart des morceaux.}
+\regl{Détection du silence}{\textbf{aucune}, 3, 4, 5, 10, 15~s}{Game Music Emu et les greffons foobar2000 qui
+l'utilisent passent au morceau suivant après un silence. Nous la laissons désactivée : beaucoup de morceaux ont des
+pauses voulues, et un SID qui joue des samples peut paraître muet pendant quelques secondes.}
+\regl{Limite de boucles}{\textbf{aucune}, 1 à 5}{Pour les formats qui connaissent leur point de boucle (VGM, certains
+modules). Sans limite, la durée connue ou la durée par défaut s'applique.}
+\regl{Fondu d'entrée, de sortie}{\textbf{aucun}, 1, 2, 3, 5, 10~s}{Un fondu de sortie de quelques secondes adoucit
+la coupure des morceaux qui bouclent ; VGMPlay et la plupart des lecteurs de VGM en proposent un. Nous ne l'imposons
+pas, pour ne jamais modifier un morceau qui a une vraie fin.}
+\regl{Gain}{50 à 200~\%, \textbf{100~\%}}{Appliqué après l'émulation. Au-dessus de 100~\%, les morceaux déjà forts
+saturent : montez plutôt le volume du téléphone.}
+\end{reglages}
+
+\section{SID (Commodore 64)}
 \capture{settings-sid}{Réglages SID dans le panneau en direct}
-Le moteur se choisit entre reSIDfp et reSID. Le modèle, 6581 ou 8580, s'applique aux morceaux qui ne le précisent
-pas ; vous pouvez aussi l'imposer à tous. Le filtre propose des préréglages mesurés sur de vraies puces et une courbe
-personnalisée : un 6581 « sombre » étouffe davantage les voix filtrées, un 6581 « clair » les laisse passer.
 
-Pour les morceaux à deux ou trois SID, la sortie peut rester stéréo (une puce à gauche, une à droite, une au centre)
-ou être ramenée en mono. La voie des samples ajoute à l'oscilloscope une voie par puce qui montre les échantillons
-joués par le volume ; les trois voix ne les contiennent alors plus, ce qui les rend plus lisibles. Ce réglage prend
-effet au morceau suivant.
+Le SID est la puce pour laquelle l'état de l'art a le plus avancé, et celle où les réglages comptent le plus : deux
+6581 sortis de la même usine n'ont pas le même filtre. La référence logicielle est la famille reSID : reSID de Dag
+Lem, utilisé par VICE, et reSIDfp, développé ensuite dans libsidplayfp (sidplayfp en ligne de commande) et repris en
+Java par JSIDPlay2.
 
-\section{Super Nintendo}
+\begin{reglages}
+\regl{Moteur}{reSID, \textbf{reSIDfp}}{sidplayfp utilise reSIDfp par défaut, VICE propose reSID. reSIDfp modélise
+le filtre du 6581 à partir des transistors et reproduit mieux les formes d'onde combinées ; reSID est plus léger.}
+\regl{Modèle par défaut}{\textbf{6581}, 8580}{Utilisé quand le fichier ne le précise pas. La grande majorité des
+musiques de la HVSC a été composée sur 6581 ; c'est aussi le défaut de libsidplayfp.}
+\regl{Forcer le modèle}{\textbf{non}, oui}{Pour écouter un morceau sur l'autre puce. Utile pour comparer, rarement
+fidèle.}
+\regl{Modèle de C64}{\textbf{PAL}, NTSC, ancien NTSC, Drean (PAL-N), PAL-M}{L'horloge change la hauteur et le tempo.
+La plupart des musiques européennes sont PAL ; les fichiers récents indiquent leur modèle.}
+\regl{Forcer le modèle de C64}{\textbf{non}, oui}{Comme pour le modèle de puce.}
+\regl{Interpolation}{\textbf{aucune}, performance, qualité}{Correspond aux méthodes d'échantillonnage de reSID :
+échantillonnage rapide, interpolation, rééchantillonnage complet. Le rééchantillonnage complet, que VICE propose
+aussi, supprime le repliement des aigus mais coûte nettement plus cher. Sur téléphone, la différence est
+rarement audible.}
+\regl{Émulation du filtre}{non, \textbf{oui}}{Sans filtre, les voix filtrées sonnent brutes : c'est faux pour
+presque toute la musique du C64. Le réglage sert surtout à comprendre ce que le filtre apporte.}
+\regl{Préréglage 6581}{\textbf{personnalisé}, 31 préréglages}{Voir ci-dessous.}
+\regl{Préréglage 8580}{\textbf{personnalisé}, 5 préréglages}{Voir ci-dessous.}
+\regl{reSID : biais du 6581}{$-1000$ à $+1000$~mV, \textbf{0}}{Décale toute la courbe de coupure. VICE règle ce biais
+à $+500$~mV par défaut (\texttt{SidResidFilterBias}) ; nous gardons la valeur d'origine de reSID et proposons celle de
+VICE en préréglage.}
+\regl{reSIDfp : courbe du 6581}{0 (clair) à 100 (sombre), \textbf{50}}{Même échelle et même défaut que
+\texttt{FilterCurve6581} de sidplayfp (0,5).}
+\regl{reSIDfp : plage du 6581}{0 (sombre) à 100 (clair), \textbf{50}}{Même défaut que sidplayfp.}
+\regl{reSIDfp : courbe du 8580}{0 (clair) à 100 (sombre), \textbf{50}}{Même défaut que sidplayfp.}
+\regl{Formes d'onde combinées}{\textbf{moyennes}, faibles, fortes}{La force des formes d'onde obtenues en activant
+plusieurs formes à la fois varie d'une puce à l'autre. sidplayfp propose les mêmes trois niveaux
+(\texttt{CombinedWaveforms}), avec le même défaut.}
+\regl{Impulsion + scie du 6581}{\textbf{normale}, forte}{Certaines puces donnent une combinaison impulsion + dent de
+scie beaucoup plus présente. À essayer quand un son semble manquer dans un morceau connu.}
+\regl{Digi boost du 8580}{\textbf{non}, oui}{Le 8580 rend presque inaudibles les samples joués par le volume. Les
+musiciens mettaient une résistance sur la carte ; libsidplayfp propose la même correction (\texttt{digiBoost}).}
+\regl{Sortie 2SID / 3SID}{\textbf{stéréo}, mono}{Stéréo : une puce à gauche, une à droite, la troisième au centre,
+comme le font la plupart des lecteurs. Mono : toutes les puces au centre, comme sur une machine réelle.}
+\regl{Voie des samples (\$D418)}{\textbf{non}, oui}{Propre à \soft. Sépare les samples joués par le volume dans une
+voie à eux ; les trois voix ne montrent alors que leurs oscillateurs. Appliqué au morceau suivant.}
+\end{reglages}
+
+\subsection*{Les préréglages de filtre}
+Les 31 préréglages du 6581 et les 5 du 8580 viennent de la configuration par défaut de JSIDPlay2. Ils se répartissent
+en trois familles.
+\begin{description}
+  \item[Lightest à Darkest] sept courbes reSID, du plus clair au plus sombre. JSIDPlay2 les définit par une position
+        de courbe ; nous la convertissons en biais de reSID.
+  \item[VICE default] le biais de $+500$~mV de VICE, pour retrouver le son de cet émulateur.
+  \item[Puces mesurées] 23 courbes reSIDfp nommées d'après la personne qui a mesuré la puce et le code de date de
+        celle-ci : Alankila, Lord Nightmare, ZrX, Trurl, Nata, Grue, KruLLo, Enigma. « 6581R3 4885 » désigne une
+        révision R3 fabriquée la 48\textsuperscript{e} semaine de 1985.
+\end{description}
+Pour le 8580, trois courbes reSID (Light, Average, Dark) et deux puces mesurées par Trurl.
+
+Notre conseil : laissez le réglage personnalisé avec ses valeurs par défaut, qui sont celles de sidplayfp. Si un
+morceau vous semble étouffé, essayez Light ou une puce Trurl ; s'il siffle, Dark. Il n'existe pas de « bon » 6581 :
+le compositeur a entendu le sien.
+
+\section{Super Nintendo (SPC, SNSF)}
 \capture{settings-spc}{Réglages SNES}
-Un seul réglage, le moteur, entre ares et snes\_spc, appliqué au morceau suivant.
+\begin{reglages}
+\regl{Moteur}{snes\_spc, \textbf{ares}}{ares reprend le travail de bsnes et higan, la référence de précision ; Mesen
+est l'autre émulateur de ce niveau. snes\_spc de blargg, utilisé par Game Music Emu et de nombreux lecteurs, est plus
+léger mais ne rend pas la stéréo inversée en phase que certains jeux utilisent pour élargir le son. Appliqué au
+morceau suivant.}
+\end{reglages}
+Nous ne proposons pas d'autre interpolation que la gaussienne. Snes9x, bsnes et Mesen offrent une interpolation
+cubique ou sinc, qui rend le son plus brillant ; c'est agréable, mais ce n'est pas le son de la console, dont le
+S-DSP applique justement ce filtre gaussien.
 
-\section{Puces FM}
+\section{Puces FM de Yamaha}
 \capturedouble{settings-ym2612-psg}{settings-ym3812}{Réglages OPN2}{réglages OPL}
-Pour chaque famille, vous choisissez le cœur, un préréglage de puce, l'effet « ladder » du convertisseur, les filtres
-de sortie et la largeur stéréo.
+Le cœur d'une puce FM est numérique : bien émulé, il donne le même résultat que la puce. Ce qui change d'une machine
+à l'autre, c'est ce qui vient après, le convertisseur et le circuit de sortie. C'est pour cela que chaque famille a
+un réglage de plateforme, qui fixe la puce, le filtre passe-bas, le blocage du continu et la stéréo à partir des
+mesures publiées. Si vous changez l'un de ces réglages, la plateforme passe en « personnalisé ».
 
-Le ladder mérite une explication. Les YM2612 des premières Mega Drive ont un défaut de convertisseur qui renforce les
-sons très faibles ; des compositeurs en ont tiré parti, et certaines musiques sonnent mal sans lui. Le YM3438 et les
-consoles plus tardives ne l'ont pas. Les filtres de sortie reproduisent le filtrage analogique de la console : sans
-eux, le son est plus brillant que sur le matériel. La largeur stéréo à zéro donne un son mono.
+\subsection*{YM2612 et YM3438 (OPN2, Mega Drive)}
+\begin{reglages}
+\regl{Cœur}{\textbf{Nuked}, ymfm, Genesis Plus GX}{Nuked-OPN2 est écrit à partir du silicium et sert de référence ;
+Genesis Plus GX l'intègre aussi en option. ymfm est le cœur de MAME. Le cœur propre à Genesis Plus GX est le plus
+rapide.}
+\regl{Plateforme}{\textbf{Mega Drive modèle 1 (VA0--VA6)}, modèle 1 VA7, modèle 2, Genesis 3, YM3438 nu, YMF276 nu,
+personnalisé}{Les premières Mega Drive ont un YM2612 séparé ; à partir du modèle 1 VA7, la puce est intégrée au
+circuit principal sous forme de YM3438. Genesis Plus GX propose le même choix entre YM2612 et YM3438.}
+\regl{Puce}{\textbf{YM2612}, YM3438, YMF276}{Fixée par la plateforme.}
+\regl{Effet d'escalier du DAC}{non, \textbf{oui} (modèle 1)}{Distorsion de croisement du YM2612 séparé, qui renforce
+les sons faibles. Nuked-OPN2 la reproduit en mode YM2612. Le YM3438 ne l'a pas.}
+\regl{Filtre passe-bas}{0 à 24\,000~Hz, \textbf{3390~Hz}}{Le modèle 1 filtre sa sortie par un circuit RC du premier
+ordre. BlastEm utilise 3390~Hz ; le filtre à un pôle de Genesis Plus GX, réglé à 0,6, coupe vers 3,7~kHz. Le modèle 2
+filtre davantage : un second ordre vers 2840~Hz, mesuré par consolemods.org.}
+\regl{Pente}{\textbf{6}, 12~dB/oct}{Premier ordre pour le modèle 1, second ordre pour le modèle 2.}
+\regl{Blocage du continu}{0 à 200~Hz, \textbf{5~Hz}}{Les condensateurs de sortie retirent la tension continue du
+convertisseur ; c'est indispensable avec l'effet d'escalier, qui décale chaque voix même muette. La valeur réelle
+n'est pas documentée, nous la plaçons sous la bande audible.}
+\regl{Largeur stéréo}{0 à 100~\%, \textbf{100~\%}}{Les voix FM ne sont que gauche, droite ou centre ; réduire la
+largeur aide au casque sur les morceaux très séparés.}
+\end{reglages}
 
-\section{AY et Z80}
+\subsection*{YM2151 (OPM)}
+\begin{reglages}
+\regl{Cœur}{Nuked, \textbf{ymfm}, ancien MAME}{Nuked-OPM est le plus exact mais aussi le plus coûteux de tous nos
+cœurs : nous le laissons en option et utilisons ymfm, le cœur actuel de MAME.}
+\regl{Plateforme}{\textbf{YM3012} (stéréo : X68000, bornes), YM3014 (mono), personnalisé}{Le convertisseur à virgule
+flottante est émulé par les cœurs. Les cartes n'ont pas de filtre explicite sur la partie FM (relevé dans les travaux
+de jotego sur les bornes), donc nous n'en ajoutons pas.}
+\regl{Filtre, pente, continu, stéréo}{\textbf{0~Hz}, \textbf{12~dB/oct}, \textbf{0~Hz}, \textbf{100~\%}}{Aucun
+filtrage par défaut, faute de mesure.}
+\end{reglages}
+
+\subsection*{YM2203, YM2608, YM2610 (OPN)}
+\begin{reglages}
+\regl{Cœur}{\textbf{ymfm}, ancien MAME}{Nuked n'existe pas pour ces puces. ymfm est le cœur de MAME.}
+\regl{Plateforme}{\textbf{PC-88 / PC-98}, personnalisé}{Les étages de sortie des cartes PC-88 et PC-98 n'ont pas été
+mesurés ; nous ne filtrons pas.}
+\regl{Horloge (TurboFM)}{1,75, \textbf{3,5}, 3,58, 4~MHz}{Pour les musiques TurboFM du ZX Spectrum, la carte tourne
+à 3,5~MHz.}
+\end{reglages}
+
+\subsection*{YM3526, YM3812, YMF262 (OPL)}
+\begin{reglages}
+\regl{Cœur}{\textbf{Nuked}, AdLibEmu, MAME}{Nuked-OPL3 est aujourd'hui la référence, utilisée notamment par les
+DOSBox modernes. AdLibEmu, de Ken Silverman, et le cœur de MAME sont rapides.}
+\regl{Plateforme}{AdLib (mono), Sound Blaster 1.x/2.0, SB Pro 1/2, \textbf{SB16}, personnalisé}{Valeurs reprises de
+DOSBox Staging, qui les a ajustées sur des enregistrements de vraies cartes : SB 1.x et 2.0, passe-bas du premier
+ordre à 12~kHz ; SB Pro, premier ordre à 8~kHz ; SB16, pas de filtre. La carte AdLib n'a pas été mesurée.}
+\end{reglages}
+
+\subsection*{YM2413 (OPLL)}
+\begin{reglages}
+\regl{Cœur}{\textbf{Nuked}, EMU2413, MAME}{EMU2413, de Mitsutaka Okazaki, est le cœur le plus répandu dans les
+lecteurs et émulateurs MSX et Master System ; Nuked-OPLL est plus exact.}
+\end{reglages}
+
+\section{AY-3-8910, YM2149 et processeur Z80}
 \capture{settings-ay}{Réglages AY}
-L'horloge doit correspondre à la machine d'origine : une horloge fausse décale toutes les notes. Le type de puce
-choisit entre AY-3-8910 et YM2149, dont l'enveloppe est plus fine et les volumes légèrement différents. La
-disposition stéréo répartit les trois voix (ABC, ACB ou mono) selon les habitudes de chaque plateforme.
-L'interpolation adoucit le rendu ; désactivée, le son est plus brut, plus proche de la puce.
+\begin{reglages}
+\regl{Horloge}{ZX Spectrum (1,7734~MHz), \textbf{Pentagon (1,75~MHz)}, Taganrog (3,5~MHz), Atari ST (2~MHz), Amstrad
+CPC (1~MHz)}{La plupart des musiques de la scène ZX archivées sur ZXArt ont été composées sur Pentagon, le clone le
+plus répandu en Russie, d'où notre défaut. Les fichiers qui donnent leur horloge l'emportent.}
+\regl{Type}{\textbf{AY-3-8910}, YM2149}{Le YM2149 a une enveloppe à 32 pas au lieu de 16 et une table de volumes
+légèrement différente. À choisir pour l'Atari ST.}
+\regl{Interpolation}{aucune, performance, \textbf{qualité}}{Adoucit le passage à 48~kHz. Sans interpolation, le son
+est plus brut, ce que certains préfèrent sur le Spectrum.}
+\regl{Disposition}{\textbf{ABC}, ACB, BAC, BCA, CAB, CBA, mono}{Le ZX Spectrum 128 d'origine est mono ; les cartes
+stéréo ont imposé ABC ou ACB selon les régions. Fuse et Unreal Speccy proposent eux aussi ABC, ACB et mono.}
+\regl{Mixage}{A : 100~\% gauche ; B : 60~\% des deux côtés ; C : 100~\% droite}{Le mixeur à trois voies permet de
+régler chaque voix. Le centre à 60~\% garde un volume équilibré en mono.}
+\regl{Rapport cyclique}{voies : \textbf{aucune} à toutes ; 1 à 99~\%, \textbf{50~\%}}{Option de ZXTune qui ne
+correspond à aucun matériel : elle remplace le carré par une impulsion. À utiliser par curiosité.}
+\regl{Horloge du Z80}{\textbf{3,5~MHz}, 3,5469~MHz (128K), 4~MHz (CPC), 7~MHz}{Pour les fichiers AY qui contiennent le
+code du lecteur.}
+\regl{Durée d'interruption}{1 à 100~T, \textbf{24~T}}{Durée pendant laquelle l'interruption reste active à chaque
+image. Ne la changez que si un lecteur rate des interruptions.}
+\end{reglages}
 
-\section{Durées et volume}
-La durée par défaut s'applique quand ni le format ni une base de données ne donnent la durée. La détection du silence
-passe au morceau suivant après un silence de la durée choisie. La limite de boucles fixe le nombre de répétitions des
-morceaux qui bouclent, et les fondus adoucissent le début et la fin. Le gain règle le volume général, de 50 à 200~\%.
+\section{SAA1099}
+\begin{reglages}
+\regl{Horloge}{\textbf{SAM Coupé (8~MHz)}, Creative Music System (7,16~MHz)}{Les deux machines qui l'utilisent.}
+\regl{Interpolation}{aucune, \textbf{performance}, qualité}{Comme pour l'AY.}
+\end{reglages}
+
+\section{Roland MT-32}
+\begin{reglages}
+\regl{Dossier des ROM}{à choisir}{Munt, utilisé aussi par DOSBox et ScummVM, a besoin des images des mémoires de
+commande et de sons du module. Nous les reconnaissons par leur contenu, entières ou par moitiés.}
+\regl{Modèle préféré}{\textbf{automatique}, MT-32, CM-32L / LAPC-I}{Le CM-32L a des sons supplémentaires que les jeux
+plus récents utilisent ; les premiers jeux ont été écrits pour le MT-32.}
+\regl{Voies de l'oscilloscope}{\textbf{9 parties}, 32 partiels}{Les parties correspondent aux instruments ; les
+partiels aux briques de synthèse LA. La seconde vue intéressera surtout ceux qui étudient le module.}
+\end{reglages}
+
+\section{Ce que nous ne proposons pas, et pourquoi}
+\begin{itemize}
+  \item Pas d'égaliseur ni de « surround » : ils transforment le son de la machine.
+  \item Pas d'interpolation non gaussienne pour la Super Nintendo, pour la même raison.
+  \item Pas de filtre inventé pour les cartes qui n'ont pas été mesurées (OPM, OPN, AdLib) : nous préférons ne rien
+        ajouter que d'ajouter une valeur au hasard. Dès qu'une mesure sera publiée, nous l'intégrerons.
+\end{itemize}

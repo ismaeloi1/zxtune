@@ -23,6 +23,51 @@ If you want more room for the voices, reduce the filter response share in the os
 
 \section{Settings}
 \capture{prefs-en-oscilloscope}{Oscilloscope settings}
-You set the time window, gain, number of periods shown, oscilloscope height, filter response share, maximum frame
-rate and rendering engine. Vulkan gives the smoothest rendering when your phone supports it; otherwise OpenGL ES takes
-over.
+\begin{reglages}
+\regl{Waveform window}{5 to 100~ms, \textbf{40~ms}}{Length of sound shown per voice. 40~ms is the value of corrscope
+(\texttt{render\_ms}), the tool behind most chiptune oscilloscope videos.}
+\regl{Visual gain}{\textbf{automatic per voice}, $\times$1 to $\times$8}{Affects only the drawing. In automatic mode
+each lane is scaled to its own level, so a quiet voice stays readable.}
+\regl{Maximum periods shown}{off, 4, \textbf{8}, 16, 32}{Zooms in on high notes, which otherwise shrink to a thick
+line. Specific to \soft.}
+\regl{SID gauges window}{2 to 40~ms, \textbf{10~ms}}{Length summarised by the SID oscillator gauges.}
+\regl{Oscilloscope height}{60 to 160~\%, \textbf{100~\%}}{Relative to a 16:9 shape of the width; the dashboard takes
+the rest.}
+\regl{Filter response height}{20 to 80~\%, \textbf{55~\%}}{Share of the SID filter view taken by the curve.}
+\regl{Waveforms under the filter}{no, \textbf{yes}}{Otherwise the curve alone.}
+\regl{AdLib rhythm lanes}{\textbf{no}, yes}{See above. Applied to the next track.}
+\regl{Frame rate}{\textbf{screen rate}, 120, 90, 60, 30}{A lower limit saves battery.}
+\regl{Graphics engine}{\textbf{automatic}, Vulkan, OpenGL ES}{Automatic picks Vulkan when available.}
+\regl{Custom Vulkan driver}{\textbf{no}, package to choose}{On Adreno GPUs, a Mesa Turnip driver can replace the
+vendor's, as recent Android emulators do. The system driver takes over if yours fails to load.}
+\end{reglages}
+
+\section{Triggering}
+Locking a waveform so it stays still is harder than it looks: a note changing timbre, an arpeggio, noise have no clean
+edge. Lab oscilloscopes look for a threshold crossing; that is not enough for music. The state of the art is
+corrscope's correlation trigger, by nyanpasu64: it looks, in the incoming sound, for the position most similar to the
+previous frames, favouring rising edges. We ported it as is, with its default values, so that people who know
+corrscope get the same picture and can reuse their settings.
+\begin{reglages}
+\regl{Preset}{\textbf{corrscope default (40~ms)}, evolving notes (60~ms), chiptune square, basses, NES triangle,
+power saving, custom}{Each preset sets the settings below.}
+\regl{Width}{10 to 200~ms, \textbf{40~ms}}{corrscope's \texttt{trigger\_ms}. Must cover two periods of the lowest
+notes: raise it for basses.}
+\regl{Edge strength}{0 to 300~\%, \textbf{100~\%}}{Favours steep rising edges: new notes are caught better, held
+notes move more.}
+\regl{Slope width}{5 to 100~\% of the period, \textbf{25~\%}}{Width of the edge looked for.}
+\regl{Buffer strength}{0 to 300~\%, \textbf{100~\%}}{Favours similarity with previous frames.}
+\regl{Responsiveness}{0 to 100~\%, \textbf{50~\%}}{How fast the history follows the sound. corrscope expresses it per
+frame at 60~fps; we convert it for other screen rates.}
+\regl{Falloff}{10 to 200~\% of the period, \textbf{50~\%}}{Weight of the history's edges.}
+\regl{Reset below}{0 to 100~\%, \textbf{30~\%}}{Forgets the history when the new note no longer resembles it.}
+\regl{DC removal}{0 to 100~\%, \textbf{0}}{For lanes whose centre drifts.}
+\regl{Sign amplification}{0 to 300~\%, \textbf{0}}{Creates sharp zero crossings for soft waves such as the triangle.}
+\regl{Search range}{10 to 100~\% of the width, \textbf{50~\%}}{How far the shape may jump from one frame to the
+next.}
+\regl{Falling edges}{\textbf{no}, yes}{For sounds that start with a fall, like some sampled trumpets.}
+\regl{Pitch tracking}{no, \textbf{yes}}{Rescales the history when the note changes.}
+\regl{Zero-crossing snap}{\textbf{0} samples}{Slides to the nearest rising zero crossing.}
+\regl{Full searches}{\textbf{every frame}, 60, 30 per second}{Fewer searches, less computation.}
+\regl{Subsampling}{\textbf{automatic}, none, 2, 4}{Computes the correlation on fewer points.}
+\end{reglages}

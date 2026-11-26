@@ -75,8 +75,9 @@ class Resolver:
 
 def describe(elem, res):
     key = elem.get(ANDROID + 'key')
-    title = res.text(elem.get(ANDROID + 'title')) or key
-    summary = res.text(elem.get(ANDROID + 'summary')) or ''
+    title = res.text(elem.get(ANDROID + 'title') or elem.get(APP + 'title')) or key
+    summary = res.text(elem.get(ANDROID + 'summary') or elem.get(APP + 'summary')) or ''
+    summary = re.sub(r'%(\d+\$)?s\s*', '', summary).strip()
     default = res.default(elem.get(ANDROID + 'defaultValue'))
     entries = res.array(elem.get(ANDROID + 'entries'))
     values = res.array(elem.get(ANDROID + 'entryValues'))
@@ -84,7 +85,7 @@ def describe(elem, res):
     if entries and values and default is not None and default in values:
         default = entries[values.index(default)]
     if kind in ('SwitchPreferenceCompat', 'CheckBoxPreference', 'SwitchPreference') and default is not None:
-        default = ('on' if EN else 'activé') if default == 'true' else ('off' if EN else 'désactivé')
+        default = ('on' if EN else 'activé') if default in ('true', '1') else ('off' if EN else 'désactivé')
     if kind == 'ValueSeekBarPreference':
         low = elem.get(APP + 'min') or '0'
         high = elem.get(ANDROID + 'max') or '?'
